@@ -204,7 +204,7 @@
 
 .finance-chart-area { min-height: 80px; }
 .finance-chart-svg-wrap { overflow-x: auto; }
-.finance-chart-svg { display: block; }
+.finance-chart-svg { display: block; max-width: 100%; height: auto; }
 
 /* Pie layout */
 .finance-pie-wrap   { display: flex; align-items: flex-start; gap: 24px; flex-wrap: wrap; }
