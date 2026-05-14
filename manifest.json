@@ -1,0 +1,10 @@
+{
+  "id": "finance-tracker",
+  "name": "Finance Tracker",
+  "version": "1.0.0",
+  "minAppVersion": "1.4.0",
+  "description": "Учёт доходов и расходов по счетам прямо в заметках Obsidian",
+  "author": "finance-tracker",
+  "authorUrl": "",
+  "isDesktopOnly": false
+}
