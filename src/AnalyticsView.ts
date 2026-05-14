@@ -171,7 +171,7 @@ export class AnalyticsView {
       ];
     }
 
-    const W = 680, H = 280;
+    const W = 680, H = 200;
     const PL = 60, PB = 52, PT = 18, PR = 16;
     const CW = W - PL - PR, CH = H - PT - PB;
 
