@@ -316,7 +316,7 @@
 }
 
 /* ── Fix #1: spacing between left stripe and first cell ─────────────────────── */
-.finance-tr .finance-td:first-child { padding-left: 18px; }
+.finance-tr .finance-td:first-child { padding-left: 24px; }
 
 .finance-td-date  { white-space: nowrap; min-width: 116px; }
 .finance-td-muted { color: var(--text-muted); }
@@ -383,7 +383,7 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    RECORD MODAL
    ═══════════════════════════════════════════════════════════════════════════ */
-.finance-modal { padding: 6px 4px 4px; max-height: calc(100vh - 120px); overflow-y: auto; }
+.finance-modal { padding: 6px 4px 4px; }
 .finance-modal-title { font-size: 1.2em !important; font-weight: 700 !important; margin: 0 0 18px !important; }
 
 .finance-type-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
@@ -594,7 +594,7 @@
   .finance-actions-td { justify-content: flex-end; }
   .finance-note-cell  { max-width: 100%; white-space: normal; }
   /* Fix: no extra left padding on mobile cards */
-  .finance-tr .finance-td:first-child { padding-left: 14px !important; }
+  .finance-tr .finance-td:first-child { padding-left: 20px !important; }
 }
 
 @media (max-width: 400px) {
@@ -609,7 +609,7 @@
 .markdown-source-view.mod-cm6.max .cm-embed-block > div:has(.finance-tracker),
 .markdown-preview-view.max .block-language-finance-account,
 .max .finance-tracker {
-  width: 100% !important;
+  width: auto !important;
   max-width: 100% !important;
   margin-left: 0 !important;
   margin-right: 0 !important;

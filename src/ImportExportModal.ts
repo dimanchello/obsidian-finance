@@ -159,15 +159,16 @@ export class ImportExportModal extends Modal {
 
       let text = '';
       try {
-        text = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = e => resolve(e.target?.result as string);
-          reader.onerror = reject;
-          reader.readAsText(file);
-        });
+        const fs = require('fs');
+        text = fs.readFileSync((file as any).path, 'utf8');
       } catch (err) {
-        new Notice('Ошибка чтения файла. Проверьте права доступа.');
-        return;
+        // Fallback for mobile devices or environments without node 'fs'
+        try {
+          text = await file.text();
+        } catch (fallbackErr) {
+          new Notice('Ошибка чтения файла. Проверьте права доступа.');
+          return;
+        }
       }
 
       const fmt  = file.name.endsWith('.csv') ? 'csv'
