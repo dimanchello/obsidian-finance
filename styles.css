@@ -600,3 +600,19 @@
   .finance-stat-card       { padding: 12px 14px; }
   .finance-add-btn         { padding: 8px 12px; font-size: .82em; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Minimal Theme Integration
+   ═══════════════════════════════════════════════════════════════════════════ */
+.markdown-source-view.mod-cm6.max .cm-embed-block > div:has(.finance-tracker),
+.markdown-preview-view.max .block-language-finance-account,
+.max .finance-tracker {
+  width: 100% !important;
+  max-width: 100% !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+.max .finance-table-scroll {
+  width: 100% !important;
+}
