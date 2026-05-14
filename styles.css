@@ -17,6 +17,8 @@
   font-family: var(--font-interface, system-ui, sans-serif);
   color: var(--text-normal);
   line-height: 1.5;
+  box-sizing: border-box;
+  padding: 0 16px;
 }
 
 /* ── Header ─────────────────────────────────────────────────────────────────── */
@@ -381,7 +383,7 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    RECORD MODAL
    ═══════════════════════════════════════════════════════════════════════════ */
-.finance-modal { padding: 6px 4px 4px; }
+.finance-modal { padding: 6px 4px 4px; max-height: calc(100vh - 120px); overflow-y: auto; }
 .finance-modal-title { font-size: 1.2em !important; font-weight: 700 !important; margin: 0 0 18px !important; }
 
 .finance-type-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
@@ -417,8 +419,8 @@
 
 .finance-note-field {
   /* Warm parchment tint — distinct from regular inputs, works light+dark */
-  background: color-mix(in srgb, #f59e0b 10%, var(--ft-input-bg)) !important;
-  border: 2px dashed color-mix(in srgb, #f59e0b 55%, var(--ft-border)) !important;
+  background: var(--background-modifier-form-field) !important;
+  border: 2px dashed var(--ft-accent) !important;
   border-radius: var(--ft-radius-sm);
   color: var(--text-normal) !important;
   font-style: italic;
@@ -611,6 +613,8 @@
   max-width: 100% !important;
   margin-left: 0 !important;
   margin-right: 0 !important;
+  box-sizing: border-box !important;
+  padding: 0 16px !important;
 }
 
 .max .finance-table-scroll {

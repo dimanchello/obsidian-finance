@@ -300,11 +300,11 @@ export class AccountView {
       [{ v:'all',l:'Все типы' },{ v:'income',l:'↑ Доходы' },{ v:'expense',l:'↓ Расходы' }],
       f.type, v => { this.state.filter.type = v as any; this.resetPage(); });
 
-    this.mkSelect(row1, 'Категория',
+    this.mkSearchSelect(row1, 'Категория',
       [{ v:'',l:'Все' }, ...this.data.categories.map(c => ({ v:c,l:c }))],
       f.category, v => { this.state.filter.category = v; this.resetPage(); });
 
-    this.mkSelect(row1, 'Тег',
+    this.mkSearchSelect(row1, 'Тег',
       [{ v:'',l:'Все' }, ...this.data.tags.map(t => ({ v:t,l:t }))],
       f.tag, v => { this.state.filter.tag = v; this.resetPage(); });
 
@@ -323,7 +323,7 @@ export class AccountView {
     dtI.value = f.dateTo;
     dtI.addEventListener('change', () => { this.state.filter.dateTo = dtI.value; this.resetPage(); });
 
-    this.mkSelect(row2, 'Плательщик',
+    this.mkSearchSelect(row2, 'Плательщик',
       [{ v:'',l:'Все' }, ...this.data.payers.map(p => ({ v:p,l:p }))],
       f.payer, v => { this.state.filter.payer = v; this.resetPage(); });
 
@@ -396,6 +396,28 @@ export class AccountView {
     const sel = g.createEl('select', { cls: 'finance-filter-select' });
     opts.forEach(({ v, l }) => { const o = sel.createEl('option', { text: l }); o.value = v; o.selected = v === cur; });
     sel.addEventListener('change', () => onChange(sel.value));
+  }
+
+  private mkSearchSelect(
+    row: HTMLElement, label: string,
+    opts: { v: string; l: string }[],
+    cur: string, onChange: (v: string) => void,
+  ): void {
+    const g   = row.createDiv('finance-filter-group');
+    g.createEl('label', { text: label, cls: 'finance-filter-label' });
+
+    const listId = `ft-dl-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    const input = g.createEl('input', { type: 'text', cls: 'finance-filter-input' });
+    input.setAttribute('list', listId);
+    input.value = cur;
+
+    const dl = g.createEl('datalist', { attr: { id: listId } });
+    opts.forEach(({ v, l }) => {
+      // Datalist works best when option value is the actual text
+      dl.createEl('option', { value: v, text: v !== l ? l : '' });
+    });
+
+    input.addEventListener('change', () => onChange(input.value));
   }
 
   // ── Filtered data ─────────────────────────────────────────────────────────

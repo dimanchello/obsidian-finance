@@ -156,7 +156,20 @@ export class ImportExportModal extends Modal {
       const file = fi.files?.[0];
       if (!file) return;
       nameEl.textContent = file.name;
-      const text = await file.text();
+
+      let text = '';
+      try {
+        text = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = e => resolve(e.target?.result as string);
+          reader.onerror = reject;
+          reader.readAsText(file);
+        });
+      } catch (err) {
+        new Notice('Ошибка чтения файла. Проверьте права доступа.');
+        return;
+      }
+
       const fmt  = file.name.endsWith('.csv') ? 'csv'
                  : file.name.endsWith('.xml') ? 'xml'
                  : 'json';
