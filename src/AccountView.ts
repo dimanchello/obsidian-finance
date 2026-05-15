@@ -279,7 +279,7 @@ export class AccountView {
     this.filtersEl.empty();
     const f = this.state.filter;
 
-    // Row 1: search / type / category / tag
+    // Row 1: search / type / category
     const row1 = this.filtersEl.createDiv('finance-filters-row');
 
     const sg = row1.createDiv('finance-filter-group finance-filter-search');
@@ -304,11 +304,7 @@ export class AccountView {
       [{ v:'',l:'Все' }, ...this.data.categories.map(c => ({ v:c,l:c }))],
       f.category, v => { this.state.filter.category = v; this.resetPage(); });
 
-    this.mkSearchSelect(row1, 'Тег',
-      [{ v:'',l:'Все' }, ...this.data.tags.map(t => ({ v:t,l:t }))],
-      f.tag, v => { this.state.filter.tag = v; this.resetPage(); });
-
-    // Row 2: dates / payer / page size / reset
+    // Row 2: dates / payer / tag / page size / reset
     const row2 = this.filtersEl.createDiv('finance-filters-row');
 
     const dfG = row2.createDiv('finance-filter-group');
@@ -326,6 +322,10 @@ export class AccountView {
     this.mkSearchSelect(row2, 'Плательщик',
       [{ v:'',l:'Все' }, ...this.data.payers.map(p => ({ v:p,l:p }))],
       f.payer, v => { this.state.filter.payer = v; this.resetPage(); });
+
+    this.mkSearchSelect(row2, 'Тег',
+      [{ v:'',l:'Все' }, ...this.data.tags.map(t => ({ v:t,l:t }))],
+      f.tag, v => { this.state.filter.tag = v; this.resetPage(); });
 
     // Per-account page size
     const psG = row2.createDiv('finance-filter-group');
@@ -403,21 +403,99 @@ export class AccountView {
     opts: { v: string; l: string }[],
     cur: string, onChange: (v: string) => void,
   ): void {
-    const g   = row.createDiv('finance-filter-group');
+    const g = row.createDiv('finance-filter-group');
     g.createEl('label', { text: label, cls: 'finance-filter-label' });
 
-    const listId = `ft-dl-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-    const input = g.createEl('input', { type: 'text', cls: 'finance-filter-input' });
-    input.setAttribute('list', listId);
-    input.value = cur;
+    const wrapper = g.createDiv('finance-custom-select');
+    let selectedValue = cur;
 
-    const dl = g.createEl('datalist', { attr: { id: listId } });
-    opts.forEach(({ v, l }) => {
-      // Datalist works best when option value is the actual text
-      dl.createEl('option', { value: v, text: v !== l ? l : '' });
+    const trigger = wrapper.createDiv('finance-custom-select-trigger');
+    trigger.setAttribute('tabindex', '0');
+    const triggerText = trigger.createEl('span', { cls: 'finance-custom-select-text' });
+    triggerText.textContent = opts.find(o => o.v === cur)?.l || cur || opts[0]?.l || '—';
+
+    let dropdown: HTMLElement | null = null;
+    let isOpen = false;
+    let outsideHandler: ((e: MouseEvent) => void) | null = null;
+
+    const closeDropdown = () => {
+      if (!isOpen) return;
+      isOpen = false;
+      dropdown?.remove();
+      dropdown = null;
+      if (outsideHandler) { document.removeEventListener('mousedown', outsideHandler); outsideHandler = null; }
+    };
+
+    // Defined before openDropdown so both can reference each other safely
+    const resetSelection = () => {
+      selectedValue = opts[0]?.v ?? '';
+      triggerText.textContent = opts[0]?.l ?? '—';
+      onChange(selectedValue);
+      closeDropdown();
+    };
+
+    const openDropdown = () => {
+      if (isOpen) { closeDropdown(); return; }
+      isOpen = true;
+
+      dropdown = wrapper.createDiv('finance-custom-select-dropdown');
+
+      const searchInput = dropdown.createEl('input', {
+        type: 'text',
+        cls: 'finance-custom-select-search',
+        placeholder: 'Поиск…',
+      });
+
+      const list = dropdown.createDiv('finance-custom-select-list');
+
+      const renderList = (q: string) => {
+        list.empty();
+        const lq = q.toLowerCase();
+        const filtered = opts.filter(o => !lq || o.l.toLowerCase().includes(lq) || o.v.toLowerCase().includes(lq));
+        if (!filtered.length) {
+          list.createDiv({ cls: 'finance-custom-select-empty', text: 'Нет вариантов' });
+          return;
+        }
+        filtered.forEach(({ v, l }) => {
+          const item = list.createDiv({ cls: `finance-custom-select-item${v === selectedValue ? ' is-active' : ''}` });
+          item.textContent = l;
+          item.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            selectedValue = v;
+            triggerText.textContent = l;
+            onChange(v);
+            closeDropdown();
+          });
+        });
+      };
+
+      renderList('');
+      searchInput.addEventListener('input', () => renderList(searchInput.value));
+      searchInput.addEventListener('keydown', (e: KeyboardEvent) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          const first = list.querySelector<HTMLElement>('.finance-custom-select-item');
+          if (first) first.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+        }
+        if (e.key === 'ArrowDown') {
+          const first = list.querySelector<HTMLElement>('.finance-custom-select-item');
+          first?.focus();
+        }
+        if (e.key === 'Escape') { resetSelection(); }
+      });
+      setTimeout(() => searchInput.focus(), 20);
+
+      outsideHandler = (e: MouseEvent) => {
+        if (!wrapper.contains(e.target as Node)) closeDropdown();
+      };
+      setTimeout(() => document.addEventListener('mousedown', outsideHandler!), 0);
+    };
+
+    trigger.addEventListener('click', openDropdown);
+    trigger.addEventListener('keydown', (e: KeyboardEvent) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDropdown(); }
+      if (e.key === 'Escape') { e.preventDefault(); resetSelection(); }
     });
-
-    input.addEventListener('change', () => onChange(input.value));
   }
 
   // ── Filtered data ─────────────────────────────────────────────────────────

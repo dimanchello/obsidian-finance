@@ -140,55 +140,60 @@ export class ImportExportModal extends Modal {
     step1.createEl('div', { text: 'Шаг 1 — Выберите файл (CSV, JSON, XML)', cls: 'finance-step-title' });
 
     const pickWrap = step1.createDiv('finance-attach-wrapper');
-    const fi       = pickWrap.createEl('input', { type: 'file', cls: 'finance-file-input' });
-    fi.accept      = '.csv,.json,.xml';
-    const uid      = `ft-imp-${Date.now()}`;
-    fi.id          = uid;
-    const lbl      = pickWrap.createEl('label', { cls: 'finance-attach-label' });
-    lbl.setAttribute('for', uid);
-    lbl.innerHTML  = '<span>📂</span><span>Открыть файл…</span>';
     const nameEl   = pickWrap.createEl('span', { text: 'Файл не выбран', cls: 'finance-attach-name' });
+
+    // Button — opens native Electron dialog (bypasses all browser file-API restrictions)
+    const openBtn = pickWrap.createEl('label', { cls: 'finance-attach-label' });
+    openBtn.innerHTML = '<span>📂</span><span>Открыть файл…</span>';
 
     // Steps 2+ appear here after file load
     const stepsContainer = b.createDiv('finance-import-steps');
 
-    fi.addEventListener('change', async () => {
-      const file = fi.files?.[0];
-      if (!file) return;
-      nameEl.textContent = file.name;
-
-      let text = '';
+    openBtn.addEventListener('click', async (e) => {
+      e.preventDefault();
       try {
-        const fs = require('fs');
-        text = fs.readFileSync((file as any).path, 'utf8');
-      } catch (err) {
-        // Fallback for mobile devices or environments without node 'fs'
+        const electron = (window as any).require('electron');
+        const fs       = (window as any).require('fs');
+
+        const result = await electron.remote.dialog.showOpenDialog({
+          properties: ['openFile'],
+          filters: [
+            { name: 'Таблицы и данные', extensions: ['csv', 'json', 'xml'] },
+            { name: 'Все файлы',        extensions: ['*'] },
+          ],
+        });
+
+        if (result.canceled || !result.filePaths.length) return;
+
+        const filePath = result.filePaths[0];
+        const fileName = filePath.split(/[\\/]/).pop() ?? filePath;
+        nameEl.textContent = fileName;
+
+        const text = fs.readFileSync(filePath, 'utf8') as string;
+
+        const fmt = fileName.endsWith('.csv') ? 'csv'
+                  : fileName.endsWith('.xml') ? 'xml'
+                  : 'json';
+
+        this.rawData   = [];
+        this.srcFields = [];
+        this.mapping   = {};
+        stepsContainer.empty();
+
         try {
-          text = await file.text();
-        } catch (fallbackErr) {
-          new Notice('Ошибка чтения файла. Проверьте права доступа.');
-          return;
+          if (fmt === 'csv')  this.parseCSV(text);
+          if (fmt === 'json') this.parseJSON(text, stepsContainer);
+          if (fmt === 'xml')  this.parseXML(text, stepsContainer);
+
+          if (fmt !== 'json' && fmt !== 'xml') {
+            this.renderMappingStep(stepsContainer);
+          }
+        } catch (e) {
+          stepsContainer.createEl('p', { text: `⚠️ Ошибка разбора файла: ${e}`, cls: 'finance-error' });
         }
-      }
 
-      const fmt  = file.name.endsWith('.csv') ? 'csv'
-                 : file.name.endsWith('.xml') ? 'xml'
-                 : 'json';
-      this.rawData   = [];
-      this.srcFields = [];
-      this.mapping   = {};
-      stepsContainer.empty();
-
-      try {
-        if (fmt === 'csv')  this.parseCSV(text);
-        if (fmt === 'json') this.parseJSON(text, stepsContainer);
-        if (fmt === 'xml')  this.parseXML(text, stepsContainer);
-
-        if (fmt !== 'json' && fmt !== 'xml') {
-          this.renderMappingStep(stepsContainer);
-        }
-      } catch (e) {
-        stepsContainer.createEl('p', { text: `⚠️ Ошибка разбора файла: ${e}`, cls: 'finance-error' });
+      } catch (err) {
+        new Notice('Ошибка открытия файла: ' + String(err));
       }
     });
   }

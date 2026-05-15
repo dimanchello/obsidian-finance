@@ -158,6 +158,12 @@ export class RecordModal extends Modal {
     timeG.createEl('label', { text: 'Время', cls: 'finance-field-label' });
     const timeIn = timeG.createEl('input', { type: 'time', cls: 'finance-input' });
     timeIn.value = this.rec.time ?? '';
+    // Set color-scheme via JS — more reliable than CSS class selectors in Electron
+    const isDark = document.body.classList.contains('theme-dark');
+    timeIn.style.colorScheme      = isDark ? 'dark' : 'light';
+    timeIn.style.backgroundColor  = 'var(--background-secondary)';
+    timeIn.style.color            = 'var(--text-normal)';
+    timeIn.style.border           = '1.5px solid var(--color-base-30, #555)';
     timeIn.addEventListener('change', () => { this.rec.time = timeIn.value; });
 
     // Category — autofill trigger
@@ -230,17 +236,56 @@ export class RecordModal extends Modal {
     options:  string[],
     onChange: (v: string) => void,
   ): HTMLInputElement {
-    const g      = parent.createDiv('finance-field-group');
+    const g = parent.createDiv('finance-field-group');
     g.createEl('label', { text: label, cls: 'finance-field-label' });
-    const listId = `ft-dl-${crypto.randomUUID()}`;
-    const input  = g.createEl('input', { type: 'text', cls: 'finance-input finance-autocomplete' });
-    input.value  = value;
-    input.setAttribute('list', listId);
+
+    const wrapper = g.createDiv('finance-combobox');
+    const input   = wrapper.createEl('input', {
+      type: 'text', cls: 'finance-input finance-combobox-input',
+    });
+    input.value = value;
     input.setAttribute('autocomplete', 'off');
-    const dl     = g.createEl('datalist');
-    dl.id = listId;
-    options.forEach(o => { const op = dl.createEl('option'); op.value = o; });
-    input.addEventListener('input', () => onChange(input.value));
+
+    let dropdown: HTMLElement | null = null;
+
+    const closeDropdown = () => { dropdown?.remove(); dropdown = null; };
+
+    const openDropdown = (q: string) => {
+      closeDropdown();
+      const lq       = q.toLowerCase();
+      const filtered = options.filter(o => !lq || o.toLowerCase().includes(lq));
+      if (!filtered.length) return;
+
+      dropdown = wrapper.createDiv('finance-combobox-dropdown');
+      filtered.forEach(opt => {
+        const item = dropdown!.createDiv({
+          cls: `finance-combobox-item${opt === input.value ? ' is-active' : ''}`,
+        });
+        item.textContent = opt;
+        item.addEventListener('mousedown', e => {
+          e.preventDefault();               // keep focus on input
+          input.value = opt;
+          onChange(opt);
+          closeDropdown();
+        });
+      });
+    };
+
+    input.addEventListener('focus', () => openDropdown(input.value));
+    input.addEventListener('input', () => { onChange(input.value); openDropdown(input.value); });
+    input.addEventListener('blur',  () => setTimeout(closeDropdown, 150));
+    input.addEventListener('keydown', (e: KeyboardEvent) => {
+      if (e.key === 'Enter' && dropdown) {
+        const first = dropdown.querySelector<HTMLElement>('.finance-combobox-item');
+        if (first) { e.preventDefault(); first.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })); }
+      }
+      if (e.key === 'Escape') { input.value = ''; onChange(''); closeDropdown(); }
+      if (e.key === 'ArrowDown' && dropdown) {
+        const first = dropdown.querySelector<HTMLElement>('.finance-combobox-item');
+        first?.focus();
+      }
+    });
+
     return input;
   }
 

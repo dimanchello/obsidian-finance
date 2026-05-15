@@ -159,7 +159,10 @@ export class AnalyticsView {
   private renderBar(rawData: Item[]): void {
     const MAX = 14;
     let data = rawData;
-    if (data.length > MAX) {
+
+    // When grouped by month, never truncate — months are chronological,
+    // grouping extras into "Другое" would be meaningless.
+    if (this.groupBy !== 'month' && data.length > MAX) {
       const rest = data.slice(MAX);
       data = [
         ...data.slice(0, MAX),
@@ -171,8 +174,11 @@ export class AnalyticsView {
       ];
     }
 
-    const W = 680, H = 200;
+    // Dynamic chart width — each group needs a minimum slot so bars don't squish
     const PL = 60, PB = 52, PT = 18, PR = 16;
+    const H  = 200;
+    const minSlotW = this.showType === 'both' ? 52 : 32;
+    const W  = Math.max(500, PL + PR + data.length * minSlotW);
     const CW = W - PL - PR, CH = H - PT - PB;
 
     let maxVal = 1;
@@ -185,9 +191,11 @@ export class AnalyticsView {
     const barW   = Math.max(4, Math.min(groupW * 0.34, 26));
     const gap    = 3;
 
-    const root = svg('svg', { viewBox: `0 0 ${W} ${H}`, width: '100%' });
+    const root = svg('svg', { viewBox: `0 0 ${W} ${H}` });
     root.classList.add('finance-chart-svg');
     root.style.display = 'block';
+    // Width is set by wrapper — SVG scales via viewBox
+    root.setAttribute('width', String(W));
 
     // Y grid
     for (let i = 0; i <= 4; i++) {
@@ -227,7 +235,7 @@ export class AnalyticsView {
         root.appendChild(rect);
       }
 
-      // X label — rotate if many items
+      // X label — rotate when many items
       const lbl = svg('text', {
         x: cx, y: H - PB + 14,
         'text-anchor': 'middle', fill: 'var(--text-muted)', 'font-size': 10,
