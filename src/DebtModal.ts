@@ -33,13 +33,15 @@ export class DebtModal extends Modal {
     const nowStr = new Date().toISOString().split('T')[0];
     const timeStr = new Date().toTimeString().slice(0, 5);
     this.debt = opts.debt
-      ? { ...opts.debt, movements: [...opts.debt.movements] }
+      ? { ...opts.debt, direction: (opts.debt.direction || 'borrowed') as 'lent' | 'borrowed', movements: [...opts.debt.movements] }
       : {
           id: crypto.randomUUID(),
           person: '',
           amount: 0,
+          direction: 'borrowed',
           date: nowStr,
-          time: timeStr,
+          time: '',
+          dueDate: '',
           createdAt: Date.now(),
           note: '',
           movements: [],
@@ -56,7 +58,36 @@ export class DebtModal extends Modal {
       cls: 'finance-modal-title',
     });
 
+    const dirRow = contentEl.createDiv('finance-type-row');
+    const lentBtn = dirRow.createEl('button', {
+      text: '💸 Мне должны',
+      cls: `finance-type-toggle${this.debt.direction === 'lent' ? ' active lent' : ''}`,
+    });
+    const borrowedBtn = dirRow.createEl('button', {
+      text: '💳 Я должен',
+      cls: `finance-type-toggle${this.debt.direction === 'borrowed' ? ' active borrowed' : ''}`,
+    });
+
+    const setDirection = (dir: 'lent' | 'borrowed') => {
+      this.debt.direction = dir;
+      lentBtn.classList.toggle('active', dir === 'lent');
+      lentBtn.classList.toggle('lent', dir === 'lent');
+      borrowedBtn.classList.toggle('active', dir === 'borrowed');
+      borrowedBtn.classList.toggle('borrowed', dir === 'borrowed');
+    };
+
     const form = contentEl.createDiv('finance-form');
+
+    // ── Person label placeholder (will be updated after direction toggle) ────
+    let personLabelText = this.debt.direction === 'lent' ? 'Кто *' : 'Кому *';
+
+    const updatePersonLabel = () => {
+      const isLent = this.debt.direction === 'lent';
+      if (personLabel) personLabel.textContent = isLent ? 'Кто *' : 'Кому *';
+    };
+
+    lentBtn.addEventListener('click', () => { setDirection('lent'); updatePersonLabel(); });
+    borrowedBtn.addEventListener('click', () => { setDirection('borrowed'); updatePersonLabel(); });
 
     // ── Amount ───────────────────────────────────────────────────────────
     const amtG = form.createDiv('finance-field-group finance-amount-group');
@@ -105,7 +136,10 @@ export class DebtModal extends Modal {
 
     // ── Person (autocomplete combobox like RecordModal) ────────────────
     const personG = form.createDiv('finance-field-group');
-    personG.createEl('label', { text: 'Кому *', cls: 'finance-field-label' });
+    const personLabel = personG.createEl('label', {
+      text: this.debt.direction === 'lent' ? 'Кто *' : 'Кому *',
+      cls: 'finance-field-label',
+    });
 
     const comboboxWrap = personG.createDiv('finance-combobox');
     const personIn = comboboxWrap.createEl('input', {
@@ -170,18 +204,20 @@ export class DebtModal extends Modal {
       }
     });
 
-    // ── Date & Time ──────────────────────────────────────────────────────
+    // ── Dates ───────────────────────────────────────────────────────────────
     const dateG = form.createDiv('finance-field-group');
-    dateG.createEl('label', { text: 'Дата', cls: 'finance-field-label' });
+    dateG.createEl('label', { text: 'Дата создания', cls: 'finance-field-label' });
+    dateG.createEl('span', { text: 'когда возник долг', cls: 'finance-field-hint' });
     const dateIn = dateG.createEl('input', { type: 'date', cls: 'finance-input' });
     dateIn.value = this.debt.date;
     dateIn.addEventListener('change', () => { this.debt.date = dateIn.value; });
 
-    const timeG = form.createDiv('finance-field-group');
-    timeG.createEl('label', { text: 'Время', cls: 'finance-field-label' });
-    const timeIn = timeG.createEl('input', { type: 'time', cls: 'finance-input' });
-    timeIn.value = this.debt.time;
-    timeIn.addEventListener('change', () => { this.debt.time = timeIn.value; });
+    const dueDateG = form.createDiv('finance-field-group');
+    dueDateG.createEl('label', { text: 'Дата возврата', cls: 'finance-field-label' });
+    dueDateG.createEl('span', { text: 'когда нужно вернуть', cls: 'finance-field-hint' });
+    const dueDateIn = dueDateG.createEl('input', { type: 'date', cls: 'finance-input' });
+    dueDateIn.value = this.debt.dueDate || '';
+    dueDateIn.addEventListener('change', () => { this.debt.dueDate = dueDateIn.value; });
 
     // ── Note — visually distinct ─────────────────────────────────────────
     const noteG = form.createDiv('finance-field-group');

@@ -53,6 +53,12 @@ export class FinanceStorage {
         if (!data.accentColor) data.accentColor = '';
         // ensure all records have time field
         data.records.forEach(r => { if (r.time === undefined) r.time = ''; });
+        // ensure all debts have direction, dueDate fields
+        data.debts.forEach(d => {
+          if (!d.direction) d.direction = 'borrowed';
+          if (d.dueDate === undefined) d.dueDate = '';
+          if (d.time === undefined) d.time = '';
+        });
         this.cache.set(notePath, data);
         return data;
       }
@@ -160,4 +166,14 @@ export class FinanceStorage {
   }
 
   invalidate(notePath: string): void { this.cache.delete(notePath); }
+
+  async resetAllData(notePath: string): Promise<void> {
+    const d = await this.load(notePath);
+    d.records = [];
+    d.debts = [];
+    d.categories = [];
+    d.tags = [];
+    d.payers = [];
+    this.schedule(notePath);
+  }
 }

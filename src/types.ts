@@ -27,12 +27,16 @@ export interface DebtMovement {
   note:      string;
 }
 
+export type DebtDirection = 'lent' | 'borrowed';  // lent = мне должны, borrowed = я должен
+
 export interface DebtRecord {
   id:        string;
   person:    string;
   amount:    number;   // current total (sum borrow - sum repay)
+  direction: DebtDirection;
   date:      string;   // creation date
   time:      string;
+  dueDate:   string;   // deadline for repayment
   createdAt: number;
   note:      string;
   movements: DebtMovement[];
@@ -61,8 +65,20 @@ export interface FilterState {
 
 export interface SortState { field: SortField; dir: SortDir; }
 
+export type DebtSortField = 'date' | 'amount' | 'person' | 'createdAt';
+export type DebtFilterState = {
+  search: string;
+  status: 'all' | 'paid' | 'unpaid';
+  direction: 'all' | DebtDirection;
+  dateFrom: string;
+  dateTo: string;
+  person: string;
+};
+
 export interface ViewState {
   sort: SortState; filter: FilterState; page: number; pageSize: number;
+  debtSort?: { field: DebtSortField; dir: SortDir };
+  debtFilter?: DebtFilterState;
 }
 
 export interface PluginSettings {
@@ -81,6 +97,10 @@ export const DEFAULT_FILTER: FilterState = {
 };
 
 export const DEFAULT_SORT: SortState = { field: 'createdAt', dir: 'desc' };
+
+export const DEFAULT_DEBT_FILTER: DebtFilterState = {
+  search: '', status: 'all', direction: 'all', dateFrom: '', dateTo: '', person: '',
+};
 
 export const COMMON_CURRENCIES = [
   '₽', '$', '€', '£', '¥', '₸', '₴', '₾', 'CHF',

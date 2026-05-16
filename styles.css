@@ -185,6 +185,23 @@
 .finance-stat-positive .finance-stat-value { color: var(--ft-positive); }
 .finance-stat-negative .finance-stat-value { color: var(--ft-negative); }
 
+.finance-stat-lent-summary { border-left: 4px solid #16a34a; }
+.finance-stat-lent-summary .finance-debt-summary-icon { font-size: 1.4em; }
+.finance-stat-lent-summary .finance-debt-summary-title { color: #16a34a; font-weight: 700; }
+.finance-stat-lent-summary .finance-debt-summary-main { color: #16a34a; }
+
+.finance-stat-borrowed-summary { border-left: 4px solid #dc2626; }
+.finance-stat-borrowed-summary .finance-debt-summary-icon { font-size: 1.4em; }
+.finance-stat-borrowed-summary .finance-debt-summary-title { color: #dc2626; font-weight: 700; }
+.finance-stat-borrowed-summary .finance-debt-summary-main { color: #dc2626; }
+
+.finance-debt-summary-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.finance-debt-summary-icon { }
+.finance-debt-summary-title { font-size: .9em; font-weight: 700; }
+.finance-debt-summary-content { display: flex; flex-direction: column; gap: 2px; }
+.finance-debt-summary-main { font-size: 1.1em; font-weight: 700; }
+.finance-debt-summary-sub { font-size: .75em; color: var(--text-muted); }
+
 /* ── Analytics toggle ───────────────────────────────────────────────────────── */
 .finance-analytics-toggle-row {
   display: flex; justify-content: flex-start; margin-bottom: 10px;
@@ -361,9 +378,9 @@
   width: 68px; padding: 4px 6px;
 }
 .finance-th {
-  background: var(--background-secondary); padding: 10px 14px;
+  background: #374151; padding: 10px 14px;
   text-align: center; font-size: .72em; font-weight: 700;
-  text-transform: uppercase; letter-spacing: .05em; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: .05em; color: #e5e7eb;
   border-bottom: 1.5px solid var(--ft-border); white-space: nowrap;
   position: sticky; top: 0; z-index: 1;
 }
@@ -454,11 +471,14 @@
 .finance-type-toggle:hover { background: var(--background-modifier-hover); }
 .finance-type-toggle.active.income  { border-color: #16a34a; background: rgba(22,163,74,.12);  color: #16a34a; }
 .finance-type-toggle.active.expense { border-color: #dc2626; background: rgba(220,38,38,.1); color: #dc2626; }
+.finance-type-toggle.active.lent    { border-color: #16a34a; background: rgba(22,163,74,.12);  color: #16a34a; }
+.finance-type-toggle.active.borrowed { border-color: #dc2626; background: rgba(220,38,38,.1); color: #dc2626; }
 
 .finance-form         { display: flex; flex-direction: column; gap: 10px; }
 .finance-form-grid    { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .finance-field-group  { display: flex; flex-direction: column; gap: 4px; }
 .finance-field-label  { font-size: .72em; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .06em; }
+.finance-field-hint   { font-size: .7em; color: var(--text-faint); font-weight: 400; text-transform: none; letter-spacing: normal; margin-left: 4px; }
 
 /* Fix 2: time input — Electron Chromium renders internal parts with OS colors.
    Must set color-scheme so -webkit-datetime-edit parts respect our theme colors.
@@ -580,8 +600,8 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 /* Target the .modal element itself — Obsidian sets max-width on it, not on .modal-content */
 .modal.finance-ie-modal {
-  max-width: 860px !important;
-  width: min(96vw, 860px) !important;
+  max-width: 560px !important;
+  width: min(96vw, 560px) !important;
 }
 .finance-ie-modal .modal-content { width: 100%; box-sizing: border-box; }
 /* Override the @media (max-width:680px) rule that forces export-grid to 1fr */
@@ -590,32 +610,32 @@
 }
 /* RecordModal — no extra overflow; Obsidian's modal-content already scrolls */
 .finance-modal { padding: 6px 4px 4px; }
-.finance-tab-bar { display: flex; gap: 4px; margin-bottom: 18px; border-bottom: 2px solid var(--ft-border); }
+.finance-tab-bar { display: flex; gap: 4px; margin-bottom: 12px; border-bottom: 2px solid var(--ft-border); }
 .finance-tab-btn {
-  background: none; border: none; padding: 8px 16px;
-  font-size: .9em; font-weight: 600; cursor: pointer; color: var(--text-muted);
+  background: none; border: none; padding: 6px 12px;
+  font-size: .85em; font-weight: 600; cursor: pointer; color: var(--text-muted);
   border-bottom: 2px solid transparent; margin-bottom: -2px; font-family: inherit;
   transition: all .15s;
 }
 .finance-tab-btn:hover  { color: var(--text-normal); }
 .finance-tab-btn.active { color: var(--ft-accent); border-bottom-color: var(--ft-accent); }
-.finance-ie-desc { font-size: .9em; color: var(--text-muted); margin-bottom: 20px; }
+.finance-ie-desc { font-size: .85em; color: var(--text-muted); margin-bottom: 12px; }
 .finance-export-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);  /* always 3 columns, equal width */
-  gap: 10px;
+  gap: 8px;
   overflow: hidden;
 }
 .finance-export-card {
-  display: flex; flex-direction: column; align-items: center; gap: 6px;
-  padding: 14px 8px;                       /* was 20px 12px */
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 10px 6px;
   background: var(--background-secondary); border: 1.5px solid var(--ft-border);
-  border-radius: var(--ft-radius); text-align: center; transition: border-color .15s;
+  border-radius: var(--ft-radius-sm); text-align: center; transition: border-color .15s;
   min-width: 0;
 }
 .finance-export-card:hover { border-color: var(--ft-accent); }
-.finance-export-icon { font-size: 1.4em; }  /* was 2em */
-.finance-export-btn  { width: 100% !important; margin-top: 4px; padding: 6px 4px !important; font-size: .82em !important; }
+.finance-export-icon { font-size: 1.2em; }
+.finance-export-btn  { width: 100% !important; margin-top: 4px; padding: 4px 2px !important; font-size: .75em !important; }
 .finance-import-step  { margin-bottom: 22px; }
 .finance-step-title   { font-size: .92em; font-weight: 700; margin-bottom: 12px; padding-bottom: 6px; border-bottom: 1px solid var(--ft-border); }
 .finance-step-title-sm { font-size: .85em; margin-top: 18px; }
@@ -830,6 +850,28 @@
 .finance-debt-row:hover {
   background: var(--background-modifier-hover);
 }
+.finance-debt-lent {
+  border-left: 4px solid #16a34a;
+}
+.finance-debt-borrowed {
+  border-left: 4px solid #dc2626;
+}
+.finance-debt-unpaid {
+  background: rgba(239, 68, 68, 0.08);
+}
+.finance-debt-unpaid .finance-td:first-child {
+  border-left-color: #ef4444;
+}
+.finance-debt-paid {
+  background: rgba(34, 197, 94, 0.08);
+}
+.finance-debt-paid .finance-td:first-child {
+  border-left-color: #22c55e;
+}
+.finance-dir-lent { color: #16a34a; font-weight: 700; }
+.finance-dir-borrowed { color: #dc2626; font-weight: 700; }
+.finance-amount-remaining { color: #f59e0b; font-weight: 700; }
+.finance-due-date { color: #8b5cf6; font-weight: 600; }
 .finance-debt-expand-row .finance-debt-expand-td {
   padding: 0;
   background: var(--background-primary);
@@ -850,9 +892,9 @@
   width: auto !important;
 }
 .finance-debt-table .finance-th {
-  background: var(--background-secondary); padding: 10px 14px;
+  background: #374151; padding: 10px 14px;
   text-align: center; font-size: .72em; font-weight: 700;
-  text-transform: uppercase; letter-spacing: .05em; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: .05em; color: #e5e7eb;
   border-bottom: 1.5px solid var(--ft-border); white-space: nowrap;
   position: sticky; top: 0; z-index: 1;
 }
@@ -875,7 +917,8 @@
 .finance-mov-table .finance-th {
   font-size: .68em;
   padding: 6px 14px;
-  background: var(--background-secondary);
+  background: #374151;
+  color: #e5e7eb;
 }
 .finance-mov-table .finance-td {
   padding: 5px 14px;
@@ -1042,5 +1085,17 @@
 /* Debt tables */
 .max .finance-debt-table      { width: 100% !important; max-width: none !important; }
 .max .finance-mov-table       { width: 100% !important; max-width: none !important; }
+
+/* Danger zone */
+.finance-danger-label { color: #dc2626 !important; font-weight: 700 !important; }
+.finance-danger-desc {
+  font-size: .8em; color: var(--text-muted); margin-bottom: 12px; line-height: 1.5;
+}
+.finance-btn-danger {
+  background: #dc2626; border: none; border-radius: var(--ft-radius-sm);
+  color: #fff; padding: 10px 20px; font-size: .9em; font-weight: 700;
+  cursor: pointer; transition: filter .15s; font-family: inherit;
+}
+.finance-btn-danger:hover { filter: brightness(1.1); }
 
 
