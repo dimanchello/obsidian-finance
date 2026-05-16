@@ -24,6 +24,7 @@ function loadState(np: string, pageSize: number): ViewState {
       v.page = 0;
       if (!v.debtFilter) v.debtFilter = { ...DEFAULT_DEBT_FILTER };
       if (!v.debtSort) v.debtSort = { field: 'createdAt', dir: 'desc' };
+      if (typeof v.debtPage !== 'number') v.debtPage = 0;
       return v;
     }
   } catch { /* ignore */ }
@@ -33,6 +34,7 @@ function loadState(np: string, pageSize: number): ViewState {
     debtSort: { field: 'createdAt', dir: 'desc' },
     debtFilter: { ...DEFAULT_DEBT_FILTER },
     page: 0,
+    debtPage: 0,
     pageSize
   };
 }
@@ -72,6 +74,7 @@ export class AccountView {
   private filtersEl?:    HTMLElement;
   private tableEl?:      HTMLElement;
   private paginationEl?: HTMLElement;
+  private debtPaginationEl?: HTMLElement;
   private analyticsEl?:  HTMLElement;
   private analyticsView: AnalyticsView | null = null;
   private analyticsOpen  = false;
@@ -93,7 +96,7 @@ export class AccountView {
     this.root.addClass('finance-tracker');
 
     // Detect mobile — Obsidian Platform or narrow viewport
-    this.isMobile = Platform.isMobile || window.innerWidth <= 680;
+    this.isMobile = Platform.isMobile || window.innerWidth <= 480;
     if (this.isMobile) this.root.addClass('finance-tracker--mobile');
 
     // ── Phase 1: instant header + buttons ───────────────────────────────
@@ -628,7 +631,6 @@ export class AccountView {
     sums.createEl('span', { text: '·', cls: 'finance-sum-sep' });
     sums.createEl('span', { text: `↓\u00a0${fmt(fe, cur)}`, cls: 'finance-sum-expense' });
 
-    // ── Table ─────────────────────────────────────────────────────────────
     const cols = [
       { key: 'date',     label: 'Дата / Время' },
       { key: 'type',     label: 'Тип' },
@@ -640,6 +642,63 @@ export class AccountView {
       { key: '_act',     label: '' },
     ];
 
+    // ── Table (ПК) или блоки (мобильные) ─────────────────────────────────
+    if (this.isMobile) {
+      this.renderRecordsAsBlocks(pageRows, cur);
+    } else {
+      this.renderRecordsAsTable(pageRows, cur, cols);
+    }
+    if (totalPages > 1) this.renderPagination(totalPages, page);
+  }
+
+  private renderRecordsAsBlocks(pageRows: FinanceRecord[], cur: string): void {
+    if (!this.tableEl) return;
+    const list = this.tableEl.createDiv('finance-records-list');
+    const frag = document.createDocumentFragment();
+
+    pageRows.forEach(rec => {
+      const block = document.createElement('div');
+      block.classList.add('finance-record-block', rec.type === 'income' ? 'finance-row-income' : 'finance-row-expense');
+
+      const header = block.createDiv('finance-record-header');
+      const amount = (rec.type === 'income' ? '+' : '−') + fmt(rec.amount, cur);
+      header.createEl('span', {
+        text: amount,
+        cls: 'finance-record-amount ' + (rec.type === 'income' ? 'finance-amount-income' : 'finance-amount-expense'),
+      });
+      header.createEl('span', { text: fmtDate(rec.date, rec.time), cls: 'finance-record-date' });
+
+      if (rec.category) {
+        block.createEl('div', { text: rec.category, cls: 'finance-record-category' });
+      }
+
+      const details = block.createDiv('finance-record-details');
+      if (rec.tag) {
+        details.createEl('span', { text: `🏷️ ${rec.tag}`, cls: 'finance-record-detail' });
+      }
+      if (rec.payer) {
+        details.createEl('span', { text: `👤 ${rec.payer}`, cls: 'finance-record-detail' });
+      }
+
+      if (rec.note) {
+        block.createEl('div', { text: rec.note, cls: 'finance-record-note' });
+      }
+
+      const actions = block.createDiv('finance-record-actions');
+      if (rec.attachmentPath) {
+        this.mkActionBtn(actions, '📎', 'Открыть вложение', () => this.openAttachment(rec));
+      }
+      this.mkActionBtn(actions, '✏️', 'Редактировать', () => this.openEditModal(rec));
+      this.mkActionBtn(actions, '🗑️', 'Удалить', () => this.confirmDelete(rec), 'finance-delete-btn');
+
+      frag.appendChild(block);
+    });
+
+    list.appendChild(frag);
+  }
+
+  private renderRecordsAsTable(pageRows: FinanceRecord[], cur: string, cols: { key: string; label: string }[]): void {
+    if (!this.tableEl) return;
     const scroll = this.tableEl.createDiv('finance-table-scroll');
     const table  = scroll.createEl('table', { cls: 'finance-table' });
 
@@ -674,7 +733,6 @@ export class AccountView {
         tr.appendChild(td);
       });
 
-      // Actions
       const atd = document.createElement('td');
       atd.classList.add('finance-td', 'finance-actions-td');
       atd.setAttribute('data-label', '');
@@ -690,7 +748,6 @@ export class AccountView {
     });
 
     tbody.appendChild(frag);
-    if (totalPages > 1) this.renderPagination(totalPages, page);
   }
 
   private mkActionBtn(parent: HTMLElement, icon: string, title: string, onClick: () => void, extraCls = ''): void {
@@ -722,8 +779,7 @@ export class AccountView {
       if (this.filterDebounce) clearTimeout(this.filterDebounce);
       this.filterDebounce = setTimeout(() => {
         this.state.debtFilter!.search = si.value;
-        this.saveDebtState();
-        this.renderBodyContent();
+        this.resetDebtPage();
       }, 280);
     });
 
@@ -741,8 +797,7 @@ export class AccountView {
     });
     statusSel.addEventListener('change', () => {
       this.state.debtFilter!.status = statusSel.value as 'all' | 'paid' | 'unpaid';
-      this.saveDebtState();
-      this.renderBodyContent();
+      this.resetDebtPage();
     });
 
     const dirG = row1.createDiv('finance-filter-group');
@@ -759,8 +814,7 @@ export class AccountView {
     });
     dirSel.addEventListener('change', () => {
       this.state.debtFilter!.direction = dirSel.value as 'all' | 'lent' | 'borrowed';
-      this.saveDebtState();
-      this.renderBodyContent();
+      this.resetDebtPage();
     });
 
     const row2 = filtersContainer.createDiv('finance-filters-row');
@@ -771,8 +825,7 @@ export class AccountView {
     dfI.value = f.dateFrom;
     dfI.addEventListener('change', () => {
       this.state.debtFilter!.dateFrom = dfI.value;
-      this.saveDebtState();
-      this.renderBodyContent();
+      this.resetDebtPage();
     });
 
     const dtG = row2.createDiv('finance-filter-group');
@@ -781,16 +834,14 @@ export class AccountView {
     dtI.value = f.dateTo;
     dtI.addEventListener('change', () => {
       this.state.debtFilter!.dateTo = dtI.value;
-      this.saveDebtState();
-      this.renderBodyContent();
+      this.resetDebtPage();
     });
 
     const allPersons = this.data ? [...new Set(this.data.debts.map(d => d.person).filter(Boolean))] : [];
     const personOpts = [{ v: '', l: 'Все' }, ...allPersons.map(p => ({ v: p, l: p }))];
     this.mkSearchSelect(row2, 'Кому', personOpts, f.person, (v) => {
       this.state.debtFilter!.person = v;
-      this.saveDebtState();
-      this.renderBodyContent();
+      this.resetDebtPage();
     });
 
     const rG = row2.createDiv('finance-filter-group finance-filter-reset');
@@ -798,8 +849,7 @@ export class AccountView {
     rG.createEl('button', { text: '✕ Сбросить', cls: 'finance-reset-btn' })
       .addEventListener('click', () => {
         this.state.debtFilter = { ...DEFAULT_DEBT_FILTER };
-        this.saveDebtState();
-        this.renderBodyContent();
+        this.resetDebtPage();
       });
 
     const sortRow = filtersContainer.createDiv('finance-sort-row');
@@ -856,13 +906,29 @@ export class AccountView {
 
   // ── Pagination ────────────────────────────────────────────────────────────
 
-  private renderPagination(totalPages: number, current: number): void {
-    if (!this.paginationEl) return;
-    const nav = this.paginationEl.createDiv('finance-pagination-nav');
+  private renderPagination(
+    totalPages: number,
+    current: number,
+    target: 'records' | 'debts' = 'records',
+  ): void {
+    const host = target === 'debts' ? this.debtPaginationEl : this.paginationEl;
+    if (!host) return;
+    const nav = host.createDiv('finance-pagination-nav');
 
-    const prev = nav.createEl('button', { cls: 'finance-page-btn', text: '← Пред' });
+    const go = (page: number) => {
+      if (target === 'debts') {
+        this.state.debtPage = page;
+        saveState(this.notePath, this.state);
+        this.renderBodyContent();
+      } else {
+        this.state.page = page;
+        this.renderTable();
+      }
+    };
+
+    const prev = nav.createEl('button', { cls: 'finance-page-btn', text: '←' });
     prev.disabled = current === 0;
-    prev.addEventListener('click', () => { this.state.page = current - 1; this.renderTable(); });
+    prev.addEventListener('click', () => go(current - 1));
 
     this.pageRange(current, totalPages).forEach(p => {
       if (p === -1) { nav.createEl('span', { text: '…', cls: 'finance-page-ellipsis' }); return; }
@@ -870,12 +936,12 @@ export class AccountView {
         text: String(p + 1),
         cls:  `finance-page-btn${p === current ? ' active' : ''}`,
       });
-      btn.addEventListener('click', () => { this.state.page = p; this.renderTable(); });
+      btn.addEventListener('click', () => go(p));
     });
 
-    const next = nav.createEl('button', { cls: 'finance-page-btn', text: 'След →' });
+    const next = nav.createEl('button', { cls: 'finance-page-btn', text: '→' });
     next.disabled = current >= totalPages - 1;
-    next.addEventListener('click', () => { this.state.page = current + 1; this.renderTable(); });
+    next.addEventListener('click', () => go(current + 1));
   }
 
   private pageRange(cur: number, total: number): number[] {
@@ -962,6 +1028,12 @@ export class AccountView {
     if (this.analyticsOpen) this.renderAnalytics();
   }
 
+  private resetDebtPage(): void {
+    this.state.debtPage = 0;
+    saveState(this.notePath, this.state);
+    this.renderBodyContent();
+  }
+
   // ── View switching ───────────────────────────────────────────────────────
 
   private renderBodyContent(): void {
@@ -984,32 +1056,6 @@ export class AccountView {
       this.analyticsOpen = false;
       this.renderRecordsView(body);
     }
-
-    // Mobile FAB — floating quick-add bar at bottom
-    if (this.isMobile && this.mode !== 'debts') {
-      this.renderMobileFAB();
-    }
-  }
-
-  // ── Mobile floating action bar ───────────────────────────────────────────
-
-  private renderMobileFAB(): void {
-    // Attach to the scroll container (Obsidian's view-content), not to root
-    // This keeps the FAB fixed on the screen, not scrolling with content
-    const container = this.root.closest('.view-content') as HTMLElement
-      ?? this.root.parentElement
-      ?? this.root;
-
-    this.fabEl = container.createDiv('finance-fab');
-
-    const incBtn = this.fabEl.createEl('button', { cls: 'finance-fab-btn finance-fab-income' });
-    incBtn.innerHTML = '<span class="finance-fab-icon">↑</span><span>Доход</span>';
-
-    const expBtn = this.fabEl.createEl('button', { cls: 'finance-fab-btn finance-fab-expense' });
-    expBtn.innerHTML = '<span class="finance-fab-icon">↓</span><span>Расход</span>';
-
-    incBtn.addEventListener('click', () => this.openAddModal('income'));
-    expBtn.addEventListener('click', () => this.openAddModal('expense'));
   }
 
   private renderRecordsView(body: HTMLElement): void {
@@ -1059,11 +1105,11 @@ export class AccountView {
     this.settingsEl.addClass('finance-settings-panel');
 
     // Page size
-    const psRow = this.settingsEl.createDiv('finance-settings-row');
-    const psG = psRow.createDiv('finance-settings-field');
+    const psRow = this.settingsEl.createDiv('finance-settings-row finance-settings-row--page-size');
+    const psG = psRow.createDiv('finance-settings-field finance-settings-field--page-size');
     psG.createEl('label', {
       text: 'Записей на странице',
-      cls: 'finance-filter-label',
+      cls: 'finance-filter-label finance-settings-page-size-label',
     });
     const psSel = psG.createEl('select', { cls: 'finance-filter-select' });
     [10, 20, 25, 50, 100, 200, 500].forEach(n => {
@@ -1074,8 +1120,10 @@ export class AccountView {
     psSel.addEventListener('change', () => {
       this.state.pageSize = parseInt(psSel.value);
       this.state.page = 0;
+      this.state.debtPage = 0;
       saveState(this.notePath, this.state);
-      this.renderTable();
+      if (this.mode === 'debts') this.renderBodyContent();
+      else this.renderTable();
     });
 
     // Accent color
@@ -1233,8 +1281,8 @@ export class AccountView {
     mkDebtCard('Я должен', '💳', borrowedTotal, borrowedRemaining, borrowedDebts.length, false);
 
     // Debt buttons header
-    const actions = body.createDiv('finance-debt-actions');
-    const newDebtBtn = actions.createEl('button', { cls: 'finance-add-btn finance-expense-btn' });
+    const toolbar = body.createDiv('finance-debt-toolbar');
+    const newDebtBtn = toolbar.createEl('button', { cls: 'finance-add-btn finance-expense-btn' });
     newDebtBtn.innerHTML = '<span class="btn-icon">＋</span><span>Новый долг</span>';
     newDebtBtn.addEventListener('click', () => this.openNewDebtModal());
 
@@ -1257,9 +1305,146 @@ export class AccountView {
       return;
     }
 
-    // Debt table
     const tw = body.createDiv('finance-table-wrapper');
-    const scroll = tw.createDiv('finance-table-scroll');
+    this.renderDebtsList(tw, filteredDebts, cur);
+  }
+
+  private renderDebtsList(wrapper: HTMLElement, filteredDebts: DebtRecord[], cur: string): void {
+    wrapper.empty();
+    this.debtPaginationEl = undefined;
+
+    const container = wrapper.createDiv('finance-table-container');
+    this.debtPaginationEl = wrapper.createDiv('finance-pagination');
+
+    const { pageSize } = this.state;
+    const totalPages = Math.max(1, Math.ceil(filteredDebts.length / pageSize));
+    const page = Math.max(0, Math.min(this.state.debtPage ?? 0, totalPages - 1));
+    this.state.debtPage = page;
+    const start = page * pageSize;
+    const pageDebts = filteredDebts.slice(start, start + pageSize);
+
+    const infoBar = container.createDiv('finance-table-info-bar');
+    const metaLeft = infoBar.createDiv('finance-table-meta');
+    metaLeft.createEl('span', {
+      text: `${start + 1}–${Math.min(start + pageSize, filteredDebts.length)} из ${filteredDebts.length}`,
+      cls: 'finance-count-text',
+    });
+
+    if (this.isMobile) {
+      this.renderDebtsAsBlocks(container, pageDebts, cur);
+    } else {
+      this.renderDebtsAsTable(container, pageDebts, cur);
+    }
+
+    if (totalPages > 1) this.renderPagination(totalPages, page, 'debts');
+  }
+
+  private renderDebtMovementsPanel(parent: HTMLElement, debt: DebtRecord, cur: string): void {
+    const movPanel = parent.createDiv('finance-mov-panel');
+    movPanel.createEl('div', { text: 'История операций', cls: 'finance-mov-panel-title' });
+
+    if (!debt.movements.length) {
+      movPanel.createEl('span', { text: 'Нет движений', cls: 'finance-mov-empty' });
+      return;
+    }
+
+    const movTable = movPanel.createEl('table', { cls: 'finance-mov-table' });
+    const movHead = movTable.createEl('thead').createEl('tr');
+    ['Тип', 'Сумма', 'Дата', 'Примечание'].forEach(l => {
+      movHead.createEl('th', { text: l, cls: 'finance-th finance-mov-th' });
+    });
+    const movBody = movTable.createEl('tbody');
+    const isLent = debt.direction === 'lent';
+    debt.movements.forEach(m => {
+      const mr = movBody.createEl('tr', { cls: `finance-mov-${m.type}` });
+      const typeLabel = m.type === 'borrow'
+        ? (isLent ? '➕ Дал ещё' : '➕ Взял ещё')
+        : (isLent ? '💰 Вернули' : '💰 Погашение');
+      mr.createEl('td', { text: typeLabel, cls: 'finance-td' });
+      mr.createEl('td', {
+        text: (m.type === 'borrow' ? '−' : '+') + fmt(m.amount, cur),
+        cls: `finance-td finance-td-mov-${m.type}`,
+      });
+      mr.createEl('td', { text: fmtDate(m.date, m.time), cls: 'finance-td' });
+      mr.createEl('td', { text: m.note || '—', cls: 'finance-td' });
+    });
+  }
+
+  private renderDebtsAsBlocks(container: HTMLElement, pageDebts: DebtRecord[], cur: string): void {
+    const list = container.createDiv('finance-debts-list');
+    const frag = document.createDocumentFragment();
+
+    pageDebts.forEach(debt => {
+      const dir = (debt.direction as string) || 'borrowed';
+      const block = document.createElement('div');
+      block.classList.add('finance-debt-block');
+      block.classList.add(dir === 'lent' ? 'finance-debt-lent' : 'finance-debt-borrowed');
+      if (this.isDebtPaidOff(debt)) {
+        block.classList.add('finance-debt-paid');
+      } else {
+        block.classList.add('finance-debt-unpaid');
+      }
+
+      const header = block.createDiv('finance-debt-header');
+      header.createEl('span', { text: debt.person || '—', cls: 'finance-debt-person' });
+      header.createEl('span', {
+        text: dir === 'lent' ? '💸 Мне должны' : '💳 Я должен',
+        cls: 'finance-debt-direction ' + (dir === 'lent' ? 'finance-dir-lent' : 'finance-dir-borrowed'),
+      });
+
+      const amounts = block.createDiv('finance-debt-amounts');
+      const original = this.getDebtOriginal(debt);
+      const remaining = this.getDebtRemaining(debt);
+
+      const amtOrig = amounts.createDiv('finance-debt-amount');
+      amtOrig.createEl('span', { text: 'Сумма', cls: 'finance-debt-amount-label' });
+      amtOrig.createEl('span', { text: fmt(original, cur), cls: 'finance-debt-amount-value' });
+
+      if (remaining > 0) {
+        const amtRem = amounts.createDiv('finance-debt-amount');
+        amtRem.createEl('span', { text: 'Остаток', cls: 'finance-debt-amount-label' });
+        amtRem.createEl('span', { text: fmt(remaining, cur), cls: 'finance-debt-amount-value finance-debt-remaining' });
+      }
+
+      if (debt.dueDate) {
+        block.createEl('div', { text: `📅 до ${fmtDate(debt.dueDate)}`, cls: 'finance-debt-due-date' });
+      }
+
+      if (debt.note) {
+        block.createEl('div', { text: debt.note, cls: 'finance-debt-note' });
+      }
+
+      const historyToggle = block.createEl('button', {
+        cls: 'finance-debt-history-toggle',
+        text: `📋 История операций (${debt.movements.length}) ▼`,
+      });
+      const historyWrap = block.createDiv('finance-debt-history-panel');
+      this.renderDebtMovementsPanel(historyWrap, debt, cur);
+
+      historyToggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const open = !historyWrap.hasClass('finance-debt-history-open');
+        historyWrap.toggleClass('finance-debt-history-open', open);
+        block.toggleClass('finance-debt-block-expanded', open);
+        historyToggle.textContent = open
+          ? `📋 История операций (${debt.movements.length}) ▲`
+          : `📋 История операций (${debt.movements.length}) ▼`;
+      });
+
+      const actions = block.createDiv('finance-debt-block-actions');
+      this.mkActionBtn(actions, '💰', 'Погасить', () => this.openRepayModal(debt));
+      this.mkActionBtn(actions, '➕', 'Взять ещё', () => this.openBorrowMoreModal(debt));
+      this.mkActionBtn(actions, '✏️', 'Редактировать', () => this.openEditDebtModal(debt));
+      this.mkActionBtn(actions, '🗑️', 'Удалить', () => this.confirmDeleteDebt(debt), 'finance-delete-btn');
+
+      frag.appendChild(block);
+    });
+
+    list.appendChild(frag);
+  }
+
+  private renderDebtsAsTable(container: HTMLElement, pageDebts: DebtRecord[], cur: string): void {
+    const scroll = container.createDiv('finance-debt-table-scroll');
     const table = scroll.createEl('table', { cls: 'finance-debt-table' });
 
     const cols = [
@@ -1279,7 +1464,7 @@ export class AccountView {
     const tbody = table.createEl('tbody');
     const frag = document.createDocumentFragment();
 
-    filteredDebts.forEach(debt => {
+    pageDebts.forEach(debt => {
       const tr = document.createElement('tr');
       tr.classList.add('finance-tr', 'finance-debt-row');
       const dir = (debt.direction as string) || 'borrowed';
@@ -1338,34 +1523,7 @@ export class AccountView {
       const expandTd = document.createElement('td');
       expandTd.setAttribute('colspan', String(cols.length));
       expandTd.classList.add('finance-debt-expand-td');
-
-      if (debt.movements.length) {
-        const movTable = expandTd.createEl('table', { cls: 'finance-mov-table' });
-        const movHead = movTable.createEl('thead').createEl('tr');
-        ['Тип', 'Сумма', 'Дата', 'Примечание'].forEach(l => {
-          movHead.createEl('th', { text: l, cls: 'finance-th finance-mov-th' });
-        });
-        const movBody = movTable.createEl('tbody');
-        debt.movements.forEach(m => {
-          const mr = movBody.createEl('tr', { cls: `finance-mov-${m.type}` });
-          const isLent = debt.direction === 'lent';
-          const typeLabel = m.type === 'borrow'
-            ? (isLent ? '➕ Дал ещё' : '➕ Взял ещё')
-            : (isLent ? '💰 Вернули' : '💰 Погашение');
-          mr.createEl('td', { text: typeLabel, cls: 'finance-td' });
-          mr.createEl('td', {
-            text: (m.type === 'borrow' ? '−' : '+') + fmt(m.amount, cur),
-            cls: `finance-td finance-td-mov-${m.type}`,
-          });
-          mr.createEl('td', { text: fmtDate(m.date, m.time), cls: 'finance-td' });
-          mr.createEl('td', { text: m.note || '—', cls: 'finance-td' });
-        });
-      } else {
-        expandTd.createEl('span', {
-          text: 'Нет движений',
-          cls: 'finance-mov-empty',
-        });
-      }
+      this.renderDebtMovementsPanel(expandTd, debt, cur);
 
       expandRow.appendChild(expandTd);
       expandRow.style.display = 'none';
@@ -1374,7 +1532,10 @@ export class AccountView {
       tr.style.cursor = 'pointer';
       tr.addEventListener('click', (e) => {
         if ((e.target as HTMLElement).closest('.finance-action-btn')) return;
-        expandRow.style.display = expandRow.style.display === 'none' ? 'table-row' : 'none';
+        const open = expandRow.style.display === 'none';
+        expandRow.style.display = open ? 'table-row' : 'none';
+        tr.classList.toggle('finance-debt-row-expanded', open);
+        expandRow.classList.toggle('finance-debt-expand-open', open);
       });
 
       frag.appendChild(tr);

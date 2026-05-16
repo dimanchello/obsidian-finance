@@ -77,6 +77,7 @@ export type DebtFilterState = {
 
 export interface ViewState {
   sort: SortState; filter: FilterState; page: number; pageSize: number;
+  debtPage?: number;
   debtSort?: { field: DebtSortField; dir: SortDir };
   debtFilter?: DebtFilterState;
 }
