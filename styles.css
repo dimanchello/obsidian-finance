@@ -773,12 +773,11 @@
 .finance-settings-list { color: var(--text-muted); font-size: .9em; line-height: 1.8; padding-left: 20px; }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   MOBILE — card view + touch improvements
+   MOBILE — компактная таблица + touch improvements
    ═══════════════════════════════════════════════════════════════════════════ */
 @media (max-width: 680px) {
 
   /* ── Layout ──────────────────────────────────────────────────────────── */
-  .finance-stats-container    { grid-template-columns: 1fr 1fr; gap: 8px; }
   .finance-filters-row        { flex-direction: column; }
   .finance-filter-group       { min-width: 100%; }
   .finance-form-grid          { grid-template-columns: 1fr; }
@@ -792,16 +791,41 @@
   .finance-mapping-cell       { border-right: none !important; border-bottom: 1px solid var(--ft-border); }
   .finance-mapping-header     { display: none; }
 
-  /* ── Header: compact icon+text buttons, full-width action row ──────── */
+  /* ── Header: кнопки на всю ширину ───────────────────────────────────── */
   .finance-add-btn            { flex: 1; justify-content: center; min-width: 0; }
 
-  /* ── Stats: 2-col grid on mobile ───────────────────────────────────── */
-  .finance-stat-card          { padding: 12px; gap: 8px; }
-  .finance-stat-icon          { width: 34px; height: 34px; font-size: 1em; flex-shrink: 0; }
-  .finance-stat-value         { font-size: .9em; }
-  .finance-stat-label         { font-size: .62em; }
+  /* ── Stats: горизонтальный скролл-ряд, карточки не сжимаются ─────────
+     Вместо grid → flex + overflow, каждая карточка фиксированной ширины.
+     Содержимое всегда читаемо, можно свайпнуть вправо.                  */
+  .finance-stats-container {
+    display: flex;
+    flex-direction: row;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;          /* Firefox: скрыть полосу прокрутки */
+    gap: 10px;
+    padding-bottom: 4px;            /* чуть воздуха под возможным скроллбаром */
+    /* Не clip'им — иначе тень на карточках обрезается */
+    margin-bottom: 10px;
+  }
+  .finance-stats-container::-webkit-scrollbar { display: none; }
 
-  /* ── Filters: bigger targets, pill sort wrap ───────────────────────── */
+  .finance-stat-card {
+    flex: 0 0 auto;                 /* не сжимать */
+    width: 160px;
+    padding: 12px 14px;
+    gap: 10px;
+  }
+  /* Долговые сводные карточки чуть шире — в них больше текста */
+  .finance-stat-lent-summary,
+  .finance-stat-borrowed-summary { width: 180px; }
+
+  .finance-stat-icon  { width: 36px; height: 36px; font-size: 1.05em; flex-shrink: 0; }
+  .finance-stat-label { font-size: .64em; }
+  .finance-stat-value { font-size: .95em; }
+
+  /* ── Filters: bigger targets, sort pills wrap ────────────────────────── */
   .finance-filter-input,
   .finance-filter-select      { height: 42px; line-height: 42px; font-size: .95em; }
   .finance-custom-select-trigger { height: 42px; }
@@ -810,202 +834,137 @@
   .finance-analytics-toggle-row { flex-wrap: wrap; gap: 6px; }
   .finance-analytics-toggle-btn { flex: 1; text-align: center; }
 
-  /* ── Action buttons always visible on mobile ───────────────────────── */
-  .finance-action-btn         { opacity: 0.8 !important; padding: 7px 8px !important; min-width: 36px; min-height: 36px; }
-  .finance-delete-btn         { opacity: 0.6 !important; }
+  /* ── Action buttons всегда видны (нет hover на touch) ───────────────── */
+  .finance-action-btn  { opacity: 0.8 !important; padding: 7px 8px !important; min-width: 36px; min-height: 36px; }
+  .finance-delete-btn  { opacity: 0.6 !important; }
 
-  /* ── Pagination: bigger touch targets ─────────────────────────────── */
-  .finance-page-btn           { min-width: 40px; min-height: 40px; padding: 9px 12px; font-size: .85em; }
+  /* ── Pagination ──────────────────────────────────────────────────────── */
+  .finance-page-btn { min-width: 40px; min-height: 40px; padding: 9px 12px; font-size: .85em; }
 
-  /* ── Card layout for RECORDS table ────────────────────────────────── */
-  .finance-table-scroll { border-top: none; }
-  .finance-table, .finance-table thead,
-  .finance-table tbody, .finance-table tr,
-  .finance-table td     { display: block; }
-  .finance-table thead  { display: none; }
+  /* ── Таблица записей: компактная, лишние колонки скрыты ─────────────────
+     Показываем: Дата | Сумма | Категория | Примечание | Действия
+     Скрываем:   Тип (виден по цвету полосы) | Тег | Плательщик          */
 
-  .finance-tr {
-    background: var(--background-secondary);
-    border: 1px solid var(--ft-border); border-radius: var(--ft-radius);
-    margin-bottom: 10px; overflow: hidden;
-    box-shadow: none !important;
-  }
-  .finance-row-income  { border-left: 5px solid #22c55e !important; }
-  .finance-row-expense { border-left: 5px solid #ef4444 !important; }
+  /* col 2 = Тип, col 5 = Тег, col 6 = Плательщик */
+  .finance-table .finance-tr > .finance-td:nth-child(2),
+  .finance-table .finance-tr > .finance-td:nth-child(5),
+  .finance-table .finance-tr > .finance-td:nth-child(6) { display: none; }
 
-  .finance-td {
-    display: flex; align-items: center;
-    justify-content: space-between;
-    padding: 9px 14px !important;
-    border-bottom: 1px solid var(--ft-border) !important;
-    max-width: 100% !important;
-    min-height: 38px;
-  }
-  .finance-tr:last-child .finance-td:last-child { border-bottom: none !important; }
+  .finance-table thead .finance-tr > .finance-th:nth-child(2),
+  .finance-table thead .finance-tr > .finance-th:nth-child(5),
+  .finance-table thead .finance-tr > .finance-th:nth-child(6) { display: none; }
 
-  .finance-td::before {
-    content: attr(data-label);
-    font-size: .68em; font-weight: 700;
-    text-transform: uppercase; letter-spacing: .05em;
-    color: var(--text-muted); flex: 0 0 90px; margin-right: 8px;
-  }
-  .finance-td[data-label=""]::before { display: none; }
-  .finance-actions-td { justify-content: flex-end; gap: 2px; }
-  .finance-note-cell  { max-width: 100%; white-space: normal; }
-  .finance-tr .finance-td:first-child { padding-left: 20px !important; }
+  /* Дата — покороче (DD.MM вместо DD.MM.YYYY) handled in JS via existing fmt,
+     но хотя бы уберём перенос и дадим чуть меньше места */
+  .finance-td-date { white-space: nowrap; font-size: .82em; }
 
-  /* ── Card layout for DEBT table ────────────────────────────────────── */
-  .finance-debt-table,
-  .finance-debt-table thead,
-  .finance-debt-table tbody,
-  .finance-debt-table tr,
-  .finance-debt-table td    { display: block !important; }
-  .finance-debt-table thead { display: none !important; }
+  /* Примечание — чуть больше места, не обрезаем слишком жёстко */
+  .finance-note-cell { max-width: 120px; }
 
-  /* Debt expand row must stay block (it wraps movements table) */
-  .finance-debt-expand-row  { display: block !important; }
-  .finance-debt-expand-td   { display: block !important; width: 100% !important; }
+  /* Таблица скроллится горизонтально при необходимости */
+  .finance-table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .finance-table        { min-width: 0; font-size: .82em; }
 
-  .finance-debt-table .finance-tr {
-    background: var(--background-secondary);
-    border: 1px solid var(--ft-border); border-radius: var(--ft-radius);
-    margin-bottom: 10px; overflow: hidden;
-    box-shadow: none !important;
-  }
-  .finance-debt-lent     { border-left: 5px solid #22c55e !important; }
-  .finance-debt-borrowed { border-left: 5px solid #ef4444 !important; }
+  /* Заголовки чуть компактнее */
+  .finance-th  { padding: 8px 8px; font-size: .68em; }
+  .finance-td  { padding: 7px 8px; }
 
-  .finance-debt-table .finance-td {
-    display: flex !important; align-items: center;
-    justify-content: space-between;
-    padding: 9px 14px !important;
-    border-bottom: 1px solid var(--ft-border) !important;
-    min-height: 38px; max-width: 100% !important;
-    width: auto !important;
-  }
-  .finance-debt-table .finance-tr:last-child .finance-td:last-child {
-    border-bottom: none !important;
-  }
+  /* Цветные полосы — делаем заметнее на узком экране */
+  .finance-tr .finance-td:first-child { border-left-width: 4px; padding-left: 10px; }
+
+  /* Кнопки действий: чуть компактнее в узкой ячейке */
+  .finance-actions-td { width: auto !important; padding: 4px 4px !important; }
+  .finance-action-btn { padding: 6px 6px !important; }
+
+  /* ── Таблица долгов: аналогично ─────────────────────────────────────────
+     Показываем: Тип | Кому | Сумма | Остаток | Действия
+     Скрываем:   Создан | Вернуть до | Примечание                         */
+
+  /* col 5 = Создан, col 6 = Вернуть до, col 7 = Примечание */
+  .finance-debt-table .finance-tr > .finance-td:nth-child(5),
+  .finance-debt-table .finance-tr > .finance-td:nth-child(6),
+  .finance-debt-table .finance-tr > .finance-td:nth-child(7) { display: none; }
+
+  .finance-debt-table thead .finance-tr > .finance-th:nth-child(5),
+  .finance-debt-table thead .finance-tr > .finance-th:nth-child(6),
+  .finance-debt-table thead .finance-tr > .finance-th:nth-child(7) { display: none; }
+
+  .finance-debt-table { font-size: .82em; }
+  .finance-debt-table .finance-th { padding: 8px 8px; font-size: .68em; }
+  .finance-debt-table .finance-td { padding: 7px 8px; }
   .finance-debt-table .finance-actions-td {
-    justify-content: flex-end; gap: 4px; flex-wrap: wrap;
+    width: auto !important; padding: 4px !important;
+    white-space: normal; flex-wrap: wrap;
   }
-  .finance-debt-table .finance-td::before {
-    content: attr(data-label);
-    font-size: .68em; font-weight: 700;
-    text-transform: uppercase; letter-spacing: .05em;
-    color: var(--text-muted); flex: 0 0 90px; margin-right: 8px;
-  }
-  .finance-debt-table .finance-td[data-label=""]::before { display: none; }
-  .finance-debt-table .finance-td:first-child { padding-left: 20px !important; }
 
-  /* Movements sub-table — keep as table (it scrolls inside the expand card) */
-  .finance-mov-table,
-  .finance-mov-table thead,
-  .finance-mov-table tbody,
-  .finance-mov-table tr,
-  .finance-mov-table th,
-  .finance-mov-table td  { display: revert !important; }
-
-  /* ── Debt summary 2-col on mobile ────────────────────────────────── */
-  .finance-stats-container:has(.finance-stat-lent-summary) { grid-template-columns: 1fr 1fr; }
-
-  /* ── Debt action buttons row full-width on mobile ─────────────────── */
+  /* ── Debt: кнопки-действия и строки ─────────────────────────────────── */
   .finance-debt-actions { flex-wrap: wrap; }
   .finance-debt-actions .finance-add-btn { flex: 1; justify-content: center; }
 
-  /* ── Modal: near-full-screen, larger inputs ─────────────────────────── */
-  .modal.finance-ie-modal {
-    width: min(98vw, 560px) !important;
-    max-width: 98vw !important;
-  }
+  /* ── Modal: кнопки в столбик ────────────────────────────────────────── */
+  .modal.finance-ie-modal { width: min(98vw, 560px) !important; max-width: 98vw !important; }
   .finance-modal-btns { flex-direction: column-reverse; gap: 8px; }
   .finance-btn-save, .finance-btn-cancel {
-    width: 100%; text-align: center; padding: 12px !important;
-    font-size: 1em !important;
-  }
-  .finance-type-row {
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
+    width: 100%; text-align: center; padding: 12px !important; font-size: 1em !important;
   }
   .finance-type-toggle { padding: 10px 6px; font-size: .9em; }
 
-  /* ── FAB (floating action bar) — spacer at bottom ──────────────────── */
+  /* ── FAB spacer ─────────────────────────────────────────────────────── */
   .finance-tracker--mobile .finance-body { padding-bottom: 80px; }
 }
 
-/* ── Very small screens (< 400px) ──────────────────────────────────────── */
+/* ── Очень маленькие экраны (< 400px) ────────────────────────────────────── */
 @media (max-width: 400px) {
-  .finance-stats-container { grid-template-columns: 1fr; gap: 8px; }
-  .finance-stat-card       { padding: 12px 14px; }
-  .finance-add-btn         { padding: 9px 12px; font-size: .85em; }
+  .finance-stat-card          { width: 140px; padding: 10px 12px; }
+  .finance-stat-lent-summary,
+  .finance-stat-borrowed-summary { width: 160px; }
+  .finance-add-btn            { padding: 9px 10px; font-size: .82em; }
   .finance-export-grid,
   .finance-ie-modal .finance-export-grid { grid-template-columns: 1fr !important; }
-  .finance-td::before      { flex: 0 0 80px; }
-  .finance-debt-table .finance-td::before { flex: 0 0 80px; }
+  .finance-table              { font-size: .78em; }
+  .finance-th, .finance-td    { padding: 6px 6px !important; }
+  /* На самых узких скрываем ещё и категорию, если не влезает */
+  /* (раскомментировать при необходимости)
+  .finance-table .finance-tr > .finance-td:nth-child(4),
+  .finance-table thead .finance-tr > .finance-th:nth-child(4) { display: none; } */
 }
 
-/* ── Touch-device: bigger tap targets, visible buttons ─────────────────────
-   Activates on real touch hardware regardless of window width
-   ─────────────────────────────────────────────────────────────────────────── */
+/* ── Touch-устройства: минимальный tap-target 44px ────────────────────────── */
 @media (hover: none) and (pointer: coarse) {
 
-  /* Action buttons always visible — нет hover-эффекта на touch */
-  .finance-tr .finance-action-btn  { opacity: 0.75 !important; }
-  .finance-tr .finance-delete-btn  { opacity: 0.55 !important; }
+  .finance-tr .finance-action-btn { opacity: 0.75 !important; }
+  .finance-tr .finance-delete-btn { opacity: 0.55 !important; }
   .finance-action-btn {
-    padding: 8px 10px !important;
-    min-width: 38px !important; min-height: 38px !important;
+    padding: 8px 8px !important;
+    min-width: 36px !important; min-height: 36px !important;
     justify-content: center !important;
   }
 
-  /* Inputs and selects — minimum 44px iOS guideline */
+  /* Inputs ≥ 44px */
   .finance-filter-input,
   .finance-filter-select,
-  .finance-input                   { height: 44px !important; line-height: 44px !important; font-size: 1em !important; }
-  .finance-custom-select-trigger   { height: 44px !important; }
+  .finance-input                 { height: 44px !important; line-height: 44px !important; font-size: 1em !important; }
+  .finance-custom-select-trigger { height: 44px !important; }
   .finance-input[type="time"],
-  .finance-input[type="date"]      { height: 44px !important; padding: 0 10px !important; }
-  .finance-textarea                { height: auto !important; line-height: 1.5 !important; padding: 12px !important; }
+  .finance-input[type="date"]    { height: 44px !important; padding: 0 10px !important; }
+  .finance-textarea              { height: auto !important; line-height: 1.5 !important; padding: 12px !important; }
+  .finance-amount-input          { font-size: 1.8em !important; padding: 16px !important; }
 
-  /* Amount input — keep big, just a little less aggressive */
-  .finance-amount-input            { font-size: 1.8em !important; padding: 16px !important; }
-
-  /* Sort pills */
-  .finance-sort-btn                { padding: 8px 16px !important; font-size: .84em !important; min-height: 36px; }
-
-  /* Pagination */
-  .finance-page-btn                { min-width: 44px !important; min-height: 44px !important; padding: 10px 14px !important; }
-
-  /* Header action buttons */
-  .finance-add-btn                 { padding: 11px 16px !important; min-height: 44px !important; }
-
-  /* Dropdown items easier to tap */
+  .finance-sort-btn              { padding: 8px 16px !important; font-size: .84em !important; min-height: 36px; }
+  .finance-page-btn              { min-width: 44px !important; min-height: 44px !important; padding: 10px 14px !important; }
+  .finance-add-btn               { padding: 11px 16px !important; min-height: 44px !important; }
   .finance-custom-select-item,
-  .finance-combobox-item           { padding: 12px !important; min-height: 44px; display: flex; align-items: center; }
-
-  /* Tab buttons in modals */
-  .finance-tab-btn                 { padding: 10px 16px !important; min-height: 44px !important; }
-
-  /* Currency options */
-  .finance-cur-option              { padding: 8px 14px !important; font-size: .85em !important; }
-
-  /* Export cards */
-  .finance-export-btn              { min-height: 38px !important; }
-
-  /* Modal save/cancel */
+  .finance-combobox-item         { padding: 12px !important; min-height: 44px; display: flex; align-items: center; }
+  .finance-tab-btn               { padding: 10px 16px !important; min-height: 44px !important; }
+  .finance-cur-option            { padding: 8px 14px !important; font-size: .85em !important; }
+  .finance-export-btn            { min-height: 38px !important; }
   .finance-btn-save, .finance-btn-cancel, .finance-btn-danger {
     min-height: 44px !important; padding: 10px 20px !important;
   }
-
-  /* Analytics buttons */
-  .finance-analytics-btn           { padding: 8px 14px !important; min-height: 36px; }
-  .finance-analytics-toggle-btn   { padding: 8px 16px !important; min-height: 40px; }
-
-  /* Type toggles in record modal */
-  .finance-type-toggle             { padding: 12px 8px !important; min-height: 44px; }
-
-  /* Reset and sort buttons in filter */
-  .finance-reset-btn               { padding: 10px 18px !important; min-height: 44px; }
+  .finance-analytics-btn         { padding: 8px 14px !important; min-height: 36px; }
+  .finance-analytics-toggle-btn  { padding: 8px 16px !important; min-height: 40px; }
+  .finance-type-toggle           { padding: 12px 8px !important; min-height: 44px; }
+  .finance-reset-btn             { padding: 10px 18px !important; min-height: 44px; }
 }
 
 /* ── FAB — sticky bottom quick-add bar ──────────────────────────────────────
