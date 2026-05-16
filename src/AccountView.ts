@@ -1,4 +1,4 @@
-import { App, Notice, TFile } from 'obsidian';
+import { App, Notice, Platform, TFile } from 'obsidian';
 import { FinanceStorage }       from './storage';
 import {
   AccountData, DebtMovement, DebtRecord, FinanceRecord,
@@ -79,6 +79,8 @@ export class AccountView {
   private settingsEl?:   HTMLElement;
   private filterDebounce: ReturnType<typeof setTimeout> | null = null;
   private mode: 'records' | 'debts' = 'records';
+  private isMobile = false;
+  private fabEl?: HTMLElement;
 
   constructor(app: App, root: HTMLElement, notePath: string, storage: FinanceStorage, settings: PluginSettings) {
     this.app = app; this.root = root; this.notePath = notePath;
@@ -89,6 +91,10 @@ export class AccountView {
   async render(): Promise<void> {
     this.root.empty();
     this.root.addClass('finance-tracker');
+
+    // Detect mobile — Obsidian Platform or narrow viewport
+    this.isMobile = Platform.isMobile || window.innerWidth <= 680;
+    if (this.isMobile) this.root.addClass('finance-tracker--mobile');
 
     // ── Phase 1: instant header + buttons ───────────────────────────────
     this.renderHeader();
@@ -136,13 +142,17 @@ export class AccountView {
     const right  = header.createDiv('finance-header-right');
 
     const incBtn = right.createEl('button', { cls: 'finance-add-btn finance-income-btn' });
-    incBtn.innerHTML = '<span class="btn-icon">↑</span><span>Доход</span>';
+    incBtn.innerHTML = this.isMobile
+      ? '<span class="btn-icon">↑</span><span>Доход</span>'
+      : '<span class="btn-icon">↑</span><span>Доход</span>';
 
     const expBtn = right.createEl('button', { cls: 'finance-add-btn finance-expense-btn' });
-    expBtn.innerHTML = '<span class="btn-icon">↓</span><span>Расход</span>';
+    expBtn.innerHTML = this.isMobile
+      ? '<span class="btn-icon">↓</span><span>Расход</span>'
+      : '<span class="btn-icon">↓</span><span>Расход</span>';
 
     const debtBtn = right.createEl('button', { cls: 'finance-add-btn finance-debt-btn' });
-    debtBtn.innerHTML = '💳 Долги';
+    debtBtn.innerHTML = this.isMobile ? '💳 Долги' : '💳 Долги';
 
     incBtn.addEventListener('click', () => { this.mode = 'records'; this.renderBodyContent(); this.openAddModal('income'); });
     expBtn.addEventListener('click', () => { this.mode = 'records'; this.renderBodyContent(); this.openAddModal('expense'); });
@@ -960,6 +970,10 @@ export class AccountView {
     if (!body) return;
     body.empty();
 
+    // Remove old FAB if any
+    this.fabEl?.remove();
+    this.fabEl = undefined;
+
     this.statsEl = body.createDiv('finance-stats-container');
     this.renderStats();
 
@@ -970,6 +984,32 @@ export class AccountView {
       this.analyticsOpen = false;
       this.renderRecordsView(body);
     }
+
+    // Mobile FAB — floating quick-add bar at bottom
+    if (this.isMobile && this.mode !== 'debts') {
+      this.renderMobileFAB();
+    }
+  }
+
+  // ── Mobile floating action bar ───────────────────────────────────────────
+
+  private renderMobileFAB(): void {
+    // Attach to the scroll container (Obsidian's view-content), not to root
+    // This keeps the FAB fixed on the screen, not scrolling with content
+    const container = this.root.closest('.view-content') as HTMLElement
+      ?? this.root.parentElement
+      ?? this.root;
+
+    this.fabEl = container.createDiv('finance-fab');
+
+    const incBtn = this.fabEl.createEl('button', { cls: 'finance-fab-btn finance-fab-income' });
+    incBtn.innerHTML = '<span class="finance-fab-icon">↑</span><span>Доход</span>';
+
+    const expBtn = this.fabEl.createEl('button', { cls: 'finance-fab-btn finance-fab-expense' });
+    expBtn.innerHTML = '<span class="finance-fab-icon">↓</span><span>Расход</span>';
+
+    incBtn.addEventListener('click', () => this.openAddModal('income'));
+    expBtn.addEventListener('click', () => this.openAddModal('expense'));
   }
 
   private renderRecordsView(body: HTMLElement): void {
