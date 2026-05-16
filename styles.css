@@ -334,7 +334,10 @@
   box-shadow: var(--ft-shadow);
 }
 .finance-table {
-  width: 100%; border-collapse: collapse; font-size: .875em;
+  width: 100%;
+  min-width: 100%;
+  border-collapse: collapse;
+  font-size: .875em;
   table-layout: auto;
 }
 
@@ -839,7 +842,7 @@
 
 /* Debt table — overrides .finance-table fixed layout */
 .finance-debt-table {
-  width: 100%; border-collapse: collapse; font-size: .875em;
+  width: 100%; min-width: 100%; border-collapse: collapse; font-size: .875em;
   table-layout: auto;
 }
 .finance-debt-table .finance-th,
@@ -960,19 +963,22 @@
   margin-left: 0 !important;
   margin-right: 0 !important;
   box-sizing: border-box !important;
-  padding: 0 !important;
+  padding: 0 20px !important;
   overflow-x: hidden !important;
 }
 
-/* ── Override Obsidian's readable-line-width centering ONLY for our plugin ──
-   Obsidian applies max-width + margin:auto to .markdown-preview-sizer and
-   padding-inline to .cm-content.  We need to undo that at every level of
-   the ancestor chain that wraps our block, without touching the rest of
-   the note.  :has() keeps the scope tight.
+/* ── Full-width mode: активируется только при наличии класса .max ────────────
+   Без .max плагин ведёт себя как обычный контент заметки и уважает
+   readable line width.  С .max — растягивается на всю ширину панели.
+
+   .max добавляется темой Minimal на <body> через Style Settings.
+   :has() ограничивает действие правил только блоками с нашим плагином,
+   не затрагивая остальной контент заметки.
    ─────────────────────────────────────────────────────────────────────── */
 
-/* ① Reading view — the direct container of the code fence output */
-.markdown-preview-view .block-language-finance-account {
+/* ① Reading view — прямой контейнер вывода code fence */
+.max .markdown-preview-view .block-language-finance-account,
+.markdown-preview-view.max .block-language-finance-account {
   width: 100% !important;
   max-width: 100% !important;
   box-sizing: border-box !important;
@@ -980,30 +986,33 @@
   margin-inline: 0 !important;
 }
 
-/* ② Reading view — every ancestor inside the sizer that wraps our block */
-.markdown-preview-view.is-readable-line-width .markdown-preview-sizer > div:has(.finance-tracker),
-.markdown-preview-view.is-readable-line-width .markdown-preview-section:has(.finance-tracker),
-.markdown-preview-view.is-readable-line-width div:has(> .finance-tracker) {
+/* ② Reading view — предки внутри sizer, которые оборачивают наш блок */
+.max .markdown-preview-view.is-readable-line-width .markdown-preview-sizer > div:has(.finance-tracker),
+.max .markdown-preview-view.is-readable-line-width .markdown-preview-section:has(.finance-tracker),
+.max .markdown-preview-view.is-readable-line-width div:has(> .finance-tracker),
+.markdown-preview-view.max.is-readable-line-width .markdown-preview-sizer > div:has(.finance-tracker),
+.markdown-preview-view.max.is-readable-line-width div:has(> .finance-tracker) {
   width: 100% !important;
   max-width: 100% !important;
   margin-inline: 0 !important;
   padding-inline: 0 !important;
 }
 
-/* ③ Live Preview — the embed block widget wrapper */
-.markdown-source-view.mod-cm6 .cm-embed-block:has(.finance-tracker),
-.markdown-source-view.mod-cm6 .cm-table-widget:has(.finance-tracker),
-.markdown-source-view.mod-cm6 .cm-contentContainer .cm-content .cm-embed-block:has(.finance-tracker) {
+/* ③ Live Preview — враппер embed-блока */
+.max .markdown-source-view.mod-cm6 .cm-embed-block:has(.finance-tracker),
+.max .markdown-source-view.mod-cm6 .cm-table-widget:has(.finance-tracker),
+.markdown-source-view.mod-cm6.max .cm-embed-block:has(.finance-tracker),
+.markdown-source-view.mod-cm6.max .cm-table-widget:has(.finance-tracker) {
   width: 100% !important;
-  max-width: 100% !important;
+  max-width: none !important;
   margin-inline: 0 !important;
   padding-inline: 0 !important;
   box-sizing: border-box !important;
 }
 
-/* ④ Live Preview — readable-line-width adds padding-inline to .cm-content;
-      override only for the content container that holds our plugin */
-.markdown-source-view.mod-cm6.is-readable-line-width .cm-content:has(.finance-tracker) {
+/* ④ Live Preview — readable-line-width вешает padding-inline на .cm-content */
+.max .markdown-source-view.mod-cm6.is-readable-line-width .cm-content:has(.finance-tracker),
+.markdown-source-view.mod-cm6.max.is-readable-line-width .cm-content:has(.finance-tracker) {
   padding-inline: 0 !important;
 }
 .max .finance-stats-container,
@@ -1028,3 +1037,10 @@
 .max .finance-table-wrapper   { overflow-x: hidden !important; }
 .max .finance-table-container { width: 100% !important; min-width: 0 !important; }
 .max .finance-table-scroll    { width: 100% !important; max-width: 100% !important; overflow-x: auto !important; }
+.max .finance-table           { width: 100% !important; max-width: none !important; table-layout: auto !important; }
+
+/* Debt tables */
+.max .finance-debt-table      { width: 100% !important; max-width: none !important; }
+.max .finance-mov-table       { width: 100% !important; max-width: none !important; }
+
+
