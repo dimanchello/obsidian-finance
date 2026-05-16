@@ -1197,9 +1197,7 @@ export class AccountView {
     const dangerDesc = this.settingsEl.createDiv('finance-danger-desc');
     dangerDesc.textContent = 'Введите "Yes" и нажмите кнопку ниже, чтобы удалить ВСЕ записи и долги безвозвратно.';
 
-    const confirmRow = this.settingsEl.createDiv('finance-settings-row');
-    confirmRow.style.flexDirection = 'column';
-    confirmRow.style.alignItems = 'stretch';
+    const confirmRow = this.settingsEl.createDiv('finance-settings-row finance-danger-confirm-row');
     const confirmIn = confirmRow.createEl('input', {
       type: 'text',
       cls: 'finance-input',
@@ -1211,7 +1209,6 @@ export class AccountView {
       text: '🗑️ Удалить ВСЕ данные',
       cls: 'finance-btn-danger',
     });
-    deleteBtn.style.marginTop = '8px';
     deleteBtn.addEventListener('click', async () => {
       if (confirmIn.value.trim() !== 'Yes') {
         new Notice('⚠️ Введите "Yes" для подтверждения');
@@ -1343,12 +1340,14 @@ export class AccountView {
     const movPanel = parent.createDiv('finance-mov-panel');
     movPanel.createEl('div', { text: 'История операций', cls: 'finance-mov-panel-title' });
 
+    const body = movPanel.createDiv('finance-mov-panel-body');
+
     if (!debt.movements.length) {
-      movPanel.createEl('span', { text: 'Нет движений', cls: 'finance-mov-empty' });
+      body.createEl('span', { text: 'Нет движений', cls: 'finance-mov-empty' });
       return;
     }
 
-    const movTable = movPanel.createEl('table', { cls: 'finance-mov-table' });
+    const movTable = body.createEl('table', { cls: 'finance-mov-table' });
     const movHead = movTable.createEl('thead').createEl('tr');
     ['Тип', 'Сумма', 'Дата', 'Примечание'].forEach(l => {
       movHead.createEl('th', { text: l, cls: 'finance-th finance-mov-th' });
