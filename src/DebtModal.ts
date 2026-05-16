@@ -1,0 +1,224 @@
+import { App, Modal, Notice } from 'obsidian';
+import { DebtRecord } from './types';
+
+export interface DebtModalOptions {
+  title:   string;
+  debt?:   DebtRecord;
+  allPersons: string[];
+  onSave:  (debt: DebtRecord) => void;
+}
+
+function fmtAmount(raw: string): string {
+  const clean = raw.replace(/[^\d.,]/g, '');
+  const dotPos = clean.search(/[.,]/);
+  let intPart  = dotPos >= 0 ? clean.slice(0, dotPos)  : clean;
+  let decPart  = dotPos >= 0 ? clean.slice(dotPos + 1) : '';
+  decPart = decPart.slice(0, 2).replace(/[.,]/g, '');
+  intPart = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0');
+  return decPart.length > 0 ? `${intPart},${decPart}` : intPart;
+}
+
+function parseAmount(s: string): number {
+  return parseFloat(s.replace(/\u00a0|\s/g, '').replace(',', '.')) || 0;
+}
+
+export class DebtModal extends Modal {
+  private o: DebtModalOptions;
+  private debt: DebtRecord;
+  private amountInput!: HTMLInputElement;
+
+  constructor(app: App, opts: DebtModalOptions) {
+    super(app);
+    this.o = opts;
+    const nowStr = new Date().toISOString().split('T')[0];
+    const timeStr = new Date().toTimeString().slice(0, 5);
+    this.debt = opts.debt
+      ? { ...opts.debt, movements: [...opts.debt.movements] }
+      : {
+          id: crypto.randomUUID(),
+          person: '',
+          amount: 0,
+          date: nowStr,
+          time: timeStr,
+          createdAt: Date.now(),
+          note: '',
+          movements: [],
+        };
+  }
+
+  onOpen(): void {
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.addClass('finance-modal');
+
+    contentEl.createEl('h2', {
+      text: this.o.title,
+      cls: 'finance-modal-title',
+    });
+
+    const form = contentEl.createDiv('finance-form');
+
+    // ── Amount ───────────────────────────────────────────────────────────
+    const amtG = form.createDiv('finance-field-group finance-amount-group');
+    amtG.createEl('label', { text: 'Сумма *', cls: 'finance-field-label' });
+
+    this.amountInput = amtG.createEl('input', {
+      type: 'text',
+      cls: 'finance-input finance-amount-input',
+    });
+    this.amountInput.setAttribute('inputmode', 'decimal');
+    this.amountInput.setAttribute('placeholder', '0');
+    this.amountInput.setAttribute('autocomplete', 'off');
+
+    if (this.debt.amount > 0) {
+      this.amountInput.value = fmtAmount(String(this.debt.amount));
+    }
+
+    this.amountInput.addEventListener('focus', () => {
+      if (this.debt.amount > 0) {
+        this.amountInput.value = String(this.debt.amount).replace('.', ',');
+      }
+    });
+
+    this.amountInput.addEventListener('input', () => {
+      const raw = this.amountInput.value;
+      this.debt.amount = parseAmount(raw);
+      const sel = this.amountInput.selectionStart ?? raw.length;
+      const rawBefore = raw.slice(0, sel).replace(/[^\d.,]/g, '').length;
+      const formatted = fmtAmount(raw);
+      if (formatted !== raw) {
+        this.amountInput.value = formatted;
+        let newPos = 0, rawCount = 0;
+        for (let i = 0; i < formatted.length; i++) {
+          if (/[\d.,]/.test(formatted[i])) rawCount++;
+          if (rawCount >= rawBefore) { newPos = i + 1; break; }
+        }
+        this.amountInput.setSelectionRange(newPos, newPos);
+      }
+    });
+
+    this.amountInput.addEventListener('blur', () => {
+      const n = parseAmount(this.amountInput.value);
+      this.debt.amount = n;
+      this.amountInput.value = n > 0 ? fmtAmount(String(n)) : '';
+    });
+
+    // ── Person (autocomplete combobox like RecordModal) ────────────────
+    const personG = form.createDiv('finance-field-group');
+    personG.createEl('label', { text: 'Кому *', cls: 'finance-field-label' });
+
+    const comboboxWrap = personG.createDiv('finance-combobox');
+    const personIn = comboboxWrap.createEl('input', {
+      type: 'text',
+      cls: 'finance-input finance-combobox-input',
+    });
+    personIn.value = this.debt.person;
+    personIn.setAttribute('autocomplete', 'off');
+
+    let dropdown: HTMLElement | null = null;
+    const opts = this.o.allPersons;
+
+    const closeDropdown = () => { dropdown?.remove(); dropdown = null; };
+
+    const openDropdown = (q: string) => {
+      closeDropdown();
+      const lq = q.toLowerCase();
+      const filtered = opts.filter(o => !lq || o.toLowerCase().includes(lq));
+      if (!filtered.length) {
+        if (q) {
+          dropdown = comboboxWrap.createDiv('finance-combobox-dropdown');
+          const addItem = dropdown.createDiv({ cls: 'finance-combobox-item' });
+          addItem.textContent = `➕ "${q}"`;
+          addItem.style.fontStyle = 'italic';
+          addItem.style.color = 'var(--text-muted)';
+          addItem.addEventListener('mousedown', e => {
+            e.preventDefault();
+            personIn.value = q;
+            this.debt.person = q;
+            closeDropdown();
+          });
+        }
+        return;
+      }
+      dropdown = comboboxWrap.createDiv('finance-combobox-dropdown');
+      filtered.forEach(opt => {
+        const item = dropdown!.createDiv({
+          cls: `finance-combobox-item${opt === personIn.value ? ' is-active' : ''}`,
+        });
+        item.textContent = opt;
+        item.addEventListener('mousedown', e => {
+          e.preventDefault();
+          personIn.value = opt;
+          this.debt.person = opt;
+          closeDropdown();
+        });
+      });
+    };
+
+    personIn.addEventListener('focus', () => openDropdown(personIn.value));
+    personIn.addEventListener('input', () => { this.debt.person = personIn.value; openDropdown(personIn.value); });
+    personIn.addEventListener('blur', () => setTimeout(closeDropdown, 150));
+    personIn.addEventListener('keydown', (e: KeyboardEvent) => {
+      if (e.key === 'Enter' && dropdown) {
+        const first = dropdown.querySelector<HTMLElement>('.finance-combobox-item');
+        if (first) { e.preventDefault(); first.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })); }
+      }
+      if (e.key === 'Escape') { personIn.value = ''; this.debt.person = ''; closeDropdown(); }
+      if (e.key === 'ArrowDown' && dropdown) {
+        const first = dropdown.querySelector<HTMLElement>('.finance-combobox-item');
+        first?.focus();
+      }
+    });
+
+    // ── Date & Time ──────────────────────────────────────────────────────
+    const dateG = form.createDiv('finance-field-group');
+    dateG.createEl('label', { text: 'Дата', cls: 'finance-field-label' });
+    const dateIn = dateG.createEl('input', { type: 'date', cls: 'finance-input' });
+    dateIn.value = this.debt.date;
+    dateIn.addEventListener('change', () => { this.debt.date = dateIn.value; });
+
+    const timeG = form.createDiv('finance-field-group');
+    timeG.createEl('label', { text: 'Время', cls: 'finance-field-label' });
+    const timeIn = timeG.createEl('input', { type: 'time', cls: 'finance-input' });
+    timeIn.value = this.debt.time;
+    timeIn.addEventListener('change', () => { this.debt.time = timeIn.value; });
+
+    // ── Note — visually distinct ─────────────────────────────────────────
+    const noteG = form.createDiv('finance-field-group');
+    const noteLabelRow = noteG.createDiv('finance-note-label-row');
+    noteLabelRow.createEl('label', { text: 'Примечание', cls: 'finance-field-label' });
+    noteLabelRow.createEl('span', { text: '📝', cls: 'finance-note-icon' });
+    const noteIn = noteG.createEl('textarea', { cls: 'finance-textarea finance-note-field' });
+    noteIn.placeholder = 'Необязательно — любой комментарий…';
+    noteIn.value = this.debt.note;
+    noteIn.rows = 2;
+    noteIn.addEventListener('input', () => { this.debt.note = noteIn.value; });
+
+    // ── Buttons ──────────────────────────────────────────────────────────
+    const btnRow = contentEl.createDiv('finance-modal-btns');
+    btnRow.createEl('button', { text: 'Отмена', cls: 'finance-btn-cancel' })
+      .addEventListener('click', () => this.close());
+    btnRow.createEl('button', { text: 'Сохранить', cls: 'finance-btn-save' })
+      .addEventListener('click', () => this.handleSave());
+
+  }
+
+  private handleSave(): void {
+    const amount = parseAmount(this.amountInput.value);
+    this.debt.amount = amount;
+    if (!amount || amount <= 0) {
+      new Notice('⚠️ Укажите сумму больше нуля');
+      this.amountInput.focus();
+      return;
+    }
+    if (!this.debt.person.trim()) {
+      new Notice('⚠️ Укажите кому');
+      return;
+    }
+    this.debt.person = this.debt.person.trim();
+    this.o.onSave(this.debt);
+    this.close();
+  }
+
+  onClose(): void { this.contentEl.empty(); }
+}

@@ -1,12 +1,12 @@
 import { App, normalizePath } from 'obsidian';
-import { AccountData, AccountMeta, FinanceRecord } from './types';
+import { AccountData, AccountMeta, DebtMovement, DebtRecord, FinanceRecord } from './types';
 
-const DATA_VERSION = 2;
+const DATA_VERSION = 3;
 
 function emptyAccount(defaultCurrency: string): AccountData {
   return {
     version: DATA_VERSION, name: '', currency: defaultCurrency,
-    records: [], categories: [], tags: [], payers: [],
+    records: [], debts: [], categories: [], tags: [], payers: [],
   };
 }
 
@@ -49,6 +49,8 @@ export class FinanceStorage {
         // back-compat: add missing fields
         if (!data.currency) data.currency = this.defaultCurrency;
         if (data.name === undefined) data.name = '';
+        if (!data.debts) data.debts = [];
+        if (!data.accentColor) data.accentColor = '';
         // ensure all records have time field
         data.records.forEach(r => { if (r.time === undefined) r.time = ''; });
         this.cache.set(notePath, data);
@@ -122,6 +124,38 @@ export class FinanceStorage {
       addToSet(d.tags,       r.tag);
       addToSet(d.payers,     r.payer);
     }
+    this.schedule(notePath);
+  }
+
+  // ── Debt CRUD ──────────────────────────────────────────────────────────────
+
+  async addDebt(notePath: string, debt: DebtRecord): Promise<void> {
+    const d = await this.load(notePath);
+    d.debts.push(debt);
+    this.schedule(notePath);
+  }
+
+  async updateDebt(notePath: string, debt: DebtRecord): Promise<void> {
+    const d   = await this.load(notePath);
+    const idx = d.debts.findIndex(x => x.id === debt.id);
+    if (idx === -1) return;
+    d.debts[idx] = debt;
+    this.schedule(notePath);
+  }
+
+  async deleteDebt(notePath: string, id: string): Promise<void> {
+    const d     = await this.load(notePath);
+    d.debts     = d.debts.filter(x => x.id !== id);
+    this.schedule(notePath);
+  }
+
+  async addDebtMovement(notePath: string, debtId: string, mov: DebtMovement): Promise<void> {
+    const d   = await this.load(notePath);
+    const idx = d.debts.findIndex(x => x.id === debtId);
+    if (idx === -1) return;
+    const debt = d.debts[idx];
+    debt.movements.push(mov);
+    debt.amount = debt.movements.reduce((sum, m) => m.type === 'borrow' ? sum + m.amount : sum - m.amount, 0);
     this.schedule(notePath);
   }
 

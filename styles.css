@@ -19,9 +19,19 @@
   line-height: 1.5;
   box-sizing: border-box;
   padding: 0 16px;
+  /* Anchor to container width; clip any child overflow so Obsidian never
+     shows a page-level horizontal scrollbar for our plugin */
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 /* ── Header ─────────────────────────────────────────────────────────────────── */
+.finance-body {
+  width: 100%;
+  box-sizing: border-box;
+  min-width: 0;    /* allow flex/grid children to shrink below content width */
+}
 .finance-header {
   display: flex; align-items: center; justify-content: space-between;
   flex-wrap: wrap; gap: 10px;
@@ -325,21 +335,27 @@
 }
 .finance-table {
   width: 100%; border-collapse: collapse; font-size: .875em;
-  table-layout: fixed;   /* rubber: columns distribute based on explicit widths */
+  table-layout: auto;
 }
 
-/* Fixed columns — take only what they need */
-.finance-th:nth-child(1), .finance-td:nth-child(1) { width: 100px; } /* date */
-.finance-th:nth-child(2), .finance-td:nth-child(2) { width: 76px;  } /* type */
-.finance-th:nth-child(3), .finance-td:nth-child(3) { width: 96px;  } /* amount */
-.finance-th:last-child,   .finance-td:last-child   { width: 68px;  } /* actions */
+/* Date, type, amount — keep compact */
+.finance-td-date,
+.finance-type-income,
+.finance-type-expense,
+.finance-amount-cell {
+  white-space: nowrap;
+}
 
-/* Flexible text columns — take remaining space equally, truncate overflow */
-.finance-th:nth-child(4), .finance-td:nth-child(4),
-.finance-th:nth-child(5), .finance-td:nth-child(5),
-.finance-th:nth-child(6), .finance-td:nth-child(6),
-.finance-th:nth-child(7), .finance-td:nth-child(7) {
+/* Note cell — ellipsis */
+.finance-note-cell {
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  max-width: 200px;
+}
+
+/* Actions compact */
+.finance-actions-td {
+  white-space: nowrap; text-align: right;
+  width: 68px; padding: 4px 6px;
 }
 .finance-th {
   background: var(--background-secondary); padding: 10px 14px;
@@ -375,19 +391,7 @@
 .finance-amount-income  { color: #16a34a; }
 .finance-amount-expense { color: #dc2626; }
 
-/* Note cell — flex fill */
-.finance-note-cell {
-  color: var(--text-muted); font-style: italic; font-size: .85em;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  max-width: 160px;
-}
 
-/* Actions — always one row, no wrap */
-.finance-actions-td {
-  white-space: nowrap; text-align: right;
-  width: 68px;        /* match last-child rule */
-  padding: 4px 6px;
-}
 .finance-action-btn {
   background: none !important; border: none !important;
   padding: 4px 5px; border-radius: 5px;
@@ -806,6 +810,145 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
+   DEBT VIEW
+   ═══════════════════════════════════════════════════════════════════════════ */
+.finance-debt-btn {
+  background: linear-gradient(135deg, #7c3aed, #a855f7);
+  color: #fff;
+  border: 2px solid transparent;
+}
+.finance-debt-actions {
+  display: flex; gap: 8px; margin-bottom: 16px;
+}
+.finance-debt-row {
+  cursor: pointer;
+  transition: background .1s;
+}
+.finance-debt-row:hover {
+  background: var(--background-modifier-hover);
+}
+.finance-debt-expand-row .finance-debt-expand-td {
+  padding: 0;
+  background: var(--background-primary);
+  border-bottom: 1px solid var(--ft-border);
+  /* Allow the nested movements table to scroll horizontally inside the cell
+     instead of pushing the outer debt table wider */
+  overflow-x: auto;
+  box-sizing: border-box;
+}
+
+/* Debt table — overrides .finance-table fixed layout */
+.finance-debt-table {
+  width: 100%; border-collapse: collapse; font-size: .875em;
+  table-layout: auto;
+}
+.finance-debt-table .finance-th,
+.finance-debt-table .finance-td {
+  width: auto !important;
+}
+.finance-debt-table .finance-th {
+  background: var(--background-secondary); padding: 10px 14px;
+  text-align: center; font-size: .72em; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .05em; color: var(--text-muted);
+  border-bottom: 1.5px solid var(--ft-border); white-space: nowrap;
+  position: sticky; top: 0; z-index: 1;
+}
+.finance-debt-table .finance-td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--ft-border);
+  color: var(--text-normal); vertical-align: middle;
+}
+.finance-debt-table .finance-actions-td {
+  white-space: nowrap; text-align: right;
+  width: 140px; padding: 4px 6px;
+}
+
+.finance-mov-table {
+  width: 100%;
+  min-width: 100%;   /* stretch to fill the expand-td even when content is sparse */
+  border-collapse: collapse;
+  font-size: .82em;
+}
+.finance-mov-table .finance-th {
+  font-size: .68em;
+  padding: 6px 14px;
+  background: var(--background-secondary);
+}
+.finance-mov-table .finance-td {
+  padding: 5px 14px;
+  font-size: .9em;
+}
+.finance-td-mov-borrow {
+  color: #dc2626;
+  font-weight: 700;
+}
+.finance-td-mov-repay {
+  color: #16a34a;
+  font-weight: 700;
+}
+.finance-mov-empty {
+  display: block;
+  padding: 12px 14px;
+  color: var(--text-muted);
+  font-style: italic;
+  font-size: .85em;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SETTINGS PANEL
+   ═══════════════════════════════════════════════════════════════════════════ */
+.finance-settings-panel {
+  background: var(--background-secondary);
+  border: 1px solid var(--ft-border);
+  border-radius: var(--ft-radius);
+  padding: 16px 18px; margin-bottom: 14px;
+  box-shadow: var(--ft-shadow);
+}
+.finance-settings-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.finance-settings-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.finance-settings-color-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.finance-settings-color-input {
+  width: 40px;
+  height: 34px;
+  padding: 2px;
+  border: 1.5px solid var(--ft-border);
+  border-radius: var(--ft-radius-sm);
+  cursor: pointer;
+  background: none;
+}
+.finance-settings-color-input::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+.finance-settings-color-input::-webkit-color-swatch {
+  border: none;
+  border-radius: 4px;
+}
+.finance-settings-hex {
+  font-size: .82em;
+  font-family: var(--font-monospace, monospace);
+  color: var(--text-muted);
+  min-width: 56px;
+}
+.finance-settings-ie-row {
+  display: flex;
+  gap: 8px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
    Minimal Theme Integration
    ═══════════════════════════════════════════════════════════════════════════ */
 .markdown-source-view.mod-cm6.max .cm-embed-block > div:has(.finance-tracker),
@@ -822,21 +965,53 @@
 }
 
 /* ── Override Obsidian's readable-line-width centering ONLY for our plugin ──
-   :has(.finance-tracker) scopes this to blocks containing the plugin only.
-   Other content in the same note is unaffected.                            */
-.markdown-preview-view.is-readable-line-width .cm-table-widget:has(.finance-tracker),
-.markdown-preview-view.is-readable-line-width div:has(> .finance-tracker),
-.markdown-source-view.mod-cm6 .cm-contentContainer .cm-content .cm-table-widget:has(.finance-tracker) {
-  margin-inline: 0 !important;
+   Obsidian applies max-width + margin:auto to .markdown-preview-sizer and
+   padding-inline to .cm-content.  We need to undo that at every level of
+   the ancestor chain that wraps our block, without touching the rest of
+   the note.  :has() keeps the scope tight.
+   ─────────────────────────────────────────────────────────────────────── */
+
+/* ① Reading view — the direct container of the code fence output */
+.markdown-preview-view .block-language-finance-account {
   width: 100% !important;
   max-width: 100% !important;
-  padding-inline-start: 0 !important;
+  box-sizing: border-box !important;
+  padding-inline: 0 !important;
+  margin-inline: 0 !important;
+}
+
+/* ② Reading view — every ancestor inside the sizer that wraps our block */
+.markdown-preview-view.is-readable-line-width .markdown-preview-sizer > div:has(.finance-tracker),
+.markdown-preview-view.is-readable-line-width .markdown-preview-section:has(.finance-tracker),
+.markdown-preview-view.is-readable-line-width div:has(> .finance-tracker) {
+  width: 100% !important;
+  max-width: 100% !important;
+  margin-inline: 0 !important;
+  padding-inline: 0 !important;
+}
+
+/* ③ Live Preview — the embed block widget wrapper */
+.markdown-source-view.mod-cm6 .cm-embed-block:has(.finance-tracker),
+.markdown-source-view.mod-cm6 .cm-table-widget:has(.finance-tracker),
+.markdown-source-view.mod-cm6 .cm-contentContainer .cm-content .cm-embed-block:has(.finance-tracker) {
+  width: 100% !important;
+  max-width: 100% !important;
+  margin-inline: 0 !important;
+  padding-inline: 0 !important;
+  box-sizing: border-box !important;
+}
+
+/* ④ Live Preview — readable-line-width adds padding-inline to .cm-content;
+      override only for the content container that holds our plugin */
+.markdown-source-view.mod-cm6.is-readable-line-width .cm-content:has(.finance-tracker) {
+  padding-inline: 0 !important;
 }
 .max .finance-stats-container,
 .max .finance-filters-container,
 .max .finance-analytics-panel,
 .max .finance-sort-row,
-.max .finance-table-wrapper {
+.max .finance-table-wrapper,
+.max .finance-body {
   max-width: 100% !important;
   min-width: 0 !important;
   box-sizing: border-box !important;

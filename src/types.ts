@@ -1,6 +1,7 @@
 export type RecordType = 'income' | 'expense';
 export type SortField  = 'date' | 'amount' | 'category' | 'type' | 'payer' | 'tag' | 'createdAt';
 export type SortDir    = 'asc'  | 'desc';
+export type DebtMovementType = 'borrow' | 'repay';
 
 export interface FinanceRecord {
   id:             string;
@@ -16,14 +17,37 @@ export interface FinanceRecord {
   attachmentPath: string;
 }
 
+export interface DebtMovement {
+  id:        string;
+  type:      DebtMovementType;
+  amount:    number;
+  date:      string;   // YYYY-MM-DD
+  time:      string;   // HH:MM
+  createdAt: number;
+  note:      string;
+}
+
+export interface DebtRecord {
+  id:        string;
+  person:    string;
+  amount:    number;   // current total (sum borrow - sum repay)
+  date:      string;   // creation date
+  time:      string;
+  createdAt: number;
+  note:      string;
+  movements: DebtMovement[];
+}
+
 export interface AccountMeta {
-  name:     string;   // custom display name; "" → use note filename
-  currency: string;   // "₽" | "$" | "BTC" etc.
+  name:         string;   // custom display name; "" → use note filename
+  currency:     string;   // "₽" | "$" | "BTC" etc.
+  accentColor?: string;   // custom accent color for this account
 }
 
 export interface AccountData extends AccountMeta {
   version:    number;
   records:    FinanceRecord[];
+  debts:      DebtRecord[];
   categories: string[];
   tags:       string[];
   payers:     string[];

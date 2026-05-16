@@ -34,6 +34,11 @@ export class ImportExportModal extends Modal {
     this.modalEl.addClass('finance-ie-modal');
   }
 
+  /** Switch to a specific tab before opening */
+  switchTo(tab: 'export' | 'import'): void {
+    this.tab = tab;
+  }
+
   onOpen(): void {
     const { contentEl } = this;
     contentEl.empty();

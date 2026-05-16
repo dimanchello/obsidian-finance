@@ -1,13 +1,16 @@
 import { App, Notice, TFile } from 'obsidian';
 import { FinanceStorage }       from './storage';
 import {
-  AccountData, FinanceRecord, PluginSettings,
-  DEFAULT_FILTER, DEFAULT_SORT, COMMON_CURRENCIES, SortField, ViewState,
+  AccountData, DebtMovement, DebtRecord, FinanceRecord,
+  PluginSettings, DEFAULT_FILTER, DEFAULT_SORT, COMMON_CURRENCIES,
+  SortField, ViewState,
 } from './types';
 import { RecordModal }       from './RecordModal';
 import { ConfirmModal }      from './ConfirmModal';
 import { ImportExportModal } from './ImportExportModal';
 import { AnalyticsView }     from './AnalyticsView';
+import { DebtModal }         from './DebtModal';
+import { DebtMovementModal } from './DebtMovementModal';
 
 // ── state persistence ─────────────────────────────────────────────────────────
 
@@ -59,7 +62,10 @@ export class AccountView {
   private analyticsEl?:  HTMLElement;
   private analyticsView: AnalyticsView | null = null;
   private analyticsOpen  = false;
+  private settingsOpen   = false;
+  private settingsEl?:   HTMLElement;
   private filterDebounce: ReturnType<typeof setTimeout> | null = null;
+  private mode: 'records' | 'debts' = 'records';
 
   constructor(app: App, root: HTMLElement, notePath: string, storage: FinanceStorage, settings: PluginSettings) {
     this.app = app; this.root = root; this.notePath = notePath;
@@ -88,35 +94,14 @@ export class AccountView {
     // ── Phase 2: load data ───────────────────────────────────────────────
     this.data = await this.storage.load(this.notePath);
 
+    // Apply accent color
+    if (this.data.accentColor) {
+      this.applyAccentColor(this.data.accentColor);
+    }
+
     // ── Phase 3: full render ─────────────────────────────────────────────
     body.empty();
-
-    this.statsEl = body.createDiv('finance-stats-container');
-    this.renderStats();
-
-    // Analytics toggle button
-    const analToggleRow = body.createDiv('finance-analytics-toggle-row');
-    const analBtn = analToggleRow.createEl('button', {
-      cls:  'finance-analytics-toggle-btn',
-      text: '📈 Аналитика ▼',
-    });
-    this.analyticsEl = body.createDiv('finance-analytics-panel');
-    this.analyticsEl.style.display = 'none';
-
-    analBtn.addEventListener('click', () => {
-      this.analyticsOpen = !this.analyticsOpen;
-      this.analyticsEl!.style.display = this.analyticsOpen ? 'block' : 'none';
-      analBtn.textContent = `📈 Аналитика ${this.analyticsOpen ? '▲' : '▼'}`;
-      if (this.analyticsOpen) this.renderAnalytics();
-    });
-
-    this.filtersEl = body.createDiv('finance-filters-container');
-    this.renderFilters();
-
-    const tw         = body.createDiv('finance-table-wrapper');
-    this.tableEl     = tw.createDiv('finance-table-container');
-    this.paginationEl= tw.createDiv('finance-pagination');
-    this.renderTable();
+    this.renderBodyContent();
   }
 
   // ── Header ────────────────────────────────────────────────────────────────
@@ -143,12 +128,25 @@ export class AccountView {
     const expBtn = right.createEl('button', { cls: 'finance-add-btn finance-expense-btn' });
     expBtn.innerHTML = '<span class="btn-icon">↓</span><span>Расход</span>';
 
-    const ieBtn  = right.createEl('button', { cls: 'finance-add-btn finance-ie-btn' });
-    ieBtn.innerHTML  = '⇅ Импорт/Экспорт';
+    const debtBtn = right.createEl('button', { cls: 'finance-add-btn finance-debt-btn' });
+    debtBtn.innerHTML = '💳 Долги';
 
-    incBtn.addEventListener('click', () => this.openAddModal('income'));
-    expBtn.addEventListener('click', () => this.openAddModal('expense'));
-    ieBtn .addEventListener('click', () => this.openIEModal());
+    incBtn.addEventListener('click', () => { this.mode = 'records'; this.renderBodyContent(); this.openAddModal('income'); });
+    expBtn.addEventListener('click', () => { this.mode = 'records'; this.renderBodyContent(); this.openAddModal('expense'); });
+    debtBtn.addEventListener('click', () => {
+      this.mode = this.mode === 'debts' ? 'records' : 'debts';
+      this.updateHeaderButtons();
+      this.renderBodyContent();
+    });
+  }
+
+  private updateHeaderButtons(): void {
+    const debtBtn = this.root.querySelector('.finance-debt-btn') as HTMLElement | null;
+    if (debtBtn) {
+      debtBtn.style.border = this.mode === 'debts'
+        ? '2px solid var(--color-accent, #7c3aed)'
+        : '2px solid transparent';
+    }
   }
 
   // ── Editable account name ─────────────────────────────────────────────────
@@ -237,11 +235,12 @@ export class AccountView {
   private renderStats(): void {
     if (!this.statsEl || !this.data) return;
     this.statsEl.empty();
-    const recs = this.data.records;
-    const cur  = this.data.currency || this.settings.defaultCurrency;
-    const inc  = recs.filter(r => r.type === 'income' ).reduce((s, r) => s + r.amount, 0);
-    const exp  = recs.filter(r => r.type === 'expense').reduce((s, r) => s + r.amount, 0);
-    const bal  = inc - exp;
+    const recs  = this.data.records;
+    const cur   = this.data.currency || this.settings.defaultCurrency;
+    const inc   = recs.filter(r => r.type === 'income' ).reduce((s, r) => s + r.amount, 0);
+    const exp   = recs.filter(r => r.type === 'expense').reduce((s, r) => s + r.amount, 0);
+    const debtTotal = this.data.debts.reduce((s, d) => s + d.amount, 0);
+    const bal   = inc - exp - debtTotal;
 
     [
       { label: 'Доходы',  value: fmt(inc, cur), mod: 'income',   icon: '↑' },
@@ -326,22 +325,6 @@ export class AccountView {
     this.mkSearchSelect(row2, 'Тег',
       [{ v:'',l:'Все' }, ...this.data.tags.map(t => ({ v:t,l:t }))],
       f.tag, v => { this.state.filter.tag = v; this.resetPage(); });
-
-    // Per-account page size
-    const psG = row2.createDiv('finance-filter-group');
-    psG.createEl('label', { text: 'Записей / стр.', cls: 'finance-filter-label' });
-    const psSel = psG.createEl('select', { cls: 'finance-filter-select' });
-    [10, 20, 25, 50, 100, 200, 500].forEach(n => {
-      const o = psSel.createEl('option', { text: String(n) });
-      o.value   = String(n);
-      o.selected = n === this.state.pageSize;
-    });
-    psSel.addEventListener('change', () => {
-      this.state.pageSize = parseInt(psSel.value);
-      this.state.page     = 0;
-      saveState(this.notePath, this.state);
-      this.renderTable();
-    });
 
     const rG = row2.createDiv('finance-filter-group finance-filter-reset');
     rG.createEl('label', { text: '\u00A0', cls: 'finance-filter-label' });
@@ -740,9 +723,9 @@ export class AccountView {
     else new Notice(`⚠️ Файл не найден: ${rec.attachmentPath}`);
   }
 
-  private openIEModal(): void {
+  private openIEModal(defaultTab?: 'export' | 'import'): void {
     if (!this.data) { new Notice('⏳ Загрузка…'); return; }
-    new ImportExportModal(this.app, {
+    const modal = new ImportExportModal(this.app, {
       noteName: this.data.name || noteFilename(this.notePath),
       currency: this.data.currency || this.settings.defaultCurrency,
       records:  this.data.records,
@@ -751,7 +734,9 @@ export class AccountView {
         this.data = await this.storage.load(this.notePath);
         this.renderStats(); this.renderFilters(); this.renderTable();
       },
-    }).open();
+    });
+    if (defaultTab) modal.switchTo(defaultTab);
+    modal.open();
   }
 
   private resetPage(): void {
@@ -759,5 +744,380 @@ export class AccountView {
     saveState(this.notePath, this.state);
     this.renderTable();
     if (this.analyticsOpen) this.renderAnalytics();
+  }
+
+  // ── View switching ───────────────────────────────────────────────────────
+
+  private renderBodyContent(): void {
+    if (!this.data) return;
+    const body = this.root.querySelector('.finance-body') as HTMLElement;
+    if (!body) return;
+    body.empty();
+
+    this.statsEl = body.createDiv('finance-stats-container');
+    this.renderStats();
+
+    if (this.mode === 'debts') {
+      this.renderDebtsView(body);
+    } else {
+      this.analyticsView = null;
+      this.analyticsOpen = false;
+      this.renderRecordsView(body);
+    }
+  }
+
+  private renderRecordsView(body: HTMLElement): void {
+    const toggleRow = body.createDiv('finance-analytics-toggle-row');
+    const analBtn = toggleRow.createEl('button', {
+      cls:  'finance-analytics-toggle-btn',
+      text: '📈 Аналитика ▼',
+    });
+    const setBtn = toggleRow.createEl('button', {
+      cls:  'finance-analytics-toggle-btn',
+      text: '⚙️ Настройки',
+    });
+    setBtn.style.marginLeft = '8px';
+
+    this.analyticsEl = body.createDiv('finance-analytics-panel');
+    this.analyticsEl.style.display = 'none';
+
+    this.settingsEl = body.createDiv('finance-analytics-panel');
+    this.settingsEl.style.display = 'none';
+
+    analBtn.addEventListener('click', () => {
+      this.analyticsOpen = !this.analyticsOpen;
+      this.analyticsEl!.style.display = this.analyticsOpen ? 'block' : 'none';
+      analBtn.textContent = `📈 Аналитика ${this.analyticsOpen ? '▲' : '▼'}`;
+      if (this.analyticsOpen) this.renderAnalytics();
+    });
+
+    setBtn.addEventListener('click', () => {
+      this.settingsOpen = !this.settingsOpen;
+      this.settingsEl!.style.display = this.settingsOpen ? 'block' : 'none';
+      setBtn.textContent = `⚙️ Настройки${this.settingsOpen ? ' ▲' : ''}`;
+      if (this.settingsOpen) this.renderSettings();
+    });
+
+    this.filtersEl = body.createDiv('finance-filters-container');
+    this.renderFilters();
+
+    const tw         = body.createDiv('finance-table-wrapper');
+    this.tableEl     = tw.createDiv('finance-table-container');
+    this.paginationEl= tw.createDiv('finance-pagination');
+    this.renderTable();
+  }
+
+  private renderSettings(): void {
+    if (!this.settingsEl || !this.data) return;
+    this.settingsEl.empty();
+    this.settingsEl.addClass('finance-settings-panel');
+
+    // Page size
+    const psRow = this.settingsEl.createDiv('finance-settings-row');
+    const psG = psRow.createDiv('finance-settings-field');
+    psG.createEl('label', {
+      text: 'Записей на странице',
+      cls: 'finance-filter-label',
+    });
+    const psSel = psG.createEl('select', { cls: 'finance-filter-select' });
+    [10, 20, 25, 50, 100, 200, 500].forEach(n => {
+      const o = psSel.createEl('option', { text: String(n) });
+      o.value = String(n);
+      o.selected = n === this.state.pageSize;
+    });
+    psSel.addEventListener('change', () => {
+      this.state.pageSize = parseInt(psSel.value);
+      this.state.page = 0;
+      saveState(this.notePath, this.state);
+      this.renderTable();
+    });
+
+    // Accent color
+    const acRow = this.settingsEl.createDiv('finance-settings-row');
+    acRow.createEl('label', {
+      text: 'Цвет акцента счёта',
+      cls: 'finance-filter-label',
+    });
+    const acColorWrap = acRow.createDiv('finance-settings-color-wrap');
+    const acIn = acColorWrap.createEl('input', { type: 'color', cls: 'finance-settings-color-input' });
+    acIn.value = this.data.accentColor || '#7c3aed';
+    const hexLabel = acColorWrap.createEl('span', {
+      text: acIn.value,
+      cls: 'finance-settings-hex',
+    });
+    acIn.addEventListener('input', async () => {
+      hexLabel.textContent = acIn.value;
+      await this.storage.updateMeta(this.notePath, { accentColor: acIn.value });
+      this.data = await this.storage.load(this.notePath);
+      this.applyAccentColor(acIn.value);
+    });
+    const resetColorBtn = acRow.createEl('button', {
+      text: 'Сбросить',
+      cls: 'finance-btn-cancel',
+    });
+    resetColorBtn.style.padding = '4px 12px';
+    resetColorBtn.style.fontSize = '.8em';
+    resetColorBtn.addEventListener('click', async () => {
+      await this.storage.updateMeta(this.notePath, { accentColor: '' });
+      this.data = await this.storage.load(this.notePath);
+      this.applyAccentColor('');
+      acIn.value = '#7c3aed';
+      hexLabel.textContent = '#7c3aed';
+    });
+
+    // Import / Export
+    const ieRow = this.settingsEl.createDiv('finance-settings-row');
+    ieRow.style.borderTop = '1px solid var(--ft-border)';
+    ieRow.style.paddingTop = '14px';
+    ieRow.style.marginTop = '4px';
+    ieRow.createEl('label', {
+      text: 'Импорт / Экспорт',
+      cls: 'finance-filter-label',
+    });
+    const ieBtns = ieRow.createDiv('finance-settings-ie-row');
+    const expBtn = ieBtns.createEl('button', {
+      cls: 'finance-add-btn finance-ie-btn',
+      text: '📤 Экспорт',
+    });
+    const impBtn = ieBtns.createEl('button', {
+      cls: 'finance-add-btn finance-ie-btn',
+      text: '📥 Импорт',
+    });
+    expBtn.addEventListener('click', () => {
+      this.openIEModal('export');
+    });
+    impBtn.addEventListener('click', () => {
+      this.openIEModal('import');
+    });
+  }
+
+  private applyAccentColor(color: string): void {
+    if (color) {
+      this.root.style.setProperty('--ft-accent', color);
+    } else {
+      this.root.style.removeProperty('--ft-accent');
+    }
+  }
+
+  // ── Debts view ──────────────────────────────────────────────────────────
+
+  private renderDebtsView(body: HTMLElement): void {
+    const cur = this.data?.currency || this.settings.defaultCurrency;
+    const debts = this.data?.debts || [];
+
+    // Summary
+    const summary = body.createDiv('finance-stats-container');
+    const totalDebt = debts.reduce((s, d) => s + d.amount, 0);
+    const totalRepaid = debts.reduce((s, d) =>
+      s + d.movements.filter(m => m.type === 'repay').reduce((ss, m) => ss + m.amount, 0), 0);
+
+    const mkCard = (label: string, value: string, mod: string, icon: string) => {
+      const card = summary.createDiv(`finance-stat-card finance-stat-${mod}`);
+      card.createEl('div', { text: icon, cls: 'finance-stat-icon' });
+      const info = card.createDiv('finance-stat-info');
+      info.createEl('div', { text: label, cls: 'finance-stat-label' });
+      info.createEl('div', { text: value, cls: 'finance-stat-value' });
+    };
+    mkCard('Активных долгов', String(debts.length), 'income', '💳');
+    mkCard('Общая сумма долга', fmt(totalDebt, cur), totalDebt >= 0 ? 'positive' : 'negative', '＝');
+    mkCard('Возвращено', fmt(totalRepaid, cur), 'income', '↑');
+
+    // Debt buttons header
+    const actions = body.createDiv('finance-debt-actions');
+    const newDebtBtn = actions.createEl('button', { cls: 'finance-add-btn finance-expense-btn' });
+    newDebtBtn.innerHTML = '<span class="btn-icon">＋</span><span>Новый долг</span>';
+    newDebtBtn.addEventListener('click', () => this.openNewDebtModal());
+
+    if (!debts.length) {
+      const e = body.createDiv('finance-empty-state');
+      e.createEl('div', { text: '💳', cls: 'finance-empty-icon' });
+      e.createEl('p', { text: 'Нет долгов', cls: 'finance-empty-title' });
+      e.createEl('p', { text: 'Нажмите «Новый долг»', cls: 'finance-empty-sub' });
+      return;
+    }
+
+    // Debt table
+    const tw = body.createDiv('finance-table-wrapper');
+    const scroll = tw.createDiv('finance-table-scroll');
+    const table = scroll.createEl('table', { cls: 'finance-debt-table' });
+
+    const cols = [
+      { key: 'person',  label: 'Кому' },
+      { key: 'amount',  label: 'Сумма' },
+      { key: 'date',    label: 'Дата' },
+      { key: 'note',    label: 'Примечание' },
+      { key: '_act',    label: '' },
+    ];
+
+    const hRow = table.createEl('thead').createEl('tr');
+    cols.forEach(c => hRow.createEl('th', { text: c.label, cls: 'finance-th' }));
+
+    const tbody = table.createEl('tbody');
+    const frag = document.createDocumentFragment();
+
+    debts.forEach(debt => {
+      const tr = document.createElement('tr');
+      tr.classList.add('finance-tr', 'finance-debt-row');
+
+      const cells: { key: string; text: string }[] = [
+        { key: 'person', text: debt.person || '—' },
+        { key: 'amount', text: fmt(debt.amount, cur) },
+        { key: 'date',   text: fmtDate(debt.date, debt.time) },
+        { key: 'note',   text: debt.note || '—' },
+      ];
+
+      cells.forEach(c => {
+        const td = document.createElement('td');
+        td.classList.add('finance-td');
+        td.setAttribute('data-label', cols.find(co => co.key === c.key)?.label ?? '');
+        td.textContent = c.text;
+        tr.appendChild(td);
+      });
+
+      // Actions
+      const atd = document.createElement('td');
+      atd.classList.add('finance-td', 'finance-actions-td');
+      atd.setAttribute('data-label', '');
+
+      this.mkActionBtn(atd, '💰', 'Погасить', () => this.openRepayModal(debt));
+      this.mkActionBtn(atd, '➕', 'Взять ещё', () => this.openBorrowMoreModal(debt));
+      this.mkActionBtn(atd, '✏️', 'Редактировать', () => this.openEditDebtModal(debt));
+      this.mkActionBtn(atd, '🗑️', 'Удалить', () => this.confirmDeleteDebt(debt), 'finance-delete-btn');
+
+      tr.appendChild(atd);
+
+      // Expandable movements row
+      const expandRow = document.createElement('tr');
+      expandRow.classList.add('finance-debt-expand-row');
+      const expandTd = document.createElement('td');
+      expandTd.setAttribute('colspan', String(cols.length));
+      expandTd.classList.add('finance-debt-expand-td');
+
+      if (debt.movements.length) {
+        const movTable = expandTd.createEl('table', { cls: 'finance-mov-table' });
+        const movHead = movTable.createEl('thead').createEl('tr');
+        ['Тип', 'Сумма', 'Дата', 'Примечание'].forEach(l => {
+          movHead.createEl('th', { text: l, cls: 'finance-th finance-mov-th' });
+        });
+        const movBody = movTable.createEl('tbody');
+        debt.movements.forEach(m => {
+          const mr = movBody.createEl('tr', { cls: `finance-mov-${m.type}` });
+          const typeLabel = m.type === 'borrow' ? '➕ Взял ещё' : '💰 Погашение';
+          mr.createEl('td', { text: typeLabel, cls: 'finance-td' });
+          mr.createEl('td', {
+            text: (m.type === 'borrow' ? '−' : '+') + fmt(m.amount, cur),
+            cls: `finance-td finance-td-mov-${m.type}`,
+          });
+          mr.createEl('td', { text: fmtDate(m.date, m.time), cls: 'finance-td' });
+          mr.createEl('td', { text: m.note || '—', cls: 'finance-td' });
+        });
+      } else {
+        expandTd.createEl('span', {
+          text: 'Нет движений',
+          cls: 'finance-mov-empty',
+        });
+      }
+
+      expandRow.appendChild(expandTd);
+      expandRow.style.display = 'none';
+
+      // Click to toggle
+      tr.style.cursor = 'pointer';
+      tr.addEventListener('click', (e) => {
+        if ((e.target as HTMLElement).closest('.finance-action-btn')) return;
+        expandRow.style.display = expandRow.style.display === 'none' ? 'table-row' : 'none';
+      });
+
+      frag.appendChild(tr);
+      frag.appendChild(expandRow);
+    });
+
+    tbody.appendChild(frag);
+  }
+
+  // ── Debt modals ──────────────────────────────────────────────────────────
+
+  private openNewDebtModal(): void {
+    if (!this.data) { new Notice('⏳ Загрузка…'); return; }
+    const allPersons = this.data.payers;
+    new DebtModal(this.app, {
+      title: '➕ Новый долг',
+      allPersons,
+      onSave: async debt => {
+        const mov: DebtMovement = {
+          id: crypto.randomUUID(),
+          type: 'borrow',
+          amount: debt.amount,
+          date: debt.date,
+          time: debt.time,
+          createdAt: debt.createdAt,
+          note: 'Создание долга',
+        };
+        debt.movements = [mov];
+        await this.storage.addDebt(this.notePath, debt);
+        this.data = await this.storage.load(this.notePath);
+        this.renderStats();
+        this.renderBodyContent();
+        new Notice('✅ Долг добавлен');
+      },
+    }).open();
+  }
+
+  private openEditDebtModal(debt: DebtRecord): void {
+    if (!this.data) return;
+    const allPersons = this.data.payers.concat(this.data.debts.map(d => d.person));
+    const unique = [...new Set(allPersons)];
+    new DebtModal(this.app, {
+      title: '✏️ Редактировать долг',
+      debt,
+      allPersons: unique,
+      onSave: async updated => {
+        await this.storage.updateDebt(this.notePath, updated);
+        this.data = await this.storage.load(this.notePath);
+        this.renderStats();
+        this.renderBodyContent();
+        new Notice('✅ Долг обновлён');
+      },
+    }).open();
+  }
+
+  private openRepayModal(debt: DebtRecord): void {
+    new DebtMovementModal(this.app, {
+      title: `💰 Погашение долга — ${debt.person}`,
+      type: 'repay',
+      onSave: async mov => {
+        await this.storage.addDebtMovement(this.notePath, debt.id, mov);
+        this.data = await this.storage.load(this.notePath);
+        this.renderStats();
+        this.renderBodyContent();
+        new Notice('✅ Погашение записано');
+      },
+    }).open();
+  }
+
+  private openBorrowMoreModal(debt: DebtRecord): void {
+    new DebtMovementModal(this.app, {
+      title: `➕ Увеличить долг — ${debt.person}`,
+      type: 'borrow',
+      onSave: async mov => {
+        await this.storage.addDebtMovement(this.notePath, debt.id, mov);
+        this.data = await this.storage.load(this.notePath);
+        this.renderStats();
+        this.renderBodyContent();
+        new Notice('✅ Сумма долга увеличена');
+      },
+    }).open();
+  }
+
+  private confirmDeleteDebt(debt: DebtRecord): void {
+    const cur = this.data?.currency || this.settings.defaultCurrency;
+    const label = `${debt.person} · ${fmt(debt.amount, cur)} · ${fmtDate(debt.date, debt.time)}`;
+    new ConfirmModal(this.app, `Удалить долг?\n${label}`, async () => {
+      await this.storage.deleteDebt(this.notePath, debt.id);
+      this.data = await this.storage.load(this.notePath);
+      this.renderStats();
+      this.renderBodyContent();
+      new Notice('🗑️ Долг удалён');
+    }).open();
   }
 }
