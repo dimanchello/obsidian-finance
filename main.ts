@@ -79,7 +79,7 @@ class FinanceSettingTab extends PluginSettingTab {
       'Создайте заметку для каждого счёта (Наличные, Карта, Крипто-кошелёк).',
       'Вставьте в заметку блок кода с языком finance-account.',
       'Название счёта и валюта редактируются прямо в шапке блока.',
-      'Данные хранятся в .obsidian/plugins/finance-tracker/accounts/',
+      'Данные хранятся в .obsidian/plugins/obsidian-finance/accounts/',
     ].forEach(t => ul.createEl('li', { text: t }));
   }
 }
