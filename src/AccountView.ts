@@ -2023,7 +2023,7 @@ export class AccountView {
     const allDeposits = this.data.deposits || [];
     const cur = this.data.currency || this.settings.defaultCurrency;
 
-    const summary = body.createDiv('finance-debt-summary');
+    const summary = body.createDiv('finance-stats-container');
     const activeDeposits = allDeposits.filter(d => d.status === 'active');
     const closedDeposits = allDeposits.filter(d => d.status === 'closed');
     const totalAmount = activeDeposits.reduce((s, d) => s + d.amount, 0);
