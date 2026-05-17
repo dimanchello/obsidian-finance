@@ -30,16 +30,18 @@ export interface DebtMovement {
 export type DebtDirection = 'lent' | 'borrowed';  // lent = мне должны, borrowed = я должен
 
 export interface DebtRecord {
-  id:        string;
-  person:    string;
-  amount:    number;   // current total (sum borrow - sum repay)
-  direction: DebtDirection;
-  date:      string;   // creation date
-  time:      string;
-  dueDate:   string;   // deadline for repayment
-  createdAt: number;
-  note:      string;
-  movements: DebtMovement[];
+  id:           string;
+  person:       string;
+  amount:       number;   // current total (sum borrow - sum repay) with interest
+  originalAmount: number; // original amount without interest
+  interestRate: number;   // percentage (e.g., 10 = 10%)
+  direction:    DebtDirection;
+  date:         string;   // creation date
+  time:         string;
+  dueDate:      string;   // deadline for repayment
+  createdAt:    number;
+  note:         string;
+  movements:    DebtMovement[];
 }
 
 export interface AccountMeta {

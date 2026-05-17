@@ -62,6 +62,16 @@ npm run build  # Production: typecheck + minified bundle
 - Enums/Types: PascalCase (`RecordType`, `DebtMovementType`)
 - Constants: UPPER_SNAKE_CASE (`DEFAULT_SETTINGS`, `COMMON_CURRENCIES`)
 
+### Mobile Adaptation (Обязательно!)
+**Все новые фичи должны поддерживать мобильные устройства!**
+
+При добавлении любой функциональности необходимо:
+- Предусмотреть адаптивную верстку (использовать `Platform.isMobile` или `window.innerWidth <= 480`)
+- Для таблиц добавить блочную версию (card-based layout) как в `renderDebtsAsBlocks`
+- Тестировать узкий экран (≤ 480px) — все элементы должны помещаться и быть удобными
+- Избегать горизонтального скролла на мобильных устройствах
+- Использовать большие кнопки и элементы управления (минимум 44px)
+
 ### UI Patterns
 - DOM manipulation: Native `document.createElement()` + Obsidian's `el.createEl()`
 - No external UI framework

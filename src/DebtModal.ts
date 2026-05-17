@@ -26,6 +26,8 @@ export class DebtModal extends Modal {
   private o: DebtModalOptions;
   private debt: DebtRecord;
   private amountInput!: HTMLInputElement;
+  private interestInput!: HTMLInputElement;
+  private totalDisplayEl!: HTMLElement;
 
   constructor(app: App, opts: DebtModalOptions) {
     super(app);
@@ -38,6 +40,8 @@ export class DebtModal extends Modal {
           id: crypto.randomUUID(),
           person: '',
           amount: 0,
+          originalAmount: 0,
+          interestRate: 0,
           direction: 'borrowed',
           date: nowStr,
           time: '',
@@ -130,9 +134,49 @@ export class DebtModal extends Modal {
 
     this.amountInput.addEventListener('blur', () => {
       const n = parseAmount(this.amountInput.value);
-      this.debt.amount = n;
+      this.debt.originalAmount = n;
+      this.debt.amount = this.calculateTotalAmount(n, this.debt.interestRate);
       this.amountInput.value = n > 0 ? fmtAmount(String(n)) : '';
+      this.updateTotalDisplay();
     });
+
+    // ── Interest Rate ──────────────────────────────────────────────────────
+    const interestG = form.createDiv('finance-field-group finance-interest-group');
+    interestG.createEl('label', { text: 'Процент', cls: 'finance-field-label' });
+    interestG.createEl('span', { text: 'если долг под %, например 10', cls: 'finance-field-hint' });
+
+    this.interestInput = interestG.createEl('input', {
+      type: 'text',
+      cls: 'finance-input finance-interest-input',
+    });
+    this.interestInput.setAttribute('inputmode', 'decimal');
+    this.interestInput.setAttribute('placeholder', '0');
+    this.interestInput.setAttribute('autocomplete', 'off');
+
+    if (this.debt.interestRate > 0) {
+      this.interestInput.value = String(this.debt.interestRate);
+    }
+
+    this.interestInput.addEventListener('input', () => {
+      const rate = parseFloat(this.interestInput.value.replace(',', '.')) || 0;
+      this.debt.interestRate = rate;
+      this.debt.amount = this.calculateTotalAmount(this.debt.originalAmount, rate);
+      this.updateTotalDisplay();
+    });
+
+    this.interestInput.addEventListener('blur', () => {
+      const rate = parseFloat(this.interestInput.value.replace(',', '.')) || 0;
+      this.debt.interestRate = rate;
+      this.debt.amount = this.calculateTotalAmount(this.debt.originalAmount, rate);
+      this.interestInput.value = rate > 0 ? String(rate) : '';
+      this.updateTotalDisplay();
+    });
+
+    // Total amount display
+    const totalG = form.createDiv('finance-field-group finance-total-group');
+    totalG.createEl('label', { text: 'Итого к возврату', cls: 'finance-field-label' });
+    this.totalDisplayEl = totalG.createEl('div', { cls: 'finance-total-display' });
+    this.totalDisplayEl.textContent = fmtAmount(String(this.debt.amount)) || '0';
 
     // ── Person (autocomplete combobox like RecordModal) ────────────────
     const personG = form.createDiv('finance-field-group');
@@ -241,7 +285,8 @@ export class DebtModal extends Modal {
 
   private handleSave(): void {
     const amount = parseAmount(this.amountInput.value);
-    this.debt.amount = amount;
+    this.debt.originalAmount = amount;
+    this.debt.amount = this.calculateTotalAmount(amount, this.debt.interestRate);
     if (!amount || amount <= 0) {
       new Notice('⚠️ Укажите сумму больше нуля');
       this.amountInput.focus();
@@ -254,6 +299,22 @@ export class DebtModal extends Modal {
     this.debt.person = this.debt.person.trim();
     this.o.onSave(this.debt);
     this.close();
+  }
+
+  private calculateTotalAmount(original: number, rate: number): number {
+    if (rate <= 0) return original;
+    return original + (original * rate / 100);
+  }
+
+  private updateTotalDisplay(): void {
+    if (this.totalDisplayEl) {
+      const total = this.calculateTotalAmount(this.debt.originalAmount, this.debt.interestRate);
+      if (this.debt.interestRate > 0) {
+        this.totalDisplayEl.innerHTML = `${fmtAmount(String(total))} <span class="finance-total-hint">(${fmtAmount(String(this.debt.originalAmount))} + ${this.debt.interestRate}%)</span>`;
+      } else {
+        this.totalDisplayEl.textContent = fmtAmount(String(total)) || '0';
+      }
+    }
   }
 
   onClose(): void { this.contentEl.empty(); }

@@ -893,15 +893,23 @@ export class AccountView {
   }
 
   private getDebtOriginal(debt: DebtRecord): number {
+    if (debt.originalAmount > 0) return debt.originalAmount;
     return debt.movements
       .filter(m => m.type === 'borrow')
       .reduce((s, m) => s + m.amount, 0);
   }
 
-  private getDebtRemaining(debt: DebtRecord): number {
+  private getDebtWithInterest(debt: DebtRecord): number {
     const original = this.getDebtOriginal(debt);
+    const rate = debt.interestRate || 0;
+    if (rate <= 0) return original;
+    return original + (original * rate / 100);
+  }
+
+  private getDebtRemaining(debt: DebtRecord): number {
+    const total = this.getDebtWithInterest(debt);
     const repaid = this.getDebtRepaid(debt);
-    return Math.max(0, original - repaid);
+    return Math.max(0, total - repaid);
   }
 
   // ── Pagination ────────────────────────────────────────────────────────────
@@ -1390,11 +1398,20 @@ export class AccountView {
 
       const amounts = block.createDiv('finance-debt-amounts');
       const original = this.getDebtOriginal(debt);
+      const withInterest = this.getDebtWithInterest(debt);
       const remaining = this.getDebtRemaining(debt);
 
+      const hasInterest = typeof debt.interestRate === 'number' && debt.interestRate > 0;
       const amtOrig = amounts.createDiv('finance-debt-amount');
-      amtOrig.createEl('span', { text: 'Сумма', cls: 'finance-debt-amount-label' });
-      amtOrig.createEl('span', { text: fmt(original, cur), cls: 'finance-debt-amount-value' });
+      amtOrig.createEl('span', { text: hasInterest ? 'Сумма + %' : 'Сумма', cls: 'finance-debt-amount-label' });
+      if (hasInterest) {
+        amtOrig.createEl('span', {
+          text: fmt(original, cur) + ' → ' + fmt(withInterest, cur),
+          cls: 'finance-debt-amount-value',
+        });
+      } else {
+        amtOrig.createEl('span', { text: fmt(original, cur), cls: 'finance-debt-amount-value' });
+      }
 
       if (remaining > 0) {
         const amtRem = amounts.createDiv('finance-debt-amount');
@@ -1478,13 +1495,19 @@ export class AccountView {
       const dirText = dir === 'lent' ? '💸 Мне должны' : '💳 Я должен';
       const dirCls = dir === 'lent' ? 'finance-dir-lent' : 'finance-dir-borrowed';
       const original = this.getDebtOriginal(debt);
+      const withInterest = this.getDebtWithInterest(debt);
       const remaining = this.getDebtRemaining(debt);
       const dueDateText = debt.dueDate ? fmtDate(debt.dueDate) : '—';
       const dueDateCls = debt.dueDate ? 'finance-due-date' : '';
+
+      const hasInterest = typeof debt.interestRate === 'number' && debt.interestRate > 0;
+      const originalText = hasInterest
+        ? `${fmt(original, cur)} → ${fmt(withInterest, cur)}`
+        : fmt(original, cur);
       const cells: { key: string; text: string; cls?: string }[] = [
         { key: 'direction', text: dirText, cls: dirCls },
         { key: 'person',    text: debt.person || '—' },
-        { key: 'original',  text: fmt(original, cur), cls: 'finance-amount-cell' },
+        { key: 'original',  text: originalText, cls: 'finance-amount-cell' },
         { key: 'remaining', text: remaining > 0 ? fmt(remaining, cur) : '—',
           cls: remaining > 0 ? 'finance-amount-cell finance-amount-remaining' : 'finance-amount-cell' },
         { key: 'date',      text: fmtDate(debt.date) },

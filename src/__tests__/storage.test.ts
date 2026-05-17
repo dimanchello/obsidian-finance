@@ -108,6 +108,8 @@ describe('FinanceStorage', () => {
         id: 'debt-1',
         person: 'Иван',
         amount: 5000,
+        originalAmount: 5000,
+        interestRate: 0,
         direction: 'lent' as const,
         date: '2024-11-01',
         time: '',
