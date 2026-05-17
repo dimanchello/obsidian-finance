@@ -1337,17 +1337,14 @@ export class AccountView {
   }
 
   private renderDebtMovementsPanel(parent: HTMLElement, debt: DebtRecord, cur: string): void {
-    const movPanel = parent.createDiv('finance-mov-panel');
-    movPanel.createEl('div', { text: 'История операций', cls: 'finance-mov-panel-title' });
-
-    const body = movPanel.createDiv('finance-mov-panel-body');
-
     if (!debt.movements.length) {
-      body.createEl('span', { text: 'Нет движений', cls: 'finance-mov-empty' });
       return;
     }
 
-    const movTable = body.createEl('table', { cls: 'finance-mov-table' });
+    const wrapper = parent.createDiv();
+    wrapper.style.padding = '10px 12px 12px';
+    const scrollWrapper = wrapper.createDiv({ cls: 'finance-mov-scroll' });
+    const movTable = scrollWrapper.createEl('table', { cls: 'finance-mov-table' });
     const movHead = movTable.createEl('thead').createEl('tr');
     ['Тип', 'Сумма', 'Дата', 'Примечание'].forEach(l => {
       movHead.createEl('th', { text: l, cls: 'finance-th finance-mov-th' });
