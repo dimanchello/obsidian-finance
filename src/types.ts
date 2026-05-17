@@ -54,6 +54,8 @@ export interface AccountData extends AccountMeta {
   version:    number;
   records:    FinanceRecord[];
   debts:      DebtRecord[];
+  credits:    CreditRecord[];
+  deposits:   DepositRecord[];
   categories: string[];
   tags:       string[];
   payers:     string[];
@@ -82,6 +84,12 @@ export interface ViewState {
   debtPage?: number;
   debtSort?: { field: DebtSortField; dir: SortDir };
   debtFilter?: DebtFilterState;
+  creditPage?: number;
+  creditSort?: { field: CreditSortField; dir: SortDir };
+  creditFilter?: CreditFilterState;
+  depositPage?: number;
+  depositSort?: { field: DepositSortField; dir: SortDir };
+  depositFilter?: DepositFilterState;
 }
 
 export interface PluginSettings {
@@ -105,7 +113,100 @@ export const DEFAULT_DEBT_FILTER: DebtFilterState = {
   search: '', status: 'all', direction: 'all', dateFrom: '', dateTo: '', person: '',
 };
 
+export type CreditSortField = 'date' | 'amount' | 'bankName' | 'createdAt';
+export type CreditFilterState = {
+  search: string;
+  status: 'all' | 'active' | 'paid';
+  bankName: string;
+  type: 'all' | CreditType;
+  dateFrom: string;
+  dateTo: string;
+};
+
+export type DepositSortField = 'date' | 'amount' | 'bankName' | 'createdAt';
+export type DepositFilterState = {
+  search: string;
+  status: 'all' | 'active' | 'closed';
+  bankName: string;
+  type: 'all' | DepositType;
+  dateFrom: string;
+  dateTo: string;
+};
+
+export const DEFAULT_CREDIT_FILTER: CreditFilterState = {
+  search: '', status: 'all', bankName: '', type: 'all', dateFrom: '', dateTo: '',
+};
+
+export const DEFAULT_DEPOSIT_FILTER: DepositFilterState = {
+  search: '', status: 'all', bankName: '', type: 'all', dateFrom: '', dateTo: '',
+};
+
 export const COMMON_CURRENCIES = [
   '₽', '$', '€', '£', '¥', '₸', '₴', '₾', 'CHF',
   'BTC', 'ETH', 'USDT', 'USDC', 'TON', 'SOL',
 ];
+
+export const CREDIT_PAGE_SIZE = 20;
+
+export type CreditType = 'credit' | 'auto' | 'mortgage' | 'consumer';
+export type CreditStatus = 'active' | 'paid';
+export type CreditPaymentStatus = 'pending' | 'paid';
+
+export interface CreditPayment {
+  id: string;
+  amount: number;
+  dueDate: string;
+  status: CreditPaymentStatus;
+  paidDate?: string;
+  note?: string;
+}
+
+export interface CreditRecord {
+  id: string;
+  name: string;
+  type: CreditType;
+  bankName: string;
+  originalAmount: number;
+  currentAmount: number;
+  interestRate: number;
+  monthlyPayment: number;
+  termMonths: number;
+  startDate: string;
+  createdAt: number;
+  note: string;
+  status: CreditStatus;
+  earlyRepaymentOption: 'term' | 'amount' | null;
+  payments: CreditPayment[];
+}
+
+export type DepositType = 'term' | 'demand' | 'savings';
+export type DepositAccrualType = 'capitalization' | 'end_of_term' | 'capitalization_at_end';
+export type DepositStatus = 'active' | 'closed';
+export type DepositAccrualStatus = 'pending' | 'paid';
+export type AccrualFrequency = 'monthly' | 'quarterly' | 'end_of_term';
+
+export interface DepositAccrual {
+  id: string;
+  amount: number;
+  dueDate: string;
+  status: DepositAccrualStatus;
+  paidDate?: string;
+  note?: string;
+}
+
+export interface DepositRecord {
+  id: string;
+  name: string;
+  type: DepositType;
+  bankName: string;
+  amount: number;
+  interestRate: number;
+  startDate: string;
+  termMonths: number;
+  accrualType: DepositAccrualType;
+  paymentFrequency: AccrualFrequency;
+  createdAt: number;
+  note: string;
+  status: DepositStatus;
+  accruals: DepositAccrual[];
+}

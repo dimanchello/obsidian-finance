@@ -185,6 +185,16 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));  /* minmax(0) prevents overflow */
   gap: 12px; margin-bottom: 10px;
 }
+.finance-debt-summary {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.finance-debt-summary .finance-stat-card {
+  flex: 1 1 140px;
+  min-width: 140px;
+}
 .finance-stat-card {
   display: flex; align-items: center; gap: 12px; padding: 14px 16px;
   border-radius: var(--ft-radius); background: var(--background-secondary);
@@ -223,6 +233,26 @@
 .finance-stat-borrowed-summary .finance-debt-summary-icon { font-size: 1.4em; }
 .finance-stat-borrowed-summary .finance-debt-summary-title { color: #dc2626; font-weight: 700; }
 .finance-stat-borrowed-summary .finance-debt-summary-main { color: #dc2626; }
+
+.finance-stat-deposit-active { border-left: 4px solid #f59e0b; }
+.finance-stat-deposit-active .finance-debt-summary-icon { font-size: 1.4em; }
+.finance-stat-deposit-active .finance-debt-summary-title { color: #f59e0b; font-weight: 700; }
+.finance-stat-deposit-active .finance-debt-summary-main { color: #f59e0b; }
+
+.finance-stat-deposit-closed { border-left: 4px solid #22c55e; }
+.finance-stat-deposit-closed .finance-debt-summary-icon { font-size: 1.4em; }
+.finance-stat-deposit-closed .finance-debt-summary-title { color: #22c55e; font-weight: 700; }
+.finance-stat-deposit-closed .finance-debt-summary-main { color: #22c55e; }
+
+.finance-stat-credit-active { border-left: 4px solid #dc2626; }
+.finance-stat-credit-active .finance-debt-summary-icon { font-size: 1.4em; }
+.finance-stat-credit-active .finance-debt-summary-title { color: #dc2626; font-weight: 700; }
+.finance-stat-credit-active .finance-debt-summary-main { color: #dc2626; }
+
+.finance-stat-credit-paid { border-left: 4px solid #22c55e; }
+.finance-stat-credit-paid .finance-debt-summary-icon { font-size: 1.4em; }
+.finance-stat-credit-paid .finance-debt-summary-title { color: #22c55e; font-weight: 700; }
+.finance-stat-credit-paid .finance-debt-summary-main { color: #22c55e; }
 
 .finance-debt-summary-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
 .finance-debt-summary-icon { }
@@ -1919,6 +1949,189 @@
   .finance-danger-confirm-row .finance-btn-danger {
     width: 100%;
   }
+}
+
+/* Dropdown меню для кредитов/вкладов/долгов */
+.finance-more-dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.finance-more-btn {
+  min-width: 44px;
+  padding: 8px 12px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.finance-dropdown-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  background: var(--background-primary, #fff);
+  border: 1px solid var(--background-modifier-border, #ccc);
+  border-radius: var(--ft-radius, 10px);
+  box-shadow: var(--ft-shadow, 0 1px 4px rgba(0,0,0,.07));
+  z-index: 1000;
+  min-width: 140px;
+  overflow: hidden;
+}
+
+.finance-dropdown-item {
+  padding: 10px 14px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 0.15s;
+}
+
+.finance-dropdown-item:hover {
+  background: var(--background-secondary, #f0f0f0);
+}
+
+.finance-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.finance-section-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.finance-section-add-btn {
+  padding: 8px 14px;
+  background: var(--ft-accent, #7c3aed);
+  color: #fff;
+  border: none;
+  border-radius: var(--ft-radius-sm, 7px);
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 0.15s;
+}
+
+.finance-section-add-btn:hover {
+  background: var(--ft-btn-save-hover, #15803d);
+}
+
+.finance-debt-cards-row {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.finance-debt-card {
+  flex: 1 1 160px;
+  min-width: 140px;
+  background: var(--background-secondary, #f8f8f8);
+  border: 1px solid var(--background-modifier-border, #ddd);
+  border-radius: var(--ft-radius, 10px);
+  padding: 16px;
+  text-align: center;
+}
+
+.finance-debt-card-icon {
+  font-size: 24px;
+  margin-bottom: 8px;
+}
+
+.finance-debt-card-title {
+  font-size: 13px;
+  color: var(--text-muted, #666);
+  margin-bottom: 4px;
+}
+
+.finance-debt-card-amount {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-normal, #333);
+}
+
+.finance-debt-card-count {
+  font-size: 12px;
+  color: var(--text-muted, #666);
+  margin-top: 4px;
+}
+
+.finance-empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-muted, #666);
+}
+
+.finance-empty-state p {
+  margin: 0;
+  font-size: 14px;
+}
+
+.finance-debt-table-wrap {
+  overflow-x: auto;
+}
+
+.finance-th-center {
+  text-align: center;
+  width: 30px;
+}
+
+.finance-expanded-row td {
+  background: var(--ft-table-nested-bg, #f5f5f5);
+  padding: 0;
+}
+
+.finance-progress-wrap {
+  margin-bottom: 12px;
+}
+
+.finance-progress-label {
+  font-size: 13px;
+  color: var(--text-muted, #666);
+  margin-bottom: 6px;
+}
+
+.finance-progress-bar {
+  height: 18px;
+  background: var(--background-secondary, #e5e5e5);
+  border-radius: 9px;
+  overflow: hidden;
+  position: relative;
+}
+
+.finance-progress-fill {
+  height: 100%;
+  background: var(--ft-accent, #7c3aed);
+  border-radius: 9px;
+  transition: width 0.3s ease;
+  text-align: center;
+  min-width: 30px;
+}
+
+.finance-empty-text {
+  color: var(--text-muted, #666);
+  font-size: 13px;
+  margin: 8px 0 0;
+}
+
+.finance-mov-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 8px;
+  font-size: 13px;
+}
+
+.finance-mov-table .finance-th {
+  text-align: left;
+  padding: 8px 10px;
+  background: var(--background-secondary, #eee);
+  font-weight: 600;
+  border-bottom: 1px solid var(--background-modifier-border, #ddd);
+}
+
+.finance-mov-table .finance-td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--background-modifier-border, #eee);
 }
 
 

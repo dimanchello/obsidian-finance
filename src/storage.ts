@@ -1,12 +1,13 @@
 import { App, normalizePath } from 'obsidian';
-import { AccountData, AccountMeta, DebtMovement, DebtRecord, FinanceRecord } from './types';
+import { AccountData, AccountMeta, CreditRecord, DebtMovement, DebtRecord, DepositRecord, FinanceRecord } from './types';
 
 const DATA_VERSION = 3;
 
 function emptyAccount(defaultCurrency: string): AccountData {
   return {
     version: DATA_VERSION, name: '', currency: defaultCurrency,
-    records: [], debts: [], categories: [], tags: [], payers: [],
+    records: [], debts: [], credits: [], deposits: [],
+    categories: [], tags: [], payers: [],
   };
 }
 
@@ -59,6 +60,9 @@ export class FinanceStorage {
           if (d.dueDate === undefined) d.dueDate = '';
           if (d.time === undefined) d.time = '';
         });
+        // back-compat: add credits and deposits
+        if (!data.credits) data.credits = [];
+        if (!data.deposits) data.deposits = [];
         this.cache.set(notePath, data);
         return data;
       }
@@ -171,9 +175,55 @@ export class FinanceStorage {
     const d = await this.load(notePath);
     d.records = [];
     d.debts = [];
+    d.credits = [];
+    d.deposits = [];
     d.categories = [];
     d.tags = [];
     d.payers = [];
+    this.schedule(notePath);
+  }
+
+  // ── Credit CRUD ──────────────────────────────────────────────────────────────
+
+  async addCredit(notePath: string, credit: CreditRecord): Promise<void> {
+    const d = await this.load(notePath);
+    d.credits.push(credit);
+    this.schedule(notePath);
+  }
+
+  async updateCredit(notePath: string, credit: CreditRecord): Promise<void> {
+    const d   = await this.load(notePath);
+    const idx = d.credits.findIndex(x => x.id === credit.id);
+    if (idx === -1) return;
+    d.credits[idx] = credit;
+    this.schedule(notePath);
+  }
+
+  async deleteCredit(notePath: string, id: string): Promise<void> {
+    const d     = await this.load(notePath);
+    d.credits   = d.credits.filter(x => x.id !== id);
+    this.schedule(notePath);
+  }
+
+  // ── Deposit CRUD ──────────────────────────────────────────────────────────────
+
+  async addDeposit(notePath: string, deposit: DepositRecord): Promise<void> {
+    const d = await this.load(notePath);
+    d.deposits.push(deposit);
+    this.schedule(notePath);
+  }
+
+  async updateDeposit(notePath: string, deposit: DepositRecord): Promise<void> {
+    const d   = await this.load(notePath);
+    const idx = d.deposits.findIndex(x => x.id === deposit.id);
+    if (idx === -1) return;
+    d.deposits[idx] = deposit;
+    this.schedule(notePath);
+  }
+
+  async deleteDeposit(notePath: string, id: string): Promise<void> {
+    const d      = await this.load(notePath);
+    d.deposits   = d.deposits.filter(x => x.id !== id);
     this.schedule(notePath);
   }
 }

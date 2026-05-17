@@ -41,7 +41,11 @@ export interface Translations {
   income: string;
   expense: string;
   debts: string;
+  credits: string;
+  deposits: string;
   newDebt: string;
+  newCredit: string;
+  newDeposit: string;
   search: string;
   type: string;
   allTypes: string;
@@ -133,6 +137,49 @@ export interface Translations {
   exportFormat: string;
   exported: string;
   imported: string;
+  bankName: string;
+  interestRate: string;
+  monthlyPayment: string;
+  startDate: string;
+  creditPayments: string;
+  depositAccruals: string;
+  earlyRepayment: string;
+  repayAmount: string;
+  repayTerm: string;
+  partialRepayment: string;
+  fullRepayment: string;
+  creditActive: string;
+  creditPaid: string;
+  depositActive: string;
+  depositClosed: string;
+  creditTypeCredit: string;
+  creditTypeAuto: string;
+  creditTypeMortgage: string;
+  creditTypeConsumer: string;
+  depositTypeTerm: string;
+  depositTypeDemand: string;
+  depositTypeSavings: string;
+  capitalization: string;
+  endOfTerm: string;
+  capitalizationAtEnd: string;
+  paymentFrequencyMonthly: string;
+  paymentFrequencyQuarterly: string;
+  noCredits: string;
+  noCreditsFiltered: string;
+  noDeposits: string;
+  noDepositsFiltered: string;
+  creditAdded: string;
+  creditUpdated: string;
+  creditDeleted: string;
+  depositAdded: string;
+  depositUpdated: string;
+  depositDeleted: string;
+  creditPaymentRecorded: string;
+  depositAccrualRecorded: string;
+  name: string;
+  repaymentDate: string;
+  allCreditTypes: string;
+  allDepositTypes: string;
 }
 
 const ru: Translations = {
@@ -171,7 +218,11 @@ const ru: Translations = {
   income: '↑ Доход',
   expense: '↓ Расход',
   debts: '💳 Долги',
+  credits: '🏦 Кредиты',
+  deposits: '📈 Вклады',
   newDebt: 'Новый долг',
+  newCredit: 'Новый кредит',
+  newDeposit: 'Новый вклад',
   search: 'Поиск',
   type: 'Тип',
   allTypes: 'Все типы',
@@ -263,6 +314,49 @@ const ru: Translations = {
   exportFormat: 'Формат экспорта',
   exported: 'записей',
   imported: 'записей',
+  bankName: 'Банк',
+  interestRate: 'Процентная ставка',
+  monthlyPayment: 'Ежемесячный платёж',
+  startDate: 'Дата начала',
+  creditPayments: 'Платежи',
+  depositAccruals: 'Начисления',
+  earlyRepayment: 'Досрочное погашение',
+  repayAmount: 'Гасить сумму',
+  repayTerm: 'Гасить срок',
+  partialRepayment: 'Частичное',
+  fullRepayment: 'Полное',
+  creditActive: 'Активен',
+  creditPaid: 'Погашен',
+  depositActive: 'Активен',
+  depositClosed: 'Закрыт',
+  creditTypeCredit: 'Кредит',
+  creditTypeAuto: 'Автокредит',
+  creditTypeMortgage: 'Ипотека',
+  creditTypeConsumer: 'Потребительский',
+  depositTypeTerm: 'Срочный',
+  depositTypeDemand: 'До востребования',
+  depositTypeSavings: 'Накопительный',
+  capitalization: 'На счёт (капитализация)',
+  endOfTerm: 'В конце срока',
+  capitalizationAtEnd: 'В конце срока с капитализацией',
+  paymentFrequencyMonthly: 'Ежемесячно',
+  paymentFrequencyQuarterly: 'Ежеквартально',
+  noCredits: 'Нет кредитов',
+  noCreditsFiltered: 'Кредитов не найдено',
+  noDeposits: 'Нет вкладов',
+  noDepositsFiltered: 'Вкладов не найдено',
+  creditAdded: '✅ Кредит добавлен',
+  creditUpdated: '✅ Кредит обновлён',
+  creditDeleted: '🗑️ Кредит удалён',
+  depositAdded: '✅ Вклад добавлен',
+  depositUpdated: '✅ Вклад обновлён',
+  depositDeleted: '🗑️ Вклад удалён',
+  creditPaymentRecorded: '✅ Платёж записан',
+  depositAccrualRecorded: '✅ Начисление записано',
+  name: 'Название',
+  repaymentDate: 'Дата погашения',
+  allCreditTypes: 'Все типы',
+  allDepositTypes: 'Все типы',
 };
 
 const en: Translations = {
@@ -301,7 +395,11 @@ const en: Translations = {
   income: '↑ Income',
   expense: '↓ Expense',
   debts: '💳 Debts',
+  credits: '🏦 Credits',
+  deposits: '📈 Deposits',
   newDebt: 'New debt',
+  newCredit: 'New credit',
+  newDeposit: 'New deposit',
   search: 'Search',
   type: 'Type',
   allTypes: 'All types',
@@ -393,6 +491,49 @@ const en: Translations = {
   exportFormat: 'Export format',
   exported: 'records',
   imported: 'records',
+  bankName: 'Bank',
+  interestRate: 'Interest rate',
+  monthlyPayment: 'Monthly payment',
+  startDate: 'Start date',
+  creditPayments: 'Payments',
+  depositAccruals: 'Accruals',
+  earlyRepayment: 'Early repayment',
+  repayAmount: 'Repay amount',
+  repayTerm: 'Repay term',
+  partialRepayment: 'Partial',
+  fullRepayment: 'Full',
+  creditActive: 'Active',
+  creditPaid: 'Paid',
+  depositActive: 'Active',
+  depositClosed: 'Closed',
+  creditTypeCredit: 'Credit',
+  creditTypeAuto: 'Auto loan',
+  creditTypeMortgage: 'Mortgage',
+  creditTypeConsumer: 'Consumer',
+  depositTypeTerm: 'Term',
+  depositTypeDemand: 'Demand',
+  depositTypeSavings: 'Savings',
+  capitalization: 'To account (capitalization)',
+  endOfTerm: 'At end of term',
+  capitalizationAtEnd: 'At end with capitalization',
+  paymentFrequencyMonthly: 'Monthly',
+  paymentFrequencyQuarterly: 'Quarterly',
+  noCredits: 'No credits',
+  noCreditsFiltered: 'No credits found',
+  noDeposits: 'No deposits',
+  noDepositsFiltered: 'No deposits found',
+  creditAdded: '✅ Credit added',
+  creditUpdated: '✅ Credit updated',
+  creditDeleted: '🗑️ Credit deleted',
+  depositAdded: '✅ Deposit added',
+  depositUpdated: '✅ Deposit updated',
+  depositDeleted: '🗑️ Deposit deleted',
+  creditPaymentRecorded: '✅ Payment recorded',
+  depositAccrualRecorded: '✅ Accrual recorded',
+  name: 'Name',
+  repaymentDate: 'Repayment date',
+  allCreditTypes: 'All types',
+  allDepositTypes: 'All types',
 };
 
 const translations: Record<Locale, Translations> = { ru, en };
