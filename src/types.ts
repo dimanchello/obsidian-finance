@@ -194,6 +194,24 @@ export interface DepositAccrual {
   note?: string;
 }
 
+export interface DepositTopUp {
+  id: string;
+  amount: number;
+  date: string;
+  time: string;
+  createdAt: number;
+  note: string;
+}
+
+export interface DepositWithdrawal {
+  id: string;
+  amount: number;
+  date: string;
+  time: string;
+  createdAt: number;
+  note: string;
+}
+
 export interface DepositRecord {
   id: string;
   name: string;
@@ -209,4 +227,6 @@ export interface DepositRecord {
   note: string;
   status: DepositStatus;
   accruals: DepositAccrual[];
+  topUps: DepositTopUp[];
+  withdrawals: DepositWithdrawal[];
 }

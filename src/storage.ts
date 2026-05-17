@@ -1,5 +1,5 @@
 import { App, normalizePath } from 'obsidian';
-import { AccountData, AccountMeta, CreditRecord, DebtMovement, DebtRecord, DepositRecord, FinanceRecord } from './types';
+import { AccountData, AccountMeta, CreditRecord, DebtMovement, DebtRecord, DepositRecord, DepositTopUp, DepositWithdrawal, FinanceRecord } from './types';
 
 const DATA_VERSION = 4;
 
@@ -197,6 +197,8 @@ export class FinanceStorage {
           if (!d.type) d.type = 'term';
           if (d.status === undefined) d.status = 'active';
           if (!d.accruals) d.accruals = [];
+          if (!d.topUps) d.topUps = [];
+          if (!d.withdrawals) d.withdrawals = [];
         });
         this.depositsCache.set(notePath, data);
         return data;
@@ -430,6 +432,72 @@ export class FinanceStorage {
   async saveAllDeposits(notePath: string, deposits: DepositRecord[]): Promise<void> {
     this.depositsCache.set(notePath, deposits);
     this.scheduleDeposits(notePath);
+  }
+
+  async addDepositTopUp(notePath: string, depositId: string, topUp: DepositTopUp): Promise<void> {
+    const d = await this.loadDeposits(notePath);
+    const idx = d.findIndex(x => x.id === depositId);
+    if (idx === -1) return;
+    const deposit = d[idx];
+    if (!deposit.topUps) deposit.topUps = [];
+    deposit.topUps.push(topUp);
+    deposit.amount += topUp.amount;
+    this.recalculateFutureAccruals(deposit);
+    this.scheduleDeposits(notePath);
+  }
+
+  async deleteDepositTopUp(notePath: string, depositId: string, topUpId: string): Promise<void> {
+    const d = await this.loadDeposits(notePath);
+    const idx = d.findIndex(x => x.id === depositId);
+    if (idx === -1) return;
+    const deposit = d[idx];
+    if (!deposit.topUps) return;
+    const topUp = deposit.topUps.find(t => t.id === topUpId);
+    if (topUp) {
+      deposit.amount = Math.max(0, deposit.amount - topUp.amount);
+      deposit.topUps = deposit.topUps.filter(t => t.id !== topUpId);
+      this.recalculateFutureAccruals(deposit);
+    }
+    this.scheduleDeposits(notePath);
+  }
+
+  async addDepositWithdrawal(notePath: string, depositId: string, withdrawal: DepositWithdrawal): Promise<void> {
+    const d = await this.loadDeposits(notePath);
+    const idx = d.findIndex(x => x.id === depositId);
+    if (idx === -1) return;
+    const deposit = d[idx];
+    if (!deposit.withdrawals) deposit.withdrawals = [];
+    deposit.withdrawals.push(withdrawal);
+    deposit.amount = Math.max(0, deposit.amount - withdrawal.amount);
+    this.recalculateFutureAccruals(deposit);
+    this.scheduleDeposits(notePath);
+  }
+
+  async deleteDepositWithdrawal(notePath: string, depositId: string, withdrawalId: string): Promise<void> {
+    const d = await this.loadDeposits(notePath);
+    const idx = d.findIndex(x => x.id === depositId);
+    if (idx === -1) return;
+    const deposit = d[idx];
+    if (!deposit.withdrawals) return;
+    const withdrawal = deposit.withdrawals.find(w => w.id === withdrawalId);
+    if (withdrawal) {
+      deposit.amount += withdrawal.amount;
+      deposit.withdrawals = deposit.withdrawals.filter(w => w.id !== withdrawalId);
+      this.recalculateFutureAccruals(deposit);
+    }
+    this.scheduleDeposits(notePath);
+  }
+
+  private recalculateFutureAccruals(deposit: DepositRecord): void {
+    const today = new Date().toISOString().split('T')[0];
+    const monthsStep = deposit.paymentFrequency === 'monthly' ? 1 : 3;
+    const accrualAmount = Math.round((deposit.amount * deposit.interestRate / 100) * (monthsStep / 12) * 100) / 100;
+
+    for (const accrual of deposit.accruals) {
+      if (accrual.dueDate > today && accrual.status === 'pending') {
+        accrual.amount = accrualAmount;
+      }
+    }
   }
 
   async saveAllCredits(notePath: string, credits: CreditRecord[]): Promise<void> {

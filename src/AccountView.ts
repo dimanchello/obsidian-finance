@@ -1,7 +1,7 @@
 import { App, Notice, Platform, TFile } from 'obsidian';
 import { FinanceStorage }       from './storage';
 import {
-  AccountData, CreditRecord, DebtMovement, DebtRecord, DepositRecord, FinanceRecord,
+  AccountData, CreditRecord, DebtMovement, DebtRecord, DepositRecord, DepositTopUp, DepositWithdrawal, FinanceRecord,
   PluginSettings, DEFAULT_FILTER, DEFAULT_SORT, DEFAULT_DEBT_FILTER, DEFAULT_CREDIT_FILTER, DEFAULT_DEPOSIT_FILTER, COMMON_CURRENCIES, CREDIT_PAGE_SIZE,
   SortField, ViewState, DebtSortField, CreditSortField, DepositSortField,
 } from './types';
@@ -15,6 +15,8 @@ import { CreditModal }       from './CreditModal';
 import { CreditPaymentModal } from './CreditPaymentModal';
 import { CreditEarlyRepaymentModal } from './CreditEarlyRepaymentModal';
 import { DepositModal }      from './DepositModal';
+import { DepositTopUpModal } from './DepositTopUpModal';
+import { DepositWithdrawalModal } from './DepositWithdrawalModal';
 
 // ── state persistence ─────────────────────────────────────────────────────────
 
@@ -1100,6 +1102,12 @@ export class AccountView {
     this.renderBodyContent();
   }
 
+  private resetCreditPage(): void {
+    this.state.creditPage = 0;
+    saveState(this.notePath, this.state);
+    this.renderBodyContent();
+  }
+
   private isDepositClosed(deposit: DepositRecord): boolean {
     return deposit.status === 'closed';
   }
@@ -1230,6 +1238,126 @@ export class AccountView {
       });
       btn.addEventListener('click', () => {
         this.state.depositSort = s.field === field
+          ? { field, dir: s.dir === 'asc' ? 'desc' : 'asc' }
+          : { field, dir: 'desc' };
+        saveState(this.notePath, this.state);
+        this.renderBodyContent();
+      });
+    });
+  }
+
+  // ── Credit Filters ───────────────────────────────────────────────────────
+
+  private renderCreditFilters(body: HTMLElement): void {
+    const f = this.state.creditFilter || DEFAULT_CREDIT_FILTER;
+
+    const filtersContainer = body.createDiv('finance-filters-container');
+
+    const row1 = filtersContainer.createDiv('finance-filters-row');
+
+    const sg = row1.createDiv('finance-filter-group finance-filter-search');
+    sg.createEl('label', { text: 'Поиск', cls: 'finance-filter-label' });
+    const si = sg.createEl('input', {
+      type: 'text', cls: 'finance-filter-input', placeholder: 'Поиск по названию или банку…',
+    });
+    si.value = f.search;
+    si.addEventListener('input', () => {
+      if (this.filterDebounce) clearTimeout(this.filterDebounce);
+      this.filterDebounce = setTimeout(() => {
+        this.state.creditFilter!.search = si.value;
+        this.resetCreditPage();
+      }, 280);
+    });
+
+    const statusG = row1.createDiv('finance-filter-group');
+    statusG.createEl('label', { text: 'Статус', cls: 'finance-filter-label' });
+    const statusSel = statusG.createEl('select', { cls: 'finance-filter-select' });
+    [
+      { v: 'all', l: 'Все' },
+      { v: 'active', l: 'Активные' },
+      { v: 'paid', l: 'Погашенные' },
+    ].forEach(({ v, l }) => {
+      const o = statusSel.createEl('option', { text: l });
+      o.value = v;
+      o.selected = v === f.status;
+    });
+    statusSel.addEventListener('change', () => {
+      this.state.creditFilter!.status = statusSel.value as 'all' | 'active' | 'paid';
+      this.resetCreditPage();
+    });
+
+    const allBanks = this.data ? [...new Set(this.data.credits.map(c => c.bankName).filter(Boolean))] : [];
+    const bankOpts = [{ v: '', l: 'Все банки' }, ...allBanks.map(b => ({ v: b, l: b }))];
+    this.mkSearchSelect(row1, 'Банк', bankOpts, f.bankName, (v) => {
+      this.state.creditFilter!.bankName = v;
+      this.resetCreditPage();
+    });
+
+    const row2 = filtersContainer.createDiv('finance-filters-row');
+
+    const dfG = row2.createDiv('finance-filter-group');
+    dfG.createEl('label', { text: 'С', cls: 'finance-filter-label' });
+    const dfI = dfG.createEl('input', { type: 'date', cls: 'finance-filter-input' });
+    dfI.value = f.dateFrom;
+    dfI.addEventListener('change', () => {
+      this.state.creditFilter!.dateFrom = dfI.value;
+      this.resetCreditPage();
+    });
+
+    const dtG = row2.createDiv('finance-filter-group');
+    dtG.createEl('label', { text: 'По', cls: 'finance-filter-label' });
+    const dtI = dtG.createEl('input', { type: 'date', cls: 'finance-filter-input' });
+    dtI.value = f.dateTo;
+    dtI.addEventListener('change', () => {
+      this.state.creditFilter!.dateTo = dtI.value;
+      this.resetCreditPage();
+    });
+
+    const typeG = row2.createDiv('finance-filter-group');
+    typeG.createEl('label', { text: 'Тип', cls: 'finance-filter-label' });
+    const typeSel = typeG.createEl('select', { cls: 'finance-filter-select' });
+    [
+      { v: 'all', l: 'Все типы' },
+      { v: 'consumer', l: 'Потребительский' },
+      { v: 'auto', l: 'Автокредит' },
+      { v: 'mortgage', l: 'Ипотека' },
+      { v: 'credit', l: 'Кредит' },
+    ].forEach(({ v, l }) => {
+      const o = typeSel.createEl('option', { text: l });
+      o.value = v;
+      o.selected = v === f.type;
+    });
+    typeSel.addEventListener('change', () => {
+      this.state.creditFilter!.type = typeSel.value as 'all' | 'consumer' | 'auto' | 'mortgage' | 'credit';
+      this.resetCreditPage();
+    });
+
+    const rG = row2.createDiv('finance-filter-group finance-filter-reset');
+    rG.createEl('label', { text: '\u00A0', cls: 'finance-filter-label' });
+    rG.createEl('button', { text: '✕ Сбросить', cls: 'finance-reset-btn' })
+      .addEventListener('click', () => {
+        this.state.creditFilter = { ...DEFAULT_CREDIT_FILTER };
+        this.resetCreditPage();
+      });
+
+    const sortRow = filtersContainer.createDiv('finance-sort-row');
+    sortRow.createEl('span', { text: 'Сортировка:', cls: 'finance-sort-label' });
+
+    const sortFields: { field: CreditSortField; label: string }[] = [
+      { field: 'createdAt', label: 'Добавлен' },
+      { field: 'date', label: 'Дата открытия' },
+      { field: 'amount', label: 'Сумма' },
+      { field: 'bankName', label: 'Банк' },
+    ];
+    const s = this.state.creditSort || { field: 'createdAt' as CreditSortField, dir: 'desc' };
+    sortFields.forEach(({ field, label }) => {
+      const active = s.field === field;
+      const btn = sortRow.createEl('button', {
+        cls: `finance-sort-btn${active ? ' active' : ''}`,
+        text: label + (active ? (s.dir === 'asc' ? ' ↑' : ' ↓') : ''),
+      });
+      btn.addEventListener('click', () => {
+        this.state.creditSort = s.field === field
           ? { field, dir: s.dir === 'asc' ? 'desc' : 'asc' }
           : { field, dir: 'desc' };
         saveState(this.notePath, this.state);
@@ -1858,18 +1986,14 @@ export class AccountView {
     const allCredits = this.data.credits || [];
     const cur = this.data.currency || this.settings.defaultCurrency;
 
-    const header = body.createDiv('finance-section-header');
-    header.createEl('h3', { text: '🏦 Кредиты' });
-
-    const addBtn = header.createEl('button', { text: '+ Добавить кредит', cls: 'finance-section-add-btn' });
-    addBtn.addEventListener('click', () => this.openNewCreditModal());
-
-    if (!allCredits.length) {
-      body.createDiv('finance-empty-state').createEl('p', { text: 'Нет кредитов. Нажмите "Добавить кредит" чтобы начать.' });
-      return;
+    if (!this.state.creditFilter) {
+      this.state.creditFilter = { ...DEFAULT_CREDIT_FILTER };
     }
 
-    const summary = body.createDiv('finance-debt-summary');
+    const filteredCredits = this.getFilteredCredits();
+
+    // Summary cards
+    const summary = body.createDiv('finance-stats-container');
     const activeCredits = allCredits.filter(c => c.status === 'active');
     const paidCredits = allCredits.filter(c => c.status === 'paid');
     const totalAmount = activeCredits.reduce((s, c) => s + c.currentAmount, 0);
@@ -1895,6 +2019,7 @@ export class AccountView {
     mkCreditCard('Активные', '💳', totalAmount, activeCredits.length, true);
     mkCreditCard('Погашенные', '✅', paidAmount, paidCredits.length, false);
 
+    // Toolbar
     const toolbar = body.createDiv('finance-debt-toolbar');
     const newCreditBtn = toolbar.createEl('button', { cls: 'finance-add-btn finance-expense-btn' });
     newCreditBtn.innerHTML = '<span class="btn-icon">＋</span><span>Новый кредит</span>';
@@ -1917,16 +2042,27 @@ export class AccountView {
       });
     }
 
+    // Filters
+    this.renderCreditFilters(body);
+
     if (!allCredits.length) {
       const e = body.createDiv('finance-empty-state');
       e.createEl('div', { text: '🏦', cls: 'finance-empty-icon' });
       e.createEl('p', { text: 'Нет кредитов', cls: 'finance-empty-title' });
-      e.createEl('p', { text: 'Нажмите "Новый кредит"', cls: 'finance-empty-sub' });
+      e.createEl('p', { text: 'Нажмите «Новый кредит»', cls: 'finance-empty-sub' });
       return;
     }
 
-    const tableWrap = body.createDiv('finance-debt-table-wrap');
-    this.renderCreditsList(tableWrap, allCredits, cur);
+    if (!filteredCredits.length) {
+      const e = body.createDiv('finance-empty-state');
+      e.createEl('div', { text: '🔍', cls: 'finance-empty-icon' });
+      e.createEl('p', { text: 'Кредитов не найдено', cls: 'finance-empty-title' });
+      e.createEl('p', { text: 'Попробуйте изменить фильтры', cls: 'finance-empty-sub' });
+      return;
+    }
+
+    const tw = body.createDiv('finance-table-wrapper');
+    this.renderCreditsList(tw, filteredCredits, cur);
   }
 
   private getFilteredCredits(): CreditRecord[] {
@@ -2340,6 +2476,76 @@ export class AccountView {
       progressFill.style.transition = 'width 0.3s ease';
     }
 
+    // Top-ups section
+    const topUps = deposit.topUps || [];
+    if (topUps.length > 0) {
+      const topUpsHeader = wrapper.createEl('h4', { text: '💰 Пополнения', cls: 'finance-section-title' });
+      topUpsHeader.style.margin = '0 0 8px';
+      topUpsHeader.style.fontSize = '13px';
+      topUpsHeader.style.color = '#6b7280';
+
+      const topUpsTable = wrapper.createEl('table', { cls: 'finance-mov-table' });
+      const topUpsHead = topUpsTable.createEl('thead').createEl('tr');
+      ['Дата', 'Сумма', 'Примечание', ''].forEach(l => {
+        topUpsHead.createEl('th', { text: l, cls: 'finance-th finance-mov-th' });
+      });
+      const topUpsBody = topUpsTable.createEl('tbody');
+
+      topUps.slice().reverse().forEach(tu => {
+        const tr = topUpsBody.createEl('tr');
+        tr.createEl('td', { text: fmtDate(tu.date, tu.time), cls: 'finance-td' });
+        tr.createEl('td', { text: '+' + fmt(tu.amount, cur), cls: 'finance-td finance-td-mov-repay' });
+        tr.createEl('td', { text: tu.note || '—', cls: 'finance-td' });
+        const actTd = tr.createEl('td', { cls: 'finance-td' });
+        this.mkActionBtn(actTd, '🗑️', 'Удалить', () => this.confirmDeleteDepositTopUp(deposit, tu), 'finance-delete-btn');
+      });
+
+      const totalTopUps = topUps.reduce((s, t) => s + t.amount, 0);
+      const topUpsSummary = wrapper.createDiv('finance-deposit-summary');
+      topUpsSummary.style.margin = '8px 0 16px';
+      topUpsSummary.style.fontSize = '13px';
+      topUpsSummary.style.color = '#6b7280';
+      topUpsSummary.textContent = `Всего пополнений: ${topUps.length} · ${fmt(totalTopUps, cur)}`;
+    }
+
+    // Withdrawals section
+    const withdrawals = deposit.withdrawals || [];
+    if (withdrawals.length > 0) {
+      const withdrawalsHeader = wrapper.createEl('h4', { text: '📤 Снятия', cls: 'finance-section-title' });
+      withdrawalsHeader.style.margin = '0 0 8px';
+      withdrawalsHeader.style.fontSize = '13px';
+      withdrawalsHeader.style.color = '#6b7280';
+
+      const withdrawalsTable = wrapper.createEl('table', { cls: 'finance-mov-table' });
+      const withdrawalsHead = withdrawalsTable.createEl('thead').createEl('tr');
+      ['Дата', 'Сумма', 'Примечание', ''].forEach(l => {
+        withdrawalsHead.createEl('th', { text: l, cls: 'finance-th finance-mov-th' });
+      });
+      const withdrawalsBody = withdrawalsTable.createEl('tbody');
+
+      withdrawals.slice().reverse().forEach(w => {
+        const tr = withdrawalsBody.createEl('tr');
+        tr.createEl('td', { text: fmtDate(w.date, w.time), cls: 'finance-td' });
+        tr.createEl('td', { text: '−' + fmt(w.amount, cur), cls: 'finance-td finance-td-mov-borrow' });
+        tr.createEl('td', { text: w.note || '—', cls: 'finance-td' });
+        const actTd = tr.createEl('td', { cls: 'finance-td' });
+        this.mkActionBtn(actTd, '🗑️', 'Удалить', () => this.confirmDeleteDepositWithdrawal(deposit, w), 'finance-delete-btn');
+      });
+
+      const totalWithdrawals = withdrawals.reduce((s, w) => s + w.amount, 0);
+      const withdrawalsSummary = wrapper.createDiv('finance-deposit-summary');
+      withdrawalsSummary.style.margin = '8px 0 16px';
+      withdrawalsSummary.style.fontSize = '13px';
+      withdrawalsSummary.style.color = '#6b7280';
+      withdrawalsSummary.textContent = `Всего снятий: ${withdrawals.length} · ${fmt(totalWithdrawals, cur)}`;
+    }
+
+    // Accruals section
+    const accrualsHeader = wrapper.createEl('h4', { text: '📊 Начисления', cls: 'finance-section-title' });
+    accrualsHeader.style.margin = '0 0 8px';
+    accrualsHeader.style.fontSize = '13px';
+    accrualsHeader.style.color = '#6b7280';
+
     if (!deposit.accruals.length) {
       wrapper.createEl('p', { text: 'Нет запланированных начислений', cls: 'finance-empty-text' });
       return;
@@ -2461,6 +2667,8 @@ export class AccountView {
 
       const actions = block.createDiv('finance-record-actions');
       if (deposit.status === 'active') {
+        this.mkActionBtn(actions, '💰', 'Пополнить', () => this.openDepositTopUpModal(deposit));
+        this.mkActionBtn(actions, '📤', 'Снять', () => this.openDepositWithdrawalModal(deposit));
         this.mkActionBtn(actions, '✅', 'Закрыть вклад', () => this.confirmCloseDeposit(deposit));
       }
       this.mkActionBtn(actions, '✏️', 'Редактировать', () => this.openEditDepositModal(deposit));
@@ -2550,6 +2758,8 @@ export class AccountView {
       actionsWrap.style.alignItems = 'center';
 
       if (deposit.status === 'active') {
+        this.mkActionBtn(actionsWrap, '💰', 'Пополнить', () => this.openDepositTopUpModal(deposit));
+        this.mkActionBtn(actionsWrap, '📤', 'Снять', () => this.openDepositWithdrawalModal(deposit));
         this.mkActionBtn(actionsWrap, '✅', 'Закрыть вклад', () => this.confirmCloseDeposit(deposit));
       }
       this.mkActionBtn(actionsWrap, '✏️', 'Редактировать', () => this.openEditDepositModal(deposit));
@@ -2670,6 +2880,59 @@ export class AccountView {
       this.renderStats();
       this.renderBodyContent();
       new Notice('🗑️ Вклад удалён');
+    }).open();
+  }
+
+  private openDepositTopUpModal(deposit: DepositRecord): void {
+    new DepositTopUpModal(this.app, {
+      title: `💰 Пополнение — ${deposit.name}`,
+      onSave: async topUp => {
+        await this.storage.addDepositTopUp(this.notePath, deposit.id, topUp);
+        this.data = await this.storage.load(this.notePath);
+        this.renderStats();
+        this.renderBodyContent();
+        new Notice('✅ Вклад пополнен');
+      },
+    }).open();
+  }
+
+  private confirmDeleteDepositTopUp(deposit: DepositRecord, topUp: DepositTopUp): void {
+    const cur = this.data?.currency || this.settings.defaultCurrency;
+    const label = `${deposit.name} · ${fmt(topUp.amount, cur)} · ${fmtDate(topUp.date, topUp.time)}`;
+    new ConfirmModal(this.app, `Удалить пополнение?\n${label}`, async () => {
+      await this.storage.deleteDepositTopUp(this.notePath, deposit.id, topUp.id);
+      this.data = await this.storage.load(this.notePath);
+      this.renderStats();
+      this.renderBodyContent();
+      new Notice('🗑️ Пополнение удалено');
+    }).open();
+  }
+
+  private openDepositWithdrawalModal(deposit: DepositRecord): void {
+    const cur = this.data?.currency || this.settings.defaultCurrency;
+    new DepositWithdrawalModal(this.app, {
+      title: `📤 Снятие — ${deposit.name}`,
+      maxAmount: deposit.amount,
+      currency: cur,
+      onSave: async withdrawal => {
+        await this.storage.addDepositWithdrawal(this.notePath, deposit.id, withdrawal);
+        this.data = await this.storage.load(this.notePath);
+        this.renderStats();
+        this.renderBodyContent();
+        new Notice('✅ Средства сняты');
+      },
+    }).open();
+  }
+
+  private confirmDeleteDepositWithdrawal(deposit: DepositRecord, withdrawal: DepositWithdrawal): void {
+    const cur = this.data?.currency || this.settings.defaultCurrency;
+    const label = `${deposit.name} · ${fmt(withdrawal.amount, cur)} · ${fmtDate(withdrawal.date, withdrawal.time)}`;
+    new ConfirmModal(this.app, `Удалить снятие?\n${label}`, async () => {
+      await this.storage.deleteDepositWithdrawal(this.notePath, deposit.id, withdrawal.id);
+      this.data = await this.storage.load(this.notePath);
+      this.renderStats();
+      this.renderBodyContent();
+      new Notice('🗑️ Снятие удалено');
     }).open();
   }
 

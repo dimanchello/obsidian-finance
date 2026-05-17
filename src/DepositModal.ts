@@ -34,7 +34,7 @@ export class DepositModal extends Modal {
     this.o = opts;
     const nowStr = new Date().toISOString().split('T')[0];
     this.deposit = opts.deposit
-        ? { ...opts.deposit, accruals: [...opts.deposit.accruals] }
+        ? { ...opts.deposit, accruals: [...opts.deposit.accruals], topUps: [...(opts.deposit.topUps || [])], withdrawals: [...(opts.deposit.withdrawals || [])] }
         : {
           id: crypto.randomUUID(),
           name: 'Вклад',
@@ -50,6 +50,8 @@ export class DepositModal extends Modal {
           note: '',
           status: 'active',
           accruals: [],
+          topUps: [],
+          withdrawals: [],
         };
   }
 
