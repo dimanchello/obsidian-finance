@@ -186,14 +186,10 @@
   gap: 12px; margin-bottom: 10px;
 }
 .finance-debt-summary {
-  display: flex;
-  gap: 16px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
   margin-bottom: 16px;
-  flex-wrap: wrap;
-}
-.finance-debt-summary .finance-stat-card {
-  flex: 1 1 140px;
-  min-width: 140px;
 }
 .finance-stat-card {
   display: flex; align-items: center; gap: 12px; padding: 14px 16px;
@@ -559,6 +555,15 @@
 
 .finance-form         { display: flex; flex-direction: column; gap: 10px; }
 .finance-form-grid    { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.finance-form-compact { gap: 8px; }
+.finance-form-compact .finance-field-group { margin-bottom: 0; }
+.finance-form-compact .finance-input { padding: 6px 8px; font-size: 13px; }
+.finance-form-compact .finance-input.finance-filter-select { padding: 0 28px 0 8px; }
+.finance-form-compact .finance-field-label { font-size: 12px; margin-bottom: 3px; }
+.finance-form-compact .finance-textarea { padding: 6px 8px; font-size: 13px; }
+.finance-form-row { display: flex; gap: 10px; }
+.finance-form-row .finance-field-group { flex: 1; }
+.finance-full-width { grid-column: 1 / -1; }
 .finance-field-group  { display: flex; flex-direction: column; gap: 4px; }
 .finance-field-label  { font-size: .72em; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .06em; }
 .finance-field-hint   { font-size: .7em; color: var(--text-faint); font-weight: 400; text-transform: none; letter-spacing: normal; margin-left: 4px; }

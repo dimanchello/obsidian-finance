@@ -61,7 +61,7 @@ export class CreditModal extends Modal {
 
     contentEl.createEl('h2', { text: this.o.title, cls: 'finance-modal-title' });
 
-    const form = contentEl.createDiv('finance-form');
+    const form = contentEl.createDiv('finance-form finance-form-compact');
 
     const nameG = form.createDiv('finance-field-group');
     nameG.createEl('label', { text: 'Название', cls: 'finance-field-label' });

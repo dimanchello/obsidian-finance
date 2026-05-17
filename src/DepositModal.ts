@@ -34,8 +34,8 @@ export class DepositModal extends Modal {
     this.o = opts;
     const nowStr = new Date().toISOString().split('T')[0];
     this.deposit = opts.deposit
-      ? { ...opts.deposit, accruals: [...opts.deposit.accruals] }
-      : {
+        ? { ...opts.deposit, accruals: [...opts.deposit.accruals] }
+        : {
           id: crypto.randomUUID(),
           name: 'Вклад',
           type: 'term' as DepositType,
@@ -60,30 +60,19 @@ export class DepositModal extends Modal {
 
     contentEl.createEl('h2', { text: this.o.title, cls: 'finance-modal-title' });
 
-    const form = contentEl.createDiv('finance-form');
+    const form = contentEl.createDiv('finance-form finance-form-grid finance-form-compact');
 
-    const nameG = form.createDiv('finance-field-group');
+    // === РЯД 1: Название | Банк ===
+    const row1 = form.createDiv('finance-form-row finance-full-width');
+
+    const nameG = row1.createDiv('finance-field-group');
     nameG.createEl('label', { text: 'Название', cls: 'finance-field-label' });
     const nameIn = nameG.createEl('input', { type: 'text', cls: 'finance-input' });
     nameIn.value = this.deposit.name;
     nameIn.addEventListener('input', () => { this.deposit.name = nameIn.value; });
 
-    const typeG = form.createDiv('finance-field-group');
-    typeG.createEl('label', { text: 'Тип вклада', cls: 'finance-field-label' });
-    const typeSel = typeG.createEl('select', { cls: 'finance-input' });
-    const types: { value: DepositType; label: string }[] = [
-      { value: 'term', label: 'Срочный' },
-      { value: 'demand', label: 'До востребования' },
-      { value: 'savings', label: 'Накопительный' },
-    ];
-    types.forEach(t => {
-      const opt = typeSel.createEl('option', { value: t.value, text: t.label });
-      if (t.value === this.deposit.type) opt.selected = true;
-    });
-    typeSel.addEventListener('change', () => { this.deposit.type = typeSel.value as DepositType; });
-
-    const bankG = form.createDiv('finance-field-group');
-    bankG.createEl('label', { text: 'Банк *', cls: 'finance-field-label' });
+    const bankG = row1.createDiv('finance-field-group');
+    bankG.createEl('label', { text: 'Банк', cls: 'finance-field-label' });
     const bankWrap = bankG.createDiv('finance-combobox');
     const bankIn = bankWrap.createEl('input', { type: 'text', cls: 'finance-input finance-combobox-input' });
     bankIn.value = this.deposit.bankName;
@@ -91,7 +80,6 @@ export class DepositModal extends Modal {
 
     let dropdown: HTMLElement | null = null;
     const bankOpts = this.o.allBanks;
-
     const closeDropdown = () => { dropdown?.remove(); dropdown = null; };
     const openDropdown = (q: string) => {
       closeDropdown();
@@ -125,23 +113,23 @@ export class DepositModal extends Modal {
         });
       });
     };
-
     bankIn.addEventListener('focus', () => openDropdown(bankIn.value));
     bankIn.addEventListener('input', () => { this.deposit.bankName = bankIn.value; openDropdown(bankIn.value); });
     bankIn.addEventListener('blur', () => setTimeout(closeDropdown, 150));
 
-    const amtG = form.createDiv('finance-field-group finance-amount-group');
-    amtG.createEl('label', { text: 'Сумма вклада *', cls: 'finance-field-label' });
+    // === РЯД 2: Сумма | Процентная ставка ===
+    const row2 = form.createDiv('finance-form-row finance-full-width');
 
+    const amtG = row2.createDiv('finance-field-group finance-amount-group');
+    amtG.createEl('label', { text: 'Сумма', cls: 'finance-field-label' });
+    // Класс finance-amount-input сохранен для выравнивания текста, но его размер мы поправим в CSS
     this.amountInput = amtG.createEl('input', { type: 'text', cls: 'finance-input finance-amount-input' });
     this.amountInput.setAttribute('inputmode', 'decimal');
     this.amountInput.setAttribute('placeholder', '0');
     this.amountInput.setAttribute('autocomplete', 'off');
-
     if (this.deposit.amount > 0) {
       this.amountInput.value = fmtAmount(String(this.deposit.amount));
     }
-
     this.amountInput.addEventListener('input', () => {
       const raw = this.amountInput.value;
       this.deposit.amount = parseAmount(raw);
@@ -158,86 +146,72 @@ export class DepositModal extends Modal {
         this.amountInput.setSelectionRange(newPos, newPos);
       }
     });
-
     this.amountInput.addEventListener('blur', () => {
       const n = parseAmount(this.amountInput.value);
       this.deposit.amount = n;
       this.amountInput.value = n > 0 ? fmtAmount(String(n)) : '';
     });
 
-    this.amountInput.addEventListener('focus', () => {
-      if (this.deposit.amount > 0) {
-        this.amountInput.value = String(this.deposit.amount).replace('.', ',');
-      }
-    });
-
-    this.amountInput.addEventListener('input', () => {
-      const raw = this.amountInput.value;
-      this.deposit.amount = parseAmount(raw);
-      const sel = this.amountInput.selectionStart ?? raw.length;
-      const rawBefore = raw.slice(0, sel).replace(/[^\d.,]/g, '').length;
-      const formatted = fmtAmount(raw);
-      if (formatted !== raw) {
-        this.amountInput.value = formatted;
-        let newPos = 0, rawCount = 0;
-        for (let i = 0; i < formatted.length; i++) {
-          if (/[\d.,]/.test(formatted[i])) rawCount++;
-          if (rawCount >= rawBefore) { newPos = i + 1; break; }
-        }
-        this.amountInput.setSelectionRange(newPos, newPos);
-      }
-    });
-
-    this.amountInput.addEventListener('blur', () => {
-      const n = parseAmount(this.amountInput.value);
-      this.deposit.amount = n;
-      this.amountInput.value = n > 0 ? fmtAmount(String(n)) : '';
-    });
-
-    const rateG = form.createDiv('finance-field-group');
+    const rateG = row2.createDiv('finance-field-group');
     rateG.createEl('label', { text: 'Процентная ставка (%)', cls: 'finance-field-label' });
-
     this.rateInput = rateG.createEl('input', { type: 'text', cls: 'finance-input' });
     this.rateInput.setAttribute('inputmode', 'decimal');
     this.rateInput.setAttribute('placeholder', '0');
     this.rateInput.setAttribute('autocomplete', 'off');
-
     if (this.deposit.interestRate > 0) {
       this.rateInput.value = String(this.deposit.interestRate);
     }
-
     this.rateInput.addEventListener('input', () => {
       const rate = parseFloat(this.rateInput.value.replace(',', '.')) || 0;
       this.deposit.interestRate = rate;
     });
-
     this.rateInput.addEventListener('blur', () => {
       const rate = parseFloat(this.rateInput.value.replace(',', '.')) || 0;
       this.deposit.interestRate = rate;
       this.rateInput.value = rate > 0 ? String(rate) : '';
     });
 
-    const dateG = form.createDiv('finance-field-group');
+    // === РЯД 3: Дата начала | Срок ===
+    const row3 = form.createDiv('finance-form-row finance-full-width');
+
+    const dateG = row3.createDiv('finance-field-group');
     dateG.createEl('label', { text: 'Дата начала', cls: 'finance-field-label' });
     const dateIn = dateG.createEl('input', { type: 'date', cls: 'finance-input' });
     dateIn.value = this.deposit.startDate;
     dateIn.addEventListener('change', () => { this.deposit.startDate = dateIn.value; });
 
-    const termG = form.createDiv('finance-field-group');
-    termG.createEl('label', { text: 'Срок (месяцев)', cls: 'finance-field-label' });
+    const termG = row3.createDiv('finance-field-group');
+    termG.createEl('label', { text: 'Срок (мес)', cls: 'finance-field-label' });
     const termIn = termG.createEl('input', { type: 'number', cls: 'finance-input' });
     termIn.value = String(this.deposit.termMonths || 12);
     termIn.setAttribute('min', '1');
     termIn.setAttribute('max', '360');
     termIn.addEventListener('change', () => { this.deposit.termMonths = parseInt(termIn.value) || 12; });
 
-    const accrualG = form.createDiv('finance-field-group');
+    // === РЯД 4: Тип вклада | Тип начисления ===
+    const row4 = form.createDiv('finance-form-row finance-full-width');
+
+    const typeG = row4.createDiv('finance-field-group');
+    typeG.createEl('label', { text: 'Тип вклада', cls: 'finance-field-label' });
+    const typeSel = typeG.createEl('select', { cls: 'finance-input finance-filter-select' });
+    const types: { value: DepositType; label: string }[] = [
+      { value: 'term', label: 'Срочный' },
+      { value: 'demand', label: 'До востребования' },
+      { value: 'savings', label: 'Накопительный' },
+    ];
+    types.forEach(t => {
+      const opt = typeSel.createEl('option', { value: t.value, text: t.label });
+      if (t.value === this.deposit.type) opt.selected = true;
+    });
+    typeSel.addEventListener('change', () => { this.deposit.type = typeSel.value as DepositType; });
+
+    const accrualG = row4.createDiv('finance-field-group');
     accrualG.createEl('label', { text: 'Тип начисления', cls: 'finance-field-label' });
-    const accrualSel = accrualG.createEl('select', { cls: 'finance-input' });
+    const accrualSel = accrualG.createEl('select', { cls: 'finance-input finance-filter-select' });
     const accrualTypes: { value: DepositAccrualType; label: string }[] = [
       { value: 'capitalization', label: 'На счёт (капитализация)' },
       { value: 'end_of_term', label: 'В конце срока' },
-      { value: 'capitalization_at_end', label: 'В конце срока с капитализацией' },
+      { value: 'capitalization_at_end', label: 'В конце с капитал.' },
     ];
     accrualTypes.forEach(t => {
       const opt = accrualSel.createEl('option', { value: t.value, text: t.label });
@@ -248,9 +222,11 @@ export class DepositModal extends Modal {
       this.frequencyContainer.style.display = (this.deposit.accrualType === 'end_of_term' || this.deposit.accrualType === 'capitalization_at_end') ? 'none' : 'block';
     });
 
-    this.frequencyContainer = form.createDiv('finance-field-group');
-    this.frequencyContainer.createEl('label', { text: 'Периодичность', cls: 'finance-field-label' });
-    const freqSel = this.frequencyContainer.createEl('select', { cls: 'finance-input' });
+    // === ДИНАМИЧЕСКИЙ РЯД: Периодичность ===
+    this.frequencyContainer = form.createDiv('finance-form-row finance-full-width');
+    const freqG = this.frequencyContainer.createDiv('finance-field-group');
+    freqG.createEl('label', { text: 'Периодичность', cls: 'finance-field-label' });
+    const freqSel = freqG.createEl('select', { cls: 'finance-input finance-filter-select' });
     const freqs: { value: AccrualFrequency; label: string }[] = [
       { value: 'monthly', label: 'Ежемесячно' },
       { value: 'quarterly', label: 'Ежеквартально' },
@@ -262,19 +238,22 @@ export class DepositModal extends Modal {
     freqSel.addEventListener('change', () => { this.deposit.paymentFrequency = freqSel.value as AccrualFrequency; });
     this.frequencyContainer.style.display = (this.deposit.accrualType === 'end_of_term' || this.deposit.accrualType === 'capitalization_at_end') ? 'none' : 'block';
 
-    const noteG = form.createDiv('finance-field-group');
+    // === РЯД 5: Примечание ===
+    const row5 = form.createDiv('finance-form-row finance-full-width');
+    const noteG = row5.createDiv('finance-field-group');
     noteG.createEl('label', { text: 'Примечание', cls: 'finance-field-label' });
     const noteIn = noteG.createEl('textarea', { cls: 'finance-textarea finance-note-field' });
-    noteIn.placeholder = 'Необязательно — любой комментарий…';
+    noteIn.placeholder = 'Необязательно';
     noteIn.value = this.deposit.note;
     noteIn.rows = 2;
     noteIn.addEventListener('input', () => { this.deposit.note = noteIn.value; });
 
+    // Кнопки управления
     const btnRow = contentEl.createDiv('finance-modal-btns');
     btnRow.createEl('button', { text: 'Отмена', cls: 'finance-btn-cancel' })
-      .addEventListener('click', () => this.close());
+        .addEventListener('click', () => this.close());
     btnRow.createEl('button', { text: 'Сохранить', cls: 'finance-btn-save' })
-      .addEventListener('click', () => this.handleSave());
+        .addEventListener('click', () => this.handleSave());
   }
 
   private handleSave(): void {
