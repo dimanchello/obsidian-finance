@@ -28,6 +28,18 @@
   --ft-input-bg: var(--background-modifier-form-field, var(--background-secondary));
 }
 
+.finance-tracker input:focus,
+.finance-tracker textarea:focus,
+.finance-tracker select:focus,
+.finance-tracker button:focus,
+.finance-tracker .finance-input:focus,
+.finance-tracker .finance-filter-input:focus,
+.finance-tracker .finance-filter-select:focus,
+.finance-tracker .finance-textarea:focus {
+  outline: none;
+  box-shadow: none;
+}
+
 .finance-tracker {
   font-family: var(--font-interface, system-ui, sans-serif);
   color: var(--text-normal);
@@ -303,14 +315,6 @@
 .finance-textarea {
   height: auto; line-height: 1.5; padding: 8px 10px;
 }
-.finance-filter-input:focus,
-.finance-filter-select:focus,
-.finance-input:focus,
-.finance-textarea:focus {
-  border-color: var(--ft-accent) !important;
-  box-shadow: 0 0 0 2.5px color-mix(in srgb, var(--ft-accent) 18%, transparent);
-}
-
 /* Select — custom arrow */
 .finance-filter-select {
   appearance: none;
@@ -567,7 +571,7 @@
 
 .finance-note-field {
   background: var(--background-secondary) !important;
-  border: 2px dashed var(--ft-accent) !important;
+  border: 1.5px solid var(--ft-border) !important;
   border-radius: var(--ft-radius-sm);
   color: var(--text-normal) !important;
   font-style: italic;
@@ -577,8 +581,6 @@
 }
 .finance-note-field:focus {
   background: var(--background-secondary) !important;
-  border: 2px solid var(--ft-accent) !important;
-  box-shadow: 0 0 0 2.5px color-mix(in srgb, var(--ft-accent) 18%, transparent);
   font-style: normal;
 }
 .finance-note-field::placeholder { color: var(--text-faint); font-style: italic; }
@@ -1315,12 +1317,6 @@
     color: #fff !important;
     box-shadow: none !important;
   }
-  .finance-input:focus,
-  .finance-filter-input:focus,
-  .finance-filter-select:focus {
-    border-color: var(--ft-accent) !important;
-    box-shadow: 0 0 0 2px var(--ft-accent) !important;
-  }
 
   /* Combobox и custom-select */
   .finance-combobox-input,
@@ -1430,12 +1426,6 @@
     background: #222 !important;
     color: #fff !important;
     box-shadow: none !important;
-  }
-  .finance-filter-input:focus,
-  .finance-filter-select:focus,
-  .finance-input:focus {
-    border-color: var(--ft-accent) !important;
-    box-shadow: 0 0 0 2px var(--ft-accent) !important;
   }
 
   .finance-custom-select-trigger {
