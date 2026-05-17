@@ -6,6 +6,7 @@ interface MockAdapter {
   read: ReturnType<typeof vi.fn>;
   write: ReturnType<typeof vi.fn>;
   mkdir: ReturnType<typeof vi.fn>;
+  remove: ReturnType<typeof vi.fn>;
 }
 
 interface MockApp {
@@ -25,6 +26,7 @@ describe('FinanceStorage', () => {
           read: vi.fn().mockResolvedValue(null),
           write: vi.fn().mockResolvedValue(undefined),
           mkdir: vi.fn().mockResolvedValue(undefined),
+          remove: vi.fn().mockResolvedValue(undefined),
         },
       },
     };
@@ -160,13 +162,28 @@ describe('FinanceStorage', () => {
 
   describe('backward compatibility', () => {
     it('adds missing fields for old data', async () => {
-      const oldData = {
-        version: 1,
-        records: [{ id: '1', createdAt: 1, date: '2024-01-01', type: 'expense', amount: 100, category: '', tag: '', payer: '', note: '', attachmentPath: '' }],
-      };
+      mockAdapter.exists.mockImplementation(async (path: string) => {
+        if (path.endsWith('.meta') || path.endsWith('.records') || path.endsWith('.debts') || path.endsWith('.credits') || path.endsWith('.deposits')) {
+          return false;
+        }
+        return true;
+      });
 
-      mockAdapter.exists.mockResolvedValue(true);
-      mockAdapter.read.mockResolvedValue(JSON.stringify(oldData));
+      const legacyData = {
+        version: 1,
+        name: 'Test',
+        currency: '₽',
+        records: [{ id: '1', createdAt: 1, date: '2024-01-01', type: 'expense', amount: 100, category: '', tag: '', payer: '', note: '', attachmentPath: '', time: '' }],
+        categories: ['Test'],
+        tags: [],
+        payers: [],
+        debts: [],
+        credits: [],
+        deposits: [],
+      };
+      mockAdapter.read.mockResolvedValue(JSON.stringify(legacyData));
+      mockAdapter.write.mockResolvedValue(undefined);
+      mockAdapter.remove.mockResolvedValue(undefined);
 
       const data = await storage.load('test/path.md');
       expect(data.currency).toBe('₽');

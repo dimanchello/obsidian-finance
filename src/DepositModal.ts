@@ -289,7 +289,21 @@ export class DepositModal extends Modal {
             status: 'pending',
           });
         }
-      } else if (this.deposit.accrualType === 'end_of_term' || this.deposit.accrualType === 'capitalization_at_end') {
+      } else if (this.deposit.accrualType === 'capitalization_at_end') {
+        const monthsStep = this.deposit.paymentFrequency === 'monthly' ? 1 : 3;
+        for (let i = monthsStep; i <= this.deposit.termMonths; i += monthsStep) {
+          const dueDate = new Date(startDate);
+          dueDate.setMonth(dueDate.getMonth() + i);
+          const dueDateStr = dueDate.toISOString().split('T')[0];
+          const interestAmount = (this.deposit.amount * this.deposit.interestRate / 100) * (monthsStep / 12);
+          this.deposit.accruals.push({
+            id: crypto.randomUUID(),
+            amount: Math.round(interestAmount * 100) / 100,
+            dueDate: dueDateStr,
+            status: 'pending',
+          });
+        }
+      } else if (this.deposit.accrualType === 'end_of_term') {
         const endDate = new Date(startDate);
         endDate.setMonth(endDate.getMonth() + this.deposit.termMonths);
         const endDateStr = endDate.toISOString().split('T')[0];
