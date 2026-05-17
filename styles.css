@@ -202,8 +202,8 @@
 .finance-stat-expense .finance-stat-icon { background: rgba(239,68,68,.15);  color: #dc2626; }
 .finance-stat-positive .finance-stat-icon,
 .finance-stat-negative .finance-stat-icon {
-  background: color-mix(in srgb, var(--ft-accent) 15%, transparent);
-  color: var(--ft-accent);
+  background: rgba(99, 102, 241, 0.15);
+  color: #6366f1;
 }
 .finance-stat-label { font-size: .68em; color: var(--text-muted); text-transform: uppercase; letter-spacing: .06em; font-weight: 700; margin-bottom: 2px; }
 .finance-stat-value { font-size: 1em; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
