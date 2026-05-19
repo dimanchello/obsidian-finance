@@ -178,10 +178,15 @@ export class RecordModal extends Modal {
       v => { this.rec.tag = v; },
     );
 
-    // Payer — autofill trigger
+    // Payer — autofill trigger + internal toggle inline
     this.payerInput = this.buildAutocomplete(
       grid, 'Плательщик', this.rec.payer ?? '', this.o.payers,
       v => { this.rec.payer = v; this.scheduleAutofill('payer', v); },
+      {
+        withInternalToggle: true,
+        isInternal: !!this.rec.isInternal,
+        onToggleInternal: (v) => { this.rec.isInternal = v; },
+      },
     );
 
     // ── Note — visually distinct ─────────────────────────────────────────
@@ -235,6 +240,7 @@ export class RecordModal extends Modal {
     value:    string,
     options:  string[],
     onChange: (v: string) => void,
+    opts?: { withInternalToggle?: boolean; isInternal?: boolean; onToggleInternal?: (v: boolean) => void },
   ): HTMLInputElement {
     const g = parent.createDiv('finance-field-group');
     g.createEl('label', { text: label, cls: 'finance-field-label' });
@@ -245,6 +251,22 @@ export class RecordModal extends Modal {
     });
     input.value = value;
     input.setAttribute('autocomplete', 'off');
+
+    // ── Internal toggle button ───────────────────────────────────────────
+    if (opts?.withInternalToggle) {
+      let internalState = opts.isInternal ?? false;
+      const intBtn = wrapper.createEl('button', {
+        type: 'button',
+        cls: `finance-internal-btn${internalState ? ' is-active' : ''}`,
+        attr: { title: 'Внутренняя операция (не учитывается в статистике)' },
+      });
+      intBtn.innerHTML = '🔄';
+      intBtn.addEventListener('click', () => {
+        internalState = !internalState;
+        opts.onToggleInternal?.(internalState);
+        intBtn.classList.toggle('is-active', internalState);
+      });
+    }
 
     let dropdown: HTMLElement | null = null;
 
@@ -421,6 +443,8 @@ export class RecordModal extends Modal {
       payer:          this.rec.payer?.trim()          ?? '',
       note:           this.rec.note?.trim()           ?? '',
       attachmentPath: this.rec.attachmentPath         ?? '',
+      isInternal:     this.rec.isInternal             ?? false,
+      linkedId:       this.rec.linkedId             ?? '',
     };
     this.o.onSave(record);
     this.close();

@@ -215,7 +215,11 @@ export class FinanceStorage {
       try {
         const data = JSON.parse(await this.app.vault.adapter.read(fp)) as AccountRecordsFile;
         console.log('[FT-storage] loadRecords loaded:', data.records.length, 'records');
-        data.records.forEach(r => { if (r.time === undefined) r.time = ''; });
+        data.records.forEach(r => {
+          if (r.time === undefined) r.time = '';
+          if (r.isInternal === undefined) r.isInternal = false;
+          if (r.linkedId === undefined) r.linkedId = '';
+        });
         this.recordsCache.set(notePath, data);
         return data;
       } catch (e) { 

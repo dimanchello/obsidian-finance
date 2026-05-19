@@ -21,11 +21,11 @@ export interface ImportExportOptions {
   currency: string;
   records:  FinanceRecord[];
   onImport: (records: FinanceRecord[]) => void;
+  mode:     'export' | 'import';
 }
 
 export class ImportExportModal extends Modal {
   private o:      ImportExportOptions;
-  private tab:    'export' | 'import' = 'export';
   private body!:  HTMLElement;
 
   constructor(app: App, opts: ImportExportOptions) {
@@ -34,35 +34,17 @@ export class ImportExportModal extends Modal {
     this.modalEl.addClass('finance-ie-modal');
   }
 
-  /** Switch to a specific tab before opening */
-  switchTo(tab: 'export' | 'import'): void {
-    this.tab = tab;
-  }
-
   onOpen(): void {
     const { contentEl } = this;
     contentEl.empty();
     contentEl.addClass('finance-modal');
-    contentEl.createEl('h2', { text: '📤 Импорт / Экспорт', cls: 'finance-modal-title' });
-
-    // Tab bar
-    const tabs = contentEl.createDiv('finance-tab-bar');
-    const mkTab = (label: string, key: typeof this.tab) => {
-      const btn = tabs.createEl('button', { text: label, cls: `finance-tab-btn${this.tab === key ? ' active' : ''}` });
-      btn.addEventListener('click', () => { this.tab = key; this.renderBody(); btn.classList.add('active');
-        tabs.querySelectorAll('.finance-tab-btn').forEach(b => { if (b !== btn) b.classList.remove('active'); });
-      });
-    };
-    mkTab('📤 Экспорт', 'export');
-    mkTab('📥 Импорт',  'import');
+    contentEl.createEl('h2', {
+      text: this.o.mode === 'export' ? '📤 Экспорт' : '📥 Импорт',
+      cls: 'finance-modal-title',
+    });
 
     this.body = contentEl.createDiv('finance-ie-body');
-    this.renderBody();
-  }
-
-  private renderBody(): void {
-    this.body.empty();
-    this.tab === 'export' ? this.renderExport() : this.renderImport();
+    this.o.mode === 'export' ? this.renderExport() : this.renderImport();
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -480,6 +462,7 @@ export class ImportExportModal extends Modal {
         payer:          get('payer'),
         note:           get('note'),
         attachmentPath: '',
+        linkedId:       '',
       };
     });
 

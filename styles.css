@@ -345,10 +345,10 @@
 .finance-filters-container {
   background: var(--background-secondary); border: 1px solid var(--ft-border);
   border-radius: var(--ft-radius); padding: 16px 18px; margin-bottom: 16px;
-  box-shadow: var(--ft-shadow);
+  box-shadow: var(--ft-shadow); position: relative; z-index: 10;
 }
 .finance-filters-row  { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }
-.finance-filter-group { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 140px; }
+.finance-filter-group { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 140px; position: relative; }
 .finance-filter-search { flex: 1; min-width: 140px; }   /* same as others — no flex:2 */
 .finance-filter-reset  { flex: 0; min-width: auto; }
 .finance-filter-label  { font-size: .7em; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .06em; }
@@ -498,6 +498,29 @@
 .finance-row-income  .finance-td:first-child { border-left-color: #22c55e; }
 .finance-row-expense .finance-td:first-child { border-left-color: #ef4444; }
 
+/* Internal records — visually muted */
+.finance-tr-internal {
+  opacity: 0.55;
+}
+.finance-tr-internal .finance-td:first-child {
+  border-left-color: var(--text-faint) !important;
+}
+.finance-tr-internal .finance-td:first-child::before {
+  content: '↔';
+  margin-right: 6px;
+  opacity: 0.7;
+  font-size: 0.85em;
+}
+.finance-record-block.finance-tr-internal {
+  opacity: 0.55;
+  border-left: 3px solid var(--text-faint) !important;
+}
+.finance-record-block.finance-tr-internal::before {
+  content: '↔ ';
+  opacity: 0.7;
+  font-size: 0.85em;
+}
+
 .finance-type-income  { color: #16a34a; font-weight: 700; white-space: nowrap; }
 .finance-type-expense { color: #dc2626; font-weight: 700; white-space: nowrap; }
 
@@ -543,6 +566,33 @@
 .finance-empty-icon  { font-size: 3.5em; margin-bottom: 14px; }
 .finance-empty-title { font-size: 1.05em; font-weight: 700; margin: 0 0 6px; }
 .finance-empty-sub   { font-size: .85em; color: var(--text-muted); margin: 0; }
+
+/* ── Internal toggle (inline button in payer field) ────────────────────────── */
+.finance-combobox { position: relative; }
+.finance-combobox-input { position: relative; z-index: 1; padding-right: 36px !important; }
+.finance-internal-btn {
+  position: absolute; right: 4px; top: 50%;
+  transform: translateY(-50%);
+  z-index: 2;
+  width: 28px; height: 28px;
+  display: flex; align-items: center; justify-content: center;
+  background: transparent; border: none; border-radius: 6px;
+  cursor: pointer; opacity: .4;
+  transition: opacity .15s;
+  padding: 0;
+  font-size: 14px; line-height: 1;
+}
+.finance-internal-btn:hover { opacity: .7; }
+.finance-internal-btn.is-active { opacity: 1; }
+
+/* ── Internal filter toggle ────────────────────────────────────────────────── */
+.finance-filter-internal {
+  display: flex; flex-direction: column; gap: 4px;
+}
+.finance-filter-internal .finance-internal-btn {
+  position: static; transform: none;
+  width: 36px; height: 36px;
+}
 
 /* ── Pagination ─────────────────────────────────────────────────────────────── */
 .finance-pagination {
@@ -593,6 +643,8 @@
 .finance-form-row .finance-field-group { flex: 1; }
 .finance-full-width { grid-column: 1 / -1; }
 .finance-field-group  { display: flex; flex-direction: column; gap: 4px; }
+.finance-internal-field { justify-content: flex-end; }
+.finance-internal-field .finance-internal-toggle-wrap { padding: 0; }
 .finance-field-label  { font-size: .72em; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .06em; }
 .finance-field-hint   { font-size: .7em; color: var(--text-faint); font-weight: 400; text-transform: none; letter-spacing: normal; margin-left: 4px; }
 
@@ -1028,6 +1080,12 @@
   .finance-analytics-toggle-row { flex-wrap: wrap; gap: 6px; }
   .finance-analytics-toggle-btn { flex: 1; text-align: center; min-height: 40px; font-size: .85em; }
   .finance-reset-btn { padding: 10px 16px; min-height: 44px; }
+
+  /* ── Internal button: bigger tap target on mobile ────────────────────── */
+  .finance-internal-btn {
+    width: 40px; height: 40px;
+    font-size: 16px;
+  }
 
   /* ── Action buttons всегда видны (нет hover на touch) ───────────────── */
   .finance-action-btn  { opacity: 0.8 !important; padding: 7px 8px !important; min-width: 36px; min-height: 36px; }
@@ -1939,7 +1997,7 @@
 .max .finance-stats-container { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
 
 /* Filters: wrap, never overflow */
-.max .finance-filters-container { overflow: hidden !important; }
+.max .finance-filters-container { overflow: visible !important; }
 .max .finance-filters-row       { flex-wrap: wrap !important; }
 
 /* Table: inner scroll only */

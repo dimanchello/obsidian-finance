@@ -37,6 +37,9 @@ function loadState(np: string, pageSize: number): ViewState {
       if (!v.depositFilter) v.depositFilter = { ...DEFAULT_DEPOSIT_FILTER };
       if (!v.depositSort) v.depositSort = { field: 'createdAt', dir: 'desc' };
       if (typeof v.depositPage !== 'number') v.depositPage = 0;
+      if (v.filter.showInternal === undefined || typeof v.filter.showInternal === 'boolean') {
+        v.filter.showInternal = v.filter.showInternal === true ? 'only' : 'all';
+      }
       return v;
     }
   } catch { /* ignore */ }
@@ -318,10 +321,11 @@ export class AccountView {
     this.statsEl.empty();
     const recs  = this.data.records;
     const cur   = this.data.currency || this.settings.defaultCurrency;
-    const inc   = recs.filter(r => r.type === 'income' ).reduce((s, r) => s + r.amount, 0);
-    const exp   = recs.filter(r => r.type === 'expense').reduce((s, r) => s + r.amount, 0);
-    const debtTotal = this.data.debts.reduce((s, d) => s + d.amount, 0);
-    const bal   = inc - exp - debtTotal;
+    const inc   = recs.filter(r => r.type === 'income'  && !r.isInternal).reduce((s, r) => s + r.amount, 0);
+    const exp   = recs.filter(r => r.type === 'expense' && !r.isInternal).reduce((s, r) => s + r.amount, 0);
+    const lent    = this.data.debts.filter(d => d.direction === 'lent').reduce((s, d) => s + d.amount, 0);
+    const borrowed = this.data.debts.filter(d => d.direction === 'borrowed').reduce((s, d) => s + d.amount, 0);
+    const bal   = inc - exp - lent + borrowed;
 
     [
       { label: 'Доходы',  value: fmt(inc, cur), mod: 'income',   icon: '↑' },
@@ -406,6 +410,27 @@ export class AccountView {
     this.mkSearchSelect(row2, 'Тег',
       [{ v:'',l:'Все' }, ...this.data.tags.map(t => ({ v:t,l:t }))],
       f.tag, v => { this.state.filter.tag = v; this.resetPage(); });
+
+    // Internal filter toggle — 2-state: all / only
+    const intG = row2.createDiv('finance-filter-group finance-filter-internal');
+    const intLabel = intG.createEl('label', { cls: 'finance-filter-label' });
+    const intBtn = intG.createEl('button', {
+      type: 'button',
+      cls: `finance-internal-btn`,
+      attr: { title: 'Показать только внутренние операции' },
+    });
+    intBtn.innerHTML = '🔄';
+    const applyInternalLabel = () => {
+      const only = f.showInternal === 'only';
+      intLabel.textContent = only ? 'Только внутр.' : 'Внутренние';
+      intBtn.style.opacity = only ? '1' : '.4';
+    };
+    applyInternalLabel();
+    intBtn.addEventListener('click', () => {
+      this.state.filter.showInternal = f.showInternal === 'only' ? 'all' : 'only';
+      applyInternalLabel();
+      this.resetPage();
+    });
 
     const rG = row2.createDiv('finance-filter-group finance-filter-reset');
     rG.createEl('label', { text: '\u00A0', cls: 'finance-filter-label' });
@@ -572,6 +597,7 @@ export class AccountView {
     console.log('[FT] getFiltered: total records:', this.data.records.length, 'filter:', JSON.stringify(filter));
 
     let rows = this.data.records.filter(r => {
+      if (filter.showInternal === 'only' && !r.isInternal) return false;
       if (filter.type !== 'all' && r.type !== filter.type)   return false;
       if (filter.category && r.category !== filter.category) return false;
       if (filter.tag      && r.tag      !== filter.tag)      return false;
@@ -718,6 +744,7 @@ export class AccountView {
     pageRows.forEach(rec => {
       const block = document.createElement('div');
       block.classList.add('finance-record-block', rec.type === 'income' ? 'finance-row-income' : 'finance-row-expense');
+      if (rec.isInternal) block.classList.add('finance-tr-internal');
 
       const header = block.createDiv('finance-record-header');
       const amount = (rec.type === 'income' ? '+' : '−') + fmt(rec.amount, cur);
@@ -770,6 +797,7 @@ export class AccountView {
     pageRows.forEach(rec => {
       const tr = document.createElement('tr');
       tr.classList.add('finance-tr', rec.type === 'income' ? 'finance-row-income' : 'finance-row-expense');
+      if (rec.isInternal) tr.classList.add('finance-tr-internal');
 
       const cells = [
         { key: 'date',     text: fmtDate(rec.date, rec.time), cls: 'finance-td-date' },
@@ -1072,7 +1100,7 @@ export class AccountView {
     else new Notice(`⚠️ Файл не найден: ${rec.attachmentPath}`);
   }
 
-  private openIEModal(defaultTab?: 'export' | 'import'): void {
+  private openIEModal(mode: 'export' | 'import'): void {
     if (!this.data) { new Notice('⏳ Загрузка…'); return; }
     const modal = new ImportExportModal(this.app, {
       noteName: this.data.name || noteFilename(this.notePath),
@@ -1083,8 +1111,8 @@ export class AccountView {
         this.data = await this.storage.load(this.notePath);
         this.renderStats(); this.renderFilters(); this.renderTable();
       },
+      mode,
     });
-    if (defaultTab) modal.switchTo(defaultTab);
     modal.open();
   }
 
@@ -2522,6 +2550,7 @@ export class AccountView {
           payer: credit.bankName,
           note: `Получение кредита "${credit.name}"`,
           attachmentPath: '',
+          linkedId: credit.id,
         };
         await this.storage.addRecord(this.notePath, rec);
         this.data = await this.storage.load(this.notePath);
@@ -3161,6 +3190,7 @@ export class AccountView {
           payer: deposit.bankName,
           note: `Открытие вклада "${deposit.name}"`,
           attachmentPath: '',
+          linkedId: deposit.id,
         };
         await this.storage.addRecord(this.notePath, rec);
         this.data = await this.storage.load(this.notePath);
@@ -3356,6 +3386,7 @@ export class AccountView {
             payer: deposit.bankName,
             note: `Начисление процентов по вкладу "${deposit.name}"`,
             attachmentPath: '',
+            linkedId: deposit.id,
           };
           this.data.records.push(record);
           recordsChanged = true;
@@ -3421,6 +3452,7 @@ export class AccountView {
             payer: credit.bankName,
             note: `Платёж по кредиту "${credit.name}"`,
             attachmentPath: '',
+            linkedId: credit.id,
           };
           this.data.records.push(record);
           recordsChanged = true;

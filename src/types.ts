@@ -15,6 +15,8 @@ export interface FinanceRecord {
   payer:          string;
   note:           string;
   attachmentPath: string;
+  isInternal?:    boolean;  // if true, excluded from income/expense stats
+  linkedId?:      string;   // links to credit/deposit/debt record (hidden from UI)
 }
 
 export interface DebtMovement {
@@ -65,6 +67,7 @@ export interface FilterState {
   search: string; type: 'all' | RecordType;
   category: string; tag: string; payer: string;
   dateFrom: string; dateTo: string;
+  showInternal?: 'all' | 'only';
 }
 
 export interface SortState { field: SortField; dir: SortDir; }
@@ -105,6 +108,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
 
 export const DEFAULT_FILTER: FilterState = {
   search: '', type: 'all', category: '', tag: '', payer: '', dateFrom: '', dateTo: '',
+  showInternal: 'all',
 };
 
 export const DEFAULT_SORT: SortState = { field: 'createdAt', dir: 'desc' };

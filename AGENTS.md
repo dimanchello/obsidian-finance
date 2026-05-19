@@ -297,7 +297,7 @@ npm run test:watch   # Run tests in watch mode
 - [x] Import CSV/JSON/XML with field mapping
 - [x] Export CSV/JSON/XML
 - [x] Mobile card layout
-- [ ] Analytics: charts by category/month
+- [x] Analytics: charts by category/month
 - [ ] Transfers between accounts
 - [ ] Recurring payments
 
