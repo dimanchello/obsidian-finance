@@ -106,6 +106,7 @@ export class AccountView {
   private expandedDepositId: string | null = null;
   private creditPaginationEl?: HTMLElement;
   private depositPaginationEl?: HTMLElement;
+  private creditPaymentPages: Map<string, number> = new Map();
 
   constructor(app: App, root: HTMLElement, notePath: string, storage: FinanceStorage, settings: PluginSettings) {
     this.app = app; this.root = root; this.notePath = notePath;
@@ -568,6 +569,8 @@ export class AccountView {
     const { filter, sort } = this.state;
     const q = filter.search.toLowerCase();
 
+    console.log('[FT] getFiltered: total records:', this.data.records.length, 'filter:', JSON.stringify(filter));
+
     let rows = this.data.records.filter(r => {
       if (filter.type !== 'all' && r.type !== filter.type)   return false;
       if (filter.category && r.category !== filter.category) return false;
@@ -639,11 +642,13 @@ export class AccountView {
   // ── Table ─────────────────────────────────────────────────────────────────
 
   private renderTable(): void {
-    if (!this.tableEl || !this.paginationEl) return;
+    console.log('[FT] renderTable: tableEl=', !!this.tableEl, 'paginationEl=', !!this.paginationEl, 'data=', !!this.data, 'records=', this.data?.records.length ?? 0);
+    if (!this.tableEl || !this.paginationEl) { console.log('[FT] renderTable: early return, missing elements'); return; }
     this.tableEl.empty();
     this.paginationEl.empty();
 
     const filtered   = this.getFiltered();
+    console.log('[FT] filtered count:', filtered.length);
     const { pageSize } = this.state;
     const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
     const page       = Math.max(0, Math.min(this.state.page, totalPages - 1));
@@ -1395,6 +1400,7 @@ export class AccountView {
   }
 
   private renderRecordsView(body: HTMLElement): void {
+    console.log('[FT] renderRecordsView called');
     const toggleRow = body.createDiv('finance-analytics-toggle-row');
     const analBtn = toggleRow.createEl('button', {
       cls:  'finance-analytics-toggle-btn',
@@ -2025,23 +2031,6 @@ export class AccountView {
     newCreditBtn.innerHTML = '<span class="btn-icon">＋</span><span>Новый кредит</span>';
     newCreditBtn.addEventListener('click', () => this.openNewCreditModal());
 
-    if (activeCredits.length > 0) {
-      const earlyBtn = toolbar.createEl('button', { cls: 'finance-add-btn finance-debt-btn' });
-      earlyBtn.innerHTML = '<span>⚡ Досрочное погашение</span>';
-      earlyBtn.addEventListener('click', () => {
-        if (activeCredits.length === 1) {
-          this.openEarlyRepaymentModal(activeCredits[0]);
-        } else {
-          const options = activeCredits.map(c => c.name);
-          const choice = prompt('Выберите кредит:\n' + options.map((n, i) => `${i + 1}. ${n}`).join('\n'));
-          const idx = parseInt(choice || '0') - 1;
-          if (idx >= 0 && idx < activeCredits.length) {
-            this.openEarlyRepaymentModal(activeCredits[idx]);
-          }
-        }
-      });
-    }
-
     // Filters
     this.renderCreditFilters(body);
 
@@ -2091,64 +2080,243 @@ export class AccountView {
     return result;
   }
 
-  private renderCreditsList(wrapper: HTMLElement, credits: CreditRecord[], cur: string): void {
-    const pageSize = CREDIT_PAGE_SIZE;
-    const page = this.state.creditPage || 0;
-    const totalPages = Math.max(1, Math.ceil(credits.length / pageSize));
+  private renderCreditsList(wrapper: HTMLElement, filteredCredits: CreditRecord[], cur: string): void {
+    wrapper.empty();
+    this.creditPaginationEl = undefined;
+
+    const container = wrapper.createDiv('finance-table-container');
+    this.creditPaginationEl = wrapper.createDiv('finance-pagination');
+
+    const { pageSize } = this.state;
+    const totalPages = Math.max(1, Math.ceil(filteredCredits.length / pageSize));
+    const page = Math.max(0, Math.min(this.state.creditPage ?? 0, totalPages - 1));
+    this.state.creditPage = page;
     const start = page * pageSize;
-    const pageCredits = credits.slice(start, start + pageSize);
+    const pageCredits = filteredCredits.slice(start, start + pageSize);
 
-    const table = wrapper.createEl('table', { cls: 'finance-table' });
-    const thead = table.createEl('thead');
-    const tr = thead.createEl('tr');
-    tr.createEl('th', { text: 'Название' });
-    tr.createEl('th', { text: 'Банк' });
-    tr.createEl('th', { text: 'Остаток' });
-    tr.createEl('th', { text: 'Платёж' });
-    tr.createEl('th', { text: 'Статус' });
-    tr.createEl('th', { text: '▼', cls: 'finance-th-center' });
+    if (!pageCredits.length) {
+      const e = container.createDiv('finance-empty-state');
+      e.createEl('div', { text: '📊', cls: 'finance-empty-icon' });
+      e.createEl('p', { text: 'Нет записей на этой странице', cls: 'finance-empty-title' });
+      return;
+    }
 
-    const tbody = table.createEl('tbody');
-    pageCredits.forEach(credit => {
-      const row = tbody.createEl('tr');
-      row.style.cursor = 'pointer';
-      row.addEventListener('click', (e) => {
-        if ((e.target as HTMLElement).closest('.finance-action-btn')) return;
-        this.expandedCreditId = this.expandedCreditId === credit.id ? null : credit.id;
-        this.renderBodyContent();
-      });
-
-      row.createEl('td', { text: credit.name });
-      row.createEl('td', { text: credit.bankName });
-      row.createEl('td', { text: fmt(credit.currentAmount, cur) });
-      row.createEl('td', { text: fmt(credit.monthlyPayment, cur) });
-      row.createEl('td', { text: credit.status === 'active' ? 'Активен' : 'Погашен' });
-
-      const expandCell = row.createEl('td', { cls: 'finance-th-center' });
-      expandCell.textContent = this.expandedCreditId === credit.id ? '▲' : '▼';
-
-      const actions = row.createEl('td');
-      actions.createEl('span', { text: '💰', cls: 'finance-action-btn', title: 'Добавить платёж' })
-        .addEventListener('click', () => this.openAddCreditPaymentModal(credit));
-      actions.createEl('span', { text: '✏️', cls: 'finance-action-btn', title: 'Редактировать' })
-        .addEventListener('click', () => this.openEditCreditModal(credit));
-      actions.createEl('span', { text: '🗑️', cls: 'finance-action-btn', title: 'Удалить' })
-        .addEventListener('click', () => this.confirmDeleteCredit(credit));
-
-      if (this.expandedCreditId === credit.id) {
-        const expandedRow = tbody.createEl('tr');
-        expandedRow.addClass('finance-expanded-row');
-        const expandedCell = expandedRow.createEl('td');
-        expandedCell.setAttribute('colspan', '7');
-        this.renderCreditPaymentsPanel(expandedCell, credit, cur);
-      }
+    const infoBar = container.createDiv('finance-table-info-bar');
+    const metaLeft = infoBar.createDiv('finance-table-meta');
+    metaLeft.createEl('span', {
+      text: `${start + 1}–${Math.min(start + pageSize, filteredCredits.length)} из ${filteredCredits.length}`,
+      cls: 'finance-count-text',
     });
 
-    if (totalPages > 1) {
-      this.creditPaginationEl?.remove();
-      this.creditPaginationEl = wrapper.createDiv('finance-pagination');
-      this.renderPaginationCredits(totalPages, page);
+    if (this.isMobile) {
+      this.renderCreditsAsBlocks(container, pageCredits, cur);
+    } else {
+      this.renderCreditsAsTable(container, pageCredits, cur);
     }
+
+    if (totalPages > 1) this.renderPaginationCredits(totalPages, page);
+  }
+
+  private renderCreditsAsBlocks(container: HTMLElement, pageCredits: CreditRecord[], cur: string): void {
+    const list = container.createDiv('finance-records-list');
+    const frag = document.createDocumentFragment();
+
+    pageCredits.forEach(credit => {
+      const block = document.createElement('div');
+      block.classList.add('finance-record-block');
+      if (credit.status === 'active') {
+        block.classList.add('finance-row-income');
+      } else {
+        block.classList.add('finance-row-expense');
+      }
+
+      const header = block.createDiv('finance-record-header');
+      const amount = '−' + fmt(credit.currentAmount, cur);
+      header.createEl('span', {
+        text: amount,
+        cls: 'finance-record-amount finance-amount-expense',
+      });
+      const typeLabel = credit.type === 'consumer' ? 'Потребительский'
+        : credit.type === 'auto' ? 'Автокредит'
+        : credit.type === 'mortgage' ? 'Ипотека' : 'Кредит';
+      header.createEl('span', { text: `${credit.bankName} · ${typeLabel}`, cls: 'finance-record-date' });
+
+      const details = block.createDiv('finance-record-details');
+      details.createEl('span', { text: `📊 ${credit.interestRate}% годовых`, cls: 'finance-record-detail' });
+      details.createEl('span', { text: `💰 Платёж: ${fmt(credit.monthlyPayment, cur)}`, cls: 'finance-record-detail' });
+
+      const paidCount = credit.payments.filter(p => p.status === 'paid').length;
+      const totalCount = credit.payments.length;
+      if (totalCount > 0) {
+        details.createEl('span', { text: `✅ ${paidCount}/${totalCount} платежей`, cls: 'finance-record-detail' });
+      }
+
+      const endDate = this.calculateCreditEndDate(credit);
+      if (endDate && credit.status === 'active') {
+        details.createEl('span', { text: `📅 до ${fmtDate(endDate)}`, cls: 'finance-record-detail' });
+      }
+
+      if (credit.note) {
+        block.createEl('div', { text: credit.note, cls: 'finance-record-note' });
+      }
+
+      const historyToggle = block.createEl('button', {
+        cls: 'finance-debt-history-toggle',
+        text: `📋 Платежи (${credit.payments.length}) ▼`,
+      });
+      const historyWrap = block.createDiv('finance-debt-history-panel');
+      historyWrap.setAttribute('data-credit-id', credit.id);
+      this.renderCreditPaymentsPanel(historyWrap, credit, cur);
+
+      const isExpanded = this.expandedCreditId === credit.id;
+      if (isExpanded) {
+        historyWrap.addClass('finance-debt-history-open');
+        block.addClass('finance-debt-block-expanded');
+        historyToggle.textContent = `📋 Платежи (${credit.payments.length}) ▲`;
+      }
+
+      historyToggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const open = !historyWrap.hasClass('finance-debt-history-open');
+        this.expandedCreditId = open ? credit.id : null;
+        historyWrap.toggleClass('finance-debt-history-open', open);
+        block.toggleClass('finance-debt-block-expanded', open);
+        historyToggle.textContent = open
+          ? `📋 Платежи (${credit.payments.length}) ▲`
+          : `📋 Платежи (${credit.payments.length}) ▼`;
+      });
+
+      const actions = block.createDiv('finance-record-actions');
+      if (credit.status === 'active') {
+        this.mkActionBtn(actions, '💰', 'Добавить платёж', () => this.openAddCreditPaymentModal(credit));
+        this.mkActionBtn(actions, '⚡', 'Досрочное погашение', () => this.openEarlyRepaymentModal(credit));
+      }
+      this.mkActionBtn(actions, '✏️', 'Редактировать', () => this.openEditCreditModal(credit));
+      this.mkActionBtn(actions, '🗑️', 'Удалить', () => this.confirmDeleteCredit(credit), 'finance-delete-btn');
+
+      frag.appendChild(block);
+    });
+
+    list.appendChild(frag);
+  }
+
+  private calculateCreditEndDate(credit: CreditRecord): string {
+    if (!credit.startDate) return '';
+    const startDate = new Date(credit.startDate);
+    if (isNaN(startDate.getTime())) return '';
+    const term = credit.termMonths || 0;
+    startDate.setMonth(startDate.getMonth() + term);
+    return startDate.toISOString().split('T')[0];
+  }
+
+  private renderCreditsAsTable(container: HTMLElement, pageCredits: CreditRecord[], cur: string): void {
+    const scroll = container.createDiv('finance-table-scroll');
+    const table = scroll.createEl('table', { cls: 'finance-table' });
+
+    const cols = [
+      { key: 'name',      label: 'Название' },
+      { key: 'bank',      label: 'Банк' },
+      { key: 'type',      label: 'Тип' },
+      { key: 'amount',    label: 'Остаток' },
+      { key: 'payment',   label: 'Платёж' },
+      { key: 'rate',      label: 'Ставка' },
+      { key: 'date',      label: 'Открыт' },
+      { key: 'endDate',   label: 'Окончание' },
+      { key: '_act',      label: '' },
+    ];
+
+    const hRow = table.createEl('thead').createEl('tr');
+    cols.forEach(c => hRow.createEl('th', { text: c.label, cls: 'finance-th' }));
+
+    const tbody = table.createEl('tbody');
+    const frag = document.createDocumentFragment();
+
+    pageCredits.forEach(credit => {
+      const tr = document.createElement('tr');
+      tr.classList.add('finance-tr');
+      if (credit.status === 'active') {
+        tr.classList.add('finance-row-income');
+      } else {
+        tr.classList.add('finance-row-expense');
+      }
+
+      const typeLabel = credit.type === 'consumer' ? 'Потребительский'
+        : credit.type === 'auto' ? 'Автокредит'
+        : credit.type === 'mortgage' ? 'Ипотека' : 'Кредит';
+      const endDate = this.calculateCreditEndDate(credit);
+      const endDateText = endDate ? fmtDate(endDate) : '—';
+
+      const cells: { key: string; text: string; cls?: string }[] = [
+        { key: 'name', text: credit.name || '—' },
+        { key: 'bank', text: credit.bankName || '—' },
+        { key: 'type', text: typeLabel },
+        { key: 'amount', text: fmt(credit.currentAmount, cur), cls: 'finance-amount-cell' },
+        { key: 'payment', text: fmt(credit.monthlyPayment, cur), cls: 'finance-amount-cell' },
+        { key: 'rate', text: `${credit.interestRate}%` },
+        { key: 'date', text: fmtDate(credit.startDate) },
+        { key: 'endDate', text: endDateText, cls: endDate ? 'finance-due-date' : '' },
+      ];
+
+      cells.forEach(c => {
+        const td = document.createElement('td');
+        td.classList.add('finance-td');
+        if (c.cls) c.cls.split(' ').forEach(cls => td.classList.add(cls));
+        td.setAttribute('data-label', cols.find(co => co.key === c.key)?.label ?? '');
+        td.textContent = c.text;
+        tr.appendChild(td);
+      });
+
+      // Actions
+      const atd = document.createElement('td');
+      atd.classList.add('finance-td', 'finance-actions-td');
+      atd.setAttribute('data-label', '');
+
+      const actionsWrap = document.createElement('div');
+      actionsWrap.style.display = 'flex';
+      actionsWrap.style.gap = '2px';
+      actionsWrap.style.justifyContent = 'flex-end';
+      actionsWrap.style.alignItems = 'center';
+
+      if (credit.status === 'active') {
+        this.mkActionBtn(actionsWrap, '💰', 'Добавить платёж', () => this.openAddCreditPaymentModal(credit));
+        this.mkActionBtn(actionsWrap, '⚡', 'Досрочное погашение', () => this.openEarlyRepaymentModal(credit));
+      }
+      this.mkActionBtn(actionsWrap, '✏️', 'Редактировать', () => this.openEditCreditModal(credit));
+      this.mkActionBtn(actionsWrap, '🗑️', 'Удалить', () => this.confirmDeleteCredit(credit), 'finance-delete-btn');
+
+      atd.appendChild(actionsWrap);
+      tr.appendChild(atd);
+
+      // Expandable payments row
+      const expandRow = document.createElement('tr');
+      expandRow.classList.add('finance-debt-expand-row');
+      const expandTd = document.createElement('td');
+      expandTd.setAttribute('colspan', String(cols.length));
+      expandTd.classList.add('finance-debt-expand-td');
+      expandTd.setAttribute('data-credit-id', credit.id);
+      this.renderCreditPaymentsPanel(expandTd, credit, cur);
+
+      expandRow.appendChild(expandTd);
+
+      const isExpanded = this.expandedCreditId === credit.id;
+      expandRow.style.display = isExpanded ? 'table-row' : 'none';
+
+      // Click to toggle
+      tr.style.cursor = 'pointer';
+      tr.addEventListener('click', (e) => {
+        if ((e.target as HTMLElement).closest('.finance-action-btn')) return;
+        const open = expandRow.style.display === 'none';
+        this.expandedCreditId = open ? credit.id : null;
+        expandRow.style.display = open ? 'table-row' : 'none';
+        tr.classList.toggle('finance-debt-row-expanded', open);
+        expandRow.classList.toggle('finance-debt-expand-open', open);
+      });
+
+      frag.appendChild(tr);
+      frag.appendChild(expandRow);
+    });
+
+    tbody.appendChild(frag);
   }
 
   private renderPaginationCredits(totalPages: number, current: number): void {
@@ -2182,39 +2350,156 @@ export class AccountView {
   private renderCreditPaymentsPanel(parent: HTMLElement, credit: CreditRecord, cur: string): void {
     const wrapper = parent.createDiv();
     wrapper.style.padding = '12px';
+    const today = new Date().toISOString().split('T')[0];
 
-    const paidCount = credit.payments.filter(p => p.status === 'paid').length;
-    const totalCount = credit.payments.length;
-    const progress = totalCount > 0 ? (paidCount / totalCount) * 100 : 0;
+    // Progress bar
+    const startDate = credit.startDate ? new Date(credit.startDate) : null;
+    const endDate = this.calculateCreditEndDate(credit);
+    const endDateObj = endDate ? new Date(endDate) : null;
 
-    const progressWrap = wrapper.createDiv('finance-progress-wrap');
-    const progressLabel = progressWrap.createDiv('finance-progress-label');
-    progressLabel.textContent = `Погашено: ${paidCount} из ${totalCount} платежей`;
-    const progressBar = progressWrap.createDiv('finance-progress-bar');
-    const progressFill = progressBar.createDiv('finance-progress-fill');
-    progressFill.style.width = `${progress}%`;
-    progressFill.textContent = `${Math.round(progress)}%`;
-    progressFill.style.color = '#fff';
-    progressFill.style.fontSize = '11px';
-    progressFill.style.lineHeight = '16px';
+    if (startDate && endDateObj && startDate.getTime() < endDateObj.getTime()) {
+      const totalDuration = endDateObj.getTime() - startDate.getTime();
+      const elapsed = Date.now() - startDate.getTime();
+      const progress = Math.min(100, Math.max(0, (elapsed / totalDuration) * 100));
 
-    if (totalCount > 0) {
-      const table = wrapper.createEl('table', { cls: 'finance-mov-table' });
-      const thead = table.createEl('thead').createEl('tr');
-      ['Дата', 'Сумма', 'Статус'].forEach(l => thead.createEl('th', { text: l, cls: 'finance-th' }));
+      const progressWrap = wrapper.createDiv('finance-deposit-progress');
+      progressWrap.style.maxWidth = '400px';
+      progressWrap.style.margin = '0 auto 16px';
 
-      const tbody = table.createEl('tbody');
-      credit.payments.forEach(p => {
-        const tr = tbody.createEl('tr');
-        tr.createEl('td', { text: fmtDate(p.dueDate), cls: 'finance-td' });
-        tr.createEl('td', { text: fmt(p.amount, cur), cls: 'finance-td' });
-        const statusCell = tr.createEl('td', { cls: 'finance-td' });
-        statusCell.textContent = p.status === 'paid' ? '✓ Оплачено' : '⏳ Ожидает';
-        statusCell.style.color = p.status === 'paid' ? '#22c55e' : '#f59e0b';
-      });
-    } else {
-      wrapper.createEl('p', { text: 'Нет запланированных платежей', cls: 'finance-empty-text' });
+      const progressLabel = progressWrap.createDiv('finance-deposit-progress-label');
+      progressLabel.style.textAlign = 'center';
+      progressLabel.style.fontSize = '12px';
+      progressLabel.style.color = '#6b7280';
+      progressLabel.style.marginBottom = '6px';
+
+      const startStr = fmtDate(credit.startDate);
+      const endStr = fmtDate(endDate);
+      progressLabel.textContent = `${startStr} → ${endStr} (${Math.round(progress)}%)`;
+
+      const progressBar = progressWrap.createDiv('finance-deposit-progress-bar');
+      progressBar.style.height = '8px';
+      progressBar.style.borderRadius = '4px';
+      progressBar.style.background = '#e5e7eb';
+      progressBar.style.overflow = 'hidden';
+
+      const progressFill = progressBar.createDiv('finance-deposit-progress-fill');
+      progressFill.style.height = '100%';
+      progressFill.style.width = `${progress}%`;
+      progressFill.style.borderRadius = '4px';
+      progressFill.style.background = progress >= 100 ? '#22c55e' : '#7c3aed';
+      progressFill.style.transition = 'width 0.3s ease';
     }
+
+    // Payments header
+    const paymentsHeader = wrapper.createEl('h4', { text: '📋 Платежи', cls: 'finance-section-title' });
+    paymentsHeader.style.margin = '0 0 8px';
+    paymentsHeader.style.fontSize = '13px';
+    paymentsHeader.style.color = '#6b7280';
+
+    if (!credit.payments.length) {
+      wrapper.createEl('p', { text: 'Нет запланированных платежей', cls: 'finance-empty-text' });
+      return;
+    }
+
+    const PAYMENT_PAGE_SIZE = 15;
+    const totalPayments = credit.payments.length;
+    const totalPages = Math.max(1, Math.ceil(totalPayments / PAYMENT_PAGE_SIZE));
+    let page = this.creditPaymentPages.get(credit.id);
+    if (page === undefined) {
+      const lastPaidIdx = credit.payments.findLastIndex(p => p.status === 'paid');
+      page = lastPaidIdx >= 0 ? Math.floor(lastPaidIdx / PAYMENT_PAGE_SIZE) : 0;
+      this.creditPaymentPages.set(credit.id, page);
+    }
+    page = Math.max(0, Math.min(page, totalPages - 1));
+    this.creditPaymentPages.set(credit.id, page);
+    const start = page * PAYMENT_PAGE_SIZE;
+    const pagePayments = credit.payments.slice(start, start + PAYMENT_PAGE_SIZE);
+
+    const scrollWrapper = wrapper.createDiv({ cls: 'finance-mov-scroll' });
+    const movTable = scrollWrapper.createEl('table', { cls: 'finance-mov-table' });
+    const movHead = movTable.createEl('thead').createEl('tr');
+    ['#', 'Дата', 'Сумма', 'Статус'].forEach(l => {
+      movHead.createEl('th', { text: l, cls: 'finance-th finance-mov-th' });
+    });
+    const movBody = movTable.createEl('tbody');
+
+    pagePayments.forEach((p, idx) => {
+      const isPaid = p.status === 'paid' || p.dueDate <= today;
+      const bgColor = isPaid ? 'rgba(34, 197, 94, 0.08)' : '';
+      const textColor = isPaid ? '#16a34a' : '';
+      const mr = movBody.createEl('tr');
+
+      const rowNum = start + idx + 1;
+      const td1 = mr.createEl('td', { text: String(rowNum), cls: 'finance-td' });
+      td1.style.background = bgColor;
+      td1.style.color = textColor;
+
+      const td2 = mr.createEl('td', { text: fmtDate(p.dueDate), cls: 'finance-td' });
+      td2.style.background = bgColor;
+      td2.style.color = textColor;
+
+      const td3 = mr.createEl('td', {
+        text: fmt(p.amount, cur),
+        cls: 'finance-td',
+      });
+      td3.style.background = bgColor;
+      td3.style.color = textColor;
+
+      const statusCell = mr.createEl('td', { cls: 'finance-td' });
+      statusCell.style.background = bgColor;
+      if (isPaid) {
+        statusCell.textContent = '✓ Оплачено';
+        statusCell.style.color = '#16a34a';
+      } else {
+        statusCell.textContent = '⏳ Ожидает';
+        statusCell.style.color = '#6b7280';
+      }
+    });
+
+    // Pagination controls
+    if (totalPages > 1) {
+      const pagNav = wrapper.createDiv('finance-pagination-nav');
+      pagNav.style.display = 'flex';
+      pagNav.style.justifyContent = 'center';
+      pagNav.style.alignItems = 'center';
+      pagNav.style.gap = '4px';
+      pagNav.style.marginTop = '12px';
+
+      const go = (newPage: number) => {
+        this.creditPaymentPages.set(credit.id, newPage);
+        this.rerenderCreditPaymentPanel(credit.id);
+      };
+
+      const prev = pagNav.createEl('button', { cls: 'finance-page-btn', text: '←' });
+      prev.disabled = page === 0;
+      prev.addEventListener('click', () => go(page - 1));
+
+      this.pageRange(page, totalPages).forEach(p => {
+        if (p === -1) { pagNav.createEl('span', { text: '…', cls: 'finance-page-ellipsis' }); return; }
+        const btn = pagNav.createEl('button', {
+          text: String(p + 1),
+          cls: `finance-page-btn${p === page ? ' active' : ''}`,
+        });
+        btn.addEventListener('click', () => go(p));
+      });
+
+      const next = pagNav.createEl('button', { cls: 'finance-page-btn', text: '→' });
+      next.disabled = page >= totalPages - 1;
+      next.addEventListener('click', () => go(page + 1));
+    }
+  }
+
+  private rerenderCreditPaymentPanel(creditId: string): void {
+    if (!this.data) return;
+    const credit = this.data.credits.find(c => c.id === creditId);
+    if (!credit) return;
+
+    const expandTd = this.root.querySelector(`[data-credit-id="${creditId}"]`) as HTMLElement | null;
+    if (!expandTd) return;
+
+    const cur = this.data.currency || this.settings.defaultCurrency;
+    expandTd.empty();
+    this.renderCreditPaymentsPanel(expandTd, credit, cur);
   }
 
   private openNewCreditModal(): void {
@@ -2225,6 +2510,20 @@ export class AccountView {
       allBanks,
       onSave: async credit => {
         await this.storage.addCredit(this.notePath, credit);
+        const rec: FinanceRecord = {
+          id: crypto.randomUUID(),
+          createdAt: Date.now(),
+          date: credit.startDate,
+          time: '',
+          type: 'income',
+          amount: credit.originalAmount,
+          category: 'Кредит',
+          tag: '',
+          payer: credit.bankName,
+          note: `Получение кредита "${credit.name}"`,
+          attachmentPath: '',
+        };
+        await this.storage.addRecord(this.notePath, rec);
         this.data = await this.storage.load(this.notePath);
         this.renderStats();
         this.renderBodyContent();
@@ -2271,9 +2570,11 @@ export class AccountView {
   }
 
   private openEarlyRepaymentModal(credit: CreditRecord): void {
+    const cur = this.data?.currency || this.settings.defaultCurrency;
     new CreditEarlyRepaymentModal(this.app, {
       title: `⚡ Досрочное погашение — ${credit.name}`,
       credit,
+      currency: cur,
       onSave: async updated => {
         await this.storage.updateCredit(this.notePath, updated);
         this.data = await this.storage.load(this.notePath);
@@ -2289,6 +2590,8 @@ export class AccountView {
     const label = `${credit.name} · ${fmt(credit.currentAmount, cur)}`;
     new ConfirmModal(this.app, `Удалить кредит?\n${label}`, async () => {
       await this.storage.deleteCredit(this.notePath, credit.id);
+      const recs = this.data!.records.filter(r => !(r.category === 'Кредит' && r.payer === credit.bankName && r.note.includes(credit.name)));
+      await this.storage.saveAllRecords(this.notePath, recs);
       this.data = await this.storage.load(this.notePath);
       this.renderStats();
       this.renderBodyContent();
@@ -2846,6 +3149,20 @@ export class AccountView {
       allBanks,
       onSave: async deposit => {
         await this.storage.addDeposit(this.notePath, deposit);
+        const rec: FinanceRecord = {
+          id: crypto.randomUUID(),
+          createdAt: Date.now(),
+          date: deposit.startDate,
+          time: '',
+          type: 'expense',
+          amount: deposit.amount,
+          category: 'Вклад',
+          tag: '',
+          payer: deposit.bankName,
+          note: `Открытие вклада "${deposit.name}"`,
+          attachmentPath: '',
+        };
+        await this.storage.addRecord(this.notePath, rec);
         this.data = await this.storage.load(this.notePath);
         this.renderStats();
         this.renderBodyContent();
@@ -2876,6 +3193,8 @@ export class AccountView {
     const label = `${deposit.name} · ${fmt(deposit.amount, cur)}`;
     new ConfirmModal(this.app, `Удалить вклад?\n${label}`, async () => {
       await this.storage.deleteDeposit(this.notePath, deposit.id);
+      const recs = this.data!.records.filter(r => !(r.category === 'Вклад' && r.payer === deposit.bankName && r.note.includes(deposit.name)));
+      await this.storage.saveAllRecords(this.notePath, recs);
       this.data = await this.storage.load(this.notePath);
       this.renderStats();
       this.renderBodyContent();
@@ -2951,46 +3270,71 @@ export class AccountView {
       if (!deposit.accruals.length && deposit.termMonths > 0 && deposit.amount > 0 && deposit.startDate) {
         const startDate = new Date(deposit.startDate);
         const termMonths = deposit.termMonths;
-        if (deposit.accrualType === 'capitalization') {
-          const monthsStep = deposit.paymentFrequency === 'monthly' ? 1 : 3;
-          for (let i = monthsStep; i <= termMonths; i += monthsStep) {
-            const dueDate = new Date(startDate);
-            dueDate.setMonth(dueDate.getMonth() + i);
-            const dueDateStr = dueDate.toISOString().split('T')[0];
-            const interestAmount = (deposit.amount * deposit.interestRate / 100) * (monthsStep / 12);
+        const createAccruals = (accrualType: string) => {
+          if (accrualType === 'capitalization' || accrualType === 'capitalization_at_end') {
+            const monthsStep = deposit.paymentFrequency === 'monthly' ? 1 : 3;
+            for (let i = monthsStep; i <= termMonths; i += monthsStep) {
+              const dueDate = new Date(startDate);
+              dueDate.setMonth(dueDate.getMonth() + i);
+              const dueDateStr = dueDate.toISOString().split('T')[0];
+              const interestAmount = (deposit.amount * deposit.interestRate / 100) * (monthsStep / 12);
+              const isPast = dueDateStr <= today;
+              deposit.accruals.push({
+                id: crypto.randomUUID(),
+                amount: Math.round(interestAmount * 100) / 100,
+                dueDate: dueDateStr,
+                status: isPast ? 'paid' : 'pending',
+                paidDate: isPast ? dueDateStr : undefined,
+              });
+              if (isPast && deposit.status === 'active') {
+                this.data!.records.push({
+                  id: crypto.randomUUID(),
+                  createdAt: Date.now(),
+                  date: dueDateStr,
+                  time: '',
+                  type: 'income',
+                  amount: Math.round(interestAmount * 100) / 100,
+                  category: 'Проценты по вкладу',
+                  tag: '',
+                  payer: deposit.bankName,
+                  note: `Начисление процентов по вкладу "${deposit.name}"`,
+                  attachmentPath: '',
+                });
+                recordsChanged = true;
+              }
+            }
+          } else if (accrualType === 'end_of_term') {
+            const endDate = new Date(startDate);
+            endDate.setMonth(endDate.getMonth() + termMonths);
+            const endDateStr = endDate.toISOString().split('T')[0];
+            const totalInterest = (deposit.amount * deposit.interestRate / 100) * (termMonths / 12);
+            const isPast = endDateStr <= today;
             deposit.accruals.push({
               id: crypto.randomUUID(),
-              amount: Math.round(interestAmount * 100) / 100,
-              dueDate: dueDateStr,
-              status: 'pending',
+              amount: Math.round(totalInterest * 100) / 100,
+              dueDate: endDateStr,
+              status: isPast ? 'paid' : 'pending',
+              paidDate: isPast ? endDateStr : undefined,
             });
+            if (isPast && deposit.status === 'active') {
+              this.data!.records.push({
+                id: crypto.randomUUID(),
+                createdAt: Date.now(),
+                date: endDateStr,
+                time: '',
+                type: 'income',
+                amount: Math.round(totalInterest * 100) / 100,
+                category: 'Проценты по вкладу',
+                tag: '',
+                payer: deposit.bankName,
+                note: `Начисление процентов по вкладу "${deposit.name}"`,
+                attachmentPath: '',
+              });
+              recordsChanged = true;
+            }
           }
-        } else if (deposit.accrualType === 'capitalization_at_end') {
-          const monthsStep = deposit.paymentFrequency === 'monthly' ? 1 : 3;
-          for (let i = monthsStep; i <= termMonths; i += monthsStep) {
-            const dueDate = new Date(startDate);
-            dueDate.setMonth(dueDate.getMonth() + i);
-            const dueDateStr = dueDate.toISOString().split('T')[0];
-            const interestAmount = (deposit.amount * deposit.interestRate / 100) * (monthsStep / 12);
-            deposit.accruals.push({
-              id: crypto.randomUUID(),
-              amount: Math.round(interestAmount * 100) / 100,
-              dueDate: dueDateStr,
-              status: 'pending',
-            });
-          }
-        } else if (deposit.accrualType === 'end_of_term') {
-          const endDate = new Date(startDate);
-          endDate.setMonth(endDate.getMonth() + termMonths);
-          const endDateStr = endDate.toISOString().split('T')[0];
-          const totalInterest = (deposit.amount * deposit.interestRate / 100) * (termMonths / 12);
-          deposit.accruals.push({
-            id: crypto.randomUUID(),
-            amount: Math.round(totalInterest * 100) / 100,
-            dueDate: endDateStr,
-            status: 'pending',
-          });
-        }
+        };
+        createAccruals(deposit.accrualType);
         depositsChanged = true;
       }
 
@@ -2998,12 +3342,12 @@ export class AccountView {
       for (const accrual of deposit.accruals) {
         if (accrual.status === 'pending' && accrual.dueDate <= today) {
           accrual.status = 'paid';
-          accrual.paidDate = today;
+          accrual.paidDate = accrual.dueDate;
 
           const record: FinanceRecord = {
             id: crypto.randomUUID(),
             createdAt: Date.now(),
-            date: today,
+            date: accrual.dueDate,
             time: '',
             type: 'income',
             amount: accrual.amount,
@@ -3025,16 +3369,50 @@ export class AccountView {
     }
 
     for (const credit of this.data.credits) {
+      if (!credit.payments.length && credit.termMonths > 0 && credit.monthlyPayment > 0 && credit.startDate) {
+        const startDate = new Date(credit.startDate);
+        for (let i = 1; i <= credit.termMonths; i++) {
+          const dueDate = new Date(startDate);
+          dueDate.setMonth(dueDate.getMonth() + i);
+          const dueDateStr = dueDate.toISOString().split('T')[0];
+          const isPast = dueDateStr <= today;
+          credit.payments.push({
+            id: crypto.randomUUID(),
+            amount: credit.monthlyPayment,
+            dueDate: dueDateStr,
+            status: isPast ? 'paid' : 'pending',
+            paidDate: isPast ? dueDateStr : undefined,
+          });
+          if (isPast && credit.status === 'active') {
+            this.data!.records.push({
+              id: crypto.randomUUID(),
+              createdAt: Date.now(),
+              date: dueDateStr,
+              time: '',
+              type: 'expense',
+              amount: credit.monthlyPayment,
+              category: 'Кредитный платёж',
+              tag: '',
+              payer: credit.bankName,
+              note: `Платёж по кредиту "${credit.name}"`,
+              attachmentPath: '',
+            });
+            recordsChanged = true;
+          }
+        }
+        creditsChanged = true;
+      }
+
       if (credit.status !== 'active') continue;
       for (const payment of credit.payments) {
         if (payment.status === 'pending' && payment.dueDate <= today) {
           payment.status = 'paid';
-          payment.paidDate = today;
+          payment.paidDate = payment.dueDate;
 
           const record: FinanceRecord = {
             id: crypto.randomUUID(),
             createdAt: Date.now(),
-            date: today,
+            date: payment.dueDate,
             time: '',
             type: 'expense',
             amount: payment.amount,

@@ -1,4 +1,4 @@
-import { Plugin, PluginSettingTab, App, Setting } from 'obsidian';
+import { Plugin, PluginSettingTab, App, Setting, TFile } from 'obsidian';
 import { FinanceStorage } from './src/storage';
 import { AccountView }    from './src/AccountView';
 import { PluginSettings, DEFAULT_SETTINGS } from './src/types';
@@ -6,10 +6,14 @@ import { PluginSettings, DEFAULT_SETTINGS } from './src/types';
 export default class FinanceTrackerPlugin extends Plugin {
   settings: PluginSettings;
   storage:  FinanceStorage;
+  private styleEl?: HTMLStyleElement;
 
   async onload(): Promise<void> {
     await this.loadSettings();
     this.storage = new FinanceStorage(this.app, this.manifest.id, this.settings.defaultCurrency);
+
+    // Inject styles dynamically to avoid Obsidian CSS caching issues
+    await this.injectStyles();
 
     this.registerMarkdownCodeBlockProcessor(
       'finance-account',
@@ -19,11 +23,29 @@ export default class FinanceTrackerPlugin extends Plugin {
       },
     );
 
+    this.registerEvent(
+      this.app.vault.on('rename', (file: TFile, oldPath: string) => {
+        if (file instanceof TFile && file.extension === 'md') {
+          this.storage.renameAccount(oldPath, file.path);
+          const oldKey = 'ft-view:' + oldPath;
+          const newKey = 'ft-view:' + file.path;
+          try {
+            const val = localStorage.getItem(oldKey);
+            if (val) {
+              localStorage.setItem(newKey, val);
+              localStorage.removeItem(oldKey);
+            }
+          } catch { /* ignore */ }
+        }
+      }),
+    );
+
     this.addSettingTab(new FinanceSettingTab(this.app, this));
   }
 
   async onunload(): Promise<void> {
     await this.storage.flush();
+    this.styleEl?.remove();
   }
 
   async loadSettings(): Promise<void> {
@@ -33,6 +55,33 @@ export default class FinanceTrackerPlugin extends Plugin {
   async saveSettings(): Promise<void> {
     await this.saveData(this.settings);
     this.storage?.setDefaultCurrency(this.settings.defaultCurrency);
+  }
+
+  private async injectStyles(): Promise<void> {
+    // Remove old style element if exists
+    this.styleEl?.remove();
+
+    // Create new style element
+    this.styleEl = document.createElement('style');
+    this.styleEl.id = 'finance-tracker-styles-v4';
+
+    // Try to load styles from plugin folder
+    const configDir = this.app.vault.configDir;
+    const stylePaths = [
+      `${configDir}/plugins/obsidian-finance/styles.css`,
+      `${configDir}/plugins/obsidian-finance/dist/styles.css`,
+    ];
+
+    for (const path of stylePaths) {
+      try {
+        const css = await this.app.vault.adapter.read(path);
+        this.styleEl.textContent = css;
+        document.head.appendChild(this.styleEl);
+        return;
+      } catch {
+        // Try next path
+      }
+    }
   }
 }
 
@@ -79,7 +128,7 @@ class FinanceSettingTab extends PluginSettingTab {
       'Создайте заметку для каждого счёта (Наличные, Карта, Крипто-кошелёк).',
       'Вставьте в заметку блок кода с языком finance-account.',
       'Название счёта и валюта редактируются прямо в шапке блока.',
-      'Данные хранятся в .obsidian/plugins/obsidian-finance/accounts/',
+      'Данные хранятся в .obsidian/plugins/obsidian-finance/accounts/{название_заметки}/',
     ].forEach(t => ul.createEl('li', { text: t }));
   }
 }

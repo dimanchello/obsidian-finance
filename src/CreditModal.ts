@@ -286,15 +286,18 @@ export class CreditModal extends Modal {
 
     if (!this.credit.payments.length && this.credit.termMonths > 0 && this.credit.monthlyPayment > 0) {
       const startDate = new Date(this.credit.startDate);
+      const today = new Date().toISOString().split('T')[0];
       for (let i = 1; i <= this.credit.termMonths; i++) {
         const dueDate = new Date(startDate);
         dueDate.setMonth(dueDate.getMonth() + i);
         const dueDateStr = dueDate.toISOString().split('T')[0];
+        const isPast = dueDateStr <= today;
         this.credit.payments.push({
           id: crypto.randomUUID(),
           amount: this.credit.monthlyPayment,
           dueDate: dueDateStr,
-          status: 'pending',
+          status: isPast ? 'paid' : 'pending',
+          paidDate: isPast ? dueDateStr : undefined,
         });
       }
     }

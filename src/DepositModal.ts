@@ -277,6 +277,7 @@ export class DepositModal extends Modal {
 
     if (!this.deposit.accruals.length && this.deposit.termMonths > 0) {
       const startDate = new Date(this.deposit.startDate);
+      const today = new Date().toISOString().split('T')[0];
       if (this.deposit.accrualType === 'capitalization') {
         const monthsStep = this.deposit.paymentFrequency === 'monthly' ? 1 : 3;
         for (let i = monthsStep; i <= this.deposit.termMonths; i += monthsStep) {
@@ -284,11 +285,13 @@ export class DepositModal extends Modal {
           dueDate.setMonth(dueDate.getMonth() + i);
           const dueDateStr = dueDate.toISOString().split('T')[0];
           const interestAmount = (this.deposit.amount * this.deposit.interestRate / 100) * (monthsStep / 12);
+          const isPast = dueDateStr <= today;
           this.deposit.accruals.push({
             id: crypto.randomUUID(),
             amount: Math.round(interestAmount * 100) / 100,
             dueDate: dueDateStr,
-            status: 'pending',
+            status: isPast ? 'paid' : 'pending',
+            paidDate: isPast ? dueDateStr : undefined,
           });
         }
       } else if (this.deposit.accrualType === 'capitalization_at_end') {
@@ -298,11 +301,13 @@ export class DepositModal extends Modal {
           dueDate.setMonth(dueDate.getMonth() + i);
           const dueDateStr = dueDate.toISOString().split('T')[0];
           const interestAmount = (this.deposit.amount * this.deposit.interestRate / 100) * (monthsStep / 12);
+          const isPast = dueDateStr <= today;
           this.deposit.accruals.push({
             id: crypto.randomUUID(),
             amount: Math.round(interestAmount * 100) / 100,
             dueDate: dueDateStr,
-            status: 'pending',
+            status: isPast ? 'paid' : 'pending',
+            paidDate: isPast ? dueDateStr : undefined,
           });
         }
       } else if (this.deposit.accrualType === 'end_of_term') {
@@ -310,11 +315,13 @@ export class DepositModal extends Modal {
         endDate.setMonth(endDate.getMonth() + this.deposit.termMonths);
         const endDateStr = endDate.toISOString().split('T')[0];
         const totalInterest = (this.deposit.amount * this.deposit.interestRate / 100) * (this.deposit.termMonths / 12);
+        const isPast = endDateStr <= today;
         this.deposit.accruals.push({
           id: crypto.randomUUID(),
           amount: Math.round(totalInterest * 100) / 100,
           dueDate: endDateStr,
-          status: 'pending',
+          status: isPast ? 'paid' : 'pending',
+          paidDate: isPast ? endDateStr : undefined,
         });
       }
     }

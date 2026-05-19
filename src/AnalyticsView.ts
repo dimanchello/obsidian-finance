@@ -38,6 +38,10 @@ export class AnalyticsView {
   private groupBy:   GroupBy   = 'category';
   private showType:  ShowType  = 'both';
   private chartEl!:  HTMLElement;
+  private dateFrom:  string = '';
+  private dateTo:    string = '';
+  private timeFrom:  string = '00:00';
+  private timeTo:    string = '23:59';
 
   constructor(el: HTMLElement, records: FinanceRecord[], currency: string) {
     this.el       = el;
@@ -79,6 +83,33 @@ export class AnalyticsView {
     const sSel = this.mkSelect(sg, [['both','Все'],['income','Доходы'],['expense','Расходы']], this.showType);
     sSel.addEventListener('change', () => { this.showType = sSel.value as ShowType; this.redrawChart(); });
 
+    // ── date/time range ───────────────────────────────────────────────────
+    const dateRow = this.el.createDiv('finance-filters-row finance-analytics-date-row');
+
+    const dfG = dateRow.createDiv('finance-filter-group');
+    dfG.createEl('label', { text: 'С', cls: 'finance-filter-label' });
+    const dfI = dfG.createEl('input', { type: 'date', cls: 'finance-filter-input' });
+    dfI.value = this.dateFrom;
+    dfI.addEventListener('change', () => { this.dateFrom = dfI.value; this.redrawChart(); });
+
+    const tfG = dateRow.createDiv('finance-filter-group');
+    tfG.createEl('label', { text: 'Время', cls: 'finance-filter-label' });
+    const tfI = tfG.createEl('input', { type: 'time', cls: 'finance-filter-input' });
+    tfI.value = this.timeFrom;
+    tfI.addEventListener('change', () => { this.timeFrom = tfI.value; this.redrawChart(); });
+
+    const dtG = dateRow.createDiv('finance-filter-group');
+    dtG.createEl('label', { text: 'По', cls: 'finance-filter-label' });
+    const dtI = dtG.createEl('input', { type: 'date', cls: 'finance-filter-input' });
+    dtI.value = this.dateTo;
+    dtI.addEventListener('change', () => { this.dateTo = dtI.value; this.redrawChart(); });
+
+    const ttG = dateRow.createDiv('finance-filter-group');
+    ttG.createEl('label', { text: 'Время', cls: 'finance-filter-label' });
+    const ttI = ttG.createEl('input', { type: 'time', cls: 'finance-filter-input' });
+    ttI.value = this.timeTo;
+    ttI.addEventListener('change', () => { this.timeTo = ttI.value; this.redrawChart(); });
+
     this.chartEl = this.el.createDiv('finance-chart-area');
     this.redrawChart();
   }
@@ -106,6 +137,12 @@ export class AnalyticsView {
     const map = new Map<string, { income: number; expense: number }>();
 
     this.records.forEach(r => {
+      // Filter by analytics date range
+      if (this.dateFrom && r.date < this.dateFrom) return;
+      if (this.dateTo && r.date > this.dateTo) return;
+      if (this.dateFrom && r.date === this.dateFrom && r.time < this.timeFrom) return;
+      if (this.dateTo && r.date === this.dateTo && r.time > this.timeTo) return;
+
       let key: string;
       if      (this.groupBy === 'category') key = r.category || 'Без категории';
       else if (this.groupBy === 'payer')    key = r.payer    || 'Не указан';
@@ -157,7 +194,7 @@ export class AnalyticsView {
   // ── Bar chart (SVG) ───────────────────────────────────────────────────────
 
   private renderBar(rawData: Item[]): void {
-    const MAX = 14;
+    const MAX = 20;
     let data = rawData;
 
     // When grouped by month, never truncate — months are chronological,
@@ -174,12 +211,10 @@ export class AnalyticsView {
       ];
     }
 
-    // Dynamic chart width — each group needs a minimum slot so bars don't squish
-    const PL = 60, PB = 52, PT = 18, PR = 16;
-    const H  = 200;
-    const minSlotW = this.showType === 'both' ? 52 : 32;
-    const W  = Math.max(500, PL + PR + data.length * minSlotW);
-    const CW = W - PL - PR, CH = H - PT - PB;
+    // Flat wide chart — moderate height, width fills container
+    const PL = 38, PB = 28, PT = 6, PR = 6;
+    const H  = 100;
+    const CW = 800 - PL - PR, CH = H - PT - PB;
 
     let maxVal = 1;
     data.forEach(d => {
@@ -188,25 +223,40 @@ export class AnalyticsView {
     });
 
     const groupW = CW / data.length;
-    const barW   = Math.max(4, Math.min(groupW * 0.34, 26));
-    const gap    = 3;
+    const barW   = Math.max(2, Math.min(groupW * 0.30, 14));
+    const gap    = 1;
 
-    const root = svg('svg', { viewBox: `0 0 ${W} ${H}` });
+    const root = svg('svg', { viewBox: `0 0 800 ${H}` });
     root.classList.add('finance-chart-svg');
     root.style.display = 'block';
-    // Width is set by wrapper — SVG scales via viewBox
-    root.setAttribute('width', String(W));
+
+    // Tooltip element (created once, shown on hover)
+    const tooltip = document.createElement('div');
+    tooltip.className = 'finance-bar-tooltip';
+    tooltip.style.display = 'none';
+    tooltip.style.position = 'fixed';
+    tooltip.style.zIndex = '10000';
+    tooltip.style.pointerEvents = 'none';
+    this.chartEl.appendChild(tooltip);
+
+    const showTip = (e: MouseEvent, text: string) => {
+      tooltip.textContent = text;
+      tooltip.style.display = 'block';
+      tooltip.style.left = (e.clientX + 12) + 'px';
+      tooltip.style.top  = (e.clientY - 8) + 'px';
+    };
+    const hideTip = () => { tooltip.style.display = 'none'; };
 
     // Y grid
     for (let i = 0; i <= 4; i++) {
       const y   = PT + CH * i / 4;
       const val = maxVal * (1 - i / 4);
 
-      const line = svg('line', { x1: PL, y1: y, x2: W - PR, y2: y, stroke: 'var(--background-modifier-border)', 'stroke-width': i === 4 ? 1.5 : 1 });
+      const line = svg('line', { x1: PL, y1: y, x2: 800 - PR, y2: y, stroke: 'var(--background-modifier-border)', 'stroke-width': i === 4 ? 1.5 : 1 });
       if (i > 0 && i < 4) line.setAttribute('stroke-dasharray', '3 4');
       root.appendChild(line);
 
-      const t = svg('text', { x: PL - 8, y: y + 4, 'text-anchor': 'end', fill: 'var(--text-muted)', 'font-size': 10 });
+      const t = svg('text', { x: PL - 4, y: y + 3, 'text-anchor': 'end', fill: 'var(--text-muted)', 'font-size': 8 });
       t.textContent = fmtShort(val);
       root.appendChild(t);
     }
@@ -219,9 +269,10 @@ export class AnalyticsView {
         const h = (d.income / maxVal) * CH;
         const x = this.showType === 'both' ? cx - barW - gap / 2 : cx - barW / 2;
         const rect = svg('rect', { x, y: PT + CH - h, width: barW, height: h, fill: '#22c55e', rx: 3 });
-        const tip  = svg('title');
-        tip.textContent = `${d.label} — доход: ${this.fmtNum(d.income)}`;
-        rect.appendChild(tip);
+        rect.style.cursor = 'pointer';
+        rect.addEventListener('mouseenter', (e) => showTip(e, `${d.label} — доход: ${this.fmtNum(d.income)}`));
+        rect.addEventListener('mousemove', (e) => showTip(e, `${d.label} — доход: ${this.fmtNum(d.income)}`));
+        rect.addEventListener('mouseleave', hideTip);
         root.appendChild(rect);
       }
 
@@ -229,21 +280,22 @@ export class AnalyticsView {
         const h = (d.expense / maxVal) * CH;
         const x = this.showType === 'both' ? cx + gap / 2 : cx - barW / 2;
         const rect = svg('rect', { x, y: PT + CH - h, width: barW, height: h, fill: '#ef4444', rx: 3 });
-        const tip  = svg('title');
-        tip.textContent = `${d.label} — расход: ${this.fmtNum(d.expense)}`;
-        rect.appendChild(tip);
+        rect.style.cursor = 'pointer';
+        rect.addEventListener('mouseenter', (e) => showTip(e, `${d.label} — расход: ${this.fmtNum(d.expense)}`));
+        rect.addEventListener('mousemove', (e) => showTip(e, `${d.label} — расход: ${this.fmtNum(d.expense)}`));
+        rect.addEventListener('mouseleave', hideTip);
         root.appendChild(rect);
       }
 
       // X label — rotate when many items
       const lbl = svg('text', {
-        x: cx, y: H - PB + 14,
-        'text-anchor': 'middle', fill: 'var(--text-muted)', 'font-size': 10,
+        x: cx, y: H - PB + 10,
+        'text-anchor': 'middle', fill: 'var(--text-muted)', 'font-size': 8,
       });
-      const short = d.label.length > 10 ? d.label.slice(0, 9) + '…' : d.label;
+      const short = d.label.length > 8 ? d.label.slice(0, 7) + '…' : d.label;
       lbl.textContent = short;
-      if (data.length > 8) {
-        lbl.setAttribute('transform', `rotate(-30, ${cx}, ${H - PB + 14})`);
+      if (data.length > 10) {
+        lbl.setAttribute('transform', `rotate(-30, ${cx}, ${H - PB + 10})`);
         lbl.setAttribute('text-anchor', 'end');
       }
       root.appendChild(lbl);
@@ -251,11 +303,11 @@ export class AnalyticsView {
 
     // Legend
     if (this.showType === 'both') {
-      const leg = svg('g', { transform: `translate(${PL}, ${H - 8})` });
+      const leg = svg('g', { transform: `translate(${PL}, ${H - 4})` });
       [['#22c55e', 'Доходы'], ['#ef4444', 'Расходы']].forEach(([c, lbl], i) => {
-        const gx = i * 90;
-        const r  = svg('rect', { x: gx, y: -10, width: 10, height: 10, fill: c, rx: 2 });
-        const t  = svg('text', { x: gx + 14, y: 0, fill: 'var(--text-muted)', 'font-size': 10 });
+        const gx = i * 55;
+        const r  = svg('rect', { x: gx, y: -6, width: 6, height: 6, fill: c, rx: 1 });
+        const t  = svg('text', { x: gx + 9, y: 0, fill: 'var(--text-muted)', 'font-size': 8 });
         t.textContent = lbl;
         leg.appendChild(r); leg.appendChild(t);
       });
@@ -269,7 +321,7 @@ export class AnalyticsView {
   // ── Pie / donut chart (SVG) ───────────────────────────────────────────────
 
   private renderPie(rawData: Item[]): void {
-    const MAX = 10;
+    const MAX = 14;
     let items = rawData
       .map(d => ({
         label: d.label,
@@ -291,8 +343,8 @@ export class AnalyticsView {
       return;
     }
 
-    const SZ = 200, cx = SZ / 2, cy = SZ / 2, R = 82, iR = 44;
-    const root = svg('svg', { viewBox: `0 0 ${SZ} ${SZ}`, width: SZ, height: SZ });
+    const SZ = 120, cx = SZ / 2, cy = SZ / 2, R = 48, iR = 26;
+    const root = svg('svg', { viewBox: `0 0 ${SZ} ${SZ}` });
     root.classList.add('finance-chart-svg');
     root.style.flexShrink = '0';
 
@@ -326,10 +378,10 @@ export class AnalyticsView {
     });
 
     // Center label
-    const tc = svg('text', { x: cx, y: cy - 7, 'text-anchor': 'middle', fill: 'var(--text-muted)', 'font-size': 9 });
+    const tc = svg('text', { x: cx, y: cy - 4, 'text-anchor': 'middle', fill: 'var(--text-muted)', 'font-size': 7 });
     tc.textContent = 'Итого';
     root.appendChild(tc);
-    const tv = svg('text', { x: cx, y: cy + 9, 'text-anchor': 'middle', fill: 'var(--text-normal)', 'font-size': 13, 'font-weight': 'bold' });
+    const tv = svg('text', { x: cx, y: cy + 6, 'text-anchor': 'middle', fill: 'var(--text-normal)', 'font-size': 9, 'font-weight': 'bold' });
     tv.textContent = fmtShort(total);
     root.appendChild(tv);
 

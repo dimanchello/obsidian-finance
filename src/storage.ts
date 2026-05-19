@@ -61,9 +61,13 @@ export class FinanceStorage {
 
   setDefaultCurrency(c: string) { this.defaultCurrency = c; }
 
-  private fp(notePath: string, suffix: string): string {
+  private noteFolder(notePath: string): string {
     const safe = notePath.replace(/[\\/:"*?<>|]/g, '_');
-    return normalizePath(`${this.base}/${safe}${suffix}.json`);
+    return normalizePath(`${this.base}/${safe}`);
+  }
+
+  private fp(notePath: string, suffix: string): string {
+    return normalizePath(`${this.noteFolder(notePath)}/${suffix}.json`);
   }
 
   private async ensureBase(): Promise<void> {
@@ -71,26 +75,85 @@ export class FinanceStorage {
     if (!(await a.exists(this.base))) await a.mkdir(this.base);
   }
 
+  private async ensureNoteFolder(notePath: string): Promise<void> {
+    const folder = this.noteFolder(notePath);
+    const a = this.app.vault.adapter;
+    if (!(await a.exists(folder))) await a.mkdir(folder);
+  }
+
   // ── Legacy migration ──────────────────────────────────────────────────────
 
+  private oldFp(notePath: string, suffix: string): string {
+    const safe = notePath.replace(/[\\/:"*?<>|]/g, '_');
+    return normalizePath(`${this.base}/${safe}${suffix}.json`);
+  }
+
   private async migrateLegacy(notePath: string): Promise<void> {
-    const legacyPath = this.fp(notePath, '');
-    if (!(await this.app.vault.adapter.exists(legacyPath))) return;
+    const a = this.app.vault.adapter;
+
+    // Step 1: Check if new folder files already exist
+    const newMeta = this.fp(notePath, 'meta');
+    const newRecs = this.fp(notePath, 'records');
+    if (await a.exists(newMeta) || await a.exists(newRecs)) {
+      // New format exists, clean up any old flat files
+      await this.cleanupOldFlatFiles(notePath);
+      return;
+    }
+
+    // Step 2: Try migrating from old flat files (e.g., accounts/name.meta.json → accounts/name/meta.json)
+    const oldMeta = this.oldFp(notePath, '.meta');
+    const oldRecs = this.oldFp(notePath, '.records');
+    if (await a.exists(oldMeta) || await a.exists(oldRecs)) {
+      try {
+        await this.ensureNoteFolder(notePath);
+        const suffixes = ['.meta', '.records', '.debts', '.credits', '.deposits'];
+        for (const suffix of suffixes) {
+          const oldFile = this.oldFp(notePath, suffix);
+          const newSuffix = suffix.replace('.', '');
+          const newFile = this.fp(notePath, newSuffix);
+          if (await a.exists(oldFile)) {
+            await a.rename(oldFile, newFile);
+          }
+        }
+      } catch {
+        // Migration failed, try copy+delete fallback
+        try {
+          await this.ensureNoteFolder(notePath);
+          const suffixes = ['.meta', '.records', '.debts', '.credits', '.deposits'];
+          for (const suffix of suffixes) {
+            const oldFile = this.oldFp(notePath, suffix);
+            const newSuffix = suffix.replace('.', '');
+            const newFile = this.fp(notePath, newSuffix);
+            if (await a.exists(oldFile)) {
+              const content = await a.read(oldFile);
+              await a.write(newFile, content);
+              await a.remove(oldFile);
+            }
+          }
+        } catch { /* ignore */ }
+      }
+      return;
+    }
+
+    // Step 3: Try migrating from single legacy file (accounts/name.json)
+    const safe = notePath.replace(/[\\/:"*?<>|]/g, '_');
+    const legacyPath = normalizePath(`${this.base}/${safe}.json`);
+    if (!(await a.exists(legacyPath))) return;
 
     try {
-      const raw = await this.app.vault.adapter.read(legacyPath);
+      await this.ensureNoteFolder(notePath);
+
+      const raw = await a.read(legacyPath);
       const legacy = JSON.parse(raw) as AccountData;
 
-      // Write meta
       const meta: AccountMetaFile = {
         version: DATA_VERSION,
         name: legacy.name || '',
         currency: legacy.currency || this.defaultCurrency,
         accentColor: legacy.accentColor || '',
       };
-      await this.app.vault.adapter.write(this.fp(notePath, '.meta'), JSON.stringify(meta));
+      await a.write(this.fp(notePath, 'meta'), JSON.stringify(meta));
 
-      // Write records
       const recs: AccountRecordsFile = {
         version: DATA_VERSION,
         records: legacy.records || [],
@@ -98,21 +161,32 @@ export class FinanceStorage {
         tags: legacy.tags || [],
         payers: legacy.payers || [],
       };
-      await this.app.vault.adapter.write(this.fp(notePath, '.records'), JSON.stringify(recs));
+      await a.write(this.fp(notePath, 'records'), JSON.stringify(recs));
 
-      // Write debts
-      await this.app.vault.adapter.write(this.fp(notePath, '.debts'), JSON.stringify(legacy.debts || []));
+      await a.write(this.fp(notePath, 'debts'), JSON.stringify(legacy.debts || []));
+      await a.write(this.fp(notePath, 'credits'), JSON.stringify(legacy.credits || []));
+      await a.write(this.fp(notePath, 'deposits'), JSON.stringify(legacy.deposits || []));
 
-      // Write credits
-      await this.app.vault.adapter.write(this.fp(notePath, '.credits'), JSON.stringify(legacy.credits || []));
-
-      // Write deposits
-      await this.app.vault.adapter.write(this.fp(notePath, '.deposits'), JSON.stringify(legacy.deposits || []));
-
-      // Delete legacy file
-      await this.app.vault.adapter.remove(legacyPath);
+      await a.remove(legacyPath);
     } catch {
       // Migration failed, leave legacy file as-is
+    }
+  }
+
+  private async cleanupOldFlatFiles(notePath: string): Promise<void> {
+    const a = this.app.vault.adapter;
+    const suffixes = ['.meta', '.records', '.debts', '.credits', '.deposits'];
+    for (const suffix of suffixes) {
+      const oldFile = this.oldFp(notePath, suffix);
+      if (await a.exists(oldFile)) {
+        try { await a.remove(oldFile); } catch { /* ignore */ }
+      }
+    }
+    // Also remove single legacy file if exists
+    const safe = notePath.replace(/[\\/:"*?<>|]/g, '_');
+    const legacyPath = normalizePath(`${this.base}/${safe}.json`);
+    if (await a.exists(legacyPath)) {
+      try { await a.remove(legacyPath); } catch { /* ignore */ }
     }
   }
 
@@ -120,7 +194,7 @@ export class FinanceStorage {
 
   private async loadMeta(notePath: string): Promise<AccountMetaFile> {
     if (this.metaCache.has(notePath)) return this.metaCache.get(notePath)!;
-    const fp = this.fp(notePath, '.meta');
+    const fp = this.fp(notePath, 'meta');
     if (await this.app.vault.adapter.exists(fp)) {
       try {
         const data = JSON.parse(await this.app.vault.adapter.read(fp)) as AccountMetaFile;
@@ -135,14 +209,18 @@ export class FinanceStorage {
 
   private async loadRecords(notePath: string): Promise<AccountRecordsFile> {
     if (this.recordsCache.has(notePath)) return this.recordsCache.get(notePath)!;
-    const fp = this.fp(notePath, '.records');
+    const fp = this.fp(notePath, 'records');
+    console.log('[FT-storage] loadRecords:', fp);
     if (await this.app.vault.adapter.exists(fp)) {
       try {
         const data = JSON.parse(await this.app.vault.adapter.read(fp)) as AccountRecordsFile;
+        console.log('[FT-storage] loadRecords loaded:', data.records.length, 'records');
         data.records.forEach(r => { if (r.time === undefined) r.time = ''; });
         this.recordsCache.set(notePath, data);
         return data;
-      } catch { /* corrupt */ }
+      } catch (e) { 
+        console.error('[FT-storage] loadRecords parse error:', e);
+      }
     }
     const empty = emptyRecords();
     this.recordsCache.set(notePath, empty);
@@ -151,7 +229,7 @@ export class FinanceStorage {
 
   private async loadDebts(notePath: string): Promise<DebtRecord[]> {
     if (this.debtsCache.has(notePath)) return this.debtsCache.get(notePath)!;
-    const fp = this.fp(notePath, '.debts');
+    const fp = this.fp(notePath, 'debts');
     if (await this.app.vault.adapter.exists(fp)) {
       try {
         const data = JSON.parse(await this.app.vault.adapter.read(fp)) as DebtRecord[];
@@ -171,13 +249,20 @@ export class FinanceStorage {
 
   private async loadCredits(notePath: string): Promise<CreditRecord[]> {
     if (this.creditsCache.has(notePath)) return this.creditsCache.get(notePath)!;
-    const fp = this.fp(notePath, '.credits');
+    const fp = this.fp(notePath, 'credits');
     if (await this.app.vault.adapter.exists(fp)) {
       try {
         const data = JSON.parse(await this.app.vault.adapter.read(fp)) as CreditRecord[];
+        data.forEach(c => {
+          if (!c.status) c.status = 'active';
+          if (!c.payments) c.payments = [];
+          if (c.earlyRepaymentOption === undefined) c.earlyRepaymentOption = null;
+        });
         this.creditsCache.set(notePath, data);
         return data;
-      } catch { /* corrupt */ }
+      } catch (e) { 
+        console.error('[FT-storage] loadCredits parse error:', e);
+      }
     }
     const empty: CreditRecord[] = [];
     this.creditsCache.set(notePath, empty);
@@ -186,7 +271,7 @@ export class FinanceStorage {
 
   private async loadDeposits(notePath: string): Promise<DepositRecord[]> {
     if (this.depositsCache.has(notePath)) return this.depositsCache.get(notePath)!;
-    const fp = this.fp(notePath, '.deposits');
+    const fp = this.fp(notePath, 'deposits');
     if (await this.app.vault.adapter.exists(fp)) {
       try {
         const data = JSON.parse(await this.app.vault.adapter.read(fp)) as DepositRecord[];
@@ -251,33 +336,44 @@ export class FinanceStorage {
   private async flushDirty(): Promise<void> {
     await this.ensureBase();
 
+    const allNotes = new Set([
+      ...this.metaDirty,
+      ...this.recordsDirty,
+      ...this.debtsDirty,
+      ...this.creditsDirty,
+      ...this.depositsDirty,
+    ]);
+    for (const np of allNotes) {
+      await this.ensureNoteFolder(np);
+    }
+
     for (const np of this.metaDirty) {
       const d = this.metaCache.get(np);
-      if (d) await this.app.vault.adapter.write(this.fp(np, '.meta'), JSON.stringify(d));
+      if (d) await this.app.vault.adapter.write(this.fp(np, 'meta'), JSON.stringify(d));
     }
     this.metaDirty.clear();
 
     for (const np of this.recordsDirty) {
       const d = this.recordsCache.get(np);
-      if (d) await this.app.vault.adapter.write(this.fp(np, '.records'), JSON.stringify(d));
+      if (d) await this.app.vault.adapter.write(this.fp(np, 'records'), JSON.stringify(d));
     }
     this.recordsDirty.clear();
 
     for (const np of this.debtsDirty) {
       const d = this.debtsCache.get(np);
-      if (d !== undefined) await this.app.vault.adapter.write(this.fp(np, '.debts'), JSON.stringify(d));
+      if (d !== undefined) await this.app.vault.adapter.write(this.fp(np, 'debts'), JSON.stringify(d));
     }
     this.debtsDirty.clear();
 
     for (const np of this.creditsDirty) {
       const d = this.creditsCache.get(np);
-      if (d !== undefined) await this.app.vault.adapter.write(this.fp(np, '.credits'), JSON.stringify(d));
+      if (d !== undefined) await this.app.vault.adapter.write(this.fp(np, 'credits'), JSON.stringify(d));
     }
     this.creditsDirty.clear();
 
     for (const np of this.depositsDirty) {
       const d = this.depositsCache.get(np);
-      if (d !== undefined) await this.app.vault.adapter.write(this.fp(np, '.deposits'), JSON.stringify(d));
+      if (d !== undefined) await this.app.vault.adapter.write(this.fp(np, 'deposits'), JSON.stringify(d));
     }
     this.depositsDirty.clear();
   }
@@ -534,5 +630,59 @@ export class FinanceStorage {
     const deposits: DepositRecord[] = [];
     this.depositsCache.set(notePath, deposits);
     this.scheduleDeposits(notePath);
+  }
+
+  // ── Rename ────────────────────────────────────────────────────────────────
+
+  async renameAccount(oldNotePath: string, newNotePath: string): Promise<void> {
+    await this.flushDirty();
+
+    const a = this.app.vault.adapter;
+    const oldFolder = this.noteFolder(oldNotePath);
+    const newFolder = this.noteFolder(newNotePath);
+
+    if (await a.exists(oldFolder)) {
+      try {
+        await a.rename(oldFolder, newFolder);
+      } catch {
+        // If rename fails, copy all files and delete old folder
+        try {
+          await this.ensureNoteFolder(newNotePath);
+          const suffixes = ['meta', 'records', 'debts', 'credits', 'deposits'];
+          for (const suffix of suffixes) {
+            const oldFp = this.fp(oldNotePath, suffix);
+            const newFp = this.fp(newNotePath, suffix);
+            if (await a.exists(oldFp)) {
+              const content = await a.read(oldFp);
+              await a.write(newFp, content);
+              await a.remove(oldFp);
+            }
+          }
+          // Try to remove old folder if empty
+          try { await a.remove(oldFolder); } catch { /* ignore */ }
+        } catch { /* ignore */ }
+      }
+    }
+
+    // Update caches
+    const mvCache = <T>(cache: Map<string, T>, old: string, n: string) => {
+      const v = cache.get(old);
+      if (v !== undefined) { cache.set(n, v); cache.delete(old); }
+    };
+    mvCache(this.metaCache, oldNotePath, newNotePath);
+    mvCache(this.recordsCache, oldNotePath, newNotePath);
+    mvCache(this.debtsCache, oldNotePath, newNotePath);
+    mvCache(this.creditsCache, oldNotePath, newNotePath);
+    mvCache(this.depositsCache, oldNotePath, newNotePath);
+
+    // Update dirty sets
+    const mvSet = (set: Set<string>) => {
+      if (set.has(oldNotePath)) { set.delete(oldNotePath); set.add(newNotePath); }
+    };
+    mvSet(this.metaDirty);
+    mvSet(this.recordsDirty);
+    mvSet(this.debtsDirty);
+    mvSet(this.creditsDirty);
+    mvSet(this.depositsDirty);
   }
 }

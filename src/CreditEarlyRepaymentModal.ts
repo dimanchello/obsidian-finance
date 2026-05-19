@@ -4,6 +4,7 @@ import { CreditPayment, CreditRecord } from './types';
 export interface CreditEarlyRepaymentModalOptions {
   title: string;
   credit: CreditRecord;
+  currency: string;
   onSave: (updatedCredit: CreditRecord) => void;
 }
 
@@ -26,11 +27,17 @@ export class CreditEarlyRepaymentModal extends Modal {
   private credit: CreditRecord;
   private amountInput!: HTMLInputElement;
   private selectedOption: 'amount' | 'term' = 'amount';
+  private actualRemaining: number;
+  private pendingPayments: CreditPayment[];
 
   constructor(app: App, opts: CreditEarlyRepaymentModalOptions) {
     super(app);
     this.o = opts;
     this.credit = { ...opts.credit, payments: [...opts.credit.payments] };
+
+    this.pendingPayments = this.credit.payments.filter(p => p.status === 'pending');
+    const paidAmount = this.credit.payments.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0);
+    this.actualRemaining = Math.max(0, this.credit.originalAmount - paidAmount);
   }
 
   onOpen(): void {
@@ -40,13 +47,12 @@ export class CreditEarlyRepaymentModal extends Modal {
 
     contentEl.createEl('h2', { text: this.o.title, cls: 'finance-modal-title' });
 
-    const cur = '₽';
+    const cur = this.o.currency;
 
     const info = contentEl.createDiv('finance-early-info');
-    info.createEl('p', { text: `Остаток кредита: ${fmtAmount(String(this.credit.currentAmount))} ${cur}` });
+    info.createEl('p', { text: `Остаток кредита: ${fmtAmount(String(this.actualRemaining))} ${cur}` });
     info.createEl('p', { text: `Ежемесячный платёж: ${fmtAmount(String(this.credit.monthlyPayment))} ${cur}` });
-    const pendingCount = this.credit.payments.filter(p => p.status === 'pending').length;
-    info.createEl('p', { text: `Осталось платежей: ${pendingCount}` });
+    info.createEl('p', { text: `Осталось платежей: ${this.pendingPayments.length}` });
 
     const form = contentEl.createDiv('finance-form');
 
@@ -57,14 +63,42 @@ export class CreditEarlyRepaymentModal extends Modal {
     dateIn.value = today;
 
     const optRow = form.createDiv('finance-early-options');
-    const amountBtn = optRow.createEl('button', {
-      text: 'Гасить сумму',
-      cls: `finance-option-btn active`,
-    });
-    const termBtn = optRow.createEl('button', {
-      text: 'Гасить срок',
-      cls: `finance-option-btn`,
-    });
+    optRow.style.display = 'flex';
+    optRow.style.gap = '8px';
+    optRow.style.marginBottom = '16px';
+
+    const baseBtnStyle = (btn: HTMLElement) => {
+      btn.style.flex = '1';
+      btn.style.padding = '10px 16px';
+      btn.style.borderRadius = '8px';
+      btn.style.border = '2px solid #e5e7eb';
+      btn.style.fontSize = '14px';
+      btn.style.fontWeight = '500';
+      btn.style.cursor = 'pointer';
+      btn.style.transition = 'all 0.2s ease';
+      btn.style.background = '#f9fafb';
+      btn.style.color = '#374151';
+    };
+
+    const activeBtnStyle = (btn: HTMLElement) => {
+      btn.style.background = '#7c3aed';
+      btn.style.color = '#fff';
+      btn.style.borderColor = '#7c3aed';
+    };
+
+    const inactiveBtnStyle = (btn: HTMLElement) => {
+      btn.style.background = '#f9fafb';
+      btn.style.color = '#374151';
+      btn.style.borderColor = '#e5e7eb';
+    };
+
+    const amountBtn = optRow.createEl('button', { text: 'Гасить сумму' });
+    baseBtnStyle(amountBtn);
+    activeBtnStyle(amountBtn);
+
+    const termBtn = optRow.createEl('button', { text: 'Гасить срок' });
+    baseBtnStyle(termBtn);
+    inactiveBtnStyle(termBtn);
 
     const amountSection = form.createDiv('finance-early-amount-section');
     amountSection.createEl('label', { text: 'Сумма досрочного погашения', cls: 'finance-field-label' });
@@ -76,11 +110,11 @@ export class CreditEarlyRepaymentModal extends Modal {
     this.amountInput.setAttribute('inputmode', 'decimal');
     this.amountInput.setAttribute('placeholder', '0');
     this.amountInput.setAttribute('autocomplete', 'off');
-    this.amountInput.value = fmtAmount(String(this.credit.currentAmount));
+    this.amountInput.value = fmtAmount(String(this.actualRemaining));
 
     this.amountInput.addEventListener('focus', () => {
-      if (this.credit.currentAmount > 0) {
-        this.amountInput.value = String(this.credit.currentAmount).replace('.', ',');
+      if (this.actualRemaining > 0) {
+        this.amountInput.value = String(this.actualRemaining).replace('.', ',');
       }
     });
 
@@ -108,21 +142,21 @@ export class CreditEarlyRepaymentModal extends Modal {
       cls: 'finance-input',
     });
     termInput.setAttribute('min', '1');
-    termInput.setAttribute('max', String(pendingCount));
+    termInput.setAttribute('max', String(this.pendingPayments.length));
     termInput.value = '1';
 
     amountBtn.addEventListener('click', () => {
       this.selectedOption = 'amount';
-      amountBtn.classList.add('active');
-      termBtn.classList.remove('active');
+      activeBtnStyle(amountBtn);
+      inactiveBtnStyle(termBtn);
       amountSection.style.display = 'block';
       termSection.style.display = 'none';
     });
 
     termBtn.addEventListener('click', () => {
       this.selectedOption = 'term';
-      termBtn.classList.add('active');
-      amountBtn.classList.remove('active');
+      activeBtnStyle(termBtn);
+      inactiveBtnStyle(amountBtn);
       amountSection.style.display = 'none';
       termSection.style.display = 'block';
     });
@@ -149,10 +183,9 @@ export class CreditEarlyRepaymentModal extends Modal {
             return;
           }
 
-          const pendingPayments = this.credit.payments.filter(p => p.status === 'pending');
           let remainingAmount = amount;
 
-          for (const payment of pendingPayments) {
+          for (const payment of this.pendingPayments) {
             if (remainingAmount <= 0) break;
             const payAmount = Math.min(payment.amount, remainingAmount);
             payment.status = 'paid';
@@ -161,23 +194,25 @@ export class CreditEarlyRepaymentModal extends Modal {
             remainingAmount -= payAmount;
           }
 
-          this.credit.currentAmount = Math.max(0, this.credit.currentAmount - amount);
-          if (this.credit.currentAmount <= 0 || pendingPayments.length === 0) {
+          this.credit.currentAmount = Math.max(0, this.actualRemaining - amount);
+          const stillPending = this.credit.payments.filter(p => p.status === 'pending');
+          if (this.credit.currentAmount <= 0 || stillPending.length === 0) {
             this.credit.status = 'paid';
           }
 
         } else {
           const monthsToRemove = parseInt(termInput.value) || 1;
-          const pendingPayments = this.credit.payments.filter(p => p.status === 'pending');
-          const toRemove = Math.min(monthsToRemove, pendingPayments.length);
+          const toRemove = Math.min(monthsToRemove, this.pendingPayments.length);
 
           for (let i = 0; i < toRemove; i++) {
-            pendingPayments[i].status = 'paid';
-            pendingPayments[i].paidDate = repaymentDate;
-            if (noteIn.value) pendingPayments[i].note = noteIn.value;
+            this.pendingPayments[i].status = 'paid';
+            this.pendingPayments[i].paidDate = repaymentDate;
+            if (noteIn.value) this.pendingPayments[i].note = noteIn.value;
           }
 
-          this.credit.status = pendingPayments.length === toRemove ? 'paid' : 'active';
+          const stillPending = this.credit.payments.filter(p => p.status === 'pending');
+          this.credit.currentAmount = stillPending.reduce((s, p) => s + p.amount, 0);
+          this.credit.status = stillPending.length === 0 ? 'paid' : 'active';
         }
 
         this.o.onSave(this.credit);
