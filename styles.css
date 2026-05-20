@@ -1488,6 +1488,13 @@
   .finance-debts-list { display: none !important; }
 }
 
+/* ── ПК: второй блок stats в 2 колонки ───────────── */
+@media (min-width: 481px) {
+  .finance-stats-container:nth-of-type(2) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 /* Obsidian mobile app: JS renders blocks regardless of viewport width */
 .finance-tracker--mobile .finance-table-scroll,
 .finance-tracker--mobile .finance-debt-table-scroll { display: none !important; }

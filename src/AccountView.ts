@@ -3136,10 +3136,27 @@ export class AccountView {
     new ConfirmModal(this.app, `Закрыть вклад?\n${label}`, async () => {
       deposit.status = 'closed';
       await this.storage.updateDeposit(this.notePath, deposit);
+
+      const refundRec: FinanceRecord = {
+        id: crypto.randomUUID(),
+        createdAt: Date.now(),
+        date: new Date().toISOString().split('T')[0],
+        time: '',
+        type: 'income',
+        amount: deposit.amount,
+        category: 'Возврат вклада',
+        tag: '',
+        payer: deposit.bankName,
+        note: `Возврат тела вклада "${deposit.name}"`,
+        attachmentPath: '',
+        linkedId: deposit.id,
+      };
+      await this.storage.addRecord(this.notePath, refundRec);
+
       this.data = await this.storage.load(this.notePath);
       this.renderStats();
       this.renderBodyContent();
-      new Notice('✅ Вклад закрыт');
+      new Notice('✅ Вклад закрыт, средства возвращены');
     }).open();
   }
 
@@ -3397,6 +3414,23 @@ export class AccountView {
       if (allPastAccrued) {
         deposit.status = 'closed';
         depositsChanged = true;
+
+        const refundRec: FinanceRecord = {
+          id: crypto.randomUUID(),
+          createdAt: Date.now(),
+          date: today,
+          time: '',
+          type: 'income',
+          amount: deposit.amount,
+          category: 'Возврат вклада',
+          tag: '',
+          payer: deposit.bankName,
+          note: `Возврат тела вклада "${deposit.name}"`,
+          attachmentPath: '',
+          linkedId: deposit.id,
+        };
+        this.data.records.push(refundRec);
+        recordsChanged = true;
       }
     }
 
