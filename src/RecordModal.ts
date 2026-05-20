@@ -9,6 +9,7 @@ export interface RecordModalOptions {
   payers:     string[];
   currency:   string;
   settings:   PluginSettings;
+  pluginId:   string;
   onSave:     (r: FinanceRecord) => void;
 }
 
@@ -408,7 +409,15 @@ export class RecordModal extends Modal {
       }
 
       try {
-        const folder = this.o.settings.attachmentsFolder;
+        const vaultCfg = (this.app.vault as any).getConfig('attachmentFolderPath') ?? '/';
+        let folder: string;
+        if (vaultCfg === './') {
+          folder = this.o.pluginId;
+        } else if (vaultCfg === '/') {
+          folder = this.o.pluginId;
+        } else {
+          folder = normalizePath(`${vaultCfg}/${this.o.pluginId}`);
+        }
         if (!this.app.vault.getAbstractFileByPath(folder))
           await this.app.vault.createFolder(folder);
         const dest = normalizePath(

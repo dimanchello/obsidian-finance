@@ -18,7 +18,7 @@ export default class FinanceTrackerPlugin extends Plugin {
     this.registerMarkdownCodeBlockProcessor(
       'finance-account',
       async (source, el, ctx) => {
-        const view = new AccountView(this.app, el, ctx.sourcePath, this.storage, this.settings);
+        const view = new AccountView(this.app, el, ctx.sourcePath, this.storage, this.settings, this.manifest.id);
         await view.render();
       },
     );
@@ -115,12 +115,6 @@ class FinanceSettingTab extends PluginSettingTab {
         .addOptions({ '25':'25','50':'50','100':'100','200':'200','500':'500' })
         .setValue(String(this.plugin.settings.defaultPageSize))
         .onChange(async v => { this.plugin.settings.defaultPageSize = parseInt(v); await this.plugin.saveSettings(); }));
-
-    new Setting(containerEl)
-      .setName('Папка для вложений')
-      .setDesc('Куда сохраняются фото чеков и документы.')
-      .addText(t => t.setPlaceholder('Finance/Attachments').setValue(this.plugin.settings.attachmentsFolder)
-        .onChange(async v => { this.plugin.settings.attachmentsFolder = v || 'Finance/Attachments'; await this.plugin.saveSettings(); }));
 
     containerEl.createEl('h3', { text: 'Как использовать' });
     const ul = containerEl.createEl('ul', { cls: 'finance-settings-list' });

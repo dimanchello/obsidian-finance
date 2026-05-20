@@ -968,7 +968,7 @@
 }
 .finance-custom-select-item:hover { background: var(--background-modifier-hover); }
 .finance-custom-select-item.is-active {
-  background: color-mix(in srgb, var(--color-accent, #7c3aed) 12%, transparent);
+  background: color-mix(in srgb, var(--ft-accent) 12%, transparent);
   color: var(--ft-accent); font-weight: 600;
 }
 .finance-custom-select-empty {
@@ -1002,7 +1002,7 @@
 .finance-combobox-item:hover,
 .finance-combobox-item:focus { background: var(--background-modifier-hover); outline: none; }
 .finance-combobox-item.is-active {
-  background: color-mix(in srgb, var(--color-accent, #7c3aed) 12%, transparent);
+  background: color-mix(in srgb, var(--ft-accent) 12%, transparent);
   color: var(--ft-accent); font-weight: 600;
 }
 

@@ -96,14 +96,13 @@ export interface ViewState {
 }
 
 export interface PluginSettings {
-  defaultPageSize:   number;
-  defaultCurrency:   string;
-  attachmentsFolder: string;
+  defaultCurrency: string;
+  defaultPageSize: number;
 }
 
 export const DEFAULT_SETTINGS: PluginSettings = {
-  defaultPageSize: 100, defaultCurrency: '₽',
-  attachmentsFolder: 'Finance/Attachments',
+  defaultCurrency: '₽',
+  defaultPageSize: 25,
 };
 
 export const DEFAULT_FILTER: FilterState = {

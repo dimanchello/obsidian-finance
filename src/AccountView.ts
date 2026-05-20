@@ -88,6 +88,7 @@ export class AccountView {
   private notePath: string;
   private storage:  FinanceStorage;
   private settings: PluginSettings;
+  private pluginId: string;
   private state:    ViewState;
   private data:     AccountData | null = null;
 
@@ -111,9 +112,9 @@ export class AccountView {
   private depositPaginationEl?: HTMLElement;
   private creditPaymentPages: Map<string, number> = new Map();
 
-  constructor(app: App, root: HTMLElement, notePath: string, storage: FinanceStorage, settings: PluginSettings) {
+  constructor(app: App, root: HTMLElement, notePath: string, storage: FinanceStorage, settings: PluginSettings, pluginId: string) {
     this.app = app; this.root = root; this.notePath = notePath;
-    this.storage = storage; this.settings = settings;
+    this.storage = storage; this.settings = settings; this.pluginId = pluginId;
     this.state = loadState(notePath, settings.defaultPageSize);
   }
 
@@ -1057,7 +1058,7 @@ export class AccountView {
     new RecordModal(this.app, {
       initial: { type }, records: this.data.records,
       categories: this.data.categories, tags: this.data.tags, payers: this.data.payers,
-      currency: cur, settings: this.settings,
+      currency: cur, settings: this.settings, pluginId: this.pluginId,
       onSave: async rec => {
         await this.storage.addRecord(this.notePath, rec);
         this.data = await this.storage.load(this.notePath);
@@ -1073,7 +1074,7 @@ export class AccountView {
     new RecordModal(this.app, {
       initial: { ...rec }, records: this.data.records.filter(r => r.id !== rec.id),
       categories: this.data.categories, tags: this.data.tags, payers: this.data.payers,
-      currency: cur, settings: this.settings,
+      currency: cur, settings: this.settings, pluginId: this.pluginId,
       onSave: async updated => {
         await this.storage.updateRecord(this.notePath, updated);
         this.data = await this.storage.load(this.notePath);
