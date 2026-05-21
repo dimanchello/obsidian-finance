@@ -63,7 +63,7 @@ export class AnalyticsView {
     // ── controls ──────────────────────────────────────────────────────────
     const ctrl = this.el.createDiv('finance-analytics-controls');
 
-    // chart type
+    // chart type (row 1)
     const tg = ctrl.createDiv('finance-analytics-group');
     tg.createEl('span', { text: 'Вид:', cls: 'finance-analytics-label' });
     const barBtn = this.mkToggle(tg, '▮▮ Столбцы', this.chartType === 'bar');
@@ -71,14 +71,15 @@ export class AnalyticsView {
     barBtn.addEventListener('click', () => { this.chartType = 'bar'; barBtn.classList.add('active'); pieBtn.classList.remove('active'); this.redrawChart(); });
     pieBtn.addEventListener('click', () => { this.chartType = 'pie'; pieBtn.classList.add('active'); barBtn.classList.remove('active'); this.redrawChart(); });
 
-    // group by
-    const gg = ctrl.createDiv('finance-analytics-group');
+    // row 2: group by + show type
+    const ctrl2 = ctrl.createDiv('finance-analytics-group');
+
+    const gg = ctrl2.createDiv('finance-analytics-group');
     gg.createEl('span', { text: 'Группировка:', cls: 'finance-analytics-label' });
     const gSel = this.mkSelect(gg, [['category','По категории'],['payer','По плательщику'],['month','По месяцу']], this.groupBy);
     gSel.addEventListener('change', () => { this.groupBy = gSel.value as GroupBy; this.redrawChart(); });
 
-    // show type
-    const sg = ctrl.createDiv('finance-analytics-group');
+    const sg = ctrl2.createDiv('finance-analytics-group');
     sg.createEl('span', { text: 'Данные:', cls: 'finance-analytics-label' });
     const sSel = this.mkSelect(sg, [['both','Все'],['income','Доходы'],['expense','Расходы']], this.showType);
     sSel.addEventListener('change', () => { this.showType = sSel.value as ShowType; this.redrawChart(); });
@@ -88,27 +89,35 @@ export class AnalyticsView {
 
     const dfG = dateRow.createDiv('finance-filter-group');
     dfG.createEl('label', { text: 'С', cls: 'finance-filter-label' });
-    const dfI = dfG.createEl('input', { type: 'date', cls: 'finance-filter-input' });
-    dfI.value = this.dateFrom;
-    dfI.addEventListener('change', () => { this.dateFrom = dfI.value; this.redrawChart(); });
-
-    const tfG = dateRow.createDiv('finance-filter-group');
-    tfG.createEl('label', { text: 'Время', cls: 'finance-filter-label' });
-    const tfI = tfG.createEl('input', { type: 'time', cls: 'finance-filter-input' });
-    tfI.value = this.timeFrom;
-    tfI.addEventListener('change', () => { this.timeFrom = tfI.value; this.redrawChart(); });
+    const dfI = dfG.createEl('input', { type: 'datetime-local', cls: 'finance-filter-input' });
+    if (this.dateFrom) dfI.value = `${this.dateFrom}T${this.timeFrom || '00:00'}`;
+    dfI.addEventListener('change', () => {
+      if (dfI.value) {
+        const [d, t] = dfI.value.split('T');
+        this.dateFrom = d;
+        this.timeFrom = t;
+      } else {
+        this.dateFrom = '';
+        this.timeFrom = '00:00';
+      }
+      this.redrawChart();
+    });
 
     const dtG = dateRow.createDiv('finance-filter-group');
     dtG.createEl('label', { text: 'По', cls: 'finance-filter-label' });
-    const dtI = dtG.createEl('input', { type: 'date', cls: 'finance-filter-input' });
-    dtI.value = this.dateTo;
-    dtI.addEventListener('change', () => { this.dateTo = dtI.value; this.redrawChart(); });
-
-    const ttG = dateRow.createDiv('finance-filter-group');
-    ttG.createEl('label', { text: 'Время', cls: 'finance-filter-label' });
-    const ttI = ttG.createEl('input', { type: 'time', cls: 'finance-filter-input' });
-    ttI.value = this.timeTo;
-    ttI.addEventListener('change', () => { this.timeTo = ttI.value; this.redrawChart(); });
+    const dtI = dtG.createEl('input', { type: 'datetime-local', cls: 'finance-filter-input' });
+    if (this.dateTo) dtI.value = `${this.dateTo}T${this.timeTo || '23:59'}`;
+    dtI.addEventListener('change', () => {
+      if (dtI.value) {
+        const [d, t] = dtI.value.split('T');
+        this.dateTo = d;
+        this.timeTo = t;
+      } else {
+        this.dateTo = '';
+        this.timeTo = '23:59';
+      }
+      this.redrawChart();
+    });
 
     this.chartEl = this.el.createDiv('finance-chart-area');
     this.redrawChart();
@@ -177,6 +186,8 @@ export class AnalyticsView {
 
   private redrawChart(): void {
     if (!this.chartEl) return;
+    const oldTip = document.querySelector('.finance-bar-tooltip');
+    if (oldTip) oldTip.remove();
     this.chartEl.empty();
 
     const data = this.aggregate();
@@ -211,10 +222,16 @@ export class AnalyticsView {
       ];
     }
 
-    // Flat wide chart — moderate height, width fills container
-    const PL = 38, PB = 28, PT = 6, PR = 6;
-    const H  = 100;
-    const CW = 800 - PL - PR, CH = H - PT - PB;
+    // Adaptive dimensions — viewBox matches container width so fonts render at intended size
+    const availW = Math.max(this.chartEl.clientWidth || 600, 500);
+    const W = Math.min(availW, 1200);
+    const ratio = W / 1000;
+    const PL = 60, PB = Math.round(70 * ratio), PT = Math.round(16 * ratio), PR = Math.round(14 * ratio);
+    const H = Math.round(W * 0.36);
+    const CW = W - PL - PR, CH = H - PT - PB;
+    const fsY = Math.max(Math.round(16 * ratio), 12);
+    const fsX = Math.max(Math.round(13 * ratio), 10);
+    const fsLegend = Math.max(Math.round(17 * ratio), 13);
 
     let maxVal = 1;
     data.forEach(d => {
@@ -223,27 +240,30 @@ export class AnalyticsView {
     });
 
     const groupW = CW / data.length;
-    const barW   = Math.max(2, Math.min(groupW * 0.30, 14));
-    const gap    = 1;
+    const barW   = Math.max(2, Math.min(groupW * 0.30, Math.round(18 * ratio)));
+    const gap    = Math.max(1, Math.round(ratio));
 
-    const root = svg('svg', { viewBox: `0 0 800 ${H}` });
+    const root = svg('svg', { viewBox: `0 0 ${W} ${H}` });
     root.classList.add('finance-chart-svg');
-    root.style.display = 'block';
 
-    // Tooltip element (created once, shown on hover)
+    // Tooltip div
     const tooltip = document.createElement('div');
     tooltip.className = 'finance-bar-tooltip';
-    tooltip.style.display = 'none';
-    tooltip.style.position = 'fixed';
-    tooltip.style.zIndex = '10000';
-    tooltip.style.pointerEvents = 'none';
-    this.chartEl.appendChild(tooltip);
+    tooltip.style.cssText = 'display:none;position:fixed;z-index:10000;pointer-events:none;padding:5px 10px;background:var(--background-primary);border:1px solid var(--background-modifier-border);border-radius:5px;font-size:13px;color:var(--text-normal);box-shadow:0 2px 6px rgba(0,0,0,.15);line-height:1.4;max-width:320px;';
+    document.body.appendChild(tooltip);
 
     const showTip = (e: MouseEvent, text: string) => {
       tooltip.textContent = text;
       tooltip.style.display = 'block';
-      tooltip.style.left = (e.clientX + 12) + 'px';
-      tooltip.style.top  = (e.clientY - 8) + 'px';
+      const tw = tooltip.offsetWidth;
+      const th = tooltip.offsetHeight;
+      let left = e.clientX - tw / 2;
+      let top  = e.clientY - th - 10;
+      if (left < 6) left = 6;
+      if (left + tw > window.innerWidth - 6) left = window.innerWidth - tw - 6;
+      if (top < 4) top = e.clientY + 12;
+      tooltip.style.left = left + 'px';
+      tooltip.style.top  = top + 'px';
     };
     const hideTip = () => { tooltip.style.display = 'none'; };
 
@@ -252,11 +272,11 @@ export class AnalyticsView {
       const y   = PT + CH * i / 4;
       const val = maxVal * (1 - i / 4);
 
-      const line = svg('line', { x1: PL, y1: y, x2: 800 - PR, y2: y, stroke: 'var(--background-modifier-border)', 'stroke-width': i === 4 ? 1.5 : 1 });
+      const line = svg('line', { x1: PL, y1: y, x2: W - PR, y2: y, stroke: 'var(--background-modifier-border)', 'stroke-width': i === 4 ? 1.5 : 1 });
       if (i > 0 && i < 4) line.setAttribute('stroke-dasharray', '3 4');
       root.appendChild(line);
 
-      const t = svg('text', { x: PL - 4, y: y + 3, 'text-anchor': 'end', fill: 'var(--text-muted)', 'font-size': 8 });
+      const t = svg('text', { x: PL - 8, y: y + Math.round(6 * ratio), 'text-anchor': 'end', fill: 'var(--text-muted)', 'font-size': fsY });
       t.textContent = fmtShort(val);
       root.appendChild(t);
     }
@@ -287,15 +307,15 @@ export class AnalyticsView {
         root.appendChild(rect);
       }
 
-      // X label — rotate when many items
+      // X label
       const lbl = svg('text', {
-        x: cx, y: H - PB + 10,
-        'text-anchor': 'middle', fill: 'var(--text-muted)', 'font-size': 8,
+        x: cx, y: H - PB + Math.round(20 * ratio),
+        'text-anchor': 'middle', fill: 'var(--text-muted)', 'font-size': fsX,
       });
       const short = d.label.length > 8 ? d.label.slice(0, 7) + '…' : d.label;
       lbl.textContent = short;
       if (data.length > 10) {
-        lbl.setAttribute('transform', `rotate(-30, ${cx}, ${H - PB + 10})`);
+        lbl.setAttribute('transform', `rotate(-30, ${cx}, ${H - PB + Math.round(20 * ratio)})`);
         lbl.setAttribute('text-anchor', 'end');
       }
       root.appendChild(lbl);
@@ -303,11 +323,13 @@ export class AnalyticsView {
 
     // Legend
     if (this.showType === 'both') {
-      const leg = svg('g', { transform: `translate(${PL}, ${H - 4})` });
+      const lx = Math.round(ratio * 110);
+      const leg = svg('g', { transform: `translate(${PL}, ${H - Math.round(8 * ratio)})` });
       [['#22c55e', 'Доходы'], ['#ef4444', 'Расходы']].forEach(([c, lbl], i) => {
-        const gx = i * 55;
-        const r  = svg('rect', { x: gx, y: -6, width: 6, height: 6, fill: c, rx: 1 });
-        const t  = svg('text', { x: gx + 9, y: 0, fill: 'var(--text-muted)', 'font-size': 8 });
+        const dotS = Math.round(8 * ratio);
+        const gx = i * lx;
+        const r  = svg('rect', { x: gx, y: -dotS, width: dotS, height: dotS, fill: c, rx: Math.round(ratio) });
+        const t  = svg('text', { x: gx + dotS + Math.round(8 * ratio), y: Math.round(2 * ratio), fill: 'var(--text-muted)', 'font-size': fsLegend });
         t.textContent = lbl;
         leg.appendChild(r); leg.appendChild(t);
       });

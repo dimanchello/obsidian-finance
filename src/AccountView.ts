@@ -3,7 +3,7 @@ import { FinanceStorage }       from './storage';
 import {
   AccountData, CreditRecord, DebtMovement, DebtRecord, DepositRecord, DepositTopUp, DepositWithdrawal, FinanceRecord,
   PluginSettings, DEFAULT_FILTER, DEFAULT_SORT, DEFAULT_DEBT_FILTER, DEFAULT_CREDIT_FILTER, DEFAULT_DEPOSIT_FILTER, COMMON_CURRENCIES, CREDIT_PAGE_SIZE,
-  SortField, ViewState, DebtSortField, CreditSortField, DepositSortField,
+  SortField, ViewState, DebtSortField, CreditSortField, DepositSortField, RecordType,
 } from './types';
 import { RecordModal }       from './RecordModal';
 import { ConfirmModal }      from './ConfirmModal';
@@ -1932,6 +1932,7 @@ export class AccountView {
   private openNewDebtModal(): void {
     if (!this.data) { new Notice('⏳ Загрузка…'); return; }
     const allPersons = this.data.payers;
+    const nowTime = new Date().toTimeString().slice(0, 5);
     new DebtModal(this.app, {
       title: '➕ Новый долг',
       allPersons,
@@ -1948,6 +1949,27 @@ export class AccountView {
         };
         debt.movements = [mov];
         await this.storage.addDebt(this.notePath, debt);
+
+        const recType: RecordType = debt.direction === 'lent' ? 'expense' : 'income';
+        const recNote = debt.direction === 'lent'
+          ? `Дано в долг: ${debt.person}`
+          : `Взято в долг: ${debt.person}`;
+        const rec: FinanceRecord = {
+          id: crypto.randomUUID(),
+          createdAt: Date.now(),
+          date: debt.date,
+          time: debt.time || nowTime,
+          type: recType,
+          amount: debt.amount,
+          category: 'Долг',
+          tag: '',
+          payer: debt.person,
+          note: recNote,
+          attachmentPath: '',
+          linkedId: debt.id,
+        };
+        await this.storage.addRecord(this.notePath, rec);
+
         this.data = await this.storage.load(this.notePath);
         this.renderStats();
         this.renderBodyContent();
@@ -1975,11 +1997,33 @@ export class AccountView {
   }
 
   private openRepayModal(debt: DebtRecord): void {
+    const nowTime = new Date().toTimeString().slice(0, 5);
     new DebtMovementModal(this.app, {
       title: `💰 Погашение долга — ${debt.person}`,
       type: 'repay',
       onSave: async mov => {
         await this.storage.addDebtMovement(this.notePath, debt.id, mov);
+
+        const recType: RecordType = debt.direction === 'lent' ? 'income' : 'expense';
+        const recNote = debt.direction === 'lent'
+          ? `Возврат долга: ${debt.person}`
+          : `Погашение долга: ${debt.person}`;
+        const rec: FinanceRecord = {
+          id: crypto.randomUUID(),
+          createdAt: Date.now(),
+          date: mov.date,
+          time: mov.time || nowTime,
+          type: recType,
+          amount: mov.amount,
+          category: 'Долг',
+          tag: '',
+          payer: debt.person,
+          note: recNote,
+          attachmentPath: '',
+          linkedId: debt.id,
+        };
+        await this.storage.addRecord(this.notePath, rec);
+
         this.data = await this.storage.load(this.notePath);
         this.renderStats();
         this.renderBodyContent();
@@ -1989,11 +2033,33 @@ export class AccountView {
   }
 
   private openBorrowMoreModal(debt: DebtRecord): void {
+    const nowTime = new Date().toTimeString().slice(0, 5);
     new DebtMovementModal(this.app, {
       title: `➕ Увеличить долг — ${debt.person}`,
       type: 'borrow',
       onSave: async mov => {
         await this.storage.addDebtMovement(this.notePath, debt.id, mov);
+
+        const recType: RecordType = debt.direction === 'lent' ? 'expense' : 'income';
+        const recNote = debt.direction === 'lent'
+          ? `Дополнительно дано в долг: ${debt.person}`
+          : `Дополнительно взято в долг: ${debt.person}`;
+        const rec: FinanceRecord = {
+          id: crypto.randomUUID(),
+          createdAt: Date.now(),
+          date: mov.date,
+          time: mov.time || nowTime,
+          type: recType,
+          amount: mov.amount,
+          category: 'Долг',
+          tag: '',
+          payer: debt.person,
+          note: recNote,
+          attachmentPath: '',
+          linkedId: debt.id,
+        };
+        await this.storage.addRecord(this.notePath, rec);
+
         this.data = await this.storage.load(this.notePath);
         this.renderStats();
         this.renderBodyContent();
@@ -3133,6 +3199,7 @@ export class AccountView {
   private confirmCloseDeposit(deposit: DepositRecord): void {
     const cur = this.data?.currency || this.settings.defaultCurrency;
     const label = `${deposit.name} · ${fmt(deposit.amount, cur)}`;
+    const nowTime = new Date().toTimeString().slice(0, 5);
     new ConfirmModal(this.app, `Закрыть вклад?\n${label}`, async () => {
       deposit.status = 'closed';
       await this.storage.updateDeposit(this.notePath, deposit);
@@ -3141,7 +3208,7 @@ export class AccountView {
         id: crypto.randomUUID(),
         createdAt: Date.now(),
         date: new Date().toISOString().split('T')[0],
-        time: '',
+        time: nowTime,
         type: 'income',
         amount: deposit.amount,
         category: 'Возврат вклада',
@@ -3308,6 +3375,7 @@ export class AccountView {
   private async checkAutoTransactions(): Promise<void> {
     if (!this.data) return;
     const today = new Date().toISOString().split('T')[0];
+    const nowTime = new Date().toTimeString().slice(0, 5);
     let changed = false;
     let depositsChanged = false;
     let creditsChanged = false;
@@ -3339,7 +3407,7 @@ export class AccountView {
                   id: crypto.randomUUID(),
                   createdAt: Date.now(),
                   date: dueDateStr,
-                  time: '',
+                  time: nowTime,
                   type: 'income',
                   amount: Math.round(interestAmount * 100) / 100,
                   category: 'Проценты по вкладу',
@@ -3369,7 +3437,7 @@ export class AccountView {
                 id: crypto.randomUUID(),
                 createdAt: Date.now(),
                 date: endDateStr,
-                time: '',
+                time: nowTime,
                 type: 'income',
                 amount: Math.round(totalInterest * 100) / 100,
                 category: 'Проценты по вкладу',
@@ -3396,7 +3464,7 @@ export class AccountView {
             id: crypto.randomUUID(),
             createdAt: Date.now(),
             date: accrual.dueDate,
-            time: '',
+            time: nowTime,
             type: 'income',
             amount: accrual.amount,
             category: 'Проценты по вкладу',
@@ -3419,7 +3487,7 @@ export class AccountView {
           id: crypto.randomUUID(),
           createdAt: Date.now(),
           date: today,
-          time: '',
+          time: nowTime,
           type: 'income',
           amount: deposit.amount,
           category: 'Возврат вклада',
@@ -3454,7 +3522,7 @@ export class AccountView {
               id: crypto.randomUUID(),
               createdAt: Date.now(),
               date: dueDateStr,
-              time: '',
+              time: nowTime,
               type: 'expense',
               amount: credit.monthlyPayment,
               category: 'Кредитный платёж',
@@ -3479,7 +3547,7 @@ export class AccountView {
             id: crypto.randomUUID(),
             createdAt: Date.now(),
             date: payment.dueDate,
-            time: '',
+            time: nowTime,
             type: 'expense',
             amount: payment.amount,
             category: 'Кредитный платёж',

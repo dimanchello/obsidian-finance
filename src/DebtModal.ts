@@ -27,7 +27,6 @@ export class DebtModal extends Modal {
   private debt: DebtRecord;
   private amountInput!: HTMLInputElement;
   private interestInput!: HTMLInputElement;
-  private totalDisplayEl!: HTMLElement;
 
   constructor(app: App, opts: DebtModalOptions) {
     super(app);
@@ -62,6 +61,7 @@ export class DebtModal extends Modal {
       cls: 'finance-modal-title',
     });
 
+    // ── Direction toggle ───────────────────────────────────────────────
     const dirRow = contentEl.createDiv('finance-type-row');
     const lentBtn = dirRow.createEl('button', {
       text: '💸 Мне должны',
@@ -72,116 +72,29 @@ export class DebtModal extends Modal {
       cls: `finance-type-toggle${this.debt.direction === 'borrowed' ? ' active borrowed' : ''}`,
     });
 
+    let personLabelText = this.debt.direction === 'lent' ? 'Кто *' : 'Кому *';
+
     const setDirection = (dir: 'lent' | 'borrowed') => {
       this.debt.direction = dir;
       lentBtn.classList.toggle('active', dir === 'lent');
       lentBtn.classList.toggle('lent', dir === 'lent');
       borrowedBtn.classList.toggle('active', dir === 'borrowed');
       borrowedBtn.classList.toggle('borrowed', dir === 'borrowed');
+      if (personLabel) personLabel.textContent = dir === 'lent' ? 'Кто *' : 'Кому *';
     };
 
-    const form = contentEl.createDiv('finance-form');
+    lentBtn.addEventListener('click', () => setDirection('lent'));
+    borrowedBtn.addEventListener('click', () => setDirection('borrowed'));
 
-    // ── Person label placeholder (will be updated after direction toggle) ────
-    let personLabelText = this.debt.direction === 'lent' ? 'Кто *' : 'Кому *';
+    // ── Compact grid form ──────────────────────────────────────────────
+    const form = contentEl.createDiv('finance-form finance-form-grid finance-form-compact');
 
-    const updatePersonLabel = () => {
-      const isLent = this.debt.direction === 'lent';
-      if (personLabel) personLabel.textContent = isLent ? 'Кто *' : 'Кому *';
-    };
+    // === РЯД 1: Кто/Кому | Сумма ===
+    const row1 = form.createDiv('finance-form-row finance-full-width');
 
-    lentBtn.addEventListener('click', () => { setDirection('lent'); updatePersonLabel(); });
-    borrowedBtn.addEventListener('click', () => { setDirection('borrowed'); updatePersonLabel(); });
-
-    // ── Amount ───────────────────────────────────────────────────────────
-    const amtG = form.createDiv('finance-field-group finance-amount-group');
-    amtG.createEl('label', { text: 'Сумма *', cls: 'finance-field-label' });
-
-    this.amountInput = amtG.createEl('input', {
-      type: 'text',
-      cls: 'finance-input finance-amount-input',
-    });
-    this.amountInput.setAttribute('inputmode', 'decimal');
-    this.amountInput.setAttribute('placeholder', '0');
-    this.amountInput.setAttribute('autocomplete', 'off');
-
-    if (this.debt.amount > 0) {
-      this.amountInput.value = fmtAmount(String(this.debt.amount));
-    }
-
-    this.amountInput.addEventListener('focus', () => {
-      if (this.debt.amount > 0) {
-        this.amountInput.value = String(this.debt.amount).replace('.', ',');
-      }
-    });
-
-    this.amountInput.addEventListener('input', () => {
-      const raw = this.amountInput.value;
-      this.debt.amount = parseAmount(raw);
-      const sel = this.amountInput.selectionStart ?? raw.length;
-      const rawBefore = raw.slice(0, sel).replace(/[^\d.,]/g, '').length;
-      const formatted = fmtAmount(raw);
-      if (formatted !== raw) {
-        this.amountInput.value = formatted;
-        let newPos = 0, rawCount = 0;
-        for (let i = 0; i < formatted.length; i++) {
-          if (/[\d.,]/.test(formatted[i])) rawCount++;
-          if (rawCount >= rawBefore) { newPos = i + 1; break; }
-        }
-        this.amountInput.setSelectionRange(newPos, newPos);
-      }
-    });
-
-    this.amountInput.addEventListener('blur', () => {
-      const n = parseAmount(this.amountInput.value);
-      this.debt.originalAmount = n;
-      this.debt.amount = this.calculateTotalAmount(n, this.debt.interestRate);
-      this.amountInput.value = n > 0 ? fmtAmount(String(n)) : '';
-      this.updateTotalDisplay();
-    });
-
-    // ── Interest Rate ──────────────────────────────────────────────────────
-    const interestG = form.createDiv('finance-field-group finance-interest-group');
-    interestG.createEl('label', { text: 'Процент', cls: 'finance-field-label' });
-    interestG.createEl('span', { text: 'если долг под %, например 10', cls: 'finance-field-hint' });
-
-    this.interestInput = interestG.createEl('input', {
-      type: 'text',
-      cls: 'finance-input finance-interest-input',
-    });
-    this.interestInput.setAttribute('inputmode', 'decimal');
-    this.interestInput.setAttribute('placeholder', '0');
-    this.interestInput.setAttribute('autocomplete', 'off');
-
-    if (this.debt.interestRate > 0) {
-      this.interestInput.value = String(this.debt.interestRate);
-    }
-
-    this.interestInput.addEventListener('input', () => {
-      const rate = parseFloat(this.interestInput.value.replace(',', '.')) || 0;
-      this.debt.interestRate = rate;
-      this.debt.amount = this.calculateTotalAmount(this.debt.originalAmount, rate);
-      this.updateTotalDisplay();
-    });
-
-    this.interestInput.addEventListener('blur', () => {
-      const rate = parseFloat(this.interestInput.value.replace(',', '.')) || 0;
-      this.debt.interestRate = rate;
-      this.debt.amount = this.calculateTotalAmount(this.debt.originalAmount, rate);
-      this.interestInput.value = rate > 0 ? String(rate) : '';
-      this.updateTotalDisplay();
-    });
-
-    // Total amount display
-    const totalG = form.createDiv('finance-field-group finance-total-group');
-    totalG.createEl('label', { text: 'Итого к возврату', cls: 'finance-field-label' });
-    this.totalDisplayEl = totalG.createEl('div', { cls: 'finance-total-display' });
-    this.totalDisplayEl.textContent = fmtAmount(String(this.debt.amount)) || '0';
-
-    // ── Person (autocomplete combobox like RecordModal) ────────────────
-    const personG = form.createDiv('finance-field-group');
+    const personG = row1.createDiv('finance-field-group');
     const personLabel = personG.createEl('label', {
-      text: this.debt.direction === 'lent' ? 'Кто *' : 'Кому *',
+      text: personLabelText,
       cls: 'finance-field-label',
     });
 
@@ -195,9 +108,7 @@ export class DebtModal extends Modal {
 
     let dropdown: HTMLElement | null = null;
     const opts = this.o.allPersons;
-
     const closeDropdown = () => { dropdown?.remove(); dropdown = null; };
-
     const openDropdown = (q: string) => {
       closeDropdown();
       const lq = q.toLowerCase();
@@ -248,28 +159,95 @@ export class DebtModal extends Modal {
       }
     });
 
-    // ── Dates ───────────────────────────────────────────────────────────────
-    const dateG = form.createDiv('finance-field-group');
+    const amtG = row1.createDiv('finance-field-group finance-amount-group');
+    amtG.createEl('label', { text: 'Сумма *', cls: 'finance-field-label' });
+    this.amountInput = amtG.createEl('input', { type: 'text', cls: 'finance-input finance-amount-input' });
+    this.amountInput.setAttribute('inputmode', 'decimal');
+    this.amountInput.setAttribute('placeholder', '0');
+    this.amountInput.setAttribute('autocomplete', 'off');
+
+    if (this.debt.amount > 0) {
+      this.amountInput.value = fmtAmount(String(this.debt.amount));
+    }
+
+    this.amountInput.addEventListener('focus', () => {
+      if (this.debt.amount > 0) {
+        this.amountInput.value = String(this.debt.amount).replace('.', ',');
+      }
+    });
+
+    this.amountInput.addEventListener('input', () => {
+      const raw = this.amountInput.value;
+      this.debt.amount = parseAmount(raw);
+      const sel = this.amountInput.selectionStart ?? raw.length;
+      const rawBefore = raw.slice(0, sel).replace(/[^\d.,]/g, '').length;
+      const formatted = fmtAmount(raw);
+      if (formatted !== raw) {
+        this.amountInput.value = formatted;
+        let newPos = 0, rawCount = 0;
+        for (let i = 0; i < formatted.length; i++) {
+          if (/[\d.,]/.test(formatted[i])) rawCount++;
+          if (rawCount >= rawBefore) { newPos = i + 1; break; }
+        }
+        this.amountInput.setSelectionRange(newPos, newPos);
+      }
+    });
+
+    this.amountInput.addEventListener('blur', () => {
+      const n = parseAmount(this.amountInput.value);
+      this.debt.originalAmount = n;
+      this.debt.amount = this.calculateTotalAmount(n, this.debt.interestRate);
+      this.amountInput.value = n > 0 ? fmtAmount(String(n)) : '';
+    });
+
+    // === РЯД 2: Дата создания | Дата возврата ===
+    const row2 = form.createDiv('finance-form-row finance-full-width');
+
+    const dateG = row2.createDiv('finance-field-group');
     dateG.createEl('label', { text: 'Дата создания', cls: 'finance-field-label' });
-    dateG.createEl('span', { text: 'когда возник долг', cls: 'finance-field-hint' });
     const dateIn = dateG.createEl('input', { type: 'date', cls: 'finance-input' });
     dateIn.value = this.debt.date;
     dateIn.addEventListener('change', () => { this.debt.date = dateIn.value; });
 
-    const dueDateG = form.createDiv('finance-field-group');
+    const dueDateG = row2.createDiv('finance-field-group');
     dueDateG.createEl('label', { text: 'Дата возврата', cls: 'finance-field-label' });
-    dueDateG.createEl('span', { text: 'когда нужно вернуть', cls: 'finance-field-hint' });
     const dueDateIn = dueDateG.createEl('input', { type: 'date', cls: 'finance-input' });
     dueDateIn.value = this.debt.dueDate || '';
     dueDateIn.addEventListener('change', () => { this.debt.dueDate = dueDateIn.value; });
 
-    // ── Note — visually distinct ─────────────────────────────────────────
-    const noteG = form.createDiv('finance-field-group');
-    const noteLabelRow = noteG.createDiv('finance-note-label-row');
-    noteLabelRow.createEl('label', { text: 'Примечание', cls: 'finance-field-label' });
-    noteLabelRow.createEl('span', { text: '📝', cls: 'finance-note-icon' });
+    // === РЯД 3: Процент (%) ===
+    const row3 = form.createDiv('finance-form-row finance-full-width');
+
+    const interestG = row3.createDiv('finance-field-group');
+    interestG.createEl('label', { text: 'Процент (%)', cls: 'finance-field-label' });
+    this.interestInput = interestG.createEl('input', { type: 'text', cls: 'finance-input' });
+    this.interestInput.setAttribute('inputmode', 'decimal');
+    this.interestInput.setAttribute('placeholder', '0');
+    this.interestInput.setAttribute('autocomplete', 'off');
+
+    if (this.debt.interestRate > 0) {
+      this.interestInput.value = String(this.debt.interestRate);
+    }
+
+    this.interestInput.addEventListener('input', () => {
+      const rate = parseFloat(this.interestInput.value.replace(',', '.')) || 0;
+      this.debt.interestRate = rate;
+      this.debt.amount = this.calculateTotalAmount(this.debt.originalAmount, rate);
+    });
+
+    this.interestInput.addEventListener('blur', () => {
+      const rate = parseFloat(this.interestInput.value.replace(',', '.')) || 0;
+      this.debt.interestRate = rate;
+      this.debt.amount = this.calculateTotalAmount(this.debt.originalAmount, rate);
+      this.interestInput.value = rate > 0 ? String(rate) : '';
+    });
+
+    // === РЯД 4: Примечание (на всю ширину) ===
+    const row4 = form.createDiv('finance-form-row finance-full-width');
+    const noteG = row4.createDiv('finance-field-group');
+    noteG.createEl('label', { text: 'Примечание', cls: 'finance-field-label' });
     const noteIn = noteG.createEl('textarea', { cls: 'finance-textarea finance-note-field' });
-    noteIn.placeholder = 'Необязательно — любой комментарий…';
+    noteIn.placeholder = 'Необязательно';
     noteIn.value = this.debt.note;
     noteIn.rows = 2;
     noteIn.addEventListener('input', () => { this.debt.note = noteIn.value; });
@@ -280,7 +258,6 @@ export class DebtModal extends Modal {
       .addEventListener('click', () => this.close());
     btnRow.createEl('button', { text: 'Сохранить', cls: 'finance-btn-save' })
       .addEventListener('click', () => this.handleSave());
-
   }
 
   private handleSave(): void {
@@ -304,17 +281,6 @@ export class DebtModal extends Modal {
   private calculateTotalAmount(original: number, rate: number): number {
     if (rate <= 0) return original;
     return original + (original * rate / 100);
-  }
-
-  private updateTotalDisplay(): void {
-    if (this.totalDisplayEl) {
-      const total = this.calculateTotalAmount(this.debt.originalAmount, this.debt.interestRate);
-      if (this.debt.interestRate > 0) {
-        this.totalDisplayEl.innerHTML = `${fmtAmount(String(total))} <span class="finance-total-hint">(${fmtAmount(String(this.debt.originalAmount))} + ${this.debt.interestRate}%)</span>`;
-      } else {
-        this.totalDisplayEl.textContent = fmtAmount(String(total)) || '0';
-      }
-    }
   }
 
   onClose(): void { this.contentEl.empty(); }

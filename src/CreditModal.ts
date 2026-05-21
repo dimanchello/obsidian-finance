@@ -61,31 +61,19 @@ export class CreditModal extends Modal {
 
     contentEl.createEl('h2', { text: this.o.title, cls: 'finance-modal-title' });
 
-    const form = contentEl.createDiv('finance-form finance-form-compact');
+    const form = contentEl.createDiv('finance-form finance-form-grid finance-form-compact');
 
-    const nameG = form.createDiv('finance-field-group');
+    // === РЯД 1: Название | Банк ===
+    const row1 = form.createDiv('finance-form-row finance-full-width');
+
+    const nameG = row1.createDiv('finance-field-group');
     nameG.createEl('label', { text: 'Название', cls: 'finance-field-label' });
     const nameIn = nameG.createEl('input', { type: 'text', cls: 'finance-input' });
     nameIn.value = this.credit.name;
     nameIn.addEventListener('input', () => { this.credit.name = nameIn.value; });
 
-    const typeG = form.createDiv('finance-field-group');
-    typeG.createEl('label', { text: 'Тип кредита', cls: 'finance-field-label' });
-    const typeSel = typeG.createEl('select', { cls: 'finance-input' });
-    const types: { value: CreditType; label: string }[] = [
-      { value: 'consumer', label: 'Потребительский' },
-      { value: 'auto', label: 'Автокредит' },
-      { value: 'mortgage', label: 'Ипотека' },
-      { value: 'credit', label: 'Кредит' },
-    ];
-    types.forEach(t => {
-      const opt = typeSel.createEl('option', { value: t.value, text: t.label });
-      if (t.value === this.credit.type) opt.selected = true;
-    });
-    typeSel.addEventListener('change', () => { this.credit.type = typeSel.value as CreditType; });
-
-    const bankG = form.createDiv('finance-field-group');
-    const bankLabel = bankG.createEl('label', { text: 'Банк *', cls: 'finance-field-label' });
+    const bankG = row1.createDiv('finance-field-group');
+    bankG.createEl('label', { text: 'Банк *', cls: 'finance-field-label' });
     const bankWrap = bankG.createDiv('finance-combobox');
     const bankIn = bankWrap.createEl('input', { type: 'text', cls: 'finance-input finance-combobox-input' });
     bankIn.value = this.credit.bankName;
@@ -93,7 +81,6 @@ export class CreditModal extends Modal {
 
     let dropdown: HTMLElement | null = null;
     const bankOpts = this.o.allBanks;
-
     const closeDropdown = () => { dropdown?.remove(); dropdown = null; };
     const openDropdown = (q: string) => {
       closeDropdown();
@@ -103,7 +90,7 @@ export class CreditModal extends Modal {
         if (q) {
           dropdown = bankWrap.createDiv('finance-combobox-dropdown');
           const addItem = dropdown.createDiv({ cls: 'finance-combobox-item' });
-          addItem.textContent = `➕ "${q}"`;
+          addItem.textContent = ` "${q}"`;
           addItem.style.fontStyle = 'italic';
           addItem.style.color = 'var(--text-muted)';
           addItem.addEventListener('mousedown', e => {
@@ -132,9 +119,11 @@ export class CreditModal extends Modal {
     bankIn.addEventListener('input', () => { this.credit.bankName = bankIn.value; openDropdown(bankIn.value); });
     bankIn.addEventListener('blur', () => setTimeout(closeDropdown, 150));
 
-    const amtG = form.createDiv('finance-field-group finance-amount-group');
-    amtG.createEl('label', { text: 'Сумма *', cls: 'finance-field-label' });
+    // === РЯД 2: Сумма | Процентная ставка ===
+    const row2 = form.createDiv('finance-form-row finance-full-width');
 
+    const amtG = row2.createDiv('finance-field-group finance-amount-group');
+    amtG.createEl('label', { text: 'Сумма *', cls: 'finance-field-label' });
     this.amountInput = amtG.createEl('input', { type: 'text', cls: 'finance-input finance-amount-input' });
     this.amountInput.setAttribute('inputmode', 'decimal');
     this.amountInput.setAttribute('placeholder', '0');
@@ -174,9 +163,8 @@ export class CreditModal extends Modal {
       this.amountInput.value = n > 0 ? fmtAmount(String(n)) : '';
     });
 
-    const rateG = form.createDiv('finance-field-group');
+    const rateG = row2.createDiv('finance-field-group');
     rateG.createEl('label', { text: 'Процентная ставка (%)', cls: 'finance-field-label' });
-
     this.rateInput = rateG.createEl('input', { type: 'text', cls: 'finance-input' });
     this.rateInput.setAttribute('inputmode', 'decimal');
     this.rateInput.setAttribute('placeholder', '0');
@@ -197,9 +185,11 @@ export class CreditModal extends Modal {
       this.rateInput.value = rate > 0 ? String(rate) : '';
     });
 
-    const paymentG = form.createDiv('finance-field-group finance-amount-group');
-    paymentG.createEl('label', { text: 'Ежемесячный платёж', cls: 'finance-field-label' });
+    // === РЯД 3: Ежемесячный платёж | Срок ===
+    const row3 = form.createDiv('finance-form-row finance-full-width');
 
+    const paymentG = row3.createDiv('finance-field-group finance-amount-group');
+    paymentG.createEl('label', { text: 'Ежемесячный платёж', cls: 'finance-field-label' });
     this.paymentInput = paymentG.createEl('input', { type: 'text', cls: 'finance-input finance-amount-input' });
     this.paymentInput.setAttribute('inputmode', 'decimal');
     this.paymentInput.setAttribute('placeholder', '0');
@@ -238,24 +228,44 @@ export class CreditModal extends Modal {
       this.paymentInput.value = n > 0 ? fmtAmount(String(n)) : '';
     });
 
-    const dateG = form.createDiv('finance-field-group');
-    dateG.createEl('label', { text: 'Дата начала', cls: 'finance-field-label' });
-    const dateIn = dateG.createEl('input', { type: 'date', cls: 'finance-input' });
-    dateIn.value = this.credit.startDate;
-    dateIn.addEventListener('change', () => { this.credit.startDate = dateIn.value; });
-
-    const termG = form.createDiv('finance-field-group');
-    termG.createEl('label', { text: 'Срок (месяцев)', cls: 'finance-field-label' });
+    const termG = row3.createDiv('finance-field-group');
+    termG.createEl('label', { text: 'Срок (мес)', cls: 'finance-field-label' });
     const termIn = termG.createEl('input', { type: 'number', cls: 'finance-input' });
     termIn.value = String(this.credit.termMonths || 12);
     termIn.setAttribute('min', '1');
     termIn.setAttribute('max', '360');
     termIn.addEventListener('change', () => { this.credit.termMonths = parseInt(termIn.value) || 12; });
 
-    const noteG = form.createDiv('finance-field-group');
+    // === РЯД 4: Дата начала | Тип кредита ===
+    const row4 = form.createDiv('finance-form-row finance-full-width');
+
+    const dateG = row4.createDiv('finance-field-group');
+    dateG.createEl('label', { text: 'Дата начала', cls: 'finance-field-label' });
+    const dateIn = dateG.createEl('input', { type: 'date', cls: 'finance-input' });
+    dateIn.value = this.credit.startDate;
+    dateIn.addEventListener('change', () => { this.credit.startDate = dateIn.value; });
+
+    const typeG = row4.createDiv('finance-field-group');
+    typeG.createEl('label', { text: 'Тип кредита', cls: 'finance-field-label' });
+    const typeSel = typeG.createEl('select', { cls: 'finance-input finance-filter-select' });
+    const types: { value: CreditType; label: string }[] = [
+      { value: 'consumer', label: 'Потребительский' },
+      { value: 'auto', label: 'Автокредит' },
+      { value: 'mortgage', label: 'Ипотека' },
+      { value: 'credit', label: 'Кредит' },
+    ];
+    types.forEach(t => {
+      const opt = typeSel.createEl('option', { value: t.value, text: t.label });
+      if (t.value === this.credit.type) opt.selected = true;
+    });
+    typeSel.addEventListener('change', () => { this.credit.type = typeSel.value as CreditType; });
+
+    // === РЯД 5: Примечание (на всю ширину) ===
+    const row5 = form.createDiv('finance-form-row finance-full-width');
+    const noteG = row5.createDiv('finance-field-group');
     noteG.createEl('label', { text: 'Примечание', cls: 'finance-field-label' });
     const noteIn = noteG.createEl('textarea', { cls: 'finance-textarea finance-note-field' });
-    noteIn.placeholder = 'Необязательно — любой комментарий…';
+    noteIn.placeholder = 'Необязательно';
     noteIn.value = this.credit.note;
     noteIn.rows = 2;
     noteIn.addEventListener('input', () => { this.credit.note = noteIn.value; });
