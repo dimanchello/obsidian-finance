@@ -635,10 +635,14 @@
 .finance-form-grid    { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .finance-form-compact { gap: 8px; }
 .finance-form-compact .finance-field-group { margin-bottom: 0; }
-.finance-form-compact .finance-input { padding: 0; font-size: 13px; }
-.finance-form-compact .finance-input.finance-filter-select { padding: 0 28px 0 8px; }
+.finance-form-compact .finance-input { padding: 0 10px; font-size: 13px; }
+.finance-form-compact .finance-input.finance-filter-select { padding: 0 28px 0 10px; }
 .finance-form-compact .finance-field-label { font-size: 12px; margin-bottom: 3px; }
-.finance-form-compact .finance-textarea { padding: 6px 8px; font-size: 13px; }
+.finance-form-compact .finance-textarea { padding: 6px 10px; font-size: 13px; }
+.finance-form-compact .finance-amount-input {
+  font-size: 1.3em !important;
+  padding: 8px 10px !important;
+}
 .finance-form-row { display: flex; gap: 10px; }
 .finance-form-row .finance-field-group { flex: 1; }
 .finance-full-width { grid-column: 1 / -1; }
