@@ -98,18 +98,20 @@ export class DebtMovementModal extends Modal {
       this.amountInput.value = n > 0 ? fmtAmount(String(n)) : '';
     });
 
-    // ── Date & Time ──────────────────────────────────────────────────────
-    const dateG = form.createDiv('finance-field-group');
-    dateG.createEl('label', { text: 'Дата', cls: 'finance-field-label' });
-    const dateIn = dateG.createEl('input', { type: 'date', cls: 'finance-input' });
-    dateIn.value = this.mov.date;
-    dateIn.addEventListener('change', () => { this.mov.date = dateIn.value; });
-
-    const timeG = form.createDiv('finance-field-group');
-    timeG.createEl('label', { text: 'Время', cls: 'finance-field-label' });
-    const timeIn = timeG.createEl('input', { type: 'time', cls: 'finance-input' });
-    timeIn.value = this.mov.time;
-    timeIn.addEventListener('change', () => { this.mov.time = timeIn.value; });
+    // ── Date+Time ────────────────────────────────────────────────────────
+    const dtG = form.createDiv('finance-field-group');
+    dtG.createEl('label', { text: 'Дата и время', cls: 'finance-field-label' });
+    const dtIn = dtG.createEl('input', { type: 'datetime-local', cls: 'finance-input' });
+    dtIn.value = this.mov.date
+      ? `${this.mov.date}${this.mov.time ? 'T' + this.mov.time : 'T00:00'}`
+      : new Date().toISOString().slice(0, 16);
+    dtIn.addEventListener('change', () => {
+      if (dtIn.value) {
+        const [d, t] = dtIn.value.split('T');
+        this.mov.date = d;
+        this.mov.time = t || '';
+      }
+    });
 
     // ── Note — visually distinct ─────────────────────────────────────────
     const noteG = form.createDiv('finance-field-group');

@@ -1830,7 +1830,6 @@ export class AccountView {
       { key: 'remaining', label: 'Остаток' },
       { key: 'date',      label: 'Создан' },
       { key: 'dueDate',   label: 'Вернуть до' },
-      { key: 'note',      label: 'Примечание' },
       { key: '_act',      label: '' },
     ];
 
@@ -1875,7 +1874,6 @@ export class AccountView {
           cls: remaining > 0 ? 'finance-amount-cell finance-amount-remaining' : 'finance-amount-cell' },
         { key: 'date',      text: fmtDate(debt.date) },
         { key: 'dueDate',   text: dueDateText, cls: dueDateCls },
-        { key: 'note',      text: debt.note || '—' },
       ];
 
       cells.forEach(c => {

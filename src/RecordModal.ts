@@ -144,28 +144,35 @@ export class RecordModal extends Modal {
     this.autofillBadge = form.createDiv('finance-autofill-badge');
     this.autofillBadge.style.display = 'none';
 
-    // ── Grid: date / time / category / tag / payer ──────────────────────
+    // ── Grid: date+time / payer / category / tag ──────────────────────
     const grid = form.createDiv('finance-form-grid');
 
-    // Date
-    const dateG = grid.createDiv('finance-field-group');
-    dateG.createEl('label', { text: 'Дата', cls: 'finance-field-label' });
-    const dateIn = dateG.createEl('input', { type: 'date', cls: 'finance-input' });
-    dateIn.value = this.rec.date ?? new Date().toISOString().split('T')[0];
-    dateIn.addEventListener('change', () => { this.rec.date = dateIn.value; });
+    // Date+Time (single datetime-local picker)
+    const dtG = grid.createDiv('finance-field-group');
+    dtG.createEl('label', { text: 'Дата и время', cls: 'finance-field-label' });
+    const dtIn = dtG.createEl('input', { type: 'datetime-local', cls: 'finance-input' });
+    const nowStr = new Date().toISOString().slice(0, 16);
+    dtIn.value = this.rec.date
+      ? `${this.rec.date}${this.rec.time ? 'T' + this.rec.time : 'T00:00'}`
+      : nowStr;
+    dtIn.addEventListener('change', () => {
+      if (dtIn.value) {
+        const [d, t] = dtIn.value.split('T');
+        this.rec.date = d;
+        this.rec.time = t || '';
+      }
+    });
 
-    // Time
-    const timeG = grid.createDiv('finance-field-group');
-    timeG.createEl('label', { text: 'Время', cls: 'finance-field-label' });
-    const timeIn = timeG.createEl('input', { type: 'time', cls: 'finance-input' });
-    timeIn.value = this.rec.time ?? '';
-    // Set color-scheme via JS — more reliable than CSS class selectors in Electron
-    const isDark = document.body.classList.contains('theme-dark');
-    timeIn.style.colorScheme      = isDark ? 'dark' : 'light';
-    timeIn.style.backgroundColor  = 'var(--background-secondary)';
-    timeIn.style.color            = 'var(--text-normal)';
-    timeIn.style.border           = '1.5px solid var(--color-base-30, #555)';
-    timeIn.addEventListener('change', () => { this.rec.time = timeIn.value; });
+    // Payer — autofill trigger + internal toggle inline
+    this.payerInput = this.buildAutocomplete(
+      grid, 'Плательщик', this.rec.payer ?? '', this.o.payers,
+      v => { this.rec.payer = v; this.scheduleAutofill('payer', v); },
+      {
+        withInternalToggle: true,
+        isInternal: !!this.rec.isInternal,
+        onToggleInternal: (v) => { this.rec.isInternal = v; },
+      },
+    );
 
     // Category — autofill trigger
     this.categoryInput = this.buildAutocomplete(
@@ -177,17 +184,6 @@ export class RecordModal extends Modal {
     this.tagInput = this.buildAutocomplete(
       grid, 'Тег', this.rec.tag ?? '', this.o.tags,
       v => { this.rec.tag = v; },
-    );
-
-    // Payer — autofill trigger + internal toggle inline
-    this.payerInput = this.buildAutocomplete(
-      grid, 'Плательщик', this.rec.payer ?? '', this.o.payers,
-      v => { this.rec.payer = v; this.scheduleAutofill('payer', v); },
-      {
-        withInternalToggle: true,
-        isInternal: !!this.rec.isInternal,
-        onToggleInternal: (v) => { this.rec.isInternal = v; },
-      },
     );
 
     // ── Note — visually distinct ─────────────────────────────────────────
@@ -356,7 +352,7 @@ export class RecordModal extends Modal {
       this.autofillBadge.style.display = 'flex';
       const d = match.date.split('-');
       this.autofillBadge.textContent = `✨ Подставлено из записи от ${d[2]}.${d[1]}.${d[0]}`;
-      setTimeout(() => { this.autofillBadge.style.display = 'none'; }, 4000);
+      setTimeout(() => { this.autofillBadge.style.display = 'none'; }, 6000);
     }
   }
 

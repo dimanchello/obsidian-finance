@@ -1125,6 +1125,11 @@
   }
   .finance-combobox-item { padding: 12px 16px; font-size: 1em; }
 
+  /* ── Modal forms — чуть меньше шрифт на мобилке ─────────────────────── */
+  .finance-form-compact .finance-input { font-size: 12px; }
+  .finance-form-compact .finance-field-label { font-size: 10px; }
+  .finance-form-compact .finance-amount-input { font-size: 1.1em !important; }
+
   /* ── Analytics панель на мобильных ──────────────────────────────────── */
   .finance-analytics-panel { padding: 12px 14px; margin-bottom: 12px; }
   .finance-analytics-controls { gap: 10px; }

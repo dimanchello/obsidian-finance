@@ -222,16 +222,16 @@ export class AnalyticsView {
       ];
     }
 
-    // Adaptive dimensions — viewBox matches container width so fonts render at intended size
+    const isMobile = window.innerWidth <= 480;
     const availW = Math.max(this.chartEl.clientWidth || 600, 500);
     const W = Math.min(availW, 1200);
     const ratio = W / 1000;
     const PL = 60, PB = Math.round(70 * ratio), PT = Math.round(16 * ratio), PR = Math.round(14 * ratio);
-    const H = Math.round(W * 0.36);
+    const H = Math.round(W * (isMobile ? 0.55 : 0.36));
     const CW = W - PL - PR, CH = H - PT - PB;
-    const fsY = Math.max(Math.round(16 * ratio), 12);
-    const fsX = Math.max(Math.round(13 * ratio), 10);
-    const fsLegend = Math.max(Math.round(17 * ratio), 13);
+    const fsY = Math.max(Math.round(16 * ratio), isMobile ? 14 : 12);
+    const fsX = Math.max(Math.round(13 * ratio), isMobile ? 12 : 10);
+    const fsLegend = Math.max(Math.round(17 * ratio), isMobile ? 15 : 13);
 
     let maxVal = 1;
     data.forEach(d => {
@@ -240,7 +240,7 @@ export class AnalyticsView {
     });
 
     const groupW = CW / data.length;
-    const barW   = Math.max(2, Math.min(groupW * 0.30, Math.round(18 * ratio)));
+    const barW   = Math.max(2, Math.min(groupW * (isMobile ? 0.50 : 0.30), Math.round((isMobile ? 28 : 18) * ratio)));
     const gap    = Math.max(1, Math.round(ratio));
 
     const root = svg('svg', { viewBox: `0 0 ${W} ${H}` });

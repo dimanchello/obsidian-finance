@@ -27,6 +27,7 @@ export class DebtModal extends Modal {
   private debt: DebtRecord;
   private amountInput!: HTMLInputElement;
   private interestInput!: HTMLInputElement;
+  private totalInput!: HTMLInputElement;
 
   constructor(app: App, opts: DebtModalOptions) {
     super(app);
@@ -81,6 +82,7 @@ export class DebtModal extends Modal {
       borrowedBtn.classList.toggle('active', dir === 'borrowed');
       borrowedBtn.classList.toggle('borrowed', dir === 'borrowed');
       if (personLabel) personLabel.textContent = dir === 'lent' ? 'Кто *' : 'Кому *';
+      if (totalLabel) totalLabel.textContent = dir === 'lent' ? 'Итого мне вернут' : 'Итого к возврату';
     };
 
     lentBtn.addEventListener('click', () => setDirection('lent'));
@@ -191,6 +193,7 @@ export class DebtModal extends Modal {
         }
         this.amountInput.setSelectionRange(newPos, newPos);
       }
+      this.updateTotalReadonly();
     });
 
     this.amountInput.addEventListener('blur', () => {
@@ -198,6 +201,7 @@ export class DebtModal extends Modal {
       this.debt.originalAmount = n;
       this.debt.amount = this.calculateTotalAmount(n, this.debt.interestRate);
       this.amountInput.value = n > 0 ? fmtAmount(String(n)) : '';
+      this.updateTotalReadonly();
     });
 
     // === РЯД 2: Дата создания | Дата возврата ===
@@ -215,7 +219,7 @@ export class DebtModal extends Modal {
     dueDateIn.value = this.debt.dueDate || '';
     dueDateIn.addEventListener('change', () => { this.debt.dueDate = dueDateIn.value; });
 
-    // === РЯД 3: Процент (%) ===
+    // === РЯД 3: Процент (%) | Итого к возврату ===
     const row3 = form.createDiv('finance-form-row finance-full-width');
 
     const interestG = row3.createDiv('finance-field-group');
@@ -233,6 +237,7 @@ export class DebtModal extends Modal {
       const rate = parseFloat(this.interestInput.value.replace(',', '.')) || 0;
       this.debt.interestRate = rate;
       this.debt.amount = this.calculateTotalAmount(this.debt.originalAmount, rate);
+      this.updateTotalReadonly();
     });
 
     this.interestInput.addEventListener('blur', () => {
@@ -240,7 +245,19 @@ export class DebtModal extends Modal {
       this.debt.interestRate = rate;
       this.debt.amount = this.calculateTotalAmount(this.debt.originalAmount, rate);
       this.interestInput.value = rate > 0 ? String(rate) : '';
+      this.updateTotalReadonly();
     });
+
+    const totalG = row3.createDiv('finance-field-group');
+    const totalLabel = totalG.createEl('label', {
+      text: this.debt.direction === 'lent' ? 'Итого мне вернут' : 'Итого к возврату',
+      cls: 'finance-field-label',
+    });
+    this.totalInput = totalG.createEl('input', { type: 'text', cls: 'finance-input' });
+    this.totalInput.readOnly = true;
+    this.totalInput.value = this.debt.amount > 0
+      ? fmtAmount(String(this.debt.amount))
+      : '';
 
     // === РЯД 4: Примечание (на всю ширину) ===
     const row4 = form.createDiv('finance-form-row finance-full-width');
@@ -276,6 +293,13 @@ export class DebtModal extends Modal {
     this.debt.person = this.debt.person.trim();
     this.o.onSave(this.debt);
     this.close();
+  }
+
+  private updateTotalReadonly(): void {
+    const amount = parseAmount(this.amountInput.value);
+    const rate = parseFloat(this.interestInput.value.replace(',', '.')) || 0;
+    const total = this.calculateTotalAmount(amount, rate);
+    this.totalInput.value = total > 0 ? fmtAmount(String(total)) : '';
   }
 
   private calculateTotalAmount(original: number, rate: number): number {

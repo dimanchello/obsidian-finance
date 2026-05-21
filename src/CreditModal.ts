@@ -28,6 +28,8 @@ export class CreditModal extends Modal {
   private amountInput!: HTMLInputElement;
   private paymentInput!: HTMLInputElement;
   private rateInput!: HTMLInputElement;
+  private termInput!: HTMLInputElement;
+  private calcTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(app: App, opts: CreditModalOptions) {
     super(app);
@@ -154,6 +156,7 @@ export class CreditModal extends Modal {
         }
         this.amountInput.setSelectionRange(newPos, newPos);
       }
+      this.scheduleCalc();
     });
 
     this.amountInput.addEventListener('blur', () => {
@@ -177,6 +180,7 @@ export class CreditModal extends Modal {
     this.rateInput.addEventListener('input', () => {
       const rate = parseFloat(this.rateInput.value.replace(',', '.')) || 0;
       this.credit.interestRate = rate;
+      this.scheduleCalc();
     });
 
     this.rateInput.addEventListener('blur', () => {
@@ -230,11 +234,12 @@ export class CreditModal extends Modal {
 
     const termG = row3.createDiv('finance-field-group');
     termG.createEl('label', { text: 'Срок (мес)', cls: 'finance-field-label' });
-    const termIn = termG.createEl('input', { type: 'number', cls: 'finance-input' });
-    termIn.value = String(this.credit.termMonths || 12);
-    termIn.setAttribute('min', '1');
-    termIn.setAttribute('max', '360');
-    termIn.addEventListener('change', () => { this.credit.termMonths = parseInt(termIn.value) || 12; });
+    this.termInput = termG.createEl('input', { type: 'number', cls: 'finance-input' });
+    this.termInput.value = String(this.credit.termMonths || 12);
+    this.termInput.setAttribute('min', '1');
+    this.termInput.setAttribute('max', '360');
+    this.termInput.addEventListener('change', () => { this.credit.termMonths = parseInt(this.termInput.value) || 12; });
+    this.termInput.addEventListener('input', () => this.scheduleCalc());
 
     // === РЯД 4: Дата начала | Тип кредита ===
     const row4 = form.createDiv('finance-form-row finance-full-width');
@@ -275,6 +280,28 @@ export class CreditModal extends Modal {
       .addEventListener('click', () => this.close());
     btnRow.createEl('button', { text: 'Сохранить', cls: 'finance-btn-save' })
       .addEventListener('click', () => this.handleSave());
+  }
+
+  private scheduleCalc(): void {
+    if (this.calcTimer) clearTimeout(this.calcTimer);
+    this.calcTimer = setTimeout(() => this.calcMonthlyPayment(), 500);
+  }
+
+  private calcMonthlyPayment(): void {
+    const amount = parseAmount(this.amountInput.value);
+    const rate = parseFloat(this.rateInput.value.replace(',', '.')) || 0;
+    const term = parseInt(this.termInput.value) || 0;
+    if (amount <= 0 || term <= 0) return;
+    const monthlyRate = rate / 100 / 12;
+    let payment: number;
+    if (monthlyRate > 0) {
+      const factor = Math.pow(1 + monthlyRate, term);
+      payment = amount * (monthlyRate * factor) / (factor - 1);
+    } else {
+      payment = amount / term;
+    }
+    this.credit.monthlyPayment = Math.round(payment * 100) / 100;
+    this.paymentInput.value = fmtAmount(String(this.credit.monthlyPayment));
   }
 
   private handleSave(): void {
