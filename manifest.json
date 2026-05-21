@@ -5,6 +5,6 @@
   "minAppVersion": "1.4.0",
   "description": "Учёт доходов и расходов по счетам прямо в заметках Obsidian",
   "author": "finance-tracker",
-  "authorUrl": "",
+  "authorUrl": "https://github.com/dimanchello/",
   "isDesktopOnly": false
 }
