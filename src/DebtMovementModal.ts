@@ -2,9 +2,11 @@ import { App, Modal, Notice } from 'obsidian';
 import { DebtMovement, DebtMovementType } from './types';
 
 export interface DebtMovementModalOptions {
-  title:  string;
-  type:   DebtMovementType;
-  onSave: (mov: DebtMovement) => void;
+  title:           string;
+  type:            DebtMovementType;
+  remainingAmount?: number;
+  currency?:        string;
+  onSave:          (mov: DebtMovement) => void;
 }
 
 function fmtAmount(raw: string): string {
@@ -97,6 +99,19 @@ export class DebtMovementModal extends Modal {
       this.mov.amount = n;
       this.amountInput.value = n > 0 ? fmtAmount(String(n)) : '';
     });
+
+    // ── Full repayment link (only for repay type) ────────────────────────
+    if (this.o.type === 'repay' && this.o.remainingAmount && this.o.remainingAmount > 0) {
+      const cur = this.o.currency ?? '';
+      const formatted = this.o.remainingAmount.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const link = amtG.createEl('span');
+      link.textContent = `→ ${formatted} ${cur}`;
+      link.style.cssText = 'cursor:pointer;color:var(--text-accent, #7c3aed);font-size:.85em;text-decoration:underline;display:inline-block;margin-top:4px;';
+      link.addEventListener('click', () => {
+        this.amountInput.value = fmtAmount(String(this.o.remainingAmount!));
+        this.mov.amount = this.o.remainingAmount!;
+      });
+    }
 
     // ── Date+Time ────────────────────────────────────────────────────────
     const dtG = form.createDiv('finance-field-group');

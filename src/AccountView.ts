@@ -1619,6 +1619,7 @@ export class AccountView {
 
     // Summary - 2 cards for lent and borrowed
     const summary = body.createDiv('finance-stats-container');
+    summary.style.setProperty('grid-template-columns', 'repeat(2,1fr)', 'important');
 
     const lentDebts = allDebts.filter(d => d.direction === 'lent');
     const borrowedDebts = allDebts.filter(d => d.direction !== 'lent');
@@ -1999,9 +2000,12 @@ export class AccountView {
 
   private openRepayModal(debt: DebtRecord): void {
     const nowTime = new Date().toTimeString().slice(0, 5);
+    const cur = this.data?.currency || this.settings.defaultCurrency;
     new DebtMovementModal(this.app, {
       title: `💰 Погашение долга — ${debt.person}`,
       type: 'repay',
+      remainingAmount: this.getDebtRemaining(debt),
+      currency: cur,
       onSave: async mov => {
         await this.storage.addDebtMovement(this.notePath, debt.id, mov);
 
@@ -2096,6 +2100,7 @@ export class AccountView {
 
     // Summary cards
     const summary = body.createDiv('finance-stats-container');
+    summary.style.setProperty('grid-template-columns', 'repeat(2,1fr)', 'important');
     const activeCredits = allCredits.filter(c => c.status === 'active');
     const paidCredits = allCredits.filter(c => c.status === 'paid');
     const totalAmount = activeCredits.reduce((s, c) => s + c.currentAmount, 0);
@@ -2710,6 +2715,7 @@ export class AccountView {
 
     // Summary cards
     const summary = body.createDiv('finance-stats-container');
+    summary.style.setProperty('grid-template-columns', 'repeat(2,1fr)', 'important');
     const activeDeposits = allDeposits.filter(d => d.status === 'active');
     const closedDeposits = allDeposits.filter(d => d.status === 'closed');
 
