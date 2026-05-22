@@ -43,14 +43,16 @@ export class RecordModal extends Modal {
   private o:   RecordModalOptions;
   private rec: Partial<FinanceRecord>;
 
-  private amountInput!:   HTMLInputElement;
-  private incomeBtn!:     HTMLButtonElement;
-  private expenseBtn!:    HTMLButtonElement;
-  private categoryInput!: HTMLInputElement;
-  private tagInput!:      HTMLInputElement;
-  private payerInput!:    HTMLInputElement;
-  private autofillBadge!: HTMLElement;
-  private autofillTimer:  ReturnType<typeof setTimeout> | null = null;
+  private amountInput!:      HTMLInputElement;
+  private incomeBtn!:         HTMLButtonElement;
+  private expenseBtn!:        HTMLButtonElement;
+  private categoryInput!:     HTMLInputElement;
+  private tagInput!:          HTMLInputElement;
+  private payerInput!:        HTMLInputElement;
+  private autofillBadge!:     HTMLElement;
+  private autofillTimer:      ReturnType<typeof setTimeout> | null = null;
+  private exchangeRateInput?: HTMLInputElement;
+  private exchangeRateWrap?:  HTMLElement;
 
   constructor(app: App, opts: RecordModalOptions) {
     super(app);
@@ -139,6 +141,41 @@ export class RecordModal extends Modal {
     });
 
     this.updateAmountColor();
+
+    // ── Exchange rate — collapsible ─────────────────────────────────────
+    this.exchangeRateWrap = form.createDiv('finance-field-group finance-exrate-group');
+    this.exchangeRateWrap.style.display = 'none';
+
+    const erLabelRow = this.exchangeRateWrap.createDiv('finance-exrate-label-row');
+    erLabelRow.createEl('label', { text: `Курс (1 ${this.o.currency} = ?)`, cls: 'finance-field-label' });
+    erLabelRow.createEl('span', { text: '💱', cls: 'finance-exrate-icon' });
+
+    this.exchangeRateInput = this.exchangeRateWrap.createEl('input', {
+      type: 'text',
+      cls:  'finance-input finance-exrate-input',
+    });
+    this.exchangeRateInput.setAttribute('inputmode', 'decimal');
+    this.exchangeRateInput.setAttribute('placeholder', 'напр. 95,50');
+    this.exchangeRateInput.setAttribute('autocomplete', 'off');
+
+    if (this.rec.exchangeRate && this.rec.exchangeRate > 0) {
+      this.exchangeRateInput.value = String(this.rec.exchangeRate).replace('.', ',');
+      this.exchangeRateWrap.style.display = '';
+    }
+
+    this.exchangeRateInput.addEventListener('input', () => {
+      const raw = this.exchangeRateInput!.value.replace(',', '.').replace(/[^\d.]/g, '');
+      this.rec.exchangeRate = parseFloat(raw) || undefined;
+    });
+
+    const erToggle = form.createDiv('finance-exrate-toggle');
+    erToggle.textContent = this.rec.exchangeRate ? '− Курс' : '+ Курс';
+    erToggle.addEventListener('click', () => {
+      const shown = this.exchangeRateWrap!.style.display !== 'none';
+      this.exchangeRateWrap!.style.display = shown ? 'none' : '';
+      erToggle.textContent = shown ? '+ Курс' : '− Курс';
+      if (!shown) setTimeout(() => this.exchangeRateInput!.focus(), 50);
+    });
 
     // ── Autofill badge ───────────────────────────────────────────────────
     this.autofillBadge = form.createDiv('finance-autofill-badge');
@@ -348,6 +385,17 @@ export class RecordModal extends Modal {
       filled = true;
     }
 
+    if (match.exchangeRate && (!this.exchangeRateInput || !this.exchangeRateInput.value)) {
+      if (this.exchangeRateWrap && this.exchangeRateInput) {
+        this.exchangeRateWrap.style.display = '';
+        this.exchangeRateInput.value = String(match.exchangeRate).replace('.', ',');
+        this.rec.exchangeRate = match.exchangeRate;
+        const toggle = this.exchangeRateWrap.parentElement?.querySelector('.finance-exrate-toggle') as HTMLElement;
+        if (toggle) toggle.textContent = '− Курс';
+        filled = true;
+      }
+    }
+
     if (filled) {
       this.autofillBadge.style.display = 'flex';
       const d = match.date.split('-');
@@ -450,6 +498,7 @@ export class RecordModal extends Modal {
       attachmentPath: this.rec.attachmentPath         ?? '',
       isInternal:     this.rec.isInternal             ?? false,
       linkedId:       this.rec.linkedId             ?? '',
+      exchangeRate:   this.rec.exchangeRate,
     };
     this.o.onSave(record);
     this.close();

@@ -606,7 +606,7 @@ export class AccountView {
       if (filter.dateFrom && r.date < filter.dateFrom)       return false;
       if (filter.dateTo   && r.date > filter.dateTo)         return false;
       if (q) {
-        const hay = [r.category, r.tag, r.payer, r.note, String(r.amount)].join(' ').toLowerCase();
+        const hay = [r.category, r.tag, r.payer, r.note, String(r.amount), r.exchangeRate ? String(r.exchangeRate) : ''].join(' ').toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
@@ -766,6 +766,9 @@ export class AccountView {
       if (rec.payer) {
         details.createEl('span', { text: `👤 ${rec.payer}`, cls: 'finance-record-detail' });
       }
+      if (rec.exchangeRate) {
+        details.createEl('span', { text: `💱 @ ${rec.exchangeRate}`, cls: 'finance-record-detail' });
+      }
 
       if (rec.note) {
         block.createEl('div', { text: rec.note, cls: 'finance-record-note' });
@@ -804,7 +807,8 @@ export class AccountView {
         { key: 'date',     text: fmtDate(rec.date, rec.time), cls: 'finance-td-date' },
         { key: 'type',     text: rec.type === 'income' ? '↑ Доход' : '↓ Расход',
           cls: rec.type === 'income' ? 'finance-type-income' : 'finance-type-expense' },
-        { key: 'amount',   text: (rec.type === 'income' ? '+' : '−') + fmt(rec.amount, cur),
+        { key: 'amount',   text: (rec.type === 'income' ? '+' : '−') + fmt(rec.amount, cur)
+          + (rec.exchangeRate ? ` @ ${rec.exchangeRate}` : ''),
           cls: 'finance-amount-cell ' + (rec.type === 'income' ? 'finance-amount-income' : 'finance-amount-expense') },
         { key: 'category', text: rec.category || '—', cls: '' },
         { key: 'tag',      text: rec.tag      || '—', cls: 'finance-td-muted' },

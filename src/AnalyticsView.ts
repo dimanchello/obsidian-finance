@@ -60,6 +60,8 @@ export class AnalyticsView {
     this.el.empty();
     this.el.addClass('finance-analytics');
 
+    const isMobile = window.innerWidth <= 480;
+
     // ── controls ──────────────────────────────────────────────────────────
     const ctrl = this.el.createDiv('finance-analytics-controls');
 
@@ -68,11 +70,21 @@ export class AnalyticsView {
     tg.createEl('span', { text: 'Вид:', cls: 'finance-analytics-label' });
     const barBtn = this.mkToggle(tg, '▮▮ Столбцы', this.chartType === 'bar');
     const pieBtn = this.mkToggle(tg, '◕ Пирог',    this.chartType === 'pie');
+    if (isMobile) {
+      [barBtn, pieBtn].forEach(b => {
+        b.style.fontSize = '12px';
+        b.style.padding = '2px 8px';
+      });
+    }
     barBtn.addEventListener('click', () => { this.chartType = 'bar'; barBtn.classList.add('active'); pieBtn.classList.remove('active'); this.redrawChart(); });
     pieBtn.addEventListener('click', () => { this.chartType = 'pie'; pieBtn.classList.add('active'); barBtn.classList.remove('active'); this.redrawChart(); });
 
     // row 2: group by + show type
     const ctrl2 = ctrl.createDiv('finance-analytics-group');
+    if (isMobile) {
+      ctrl2.style.flexDirection = 'column';
+      ctrl2.style.alignItems = 'stretch';
+    }
 
     const gg = ctrl2.createDiv('finance-analytics-group');
     gg.createEl('span', { text: 'Группировка:', cls: 'finance-analytics-label' });

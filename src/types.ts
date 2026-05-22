@@ -17,6 +17,7 @@ export interface FinanceRecord {
   attachmentPath: string;
   isInternal?:    boolean;  // if true, excluded from income/expense stats
   linkedId?:      string;   // links to credit/deposit/debt record (hidden from UI)
+  exchangeRate?:  number;   // optional currency exchange rate (e.g., 95.5 for ₽→$)
 }
 
 export interface DebtMovement {
