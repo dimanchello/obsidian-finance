@@ -257,7 +257,6 @@ export class CreditModal extends Modal {
       { value: 'consumer', label: 'Потребительский' },
       { value: 'auto', label: 'Автокредит' },
       { value: 'mortgage', label: 'Ипотека' },
-      { value: 'credit', label: 'Кредит' },
     ];
     types.forEach(t => {
       const opt = typeSel.createEl('option', { value: t.value, text: t.label });

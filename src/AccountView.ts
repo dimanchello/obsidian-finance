@@ -1359,14 +1359,13 @@ export class AccountView {
       { v: 'consumer', l: 'Потребительский' },
       { v: 'auto', l: 'Автокредит' },
       { v: 'mortgage', l: 'Ипотека' },
-      { v: 'credit', l: 'Кредит' },
     ].forEach(({ v, l }) => {
       const o = typeSel.createEl('option', { text: l });
       o.value = v;
       o.selected = v === f.type;
     });
     typeSel.addEventListener('change', () => {
-      this.state.creditFilter!.type = typeSel.value as 'all' | 'consumer' | 'auto' | 'mortgage' | 'credit';
+      this.state.creditFilter!.type = typeSel.value as 'all' | 'consumer' | 'auto' | 'mortgage';
       this.resetCreditPage();
     });
 

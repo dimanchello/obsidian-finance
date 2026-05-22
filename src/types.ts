@@ -152,7 +152,7 @@ export const COMMON_CURRENCIES = [
 
 export const CREDIT_PAGE_SIZE = 20;
 
-export type CreditType = 'credit' | 'auto' | 'mortgage' | 'consumer';
+export type CreditType = 'consumer' | 'auto' | 'mortgage';
 export type CreditStatus = 'active' | 'paid';
 export type CreditPaymentStatus = 'pending' | 'paid';
 
