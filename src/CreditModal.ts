@@ -40,7 +40,7 @@ export class CreditModal extends Modal {
       : {
           id: crypto.randomUUID(),
           name: 'Кредит',
-          type: 'consumer' as CreditType,
+          type: 'consumer',
           bankName: '',
           originalAmount: 0,
           currentAmount: 0,

@@ -74,14 +74,14 @@ export interface FilterState {
 export interface SortState { field: SortField; dir: SortDir; }
 
 export type DebtSortField = 'date' | 'amount' | 'person' | 'createdAt';
-export type DebtFilterState = {
+export interface DebtFilterState {
   search: string;
   status: 'all' | 'paid' | 'unpaid';
   direction: 'all' | DebtDirection;
   dateFrom: string;
   dateTo: string;
   person: string;
-};
+}
 
 export interface ViewState {
   sort: SortState; filter: FilterState; page: number; pageSize: number;
@@ -118,24 +118,24 @@ export const DEFAULT_DEBT_FILTER: DebtFilterState = {
 };
 
 export type CreditSortField = 'date' | 'amount' | 'bankName' | 'createdAt';
-export type CreditFilterState = {
+export interface CreditFilterState {
   search: string;
   status: 'all' | 'active' | 'paid';
   bankName: string;
   type: 'all' | CreditType;
   dateFrom: string;
   dateTo: string;
-};
+}
 
 export type DepositSortField = 'date' | 'amount' | 'bankName' | 'createdAt';
-export type DepositFilterState = {
+export interface DepositFilterState {
   search: string;
   status: 'all' | 'active' | 'closed';
   bankName: string;
   type: 'all' | DepositType;
   dateFrom: string;
   dateTo: string;
-};
+}
 
 export const DEFAULT_CREDIT_FILTER: CreditFilterState = {
   search: '', status: 'all', bankName: '', type: 'all', dateFrom: '', dateTo: '',

@@ -18,7 +18,7 @@ const MONTHS = ['Янв','Фев','Мар','Апр','Май','Июн','Июл','
 function svg<K extends keyof SVGElementTagNameMap>(
   tag: K, attrs: Record<string, string | number> = {},
 ): SVGElementTagNameMap[K] {
-  const el = document.createElementNS('http://www.w3.org/2000/svg', tag) as SVGElementTagNameMap[K];
+  const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
   for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, String(v));
   return el;
 }
@@ -38,10 +38,10 @@ export class AnalyticsView {
   private groupBy:   GroupBy   = 'category';
   private showType:  ShowType  = 'both';
   private chartEl!:  HTMLElement;
-  private dateFrom:  string = '';
-  private dateTo:    string = '';
-  private timeFrom:  string = '00:00';
-  private timeTo:    string = '23:59';
+  private dateFrom = '';
+  private dateTo = '';
+  private timeFrom = '00:00';
+  private timeTo = '23:59';
 
   constructor(el: HTMLElement, records: FinanceRecord[], currency: string) {
     this.el       = el;
@@ -220,8 +220,6 @@ export class AnalyticsView {
     const MAX = 20;
     let data = rawData;
 
-    // When grouped by month, never truncate — months are chronological,
-    // grouping extras into "Другое" would be meaningless.
     if (this.groupBy !== 'month' && data.length > MAX) {
       const rest = data.slice(MAX);
       data = [
@@ -236,10 +234,13 @@ export class AnalyticsView {
 
     const isMobile = window.innerWidth <= 480;
     const availW = Math.max(this.chartEl.clientWidth || 600, 500);
-    const W = Math.min(availW, 1200);
-    const ratio = W / 1000;
-    const PL = 60, PB = Math.round(70 * ratio), PT = Math.round(16 * ratio), PR = Math.round(14 * ratio);
-    const H = Math.round(W * (isMobile ? 0.55 : 0.36));
+    const PL = 60, PR = 14;
+    const MIN_GROUP = 60;
+    const minW = PL + data.length * MIN_GROUP + PR;
+    const W = Math.max(availW, minW);
+    const ratio = Math.min(W / 1000, 1.3);
+    const PB = Math.round(70 * ratio), PT = Math.round(16 * ratio);
+    const H = Math.round(Math.max(availW, 500) * (isMobile ? 0.55 : 0.36));
     const CW = W - PL - PR, CH = H - PT - PB;
     const fsY = Math.max(Math.round(16 * ratio), isMobile ? 14 : 12);
     const fsX = Math.max(Math.round(13 * ratio), isMobile ? 12 : 10);
@@ -258,7 +259,6 @@ export class AnalyticsView {
     const root = svg('svg', { viewBox: `0 0 ${W} ${H}` });
     root.classList.add('finance-chart-svg');
 
-    // Tooltip div
     const tooltip = document.createElement('div');
     tooltip.className = 'finance-bar-tooltip';
     tooltip.style.cssText = 'display:none;position:fixed;z-index:10000;pointer-events:none;padding:5px 10px;background:var(--background-primary);border:1px solid var(--background-modifier-border);border-radius:5px;font-size:13px;color:var(--text-normal);box-shadow:0 2px 6px rgba(0,0,0,.15);line-height:1.4;max-width:320px;';
@@ -274,12 +274,11 @@ export class AnalyticsView {
       if (left < 6) left = 6;
       if (left + tw > window.innerWidth - 6) left = window.innerWidth - tw - 6;
       if (top < 4) top = e.clientY + 12;
-      tooltip.style.left = left + 'px';
-      tooltip.style.top  = top + 'px';
+      tooltip.style.left = `${left}px`;
+      tooltip.style.top  = `${top}px`;
     };
     const hideTip = () => { tooltip.style.display = 'none'; };
 
-    // Y grid
     for (let i = 0; i <= 4; i++) {
       const y   = PT + CH * i / 4;
       const val = maxVal * (1 - i / 4);
@@ -293,7 +292,6 @@ export class AnalyticsView {
       root.appendChild(t);
     }
 
-    // Bars + X labels
     data.forEach((d, i) => {
       const cx = PL + groupW * i + groupW / 2;
 
@@ -319,13 +317,11 @@ export class AnalyticsView {
         root.appendChild(rect);
       }
 
-      // X label
       const lbl = svg('text', {
         x: cx, y: H - PB + Math.round(20 * ratio),
         'text-anchor': 'middle', fill: 'var(--text-muted)', 'font-size': fsX,
       });
-      const short = d.label.length > 8 ? d.label.slice(0, 7) + '…' : d.label;
-      lbl.textContent = short;
+      lbl.textContent = d.label;
       if (data.length > 10) {
         lbl.setAttribute('transform', `rotate(-30, ${cx}, ${H - PB + Math.round(20 * ratio)})`);
         lbl.setAttribute('text-anchor', 'end');
@@ -333,7 +329,6 @@ export class AnalyticsView {
       root.appendChild(lbl);
     });
 
-    // Legend
     if (this.showType === 'both') {
       const lx = Math.round(ratio * 110);
       const leg = svg('g', { transform: `translate(${PL}, ${H - Math.round(8 * ratio)})` });
@@ -342,6 +337,7 @@ export class AnalyticsView {
         const gx = i * lx;
         const r  = svg('rect', { x: gx, y: -dotS, width: dotS, height: dotS, fill: c, rx: Math.round(ratio) });
         const t  = svg('text', { x: gx + dotS + Math.round(8 * ratio), y: Math.round(2 * ratio), fill: 'var(--text-muted)', 'font-size': fsLegend });
+
         t.textContent = lbl;
         leg.appendChild(r); leg.appendChild(t);
       });
@@ -349,6 +345,10 @@ export class AnalyticsView {
     }
 
     const wrap = this.chartEl.createDiv('finance-chart-svg-wrap');
+    wrap.style.overflowX = 'auto';
+    wrap.style.minWidth = '100%';
+    root.style.display = 'block';
+    if (W > availW) root.style.width = `${W}px`;
     wrap.appendChild(root);
   }
 

@@ -539,7 +539,7 @@ const en: Translations = {
 const translations: Record<Locale, Translations> = { ru, en };
 
 export function getLocale(lang: string | undefined): Locale {
-  if (lang && lang.startsWith('en')) return 'en';
+  if (lang?.startsWith('en')) return 'en';
   return 'ru';
 }
 

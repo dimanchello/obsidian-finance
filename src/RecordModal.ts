@@ -385,12 +385,12 @@ export class RecordModal extends Modal {
       filled = true;
     }
 
-    if (match.exchangeRate && (!this.exchangeRateInput || !this.exchangeRateInput.value)) {
+    if (match.exchangeRate && (!this.exchangeRateInput?.value)) {
       if (this.exchangeRateWrap && this.exchangeRateInput) {
         this.exchangeRateWrap.style.display = '';
         this.exchangeRateInput.value = String(match.exchangeRate).replace('.', ',');
         this.rec.exchangeRate = match.exchangeRate;
-        const toggle = this.exchangeRateWrap.parentElement?.querySelector('.finance-exrate-toggle') as HTMLElement;
+        const toggle = this.exchangeRateWrap.parentElement?.querySelector('.finance-exrate-toggle');
         if (toggle) toggle.textContent = '− Курс';
         filled = true;
       }

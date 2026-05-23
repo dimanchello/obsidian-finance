@@ -44,7 +44,8 @@ export class ImportExportModal extends Modal {
     });
 
     this.body = contentEl.createDiv('finance-ie-body');
-    this.o.mode === 'export' ? this.renderExport() : this.renderImport();
+    if (this.o.mode === 'export') this.renderExport();
+    else this.renderImport();
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -79,7 +80,7 @@ export class ImportExportModal extends Modal {
 
     if (fmt === 'csv') {
       const headers = ['id','createdAt','date','time','type','amount','category','tag','payer','note','attachmentPath'];
-      const escape  = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+      const escape  = (v: unknown) => { const s = v == null ? '' : typeof v === 'string' ? v : typeof v === 'number' || typeof v === 'boolean' ? String(v) : ''; return `"${s.replace(/"/g, '""')}"`; };
       content = [headers.join(','), ...recs.map(r => headers.map(h => escape(r[h as keyof FinanceRecord])).join(','))].join('\n');
       mime    = 'text/csv;charset=utf-8;';
 
@@ -88,7 +89,7 @@ export class ImportExportModal extends Modal {
       mime    = 'application/json';
 
     } else {
-      const esc   = (v: unknown) => String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      const esc   = (v: unknown) => { const s = v == null ? '' : typeof v === 'string' ? v : typeof v === 'number' || typeof v === 'boolean' ? String(v) : ''; return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
       const inner = recs.map(r =>
         `  <record>${['id','createdAt','date','time','type','amount','category','tag','payer','note','attachmentPath']
           .map(k => `<${k}>${esc(r[k as keyof FinanceRecord])}</${k}>`).join('')}</record>`
@@ -117,7 +118,7 @@ export class ImportExportModal extends Modal {
   private mapping:    Record<string, string> = {};  // ourField → srcField
   private typeMap:    { incomeVal: string; expenseVal: string } = { incomeVal: 'income', expenseVal: 'expense' };
   private typeMode:   'field' | 'sign' | 'all_income' | 'all_expense' = 'field';
-  private typeField:  string = '';
+  private typeField = '';
 
   private renderImport(): void {
     const b = this.body;
@@ -293,7 +294,7 @@ export class ImportExportModal extends Modal {
   private setRawData(rows: Record<string, unknown>[]): void {
     this.rawData   = rows.map(r => {
       const out: Record<string, string> = {};
-      Object.entries(r).forEach(([k, v]) => { out[k] = String(v ?? ''); });
+      Object.entries(r).forEach(([k, v]) => { out[k] = v == null ? '' : typeof v === 'string' ? v : typeof v === 'number' || typeof v === 'boolean' ? String(v) : ''; });
       return out;
     });
     this.srcFields = Object.keys(this.rawData[0] ?? {});
@@ -392,7 +393,7 @@ export class ImportExportModal extends Modal {
         selG.createEl('label', { text: 'Поле типа', cls: 'finance-filter-label' });
         const sel  = selG.createEl('select', { cls: 'finance-filter-select' });
         this.srcFields.forEach(f => { const o = sel.createEl('option',{text:f}); o.value=f; });
-        sel.value      = this.mapping['type'] || this.srcFields[0] || '';
+        sel.value      = this.mapping.type || this.srcFields[0] || '';
         this.typeField = sel.value;
         sel.addEventListener('change', () => { this.typeField = sel.value; });
 
@@ -481,10 +482,10 @@ function normalizeDate(s: string): string {
   // already YYYY-MM-DD
   if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
   // DD.MM.YYYY or DD/MM/YYYY
-  const m = s.match(/^(\d{1,2})[./](\d{1,2})[./](\d{4})/);
+  const m = /^(\d{1,2})[./](\d{1,2})[./](\d{4})/.exec(s);
   if (m) return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
   // MM/DD/YYYY
-  const m2 = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  const m2 = /^(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(s);
   if (m2) return `${m2[3]}-${m2[1].padStart(2,'0')}-${m2[2].padStart(2,'0')}`;
   // Try native Date parse
   const d = new Date(s);

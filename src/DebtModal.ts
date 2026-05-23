@@ -33,9 +33,8 @@ export class DebtModal extends Modal {
     super(app);
     this.o = opts;
     const nowStr = new Date().toISOString().split('T')[0];
-    const timeStr = new Date().toTimeString().slice(0, 5);
     this.debt = opts.debt
-      ? { ...opts.debt, direction: (opts.debt.direction || 'borrowed') as 'lent' | 'borrowed', movements: [...opts.debt.movements] }
+      ? { ...opts.debt, direction: (opts.debt.direction || 'borrowed'), movements: [...opts.debt.movements] }
       : {
           id: crypto.randomUUID(),
           person: '',

@@ -2,7 +2,7 @@ import { App, Notice, Platform, TFile } from 'obsidian';
 import { FinanceStorage }       from './storage';
 import {
   AccountData, CreditRecord, DebtMovement, DebtRecord, DepositRecord, DepositTopUp, DepositWithdrawal, FinanceRecord,
-  PluginSettings, DEFAULT_FILTER, DEFAULT_SORT, DEFAULT_DEBT_FILTER, DEFAULT_CREDIT_FILTER, DEFAULT_DEPOSIT_FILTER, COMMON_CURRENCIES, CREDIT_PAGE_SIZE,
+  PluginSettings, DEFAULT_FILTER, DEFAULT_SORT, DEFAULT_DEBT_FILTER, DEFAULT_CREDIT_FILTER, DEFAULT_DEPOSIT_FILTER, COMMON_CURRENCIES,
   SortField, ViewState, DebtSortField, CreditSortField, DepositSortField, RecordType,
 } from './types';
 import { RecordModal }       from './RecordModal';
@@ -28,14 +28,14 @@ function loadState(np: string, pageSize: number): ViewState {
     if (raw) {
       const v = JSON.parse(raw) as ViewState;
       v.page = 0;
-      if (!v.debtFilter) v.debtFilter = { ...DEFAULT_DEBT_FILTER };
-      if (!v.debtSort) v.debtSort = { field: 'createdAt', dir: 'desc' };
+      v.debtFilter ??= { ...DEFAULT_DEBT_FILTER };
+      v.debtSort ??= { field: 'createdAt', dir: 'desc' };
       if (typeof v.debtPage !== 'number') v.debtPage = 0;
-      if (!v.creditFilter) v.creditFilter = { ...DEFAULT_CREDIT_FILTER };
-      if (!v.creditSort) v.creditSort = { field: 'createdAt', dir: 'desc' };
+      v.creditFilter ??= { ...DEFAULT_CREDIT_FILTER };
+      v.creditSort ??= { field: 'createdAt', dir: 'desc' };
       if (typeof v.creditPage !== 'number') v.creditPage = 0;
-      if (!v.depositFilter) v.depositFilter = { ...DEFAULT_DEPOSIT_FILTER };
-      if (!v.depositSort) v.depositSort = { field: 'createdAt', dir: 'desc' };
+      v.depositFilter ??= { ...DEFAULT_DEPOSIT_FILTER };
+      v.depositSort ??= { field: 'createdAt', dir: 'desc' };
       if (typeof v.depositPage !== 'number') v.depositPage = 0;
       if (v.filter.showInternal === undefined || typeof v.filter.showInternal === 'boolean') {
         v.filter.showInternal = v.filter.showInternal === true ? 'only' : 'all';
@@ -110,7 +110,7 @@ export class AccountView {
   private expandedDepositId: string | null = null;
   private creditPaginationEl?: HTMLElement;
   private depositPaginationEl?: HTMLElement;
-  private creditPaymentPages: Map<string, number> = new Map();
+  private creditPaymentPages = new Map<string, number>();
 
   constructor(app: App, root: HTMLElement, notePath: string, storage: FinanceStorage, settings: PluginSettings, pluginId: string) {
     this.app = app; this.root = root; this.notePath = notePath;
@@ -163,7 +163,7 @@ export class AccountView {
     const left   = header.createDiv('finance-header-left');
 
     const nameWrap   = left.createDiv('finance-account-name-wrap');
-    const displayName = this.data?.name || noteFilename(this.notePath);
+    const displayName = this.data?.name ?? noteFilename(this.notePath);
     const nameEl     = nameWrap.createEl('h2', { text: displayName, cls: 'finance-title' });
     nameEl.title     = 'Нажмите чтобы переименовать';
     nameEl.addEventListener('click', () => this.startNameEdit(nameEl));
@@ -225,7 +225,7 @@ export class AccountView {
   }
 
   private updateHeaderButtons(): void {
-    const moreBtn = this.root.querySelector('.finance-more-btn') as HTMLElement | null;
+    const moreBtn = this.root.querySelector<HTMLElement>('.finance-more-btn');
     if (moreBtn) {
       const isActive = this.mode === 'debts' || this.mode === 'credits' || this.mode === 'deposits';
       moreBtn.style.border = isActive
@@ -347,7 +347,7 @@ export class AccountView {
   private renderAnalytics(): void {
     if (!this.analyticsEl) return;
     const filtered = this.getFiltered();
-    const cur      = this.data?.currency || this.settings.defaultCurrency;
+    const cur      = this.data?.currency ?? this.settings.defaultCurrency;
 
     if (this.analyticsView) {
       this.analyticsView.update(filtered, cur);
@@ -502,7 +502,7 @@ export class AccountView {
     const trigger = wrapper.createDiv('finance-custom-select-trigger');
     trigger.setAttribute('tabindex', '0');
     const triggerText = trigger.createEl('span', { cls: 'finance-custom-select-text' });
-    triggerText.textContent = opts.find(o => o.v === cur)?.l || cur || opts[0]?.l || '—';
+    triggerText.textContent = opts.find(o => o.v === cur)?.l ?? cur ?? opts[0]?.l ?? '—';
 
     let dropdown: HTMLElement | null = null;
     let isOpen = false;
@@ -626,8 +626,8 @@ export class AccountView {
 
   private getFilteredDebts(): DebtRecord[] {
     if (!this.data) return [];
-    const f = this.state.debtFilter || DEFAULT_DEBT_FILTER;
-    const s = this.state.debtSort || { field: 'createdAt' as DebtSortField, dir: 'desc' };
+    const f = this.state.debtFilter ?? DEFAULT_DEBT_FILTER;
+    const s = this.state.debtSort ?? { field: 'createdAt' as DebtSortField, dir: 'desc' };
     const q = f.search.toLowerCase();
 
     const repaid = (d: DebtRecord) =>
@@ -682,7 +682,7 @@ export class AccountView {
     this.state.page  = page;
     const start      = page * pageSize;
     const pageRows   = filtered.slice(start, start + pageSize);
-    const cur        = this.data?.currency || this.settings.defaultCurrency;
+    const cur        = this.data?.currency ?? this.settings.defaultCurrency;
 
     // Update analytics if open
     if (this.analyticsOpen && this.analyticsView) {
@@ -855,7 +855,7 @@ export class AccountView {
   // ── Debt Filters ───────────────────────────────────────────────────────────
 
   private renderDebtFilters(body: HTMLElement): void {
-    const f = this.state.debtFilter || DEFAULT_DEBT_FILTER;
+    const f = this.state.debtFilter ?? DEFAULT_DEBT_FILTER;
 
     const filtersContainer = body.createDiv('finance-filters-container');
 
@@ -953,7 +953,7 @@ export class AccountView {
       { field: 'amount', label: 'Сумма' },
       { field: 'person', label: 'Кому' },
     ];
-    const s = this.state.debtSort || { field: 'createdAt' as DebtSortField, dir: 'desc' };
+    const s = this.state.debtSort ?? { field: 'createdAt' as DebtSortField, dir: 'desc' };
     sortFields.forEach(({ field, label }) => {
       const active = s.field === field;
       const btn = sortRow.createEl('button', {
@@ -1168,7 +1168,7 @@ export class AccountView {
   // ── Deposit Filters ───────────────────────────────────────────────────────
 
   private renderDepositFilters(body: HTMLElement): void {
-    const f = this.state.depositFilter || DEFAULT_DEPOSIT_FILTER;
+    const f = this.state.depositFilter ?? DEFAULT_DEPOSIT_FILTER;
 
     const filtersContainer = body.createDiv('finance-filters-container');
 
@@ -1267,7 +1267,7 @@ export class AccountView {
       { field: 'amount', label: 'Сумма' },
       { field: 'bankName', label: 'Банк' },
     ];
-    const s = this.state.depositSort || { field: 'createdAt' as DepositSortField, dir: 'desc' };
+    const s = this.state.depositSort ?? { field: 'createdAt' as DepositSortField, dir: 'desc' };
     sortFields.forEach(({ field, label }) => {
       const active = s.field === field;
       const btn = sortRow.createEl('button', {
@@ -1287,7 +1287,7 @@ export class AccountView {
   // ── Credit Filters ───────────────────────────────────────────────────────
 
   private renderCreditFilters(body: HTMLElement): void {
-    const f = this.state.creditFilter || DEFAULT_CREDIT_FILTER;
+    const f = this.state.creditFilter ?? DEFAULT_CREDIT_FILTER;
 
     const filtersContainer = body.createDiv('finance-filters-container');
 
@@ -1386,7 +1386,7 @@ export class AccountView {
       { field: 'amount', label: 'Сумма' },
       { field: 'bankName', label: 'Банк' },
     ];
-    const s = this.state.creditSort || { field: 'createdAt' as CreditSortField, dir: 'desc' };
+    const s = this.state.creditSort ?? { field: 'createdAt' as CreditSortField, dir: 'desc' };
     sortFields.forEach(({ field, label }) => {
       const active = s.field === field;
       const btn = sortRow.createEl('button', {
@@ -1407,7 +1407,7 @@ export class AccountView {
 
   private renderBodyContent(): void {
     if (!this.data) return;
-    const body = this.root.querySelector('.finance-body') as HTMLElement;
+    const body = this.root.querySelector<HTMLElement>('.finance-body')!;
     if (!body) return;
     body.empty();
 
@@ -1508,7 +1508,7 @@ export class AccountView {
     });
     const acColorWrap = acRow.createDiv('finance-settings-color-wrap');
     const acIn = acColorWrap.createEl('input', { type: 'color', cls: 'finance-settings-color-input' });
-    acIn.value = this.data.accentColor || '#7c3aed';
+    acIn.value = this.data.accentColor ?? '#7c3aed';
     const hexLabel = acColorWrap.createEl('span', {
       text: acIn.value,
       cls: 'finance-settings-hex',
@@ -1608,12 +1608,10 @@ export class AccountView {
   // ── Debts view ──────────────────────────────────────────────────────────
 
   private renderDebtsView(body: HTMLElement): void {
-    const cur = this.data?.currency || this.settings.defaultCurrency;
-    const allDebts = this.data?.debts || [];
+    const cur = this.data?.currency ?? this.settings.defaultCurrency;
+    const allDebts = this.data?.debts ?? [];
 
-    if (!this.state.debtFilter) {
-      this.state.debtFilter = { ...DEFAULT_DEBT_FILTER };
-    }
+    this.state.debtFilter ??= { ...DEFAULT_DEBT_FILTER };
 
     const filteredDebts = this.getFilteredDebts();
 
@@ -2000,7 +1998,7 @@ export class AccountView {
 
   private openRepayModal(debt: DebtRecord): void {
     const nowTime = new Date().toTimeString().slice(0, 5);
-    const cur = this.data?.currency || this.settings.defaultCurrency;
+    const cur = this.data?.currency ?? this.settings.defaultCurrency;
     new DebtMovementModal(this.app, {
       title: `💰 Погашение долга — ${debt.person}`,
       type: 'repay',
@@ -2074,7 +2072,7 @@ export class AccountView {
   }
 
   private confirmDeleteDebt(debt: DebtRecord): void {
-    const cur = this.data?.currency || this.settings.defaultCurrency;
+    const cur = this.data?.currency ?? this.settings.defaultCurrency;
     const label = `${debt.person} · ${fmt(debt.amount, cur)} · ${fmtDate(debt.date, debt.time)}`;
     new ConfirmModal(this.app, `Удалить долг?\n${label}`, async () => {
       await this.storage.deleteDebt(this.notePath, debt.id);
@@ -2090,11 +2088,9 @@ export class AccountView {
   private renderCreditsView(body: HTMLElement): void {
     if (!this.data) return;
     const allCredits = this.data.credits || [];
-    const cur = this.data.currency || this.settings.defaultCurrency;
+    const cur = this.data.currency ?? this.settings.defaultCurrency;
 
-    if (!this.state.creditFilter) {
-      this.state.creditFilter = { ...DEFAULT_CREDIT_FILTER };
-    }
+    this.state.creditFilter ??= { ...DEFAULT_CREDIT_FILTER };
 
     const filteredCredits = this.getFilteredCredits();
 
@@ -2595,7 +2591,7 @@ export class AccountView {
     const credit = this.data.credits.find(c => c.id === creditId);
     if (!credit) return;
 
-    const expandTd = this.root.querySelector(`[data-credit-id="${creditId}"]`) as HTMLElement | null;
+    const expandTd = this.root.querySelector<HTMLElement>(`[data-credit-id="${creditId}"]`);
     if (!expandTd) return;
 
     const cur = this.data.currency || this.settings.defaultCurrency;
@@ -2672,7 +2668,7 @@ export class AccountView {
   }
 
   private openEarlyRepaymentModal(credit: CreditRecord): void {
-    const cur = this.data?.currency || this.settings.defaultCurrency;
+    const cur = this.data?.currency ?? this.settings.defaultCurrency;
     new CreditEarlyRepaymentModal(this.app, {
       title: `⚡ Досрочное погашение — ${credit.name}`,
       credit,
@@ -2688,7 +2684,7 @@ export class AccountView {
   }
 
   private confirmDeleteCredit(credit: CreditRecord): void {
-    const cur = this.data?.currency || this.settings.defaultCurrency;
+    const cur = this.data?.currency ?? this.settings.defaultCurrency;
     const label = `${credit.name} · ${fmt(credit.currentAmount, cur)}`;
     new ConfirmModal(this.app, `Удалить кредит?\n${label}`, async () => {
       await this.storage.deleteCredit(this.notePath, credit.id);
@@ -2704,12 +2700,10 @@ export class AccountView {
   // ── Deposits view ──────────────────────────────────────────────────────────
 
   private renderDepositsView(body: HTMLElement): void {
-    const cur = this.data?.currency || this.settings.defaultCurrency;
-    const allDeposits = this.data?.deposits || [];
+    const cur = this.data?.currency ?? this.settings.defaultCurrency;
+    const allDeposits = this.data?.deposits ?? [];
 
-    if (!this.state.depositFilter) {
-      this.state.depositFilter = { ...DEFAULT_DEPOSIT_FILTER };
-    }
+    this.state.depositFilter ??= { ...DEFAULT_DEPOSIT_FILTER };
 
     const filteredDeposits = this.getFilteredDeposits();
 
@@ -3204,7 +3198,7 @@ export class AccountView {
   }
 
   private confirmCloseDeposit(deposit: DepositRecord): void {
-    const cur = this.data?.currency || this.settings.defaultCurrency;
+    const cur = this.data?.currency ?? this.settings.defaultCurrency;
     const label = `${deposit.name} · ${fmt(deposit.amount, cur)}`;
     const nowTime = new Date().toTimeString().slice(0, 5);
     new ConfirmModal(this.app, `Закрыть вклад?\n${label}`, async () => {
@@ -3311,7 +3305,7 @@ export class AccountView {
   }
 
   private confirmDeleteDeposit(deposit: DepositRecord): void {
-    const cur = this.data?.currency || this.settings.defaultCurrency;
+    const cur = this.data?.currency ?? this.settings.defaultCurrency;
     const label = `${deposit.name} · ${fmt(deposit.amount, cur)}`;
     new ConfirmModal(this.app, `Удалить вклад?\n${label}`, async () => {
       await this.storage.deleteDeposit(this.notePath, deposit.id);
@@ -3338,7 +3332,7 @@ export class AccountView {
   }
 
   private confirmDeleteDepositTopUp(deposit: DepositRecord, topUp: DepositTopUp): void {
-    const cur = this.data?.currency || this.settings.defaultCurrency;
+    const cur = this.data?.currency ?? this.settings.defaultCurrency;
     const label = `${deposit.name} · ${fmt(topUp.amount, cur)} · ${fmtDate(topUp.date, topUp.time)}`;
     new ConfirmModal(this.app, `Удалить пополнение?\n${label}`, async () => {
       await this.storage.deleteDepositTopUp(this.notePath, deposit.id, topUp.id);
@@ -3350,7 +3344,7 @@ export class AccountView {
   }
 
   private openDepositWithdrawalModal(deposit: DepositRecord): void {
-    const cur = this.data?.currency || this.settings.defaultCurrency;
+    const cur = this.data?.currency ?? this.settings.defaultCurrency;
     new DepositWithdrawalModal(this.app, {
       title: `📤 Снятие — ${deposit.name}`,
       maxAmount: deposit.amount,
@@ -3366,7 +3360,7 @@ export class AccountView {
   }
 
   private confirmDeleteDepositWithdrawal(deposit: DepositRecord, withdrawal: DepositWithdrawal): void {
-    const cur = this.data?.currency || this.settings.defaultCurrency;
+    const cur = this.data?.currency ?? this.settings.defaultCurrency;
     const label = `${deposit.name} · ${fmt(withdrawal.amount, cur)} · ${fmtDate(withdrawal.date, withdrawal.time)}`;
     new ConfirmModal(this.app, `Удалить снятие?\n${label}`, async () => {
       await this.storage.deleteDepositWithdrawal(this.notePath, deposit.id, withdrawal.id);
@@ -3525,7 +3519,7 @@ export class AccountView {
             paidDate: isPast ? dueDateStr : undefined,
           });
           if (isPast && credit.status === 'active') {
-            this.data!.records.push({
+            this.data.records.push({
               id: crypto.randomUUID(),
               createdAt: Date.now(),
               date: dueDateStr,

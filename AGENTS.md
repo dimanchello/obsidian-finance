@@ -27,6 +27,8 @@
 ```bash
 npm run dev    # Development: watch + rebuild on changes
 npm run build  # Production: typecheck + minified bundle
+npm run lint   # ESLint strict check (must pass 0 errors)
+npm test       # Run unit tests
 ```
 
 **Build Process:**
@@ -246,6 +248,18 @@ When user enters category/payer, the modal automatically fills amount, tag, and 
 
 ## Testing / Development
 
+### Verification (Обязательно после каждой задачи!)
+
+После завершения любой задачи необходимо выполнить:
+
+```bash
+npm run lint   # 0 errors, warnings допустимы только no-explicit-any
+npm run build  # tsc + esbuild — чистый выход
+npm test       # все тесты зелёные
+```
+
+Если хоть один шаг падает — фикс не завершён, править до прохождения.
+
 ### Unit Tests
 
 - **Test framework:** Vitest 2.0+
@@ -263,6 +277,12 @@ npm run test:watch   # Run tests in watch mode
 - `src/__tests__/types.test.ts` — Type definitions and data structures
 - `src/__tests__/i18n.test.ts` — Translations and locale detection
 - `src/__tests__/storage.test.ts` — Storage CRUD, caching, migrations
+
+**Правила написания тестов:**
+- Покрывать только **бизнес-логику** (типы, функции трансформации, storage CRUD, фильтрация, сортировка, миграции, i18n)
+- **НЕ покрывать** UI/рендер (AccountView, модалки, DOM-манипуляции)
+- Один тест — одна проверка
+- Использовать `describe` + `it`, без `test`
 
 ### Manual Testing
 

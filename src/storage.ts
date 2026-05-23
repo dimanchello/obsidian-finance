@@ -35,20 +35,20 @@ export class FinanceStorage {
   private app:   App;
   private base:  string;
 
-  private metaCache: Map<string, AccountMetaFile> = new Map();
-  private metaDirty: Set<string> = new Set();
+  private metaCache = new Map<string, AccountMetaFile>();
+  private metaDirty = new Set<string>();
 
-  private recordsCache: Map<string, AccountRecordsFile> = new Map();
-  private recordsDirty: Set<string> = new Set();
+  private recordsCache = new Map<string, AccountRecordsFile>();
+  private recordsDirty = new Set<string>();
 
-  private debtsCache: Map<string, DebtRecord[]> = new Map();
-  private debtsDirty: Set<string> = new Set();
+  private debtsCache = new Map<string, DebtRecord[]>();
+  private debtsDirty = new Set<string>();
 
-  private creditsCache: Map<string, CreditRecord[]> = new Map();
-  private creditsDirty: Set<string> = new Set();
+  private creditsCache = new Map<string, CreditRecord[]>();
+  private creditsDirty = new Set<string>();
 
-  private depositsCache: Map<string, DepositRecord[]> = new Map();
-  private depositsDirty: Set<string> = new Set();
+  private depositsCache = new Map<string, DepositRecord[]>();
+  private depositsDirty = new Set<string>();
 
   private timer: ReturnType<typeof setTimeout> | null = null;
   private defaultCurrency: string;
@@ -150,7 +150,7 @@ export class FinanceStorage {
         version: DATA_VERSION,
         name: legacy.name || '',
         currency: legacy.currency || this.defaultCurrency,
-        accentColor: legacy.accentColor || '',
+        accentColor: legacy.accentColor ?? '',
       };
       await a.write(this.fp(notePath, 'meta'), JSON.stringify(meta));
 
@@ -216,9 +216,9 @@ export class FinanceStorage {
         const data = JSON.parse(await this.app.vault.adapter.read(fp)) as AccountRecordsFile;
         console.log('[FT-storage] loadRecords loaded:', data.records.length, 'records');
         data.records.forEach(r => {
-          if (r.time === undefined) r.time = '';
-          if (r.isInternal === undefined) r.isInternal = false;
-          if (r.linkedId === undefined) r.linkedId = '';
+          r.time ??= '';
+          r.isInternal ??= false;
+          r.linkedId ??= '';
         });
         this.recordsCache.set(notePath, data);
         return data;
@@ -239,8 +239,8 @@ export class FinanceStorage {
         const data = JSON.parse(await this.app.vault.adapter.read(fp)) as DebtRecord[];
         data.forEach(d => {
           if (!d.direction) d.direction = 'borrowed';
-          if (d.dueDate === undefined) d.dueDate = '';
-          if (d.time === undefined) d.time = '';
+          d.dueDate ??= '';
+          d.time ??= '';
         });
         this.debtsCache.set(notePath, data);
         return data;
@@ -284,7 +284,7 @@ export class FinanceStorage {
           if (!d.accrualType) d.accrualType = 'end_of_term';
           if (!d.paymentFrequency) d.paymentFrequency = 'monthly';
           if (!d.type) d.type = 'term';
-          if (d.status === undefined) d.status = 'active';
+          d.status ??= 'active';
           if (!d.accruals) d.accruals = [];
           if (!d.topUps) d.topUps = [];
           if (!d.withdrawals) d.withdrawals = [];
