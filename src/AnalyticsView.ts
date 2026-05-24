@@ -231,8 +231,8 @@ export class AnalyticsView {
     const PL = 45, PR = 12;
     const minW = PL + data.length * MIN_GROUP + PR;
     const W = minW;
-    const CH = 300;
-    const PT = 16, PB = 60;
+    const CH = 340;
+    const PT = 18, PB = 96;
     const chartH = CH - PT - PB;
     const fsY = 14, fsX = 12;
     const gap = 2;
