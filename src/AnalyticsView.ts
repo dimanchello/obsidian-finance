@@ -70,12 +70,6 @@ export class AnalyticsView {
     tg.createEl('span', { text: 'Вид:', cls: 'finance-analytics-label' });
     const barBtn = this.mkToggle(tg, '▮▮ Столбцы', this.chartType === 'bar');
     const pieBtn = this.mkToggle(tg, '◕ Пирог',    this.chartType === 'pie');
-    if (isMobile) {
-      [barBtn, pieBtn].forEach(b => {
-        b.style.fontSize = '12px';
-        b.style.padding = '2px 8px';
-      });
-    }
     barBtn.addEventListener('click', () => { this.chartType = 'bar'; barBtn.classList.add('active'); pieBtn.classList.remove('active'); this.redrawChart(); });
     pieBtn.addEventListener('click', () => { this.chartType = 'pie'; pieBtn.classList.add('active'); barBtn.classList.remove('active'); this.redrawChart(); });
 
@@ -233,18 +227,15 @@ export class AnalyticsView {
     }
 
     const isMobile = window.innerWidth <= 480;
-    const availW = Math.max(this.chartEl.clientWidth || 600, 500);
-    const PL = 60, PR = 14;
-    const MIN_GROUP = 60;
+    const MIN_GROUP = data.length > 12 ? 35 : data.length > 6 ? 50 : data.length > 3 ? 55 : 60;
+    const PL = 45, PR = 12;
     const minW = PL + data.length * MIN_GROUP + PR;
-    const W = Math.max(availW, minW);
-    const ratio = Math.min(W / 1000, 1.3);
-    const PB = Math.round(70 * ratio), PT = Math.round(16 * ratio);
-    const H = Math.round(Math.max(availW, 500) * (isMobile ? 0.55 : 0.36));
-    const CW = W - PL - PR, CH = H - PT - PB;
-    const fsY = Math.max(Math.round(16 * ratio), isMobile ? 14 : 12);
-    const fsX = Math.max(Math.round(13 * ratio), isMobile ? 12 : 10);
-    const fsLegend = Math.max(Math.round(17 * ratio), isMobile ? 15 : 13);
+    const W = minW;
+    const CH = 300;
+    const PT = 16, PB = 60;
+    const chartH = CH - PT - PB;
+    const fsY = 14, fsX = 12;
+    const gap = 2;
 
     let maxVal = 1;
     data.forEach(d => {
@@ -252,11 +243,11 @@ export class AnalyticsView {
       if (this.showType !== 'income')  maxVal = Math.max(maxVal, d.expense);
     });
 
-    const groupW = CW / data.length;
-    const barW   = Math.max(2, Math.min(groupW * (isMobile ? 0.50 : 0.30), Math.round((isMobile ? 28 : 18) * ratio)));
-    const gap    = Math.max(1, Math.round(ratio));
+    const groupW = (W - PL - PR) / data.length;
+    const maxBarW = isMobile ? 28 : data.length <= 4 ? 50 : data.length <= 8 ? 30 : 20;
+    const barW   = Math.max(2, Math.min(groupW * (isMobile ? 0.50 : 0.35), maxBarW));
 
-    const root = svg('svg', { viewBox: `0 0 ${W} ${H}` });
+    const root = svg('svg', { viewBox: `0 0 ${W} ${CH}` });
     root.classList.add('finance-chart-svg');
 
     const tooltip = document.createElement('div');
@@ -280,14 +271,14 @@ export class AnalyticsView {
     const hideTip = () => { tooltip.style.display = 'none'; };
 
     for (let i = 0; i <= 4; i++) {
-      const y   = PT + CH * i / 4;
+      const y   = PT + chartH * i / 4;
       const val = maxVal * (1 - i / 4);
 
       const line = svg('line', { x1: PL, y1: y, x2: W - PR, y2: y, stroke: 'var(--background-modifier-border)', 'stroke-width': i === 4 ? 1.5 : 1 });
       if (i > 0 && i < 4) line.setAttribute('stroke-dasharray', '3 4');
       root.appendChild(line);
 
-      const t = svg('text', { x: PL - 8, y: y + Math.round(6 * ratio), 'text-anchor': 'end', fill: 'var(--text-muted)', 'font-size': fsY });
+      const t = svg('text', { x: PL - 8, y: y + 6, 'text-anchor': 'end', fill: 'var(--text-muted)', 'font-size': fsY });
       t.textContent = fmtShort(val);
       root.appendChild(t);
     }
@@ -296,9 +287,9 @@ export class AnalyticsView {
       const cx = PL + groupW * i + groupW / 2;
 
       if (this.showType !== 'expense' && d.income > 0) {
-        const h = (d.income / maxVal) * CH;
+        const h = (d.income / maxVal) * chartH;
         const x = this.showType === 'both' ? cx - barW - gap / 2 : cx - barW / 2;
-        const rect = svg('rect', { x, y: PT + CH - h, width: barW, height: h, fill: '#22c55e', rx: 3 });
+        const rect = svg('rect', { x, y: PT + chartH - h, width: barW, height: h, fill: '#22c55e', rx: 3 });
         rect.style.cursor = 'pointer';
         rect.addEventListener('mouseenter', (e) => showTip(e, `${d.label} — доход: ${this.fmtNum(d.income)}`));
         rect.addEventListener('mousemove', (e) => showTip(e, `${d.label} — доход: ${this.fmtNum(d.income)}`));
@@ -307,9 +298,9 @@ export class AnalyticsView {
       }
 
       if (this.showType !== 'income' && d.expense > 0) {
-        const h = (d.expense / maxVal) * CH;
+        const h = (d.expense / maxVal) * chartH;
         const x = this.showType === 'both' ? cx + gap / 2 : cx - barW / 2;
-        const rect = svg('rect', { x, y: PT + CH - h, width: barW, height: h, fill: '#ef4444', rx: 3 });
+        const rect = svg('rect', { x, y: PT + chartH - h, width: barW, height: h, fill: '#ef4444', rx: 3 });
         rect.style.cursor = 'pointer';
         rect.addEventListener('mouseenter', (e) => showTip(e, `${d.label} — расход: ${this.fmtNum(d.expense)}`));
         rect.addEventListener('mousemove', (e) => showTip(e, `${d.label} — расход: ${this.fmtNum(d.expense)}`));
@@ -318,38 +309,32 @@ export class AnalyticsView {
       }
 
       const lbl = svg('text', {
-        x: cx, y: H - PB + Math.round(20 * ratio),
+        x: cx, y: CH - PB + 20,
         'text-anchor': 'middle', fill: 'var(--text-muted)', 'font-size': fsX,
       });
       lbl.textContent = d.label;
       if (data.length > 10) {
-        lbl.setAttribute('transform', `rotate(-30, ${cx}, ${H - PB + Math.round(20 * ratio)})`);
+        lbl.setAttribute('transform', `rotate(-30, ${cx}, ${CH - PB + 20})`);
         lbl.setAttribute('text-anchor', 'end');
       }
       root.appendChild(lbl);
     });
 
-    if (this.showType === 'both') {
-      const lx = Math.round(ratio * 110);
-      const leg = svg('g', { transform: `translate(${PL}, ${H - Math.round(8 * ratio)})` });
-      [['#22c55e', 'Доходы'], ['#ef4444', 'Расходы']].forEach(([c, lbl], i) => {
-        const dotS = Math.round(8 * ratio);
-        const gx = i * lx;
-        const r  = svg('rect', { x: gx, y: -dotS, width: dotS, height: dotS, fill: c, rx: Math.round(ratio) });
-        const t  = svg('text', { x: gx + dotS + Math.round(8 * ratio), y: Math.round(2 * ratio), fill: 'var(--text-muted)', 'font-size': fsLegend });
-
-        t.textContent = lbl;
-        leg.appendChild(r); leg.appendChild(t);
-      });
-      root.appendChild(leg);
-    }
-
     const wrap = this.chartEl.createDiv('finance-chart-svg-wrap');
-    wrap.style.overflowX = 'auto';
-    wrap.style.minWidth = '100%';
     root.style.display = 'block';
-    if (W > availW) root.style.width = `${W}px`;
+    root.style.width = `${W}px`;
+    root.style.height = `${CH}px`;
     wrap.appendChild(root);
+
+    if (this.showType === 'both') {
+      const legEl = this.chartEl.createDiv('finance-chart-legend');
+      [['#22c55e', 'Доходы'], ['#ef4444', 'Расходы']].forEach(([c, lbl]) => {
+        const row = legEl.createDiv('finance-chart-legend-row');
+        const dot = row.createDiv('finance-chart-legend-dot');
+        dot.style.background = c;
+        row.createEl('span', { text: lbl });
+      });
+    }
   }
 
   // ── Pie / donut chart (SVG) ───────────────────────────────────────────────
@@ -377,10 +362,31 @@ export class AnalyticsView {
       return;
     }
 
-    const SZ = 120, cx = SZ / 2, cy = SZ / 2, R = 48, iR = 26;
+    const SZ = 160, cx = SZ / 2, cy = SZ / 2, R = 64, iR = 36;
     const root = svg('svg', { viewBox: `0 0 ${SZ} ${SZ}` });
     root.classList.add('finance-chart-svg');
     root.style.flexShrink = '0';
+    root.style.height = '100%';
+
+    const tooltip = document.createElement('div');
+    tooltip.className = 'finance-bar-tooltip';
+    tooltip.style.cssText = 'display:none;position:fixed;z-index:10000;pointer-events:none;padding:5px 10px;background:var(--background-primary);border:1px solid var(--background-modifier-border);border-radius:5px;font-size:13px;color:var(--text-normal);box-shadow:0 2px 6px rgba(0,0,0,.15);line-height:1.4;max-width:320px;';
+    document.body.appendChild(tooltip);
+
+    const showTip = (e: MouseEvent, text: string) => {
+      tooltip.textContent = text;
+      tooltip.style.display = 'block';
+      const tw = tooltip.offsetWidth;
+      const th = tooltip.offsetHeight;
+      let left = e.clientX - tw / 2;
+      let top  = e.clientY - th - 10;
+      if (left < 6) left = 6;
+      if (left + tw > window.innerWidth - 6) left = window.innerWidth - tw - 6;
+      if (top < 4) top = e.clientY + 12;
+      tooltip.style.left = `${left}px`;
+      tooltip.style.top  = `${top}px`;
+    };
+    const hideTip = () => { tooltip.style.display = 'none'; };
 
     let angle = -Math.PI / 2;
 
@@ -403,19 +409,20 @@ export class AnalyticsView {
         stroke: 'var(--background-primary)',
         'stroke-width': 2,
       });
-      const tip = svg('title');
-      tip.textContent = `${d.label}: ${this.fmtNum(d.value)} (${pct(d.value, total)})`;
-      path.appendChild(tip);
+      path.style.cursor = 'pointer';
+      path.addEventListener('mouseenter', (e) => showTip(e, `${d.label}: ${this.fmtNum(d.value)} (${pct(d.value, total)})`));
+      path.addEventListener('mousemove', (e) => showTip(e, `${d.label}: ${this.fmtNum(d.value)} (${pct(d.value, total)})`));
+      path.addEventListener('mouseleave', hideTip);
       root.appendChild(path);
 
       angle += sweep;
     });
 
     // Center label
-    const tc = svg('text', { x: cx, y: cy - 4, 'text-anchor': 'middle', fill: 'var(--text-muted)', 'font-size': 7 });
+    const tc = svg('text', { x: cx, y: cy - 6, 'text-anchor': 'middle', fill: 'var(--text-muted)', 'font-size': 9 });
     tc.textContent = 'Итого';
     root.appendChild(tc);
-    const tv = svg('text', { x: cx, y: cy + 6, 'text-anchor': 'middle', fill: 'var(--text-normal)', 'font-size': 9, 'font-weight': 'bold' });
+    const tv = svg('text', { x: cx, y: cy + 8, 'text-anchor': 'middle', fill: 'var(--text-normal)', 'font-size': 12, 'font-weight': 'bold' });
     tv.textContent = fmtShort(total);
     root.appendChild(tv);
 
