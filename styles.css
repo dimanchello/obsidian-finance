@@ -259,7 +259,7 @@
 
 /* ── Analytics toggle ───────────────────────────────────────────────────────── */
 .finance-analytics-toggle-row {
-  display: flex; justify-content: flex-start; margin-bottom: 10px;
+  display: flex; justify-content: flex-start; gap: 8px; margin-bottom: 10px;
 }
 .finance-analytics-toggle-btn {
   background: none; border: 1.5px solid var(--ft-border);
@@ -268,6 +268,7 @@
   cursor: pointer; transition: all .15s; font-family: inherit;
 }
 .finance-analytics-toggle-btn:hover { background: var(--background-modifier-hover); color: var(--ft-accent); border-color: var(--ft-accent); }
+.finance-analytics-toggle-btn.active { background: var(--ft-accent); color: #fff; border-color: var(--ft-accent); }
 
 /* ── Analytics panel ────────────────────────────────────────────────────────── */
 .finance-analytics-panel {
@@ -801,11 +802,11 @@
 .finance-calc-btn.finance-calc-clear:active { background: #991b1b; }
 .finance-calc-eq {
   grid-column: 1 / -1; width: auto;
-  background: var(--ft-accent); color: #fff; border-color: var(--ft-accent);
+  background: #16a34a !important; color: #fff; border-color: #16a34a;
   font-size: 1.05em; font-weight: 700;
 }
-.finance-calc-eq:hover { filter: brightness(1.1); }
-.finance-calc-eq:active { filter: brightness(.9); }
+.finance-calc-eq:hover { background: #15803d !important; filter: brightness(1.1); }
+.finance-calc-eq:active { background: #166534 !important; filter: brightness(.9); }
 
 .finance-calculator-modal .finance-modal-btns {
   margin-top: 8px; padding-top: 6px;
@@ -1254,9 +1255,9 @@
   /* ── Analytics панель на мобильных ──────────────────────────────────── */
   .finance-analytics-panel { padding: 12px 14px; margin-bottom: 12px; }
   .finance-analytics-controls { gap: 10px; }
-  .finance-analytics-group { width: 100%; }
+  .finance-analytics-group { width: 100%; align-items: flex-start; }
   .finance-analytics-label { font-size: .8em; }
-  .finance-analytics-btn { padding: 8px 12px; font-size: .85em; }
+  .finance-analytics-btn { flex: 1; text-align: center; padding: 8px 12px; font-size: .85em; }
   .finance-analytics-select { width: 100% !important; min-width: 0 !important; }
   .finance-chart-svg-wrap { overflow-x: auto; }
   .finance-pie-wrap { flex-direction: column; height: auto; overflow: visible; }
@@ -1610,18 +1611,22 @@
   .finance-tracker--mobile .finance-body { padding-bottom: 80px; }
 
   /* ── Calculator modal on mobile ────────────────────────────────────── */
+  .modal.finance-calculator-modal {
+    max-width: min(96vw, 420px) !important;
+  }
   .finance-calculator-modal .finance-calc-btn {
-    width: 44px; height: 44px;
-    font-size: 1.1em;
+    width: 52px; height: 52px;
+    font-size: 1.2em;
   }
   .finance-calculator-modal .finance-calc-grid {
-    grid-template-columns: repeat(4, 44px);
+    grid-template-columns: repeat(4, 52px);
+    gap: 6px;
   }
   .finance-calculator-modal .finance-calc-display {
-    font-size: 1.35em;
+    font-size: 1.5em;
   }
   .finance-calculator-modal .finance-calc-eq {
-    font-size: 1.1em;
+    font-size: 1.2em;
   }
 }
 
@@ -2028,11 +2033,24 @@
   .finance-settings-row {
     flex-direction: column;
     align-items: stretch;
-    gap: 8px;
+    gap: 6px; margin-bottom: 4px;
+  }
+  .finance-settings-row:last-child {
+    margin-bottom: 0;
+  }
+  .finance-settings-field {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+    width: 100%;
+  }
+  .finance-settings-field--page-size {
+    margin-bottom: 0;
   }
   .finance-settings-row--page-size {
     flex-direction: column;
     align-items: stretch;
+    margin-bottom: 0;
   }
   .finance-settings-field--page-size {
     flex-direction: column;
@@ -2211,6 +2229,10 @@
   .finance-danger-confirm-row .finance-input,
   .finance-danger-confirm-row .finance-btn-danger {
     width: 100%;
+  }
+  .finance-danger-confirm-row .finance-input {
+    height: 36px;
+    line-height: 36px;
   }
 }
 

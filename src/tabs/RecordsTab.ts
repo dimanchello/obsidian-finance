@@ -23,9 +23,14 @@ export class RecordsTab {
   private analyticsEl?: HTMLElement;
   private analyticsView: AnalyticsView | null = null;
   private analyticsOpen = false;
+  private filtersOpen = false;
   private settingsOpen = false;
   private settingsEl?: HTMLElement;
   private filterDebounce: ReturnType<typeof setTimeout> | null = null;
+
+  private analBtn?: HTMLButtonElement;
+  private filtBtn?: HTMLButtonElement;
+  private setBtn?: HTMLButtonElement;
 
   constructor(ctx: ViewContext, el: HTMLElement) {
     this.ctx = ctx;
@@ -39,38 +44,32 @@ export class RecordsTab {
     this.renderStats();
 
     const toggleRow = this.el.createDiv('finance-analytics-toggle-row');
-    const analBtn = toggleRow.createEl('button', {
+
+    this.analBtn = toggleRow.createEl('button', {
       cls: 'finance-analytics-toggle-btn',
       text: '📈 Аналитика ▼',
     });
-    const setBtn = toggleRow.createEl('button', {
+    this.filtBtn = toggleRow.createEl('button', {
       cls: 'finance-analytics-toggle-btn',
-      text: '⚙️ Настройки',
+      text: '🔍 Фильтры ▼',
     });
-    setBtn.style.marginLeft = '8px';
+    this.setBtn = toggleRow.createEl('button', {
+      cls: 'finance-analytics-toggle-btn',
+      text: '⚙️ Настройки ▼',
+    });
 
     this.analyticsEl = this.el.createDiv('finance-analytics-panel');
     this.analyticsEl.style.display = 'none';
 
-    this.settingsEl = this.el.createDiv('finance-analytics-panel');
+    this.filtersEl = this.el.createDiv('finance-filters-container');
+    this.filtersEl.style.display = 'none';
+
+    this.settingsEl = this.el.createDiv('finance-settings-panel');
     this.settingsEl.style.display = 'none';
 
-    analBtn.addEventListener('click', () => {
-      this.analyticsOpen = !this.analyticsOpen;
-      this.analyticsEl!.style.display = this.analyticsOpen ? 'block' : 'none';
-      analBtn.textContent = `📈 Аналитика ${this.analyticsOpen ? '▲' : '▼'}`;
-      if (this.analyticsOpen) this.renderAnalytics();
-    });
-
-    setBtn.addEventListener('click', () => {
-      this.settingsOpen = !this.settingsOpen;
-      this.settingsEl!.style.display = this.settingsOpen ? 'block' : 'none';
-      setBtn.textContent = `⚙️ Настройки${this.settingsOpen ? ' ▲' : ''}`;
-      if (this.settingsOpen) this.renderSettings();
-    });
-
-    this.filtersEl = this.el.createDiv('finance-filters-container');
-    this.renderFilters();
+    this.analBtn.addEventListener('click', () => this.togglePanel('analytics'));
+    this.filtBtn.addEventListener('click', () => this.togglePanel('filters'));
+    this.setBtn.addEventListener('click', () => this.togglePanel('settings'));
 
     const tw = this.el.createDiv('finance-table-wrapper');
     this.tableEl = tw.createDiv('finance-table-container');
@@ -78,9 +77,48 @@ export class RecordsTab {
     this.renderTable();
   }
 
+  private togglePanel(panel: 'analytics' | 'filters' | 'settings'): void {
+    const wasAnalytics = this.analyticsOpen;
+    const wasFilters = this.filtersOpen;
+    const wasSettings = this.settingsOpen;
+
+    const isOpening = (panel === 'analytics' && !wasAnalytics)
+      || (panel === 'filters' && !wasFilters)
+      || (panel === 'settings' && !wasSettings);
+
+    this.analyticsOpen = false;
+    this.filtersOpen = false;
+    this.settingsOpen = false;
+
+    if (isOpening) {
+      if (panel === 'analytics') {
+        this.analyticsOpen = true;
+        this.renderAnalytics();
+      } else if (panel === 'filters') {
+        this.filtersOpen = true;
+        this.renderFilters();
+      } else if (panel === 'settings') {
+        this.settingsOpen = true;
+        this.renderSettings();
+      }
+    }
+
+    this.analyticsEl!.style.display = this.analyticsOpen ? 'block' : 'none';
+    this.filtersEl!.style.display = this.filtersOpen ? 'block' : 'none';
+    this.settingsEl!.style.display = this.settingsOpen ? 'block' : 'none';
+
+    this.analBtn!.classList.toggle('active', this.analyticsOpen);
+    this.filtBtn!.classList.toggle('active', this.filtersOpen);
+    this.setBtn!.classList.toggle('active', this.settingsOpen);
+
+    this.analBtn!.textContent = `📈 Аналитика ${this.analyticsOpen ? '▲' : '▼'}`;
+    this.filtBtn!.textContent = `🔍 Фильтры ${this.filtersOpen ? '▲' : '▼'}`;
+    this.setBtn!.textContent = `⚙️ Настройки ${this.settingsOpen ? '▲' : '▼'}`;
+  }
+
   update(): void {
     this.renderStats();
-    this.renderFilters();
+    if (this.filtersOpen) this.renderFilters();
     this.renderTable();
   }
 
@@ -661,8 +699,8 @@ export class RecordsTab {
         await this.ctx.storage.importRecords(this.ctx.notePath, recs);
         this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
         this.renderStats();
-        this.renderFilters();
         this.renderTable();
+        if (this.filtersOpen) this.renderFilters();
       },
       mode,
     });
@@ -674,6 +712,7 @@ export class RecordsTab {
     this.ctx.saveState();
     this.renderTable();
     if (this.analyticsOpen) this.renderAnalytics();
+    if (this.filtersOpen) this.renderFilters();
   }
 
   private renderSettings(): void {
@@ -701,14 +740,15 @@ export class RecordsTab {
     });
 
     const acRow = this.settingsEl.createDiv('finance-settings-row');
-    acRow.createEl('label', {
+    const acG = acRow.createDiv('finance-settings-field');
+    acG.createEl('label', {
       text: 'Цвет акцента счёта',
       cls: 'finance-filter-label',
     });
-    const acColorWrap = acRow.createDiv('finance-settings-color-wrap');
-    const acIn = acColorWrap.createEl('input', { type: 'color', cls: 'finance-settings-color-input' });
+    const acControls = acG.createDiv('finance-settings-color-wrap');
+    const acIn = acControls.createEl('input', { type: 'color', cls: 'finance-settings-color-input' });
     acIn.value = this.ctx.data.accentColor ?? '#7c3aed';
-    const hexLabel = acColorWrap.createEl('span', {
+    const hexLabel = acControls.createEl('span', {
       text: acIn.value,
       cls: 'finance-settings-hex',
     });
@@ -718,7 +758,7 @@ export class RecordsTab {
       this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
       this.applyAccentColor(acIn.value);
     });
-    const resetColorBtn = acRow.createEl('button', {
+    const resetColorBtn = acControls.createEl('button', {
       text: 'Сбросить',
       cls: 'finance-btn-cancel',
     });

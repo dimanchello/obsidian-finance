@@ -73,9 +73,14 @@ export class AnalyticsView {
 
     // chart type (row 1)
     const tg = ctrl.createDiv('finance-analytics-group');
+    if (isMobile) { tg.style.flexDirection = 'column'; tg.style.alignItems = 'flex-start'; }
     tg.createEl('span', { text: 'Вид:', cls: 'finance-analytics-label' });
-    const barBtn = this.mkToggle(tg, '▮▮ Столбцы', this.chartType === 'bar');
-    const pieBtn = this.mkToggle(tg, '◕ Пирог',    this.chartType === 'pie');
+    const tgBtnWrap = tg.createDiv();
+    tgBtnWrap.style.display = 'flex';
+    tgBtnWrap.style.gap = '6px';
+    if (isMobile) { tgBtnWrap.style.width = '100%'; }
+    const barBtn = this.mkToggle(tgBtnWrap, '▮▮ Столбцы', this.chartType === 'bar');
+    const pieBtn = this.mkToggle(tgBtnWrap, '◕ Пирог',    this.chartType === 'pie');
     barBtn.addEventListener('click', () => { this.chartType = 'bar'; barBtn.classList.add('active'); pieBtn.classList.remove('active'); this.redrawChart(); });
     pieBtn.addEventListener('click', () => { this.chartType = 'pie'; pieBtn.classList.add('active'); barBtn.classList.remove('active'); this.redrawChart(); });
 
@@ -87,11 +92,13 @@ export class AnalyticsView {
     }
 
     const gg = ctrl2.createDiv('finance-analytics-group');
+    if (isMobile) { gg.style.flexDirection = 'column'; gg.style.alignItems = 'flex-start'; }
     gg.createEl('span', { text: 'Группировка:', cls: 'finance-analytics-label' });
     const gSel = this.mkSelect(gg, [['category','По категории'],['payer','По плательщику'],['month','По месяцу']], this.groupBy);
     gSel.addEventListener('change', () => { this.groupBy = gSel.value as GroupBy; this.redrawChart(); });
 
     const sg = ctrl2.createDiv('finance-analytics-group');
+    if (isMobile) { sg.style.flexDirection = 'column'; sg.style.alignItems = 'flex-start'; }
     sg.createEl('span', { text: 'Данные:', cls: 'finance-analytics-label' });
     const sSel = this.mkSelect(sg, [['both','Все'],['income','Доходы'],['expense','Расходы']], this.showType);
     sSel.addEventListener('change', () => { this.showType = sSel.value as ShowType; this.redrawChart(); });
