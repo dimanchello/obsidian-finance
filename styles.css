@@ -1612,14 +1612,24 @@
 
   /* ── Calculator modal on mobile ────────────────────────────────────── */
   .modal.finance-calculator-modal {
-    max-width: min(96vw, 420px) !important;
+    width: 98vw !important;
+    max-width: 98vw !important;
+    border-radius: 6px !important;
+  }
+  .finance-calculator-modal .modal-close-button {
+    width: 22px !important;
+    height: 22px !important;
+    font-size: 12px !important;
+    line-height: 22px !important;
+    top: 8px !important;
+    right: 8px !important;
   }
   .finance-calculator-modal .finance-calc-btn {
-    width: 52px; height: 52px;
+    width: 100%; height: 52px;
     font-size: 1.2em;
   }
   .finance-calculator-modal .finance-calc-grid {
-    grid-template-columns: repeat(4, 52px);
+    grid-template-columns: repeat(4, 1fr);
     gap: 6px;
   }
   .finance-calculator-modal .finance-calc-display {
