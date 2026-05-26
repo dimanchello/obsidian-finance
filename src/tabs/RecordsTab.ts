@@ -717,16 +717,16 @@ export class RecordsTab {
 
   private renderSettings(): void {
     if (!this.settingsEl || !this.ctx.data) return;
-    this.settingsEl.empty();
-    this.settingsEl.addClass('finance-settings-panel');
+    const el = this.settingsEl;
+    el.empty();
+    el.addClass('finance-settings-panel');
 
-    const psRow = this.settingsEl.createDiv('finance-settings-row finance-settings-row--page-size');
-    const psG = psRow.createDiv('finance-settings-field finance-settings-field--page-size');
-    psG.createEl('label', {
-      text: 'Записей на странице',
-      cls: 'finance-filter-label finance-settings-page-size-label',
-    });
-    const psSel = psG.createEl('select', { cls: 'finance-filter-select' });
+    const row = (): HTMLDivElement => el.createDiv('finance-settings-row');
+
+    // ── Page size ────────────────────────────────────────────────────────
+    const psRow = row();
+    psRow.createEl('label', { text: 'Записей на странице', cls: 'finance-filter-label' });
+    const psSel = psRow.createEl('select', { cls: 'finance-filter-select' });
     PAGE_SIZE_OPTIONS.forEach(n => {
       const o = psSel.createEl('option', { text: String(n) });
       o.value = String(n);
@@ -739,32 +739,23 @@ export class RecordsTab {
       this.renderTable();
     });
 
-    const acRow = this.settingsEl.createDiv('finance-settings-row');
-    const acG = acRow.createDiv('finance-settings-field');
-    acG.createEl('label', {
-      text: 'Цвет акцента счёта',
-      cls: 'finance-filter-label',
-    });
-    const acControls = acG.createDiv('finance-settings-color-wrap');
-    const acIn = acControls.createEl('input', { type: 'color', cls: 'finance-settings-color-input' });
+    // ── Accent color ─────────────────────────────────────────────────────
+    const acRow = row();
+    acRow.createEl('label', { text: 'Цвет акцента счёта', cls: 'finance-filter-label' });
+    const acC = acRow.createDiv('finance-settings-controls');
+    const acIn = acC.createEl('input', { type: 'color', cls: 'finance-settings-color-input' });
     acIn.value = this.ctx.data.accentColor ?? '#7c3aed';
-    const hexLabel = acControls.createEl('span', {
-      text: acIn.value,
-      cls: 'finance-settings-hex',
-    });
+    const hexLabel = acC.createEl('span', { text: acIn.value, cls: 'finance-settings-hex' });
     acIn.addEventListener('input', async () => {
       hexLabel.textContent = acIn.value;
       await this.ctx.storage.updateMeta(this.ctx.notePath, { accentColor: acIn.value });
       this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
       this.applyAccentColor(acIn.value);
     });
-    const resetColorBtn = acControls.createEl('button', {
-      text: 'Сбросить',
-      cls: 'finance-btn-cancel',
-    });
-    resetColorBtn.style.padding = '4px 12px';
-    resetColorBtn.style.fontSize = '.8em';
-    resetColorBtn.addEventListener('click', async () => {
+    const rstBtn = acC.createEl('button', { text: 'Сбросить', cls: 'finance-btn-cancel' });
+    rstBtn.style.padding = '4px 12px';
+    rstBtn.style.fontSize = '.8em';
+    rstBtn.addEventListener('click', async () => {
       await this.ctx.storage.updateMeta(this.ctx.notePath, { accentColor: '' });
       this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
       this.applyAccentColor('');
@@ -772,56 +763,33 @@ export class RecordsTab {
       hexLabel.textContent = '#7c3aed';
     });
 
-    const ieRow = this.settingsEl.createDiv('finance-settings-row');
-    ieRow.style.borderTop = '1px solid var(--ft-border)';
-    ieRow.style.paddingTop = '14px';
-    ieRow.style.marginTop = '4px';
-    ieRow.createEl('label', {
-      text: 'Импорт / Экспорт',
-      cls: 'finance-filter-label',
-    });
-    const ieBtns = ieRow.createDiv('finance-settings-ie-row');
-    const expBtn = ieBtns.createEl('button', {
-      cls: 'finance-add-btn finance-ie-btn',
-      text: '📤 Экспорт',
-    });
-    const impBtn = ieBtns.createEl('button', {
-      cls: 'finance-add-btn finance-ie-btn',
-      text: '📥 Импорт',
-    });
-    expBtn.addEventListener('click', () => {
-      this.openIEModal('export');
-    });
-    impBtn.addEventListener('click', () => {
-      this.openIEModal('import');
-    });
+    // ── Import / Export ────────────────────────────────────────────────────
+    const ieRow = row();
+    ieRow.classList.add('finance-settings-sep');
+    ieRow.createEl('label', { text: 'Импорт / Экспорт', cls: 'finance-filter-label' });
+    const ieC = ieRow.createDiv('finance-settings-controls');
+    const expBtn = ieC.createEl('button', { cls: 'finance-add-btn finance-ie-btn', text: '📤 Экспорт' });
+    const impBtn = ieC.createEl('button', { cls: 'finance-add-btn finance-ie-btn', text: '📥 Импорт' });
+    expBtn.addEventListener('click', () => this.openIEModal('export'));
+    impBtn.addEventListener('click', () => this.openIEModal('import'));
 
-    const dangerRow = this.settingsEl.createDiv('finance-settings-row');
-    dangerRow.style.borderTop = '2px solid #dc2626';
-    dangerRow.style.paddingTop = '16px';
-    dangerRow.style.marginTop = '8px';
-    dangerRow.createEl('label', {
-      text: 'ОПАСНАЯ ЗОНА',
-      cls: 'finance-danger-label',
-    });
+    // ── Danger zone ───────────────────────────────────────────────────────
+    const dgRow = row();
+    dgRow.classList.add('finance-settings-danger');
+    dgRow.createEl('label', { text: 'ОПАСНАЯ ЗОНА', cls: 'finance-danger-label' });
 
-    const dangerDesc = this.settingsEl.createDiv('finance-danger-desc');
+    const dangerDesc = el.createDiv('finance-danger-desc');
     dangerDesc.textContent = 'Введите "Yes" и нажмите кнопку ниже, чтобы удалить ВСЕ записи и долги безвозвратно.';
 
-    const confirmRow = this.settingsEl.createDiv('finance-settings-row finance-danger-confirm-row');
-    const confirmIn = confirmRow.createEl('input', {
-      type: 'text',
-      cls: 'finance-input',
-      placeholder: 'Введите Yes для подтверждения',
+    const cfRow = row();
+    cfRow.classList.add('finance-settings-cf');
+    const cfIn = cfRow.createEl('input', {
+      type: 'text', cls: 'finance-input', placeholder: 'Введите Yes для подтверждения',
     });
-    confirmIn.style.borderColor = '#dc2626';
-
-    const deleteBtn = confirmRow.createEl('button', {
-      text: '🗑️ Удалить ВСЕ данные',
-      cls: 'finance-btn-danger',
-    });
-    deleteBtn.addEventListener('click', async () => {
-      if (confirmIn.value.trim() !== 'Yes') {
+    cfIn.style.borderColor = '#dc2626';
+    const delBtn = cfRow.createEl('button', { text: '🗑️ Удалить ВСЕ данные', cls: 'finance-btn-danger' });
+    delBtn.addEventListener('click', async () => {
+      if (cfIn.value.trim() !== 'Yes') {
         new Notice('⚠️ Введите "Yes" для подтверждения');
         return;
       }

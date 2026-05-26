@@ -1989,97 +1989,43 @@
   background: var(--background-secondary);
   border: 1px solid var(--ft-border);
   border-radius: var(--ft-radius);
-  padding: 16px 18px; margin-bottom: 14px;
+  padding: 16px 18px;
+  margin-bottom: 14px;
   box-shadow: var(--ft-shadow);
 }
+
 .finance-settings-row {
   display: flex;
+  flex-direction: row;
   align-items: center;
   gap: 12px;
   margin-bottom: 12px;
-  flex-wrap: wrap;
 }
-.finance-settings-field {
+
+.finance-settings-row:last-child {
+  margin-bottom: 0;
+}
+
+.finance-settings-controls {
   display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.finance-settings-field--page-size {
-  flex: 1 1 220px;
-  min-width: 0;
-}
-.finance-settings-page-size-label {
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-.finance-settings-field--page-size .finance-filter-select {
-  min-width: 5.5em;
-  flex-shrink: 0;
-}
-@media (min-width: 481px) {
-  .finance-settings-row--page-size {
-    flex-wrap: nowrap;
-    align-items: center;
-  }
-  .finance-settings-field--page-size {
-    flex: 0 0 auto;
-    min-width: 280px;
-  }
-}
-@media (max-width: 480px) {
-  .finance-settings-panel {
-    padding: 12px 14px;
-  }
-  .finance-settings-row {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 6px; margin-bottom: 4px;
-  }
-  .finance-settings-row:last-child {
-    margin-bottom: 0;
-  }
-  .finance-settings-field {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 6px;
-    width: 100%;
-  }
-  .finance-settings-field--page-size {
-    margin-bottom: 0;
-  }
-  .finance-settings-row--page-size {
-    flex-direction: column;
-    align-items: stretch;
-    margin-bottom: 0;
-  }
-  .finance-settings-field--page-size {
-    flex-direction: column;
-    align-items: stretch;
-    width: 100%;
-  }
-  .finance-settings-page-size-label {
-    white-space: normal;
-  }
-  .finance-settings-field--page-size .finance-filter-select {
-    width: 100%;
-  }
-  .finance-settings-color-wrap {
-    flex-wrap: wrap;
-  }
-  .finance-settings-ie-row {
-    flex-direction: column;
-    gap: 6px;
-  }
-  .finance-settings-ie-row .finance-add-btn {
-    width: 100%;
-    justify-content: center;
-  }
-}
-.finance-settings-color-wrap {
-  display: flex;
+  flex-direction: row;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
 }
+
+.finance-settings-sep {
+  border-top: 1px solid var(--ft-border);
+  padding-top: 14px;
+  margin-top: 4px;
+}
+
+.finance-settings-danger {
+  border-top: 2px solid #dc2626;
+  padding-top: 16px;
+  margin-top: 8px;
+}
+
 .finance-settings-color-input {
   width: 40px;
   height: 34px;
@@ -2089,22 +2035,43 @@
   cursor: pointer;
   background: none;
 }
+
 .finance-settings-color-input::-webkit-color-swatch-wrapper {
   padding: 0;
 }
+
 .finance-settings-color-input::-webkit-color-swatch {
   border: none;
   border-radius: 4px;
 }
+
 .finance-settings-hex {
   font-size: .82em;
   font-family: var(--font-monospace, monospace);
   color: var(--text-muted);
   min-width: 56px;
 }
-.finance-settings-ie-row {
-  display: flex;
-  gap: 8px;
+
+@media (max-width: 480px) {
+  .finance-settings-panel {
+    padding: 12px 14px;
+  }
+  .finance-settings-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+    margin-bottom: 8px;
+  }
+  .finance-settings-controls {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+  .finance-settings-sep,
+  .finance-settings-danger {
+    border-top-width: 1.5px;
+    padding-top: 12px;
+    margin-top: 6px;
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -2204,35 +2171,24 @@
 .finance-danger-desc {
   font-size: .8em; color: var(--text-muted); margin-bottom: 12px; line-height: 1.5;
 }
-.finance-danger-confirm-row {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-.finance-danger-confirm-row .finance-input {
-  flex: 1 1 180px;
+.finance-settings-cf .finance-input {
+  flex: 1;
   min-width: 120px;
-  margin: 0;
 }
-.finance-danger-confirm-row .finance-btn-danger {
+.finance-settings-cf .finance-btn-danger {
   flex: 0 0 auto;
   white-space: nowrap;
-  margin: 0;
 }
 @media (max-width: 480px) {
-  .finance-danger-confirm-row {
-    flex-direction: column;
-    align-items: stretch;
+  .finance-settings-cf {
+    gap: 6px;
   }
-  .finance-danger-confirm-row .finance-input,
-  .finance-danger-confirm-row .finance-btn-danger {
-    width: 100%;
-  }
-  .finance-danger-confirm-row .finance-input {
+  .finance-settings-cf .finance-input {
     height: 36px;
     line-height: 36px;
+  }
+  .finance-settings-cf .finance-btn-danger {
+    width: 100%;
   }
 }
 
