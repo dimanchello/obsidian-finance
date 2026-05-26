@@ -18,7 +18,7 @@
 - **Build:** esbuild (bundler)
 - **API:** Obsidian API (`obsidian` npm package)
 - **Target:** Obsidian Desktop + Mobile (responsive design)
-- **Output:** Single bundled `main.js` (CJS, ES2018)
+- **Output:** Single bundled `main.js` (CJS, ES2021)
 
 ---
 
@@ -64,6 +64,15 @@ npm test       # Run unit tests
 - Enums/Types: PascalCase (`RecordType`, `DebtMovementType`)
 - Constants: UPPER_SNAKE_CASE (`DEFAULT_SETTINGS`, `COMMON_CURRENCIES`)
 
+### Constants (Всегда!)
+**Магические числа запрещены!** Все числовые литералы (кроме 0, 1, -1, 2) должны быть вынесены в именованные константы в `types.ts`:
+- Размеры страниц, лимиты, пороги → `PAGE_SIZE_OPTIONS`, `PAGE_RANGE_THRESHOLD`
+- Тайминги, дебаунсы → `SEARCH_DEBOUNCE_MS`, `FOCUS_DELAY_MS`
+- Мобильный брейкпоинт → `MOBILE_BREAKPOINT`
+- Правила склонения → `PLURAL_THRESHOLD`
+- Шаги расчётов → `ACCRUAL_STEP_MONTHLY`, `ACCRUAL_STEP_QUARTERLY`
+- Константы именуются `UPPER_SNAKE_CASE`
+
 ### Mobile Adaptation (Обязательно!)
 **Все новые фичи должны поддерживать мобильные устройства!**
 
@@ -89,15 +98,22 @@ npm test       # Run unit tests
 ├── main.js              # Bundled output (DO NOT EDIT)
 ├── src/
 │   ├── types.ts         # All TypeScript interfaces and constants
+│   ├── utils.ts         # Shared utilities (fmtAmount, parseAmount, fmtDate, fmt)
 │   ├── i18n.ts          # Internationalization (Russian/English)
 │   ├── storage.ts       # FinanceStorage class (CRUD for accounts)
-│   ├── AccountView.ts   # Main view component (~1200 lines)
+│   ├── AccountView.ts   # Main view component (~3500 lines)
 │   ├── RecordModal.ts   # Add/edit record modal
 │   ├── ConfirmModal.ts  # Delete confirmation modal
 │   ├── ImportExportModal.ts
 │   ├── AnalyticsView.ts
 │   ├── DebtModal.ts
-│   └── DebtMovementModal.ts
+│   ├── DebtMovementModal.ts
+│   ├── CreditModal.ts
+│   ├── CreditPaymentModal.ts
+│   ├── CreditEarlyRepaymentModal.ts
+│   ├── DepositModal.ts
+│   ├── DepositTopUpModal.ts
+│   └── DepositWithdrawalModal.ts
 ├── src/__tests__/       # Unit tests
 ├── esbuild.config.mjs   # Build configuration
 ├── vitest.config.ts     # Test configuration
@@ -126,6 +142,9 @@ interface FinanceRecord {
   payer: string;
   note: string;
   attachmentPath: string;
+  isInternal?: boolean;
+  linkedId?: string;
+  exchangeRate?: number;
 }
 
 // Debt system
@@ -135,7 +154,9 @@ type DebtDirection = 'lent' | 'borrowed';
 interface DebtRecord {
   id: string;
   person: string;
-  amount: number;       // current total (sum borrow - sum repay)
+  amount: number;       // current total (sum borrow - sum repay) with interest
+  originalAmount: number;
+  interestRate: number;
   direction: DebtDirection;
   date: string;
   time: string;
@@ -153,6 +174,8 @@ interface AccountData {
   accentColor?: string;
   records: FinanceRecord[];
   debts: DebtRecord[];
+  credits: CreditRecord[];
+  deposits: DepositRecord[];
   categories: string[];
   tags: string[];
   payers: string[];
@@ -181,8 +204,8 @@ interface AccountData {
 - **Versioning:** DATA_VERSION = 3 (handles backward compat for missing fields)
 
 ### View State
-- Saved to localStorage: `ft-view:{notePath}`
-- Contains: sort, filter, pagination, debt filters
+- Saved to localStorage: `ft-view:{pluginId}:{notePath}`
+- Contains: sort, filter, pagination, debt/credit/deposit filters
 - Reset page to 0 on filter change (preserved in state)
 
 ### Internationalization (src/i18n.ts)
@@ -207,9 +230,9 @@ When user enters category/payer, the modal automatically fills amount, tag, and 
 - Per-account currency (stored in AccountData.currency)
 
 ### Data Versioning
-- Current: v3
+- Current: v4 (DATA_VERSION in storage.ts)
 - Migration handled in `storage.ts` `load()` method
-- Auto-adds missing fields: `time`, `direction`, `dueDate`, `accentColor`
+- Auto-adds missing fields: `time`, `direction`, `dueDate`, `accentColor`, `originalAmount`, `interestRate`
 
 ### Mobile Adaptation
 - Desktop: Full table with sticky header
@@ -217,9 +240,8 @@ When user enters category/payer, the modal automatically fills amount, tag, and 
 - Detection: `Platform.isMobile || window.innerWidth <= 480`
 
 ### Import/Export
-- Supported formats: CSV, JSON, XML
+- Supported formats: CSV, JSON
 - JSON path support: `data.records` for nested arrays
-- XML tag auto-detection
 - Field mapping UI for custom column names
 
 ### Debts System
@@ -330,3 +352,6 @@ npm run test:watch   # Run tests in watch mode
 - Add new fields to types with proper defaults
 - Update `DATA_VERSION` in storage.ts if schema changes
 - Test backward compat: load old JSON files and verify migration
+- **Magic numbers → constants:** always extract numeric constants to `types.ts`
+- **localStorage keys:** always use the `LS(pluginId)` function pattern for scoping
+- **Shared utilities:** put reusable formatting functions in `utils.ts`, don't duplicate across modals

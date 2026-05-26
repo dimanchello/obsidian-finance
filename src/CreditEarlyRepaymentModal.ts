@@ -1,36 +1,23 @@
 import { App, Modal, Notice } from 'obsidian';
-import { CreditPayment, CreditRecord } from './types';
+import { CreditRecord, CreditPayment } from './types';
+import { fmtAmount, parseAmount } from './utils';
 
-export interface CreditEarlyRepaymentModalOptions {
+export interface EarlyRepaymentOptions {
   title: string;
   credit: CreditRecord;
   currency: string;
-  onSave: (updatedCredit: CreditRecord) => void;
-}
-
-function fmtAmount(raw: string): string {
-  const clean = raw.replace(/[^\d.,]/g, '');
-  const dotPos = clean.search(/[.,]/);
-  let intPart = dotPos >= 0 ? clean.slice(0, dotPos) : clean;
-  let decPart = dotPos >= 0 ? clean.slice(dotPos + 1) : '';
-  decPart = decPart.slice(0, 2).replace(/[.,]/g, '');
-  intPart = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0');
-  return decPart.length > 0 ? `${intPart},${decPart}` : intPart;
-}
-
-function parseAmount(s: string): number {
-  return parseFloat(s.replace(/\u00a0|\s/g, '').replace(',', '.')) || 0;
+  onSave: (credit: CreditRecord) => void;
 }
 
 export class CreditEarlyRepaymentModal extends Modal {
-  private o: CreditEarlyRepaymentModalOptions;
+  private o: EarlyRepaymentOptions;
   private credit: CreditRecord;
-  private amountInput!: HTMLInputElement;
-  private selectedOption: 'amount' | 'term' = 'amount';
   private actualRemaining: number;
+  private amountInput!: HTMLInputElement;
   private pendingPayments: CreditPayment[];
+  private selectedOption: 'amount' | 'term' = 'amount';
 
-  constructor(app: App, opts: CreditEarlyRepaymentModalOptions) {
+  constructor(app: App, opts: EarlyRepaymentOptions) {
     super(app);
     this.o = opts;
     this.credit = { ...opts.credit, payments: [...opts.credit.payments] };

@@ -151,6 +151,15 @@ export const COMMON_CURRENCIES = [
 ];
 
 export const CREDIT_PAGE_SIZE = 20;
+export const MOBILE_BREAKPOINT = 480;
+export const SEARCH_DEBOUNCE_MS = 280;
+export const PAGE_SIZE_OPTIONS = [10, 20, 25, 50, 100, 200, 500] as const;
+export const PAGE_RANGE_THRESHOLD = 7;
+export const FOCUS_DELAY_MS = 20;
+export const SKELETON_CARD_COUNT = 3;
+export const PLURAL_THRESHOLD = 5;
+export const ACCRUAL_STEP_MONTHLY = 1;
+export const ACCRUAL_STEP_QUARTERLY = 3;
 
 export type CreditType = 'consumer' | 'auto' | 'mortgage';
 export type CreditStatus = 'active' | 'paid';

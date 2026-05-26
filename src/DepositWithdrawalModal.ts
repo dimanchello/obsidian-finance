@@ -1,32 +1,23 @@
 import { App, Modal, Notice } from 'obsidian';
-import { DepositWithdrawal } from './types';
+import { DepositWithdrawal, DepositRecord } from './types';
+import { fmtAmount, parseAmount } from './utils';
 
-export interface DepositWithdrawalModalOptions {
+export interface DepositWithdrawalOptions {
   title: string;
+  deposit: DepositRecord;
   maxAmount: number;
   currency: string;
-  onSave: (withdrawal: DepositWithdrawal) => void;
-}
-
-function fmtAmount(raw: string): string {
-  const clean = raw.replace(/[^\d.,]/g, '');
-  const dotPos = clean.search(/[.,]/);
-  let intPart = dotPos >= 0 ? clean.slice(0, dotPos) : clean;
-  let decPart = dotPos >= 0 ? clean.slice(dotPos + 1) : '';
-  decPart = decPart.slice(0, 2).replace(/[.,]/g, '');
-  intPart = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0');
-  return decPart.length > 0 ? `${intPart},${decPart}` : intPart;
-}
-
-function parseAmount(s: string): number {
-  return parseFloat(s.replace(/\u00a0|\s/g, '').replace(',', '.')) || 0;
+  onSave:   (w: DepositWithdrawal) => void;
 }
 
 export class DepositWithdrawalModal extends Modal {
-  private o: DepositWithdrawalModalOptions;
+  private o: DepositWithdrawalOptions;
+  private deposit: DepositRecord;
+  private maxAmount: number;
+  private currency: string;
   private amountInput!: HTMLInputElement;
 
-  constructor(app: App, opts: DepositWithdrawalModalOptions) {
+  constructor(app: App, opts: DepositWithdrawalOptions) {
     super(app);
     this.o = opts;
   }

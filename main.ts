@@ -27,8 +27,8 @@ export default class FinanceTrackerPlugin extends Plugin {
       this.app.vault.on('rename', (file: TFile, oldPath: string) => {
         if (file instanceof TFile && file.extension === 'md') {
           this.storage.renameAccount(oldPath, file.path);
-          const oldKey = 'ft-view:' + oldPath;
-          const newKey = 'ft-view:' + file.path;
+          const oldKey = 'ft-view:' + this.manifest.id + ':' + oldPath;
+          const newKey = 'ft-view:' + this.manifest.id + ':' + file.path;
           try {
             const val = localStorage.getItem(oldKey);
             if (val) {

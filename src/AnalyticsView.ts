@@ -12,7 +12,11 @@ const PALETTE = [
   '#06b6d4','#84cc16','#e879f9','#64748b',
 ];
 
-const MONTHS = ['Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
+function shortMonth(m: number, locale: string): string {
+  const d = new Date(2024, m, 1);
+  const s = d.toLocaleString(locale, { month: 'short' });
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
 
 // ── SVG helper ────────────────────────────────────────────────────────────────
 function svg<K extends keyof SVGElementTagNameMap>(
@@ -34,6 +38,7 @@ export class AnalyticsView {
   private el:        HTMLElement;
   private records:   FinanceRecord[];
   private currency:  string;
+  private locale:    string;
   private chartType: ChartType = 'bar';
   private groupBy:   GroupBy   = 'category';
   private showType:  ShowType  = 'both';
@@ -43,10 +48,11 @@ export class AnalyticsView {
   private timeFrom = '00:00';
   private timeTo = '23:59';
 
-  constructor(el: HTMLElement, records: FinanceRecord[], currency: string) {
+  constructor(el: HTMLElement, records: FinanceRecord[], currency: string, locale = 'ru') {
     this.el       = el;
     this.records  = records;
     this.currency = currency;
+    this.locale   = locale;
   }
 
   /** Call when filter changes outside */
@@ -179,7 +185,7 @@ export class AnalyticsView {
       items.sort((a, b) => a.label.localeCompare(b.label));
       items = items.map(d => {
         const [y, m] = d.label.split('-');
-        return { ...d, label: `${MONTHS[(parseInt(m) - 1) % 12]} ${y}` };
+        return { ...d, label: `${shortMonth((parseInt(m) - 1) % 12, this.locale)} ${y}` };
       });
     } else {
       items.sort((a, b) => (b.income + b.expense) - (a.income + a.expense));
@@ -227,10 +233,11 @@ export class AnalyticsView {
     }
 
     const isMobile = window.innerWidth <= 480;
+    const containerW = this.chartEl.clientWidth || 600;
     const MIN_GROUP = data.length > 12 ? 35 : data.length > 6 ? 50 : data.length > 3 ? 55 : 60;
     const PL = 45, PR = 12;
     const minW = PL + data.length * MIN_GROUP + PR;
-    const W = minW;
+    const W = isMobile ? Math.max(minW, containerW) : minW;
     const CH = 340;
     const PT = 18, PB = 96;
     const chartH = CH - PT - PB;
@@ -244,8 +251,9 @@ export class AnalyticsView {
     });
 
     const groupW = (W - PL - PR) / data.length;
-    const maxBarW = isMobile ? 28 : data.length <= 4 ? 50 : data.length <= 8 ? 30 : 20;
-    const barW   = Math.max(2, Math.min(groupW * (isMobile ? 0.50 : 0.35), maxBarW));
+    const maxBarW = isMobile ? 20 : (data.length <= 4 ? 50 : data.length <= 8 ? 30 : 20);
+    const barRatio = isMobile ? 0.40 : 0.35;
+    const barW   = Math.max(2, Math.min(groupW * barRatio, maxBarW));
 
     const root = svg('svg', { viewBox: `0 0 ${W} ${CH}` });
     root.classList.add('finance-chart-svg');
@@ -340,6 +348,7 @@ export class AnalyticsView {
   // ── Pie / donut chart (SVG) ───────────────────────────────────────────────
 
   private renderPie(rawData: Item[]): void {
+    const isMobile = window.innerWidth <= 480;
     const MAX = 14;
     let items = rawData
       .map(d => ({
@@ -365,8 +374,6 @@ export class AnalyticsView {
     const SZ = 160, cx = SZ / 2, cy = SZ / 2, R = 64, iR = 36;
     const root = svg('svg', { viewBox: `0 0 ${SZ} ${SZ}` });
     root.classList.add('finance-chart-svg');
-    root.style.flexShrink = '0';
-    root.style.height = '100%';
 
     const tooltip = document.createElement('div');
     tooltip.className = 'finance-bar-tooltip';
@@ -428,6 +435,12 @@ export class AnalyticsView {
 
     // Layout: chart + legend
     const wrap = this.chartEl.createDiv('finance-pie-wrap');
+    root.style.flexShrink = '0';
+    if (isMobile) {
+      root.style.height = '260px';
+    } else {
+      root.style.height = '100%';
+    }
     wrap.appendChild(root);
 
     const legend = wrap.createDiv('finance-pie-legend');

@@ -1,5 +1,7 @@
 import { App, Modal, Notice, normalizePath } from 'obsidian';
 import { FinanceRecord, RecordType, PluginSettings } from './types';
+import { fmtAmount, parseAmount } from './utils';
+import { CalculatorModal } from './CalculatorModal';
 
 export interface RecordModalOptions {
   initial:    Partial<FinanceRecord>;
@@ -11,30 +13,6 @@ export interface RecordModalOptions {
   settings:   PluginSettings;
   pluginId:   string;
   onSave:     (r: FinanceRecord) => void;
-}
-
-// ── amount formatting helpers ─────────────────────────────────────────────────
-
-/** Format a number with non-breaking space as thousands separator */
-function fmtAmount(raw: string): string {
-  // Keep only digits and one separator
-  const clean = raw.replace(/[^\d.,]/g, '');
-  const dotPos = clean.search(/[.,]/);
-  let intPart  = dotPos >= 0 ? clean.slice(0, dotPos)  : clean;
-  let decPart  = dotPos >= 0 ? clean.slice(dotPos + 1) : '';
-
-  // Limit decimals to 2
-  decPart = decPart.slice(0, 2).replace(/[.,]/g, '');
-
-  // Add non-breaking space every 3 digits
-  intPart = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0');
-
-  return decPart.length > 0 ? `${intPart},${decPart}` : intPart;
-}
-
-/** Parse formatted string back to float */
-function parseAmount(s: string): number {
-  return parseFloat(s.replace(/\u00a0|\s/g, '').replace(',', '.')) || 0;
 }
 
 // ── modal ─────────────────────────────────────────────────────────────────────
@@ -91,9 +69,11 @@ export class RecordModal extends Modal {
     const amtG = form.createDiv('finance-field-group finance-amount-group');
     amtG.createEl('label', { text: `Сумма * (${this.o.currency})`, cls: 'finance-field-label' });
 
-    this.amountInput = amtG.createEl('input', {
+    const amtRow = amtG.createDiv('finance-amount-row');
+
+    this.amountInput = amtRow.createEl('input', {
       type: 'text',
-      cls:  'finance-input finance-amount-input',
+      cls: 'finance-input finance-amount-input',
     });
     this.amountInput.setAttribute('inputmode', 'decimal');
     this.amountInput.setAttribute('placeholder', '0');
@@ -141,6 +121,21 @@ export class RecordModal extends Modal {
     });
 
     this.updateAmountColor();
+
+    const calcIconBtn = document.createElement('button');
+    calcIconBtn.className = 'finance-calc-icon-btn';
+    calcIconBtn.title = 'Калькулятор';
+    calcIconBtn.innerHTML = `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><rect x="3" y="2" width="14" height="16" rx="1.5"/><line x1="7" y1="6" x2="13" y2="6"/><circle cx="7" cy="10" r=".8" fill="currentColor"/><circle cx="13" cy="10" r=".8" fill="currentColor"/><circle cx="7" cy="14" r=".8" fill="currentColor"/><circle cx="13" cy="14" r=".8" fill="currentColor"/></svg>`;
+    amtRow.appendChild(calcIconBtn);
+    calcIconBtn.addEventListener('click', () => {
+      const currentValue = this.amountInput.value.replace(/\u00a0/g, '').replace(',', '.');
+      new CalculatorModal(this.app, (result) => {
+        this.rec.amount = result;
+        this.amountInput.value = result > 0 ? fmtAmount(String(result)) : '';
+        this.updateAmountColor();
+      }, currentValue).open();
+    });
+
 
     // ── Exchange rate — collapsible ─────────────────────────────────────
     this.exchangeRateWrap = form.createDiv('finance-field-group finance-exrate-group');

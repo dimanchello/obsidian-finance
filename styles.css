@@ -757,6 +757,91 @@
 
 .finance-modal-btns { display: flex; justify-content: flex-end; gap: 10px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--ft-border); }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   CALCULATOR MODAL
+   ═══════════════════════════════════════════════════════════════════════════ */
+.modal.finance-calculator-modal {
+  width: auto !important;
+  max-width: 280px !important;
+  min-width: unset !important;
+}
+.finance-calculator-modal .modal-content { padding: 10px 12px; }
+.finance-calc-display {
+  font-size: 1.25em; font-weight: 700; text-align: right;
+  padding: 6px 10px; margin-bottom: 5px;
+  background: var(--background-secondary);
+  border: 1px solid var(--ft-border); border-radius: 3px;
+  font-variant-numeric: tabular-nums; overflow: hidden;
+  min-height: 1.2em; line-height: 1.2;
+}
+.finance-calc-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 40px);
+  gap: 5px;
+  justify-content: center;
+}
+.finance-calc-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 40px; height: 40px; padding: 0;
+  border: 1px solid var(--ft-border);
+  border-radius: 3px;
+  background: var(--background-secondary);
+  color: var(--text-normal);
+  font-size: 1.03em; font-weight: 600; cursor: pointer;
+  font-family: inherit; transition: background .1s, border-color .1s;
+  user-select: none; box-sizing: border-box;
+}
+.finance-calc-btn:hover { background: var(--background-modifier-hover); border-color: var(--ft-accent); }
+.finance-calc-btn:active { background: var(--background-modifier-hover); border-color: var(--ft-accent); }
+.finance-calc-btn.finance-calc-clear {
+  background: #dc2626; color: #fff;
+  border-color: #b91c1c; font-weight: 700;
+}
+.finance-calc-btn.finance-calc-clear:hover { background: #b91c1c; border-color: #991b1b; }
+.finance-calc-btn.finance-calc-clear:active { background: #991b1b; }
+.finance-calc-eq {
+  grid-column: 1 / -1; width: auto;
+  background: var(--ft-accent); color: #fff; border-color: var(--ft-accent);
+  font-size: 1.05em; font-weight: 700;
+}
+.finance-calc-eq:hover { filter: brightness(1.1); }
+.finance-calc-eq:active { filter: brightness(.9); }
+
+.finance-calculator-modal .finance-modal-btns {
+  margin-top: 8px; padding-top: 6px;
+  justify-content: center;
+}
+.finance-calculator-modal .finance-modal-btns .finance-btn-cancel,
+.finance-calculator-modal .finance-modal-btns .finance-btn-save {
+  flex: 1; text-align: center;
+}
+
+/* Amount row: input + calc icon side by side */
+.finance-amount-row {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  width: 100%;
+}
+.finance-amount-row .finance-amount-input {
+  flex: 1;
+}
+.finance-calc-icon-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 44px; min-width: 44px;
+  border: 1.5px solid var(--ft-border);
+  border-radius: var(--ft-radius-sm);
+  background: var(--background-secondary);
+  cursor: pointer; color: var(--text-muted);
+  transition: all .15s;
+  padding: 0;
+}
+.finance-calc-icon-btn:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+  border-color: var(--ft-accent);
+}
+
 /* ── Семантические кнопки: сохранить / удалить / отмена ─────────────────── */
 .finance-tracker .finance-btn-save,
 .finance-modal .finance-btn-save,
@@ -1174,7 +1259,7 @@
   .finance-analytics-btn { padding: 8px 12px; font-size: .85em; }
   .finance-analytics-select { width: 100% !important; min-width: 0 !important; }
   .finance-chart-svg-wrap { overflow-x: auto; }
-  .finance-pie-wrap { flex-direction: column; }
+  .finance-pie-wrap { flex-direction: column; height: auto; overflow: visible; }
   .finance-pie-legend { width: 100%; }
 
  /* ── Таблица записей: преобразуем в блоки для мобильных ─────────────── */
@@ -1523,6 +1608,21 @@
 
   /* ── FAB spacer ─────────────────────────────────────────────────────── */
   .finance-tracker--mobile .finance-body { padding-bottom: 80px; }
+
+  /* ── Calculator modal on mobile ────────────────────────────────────── */
+  .finance-calculator-modal .finance-calc-btn {
+    width: 44px; height: 44px;
+    font-size: 1.1em;
+  }
+  .finance-calculator-modal .finance-calc-grid {
+    grid-template-columns: repeat(4, 44px);
+  }
+  .finance-calculator-modal .finance-calc-display {
+    font-size: 1.35em;
+  }
+  .finance-calculator-modal .finance-calc-eq {
+    font-size: 1.1em;
+  }
 }
 
 /* ── Экраны больше 480px (ПК) ───────────────────────────────────────────── */

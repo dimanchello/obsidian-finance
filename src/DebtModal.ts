@@ -1,25 +1,12 @@
 import { App, Modal, Notice } from 'obsidian';
 import { DebtRecord } from './types';
+import { fmtAmount, parseAmount } from './utils';
 
 export interface DebtModalOptions {
   title:   string;
   debt?:   DebtRecord;
   allPersons: string[];
   onSave:  (debt: DebtRecord) => void;
-}
-
-function fmtAmount(raw: string): string {
-  const clean = raw.replace(/[^\d.,]/g, '');
-  const dotPos = clean.search(/[.,]/);
-  let intPart  = dotPos >= 0 ? clean.slice(0, dotPos)  : clean;
-  let decPart  = dotPos >= 0 ? clean.slice(dotPos + 1) : '';
-  decPart = decPart.slice(0, 2).replace(/[.,]/g, '');
-  intPart = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0');
-  return decPart.length > 0 ? `${intPart},${decPart}` : intPart;
-}
-
-function parseAmount(s: string): number {
-  return parseFloat(s.replace(/\u00a0|\s/g, '').replace(',', '.')) || 0;
 }
 
 export class DebtModal extends Modal {

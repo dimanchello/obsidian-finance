@@ -62,7 +62,7 @@ export class FinanceStorage {
   setDefaultCurrency(c: string) { this.defaultCurrency = c; }
 
   private noteFolder(notePath: string): string {
-    const safe = notePath.replace(/[\\/:"*?<>|]/g, '_');
+    const safe = notePath.replace(/\.md$/i, '').replace(/[\\/:"*?<>|]/g, '_');
     return normalizePath(`${this.base}/${safe}`);
   }
 
@@ -84,7 +84,7 @@ export class FinanceStorage {
   // ── Legacy migration ──────────────────────────────────────────────────────
 
   private oldFp(notePath: string, suffix: string): string {
-    const safe = notePath.replace(/[\\/:"*?<>|]/g, '_');
+    const safe = notePath.replace(/\.md$/i, '').replace(/[\\/:"*?<>|]/g, '_');
     return normalizePath(`${this.base}/${safe}${suffix}.json`);
   }
 
@@ -163,9 +163,15 @@ export class FinanceStorage {
       };
       await a.write(this.fp(notePath, 'records'), JSON.stringify(recs));
 
-      await a.write(this.fp(notePath, 'debts'), JSON.stringify(legacy.debts || []));
-      await a.write(this.fp(notePath, 'credits'), JSON.stringify(legacy.credits || []));
-      await a.write(this.fp(notePath, 'deposits'), JSON.stringify(legacy.deposits || []));
+      if (legacy.debts && legacy.debts.length > 0) {
+        await a.write(this.fp(notePath, 'debts'), JSON.stringify(legacy.debts));
+      }
+      if (legacy.credits && legacy.credits.length > 0) {
+        await a.write(this.fp(notePath, 'credits'), JSON.stringify(legacy.credits));
+      }
+      if (legacy.deposits && legacy.deposits.length > 0) {
+        await a.write(this.fp(notePath, 'deposits'), JSON.stringify(legacy.deposits));
+      }
 
       await a.remove(legacyPath);
     } catch {
@@ -365,19 +371,34 @@ export class FinanceStorage {
 
     for (const np of this.debtsDirty) {
       const d = this.debtsCache.get(np);
-      if (d !== undefined) await this.app.vault.adapter.write(this.fp(np, 'debts'), JSON.stringify(d));
+      if (d !== undefined) {
+        const fp = this.fp(np, 'debts');
+        if (d.length > 0 || await this.app.vault.adapter.exists(fp)) {
+          await this.app.vault.adapter.write(fp, JSON.stringify(d));
+        }
+      }
     }
     this.debtsDirty.clear();
 
     for (const np of this.creditsDirty) {
       const d = this.creditsCache.get(np);
-      if (d !== undefined) await this.app.vault.adapter.write(this.fp(np, 'credits'), JSON.stringify(d));
+      if (d !== undefined) {
+        const fp = this.fp(np, 'credits');
+        if (d.length > 0 || await this.app.vault.adapter.exists(fp)) {
+          await this.app.vault.adapter.write(fp, JSON.stringify(d));
+        }
+      }
     }
     this.creditsDirty.clear();
 
     for (const np of this.depositsDirty) {
       const d = this.depositsCache.get(np);
-      if (d !== undefined) await this.app.vault.adapter.write(this.fp(np, 'deposits'), JSON.stringify(d));
+      if (d !== undefined) {
+        const fp = this.fp(np, 'deposits');
+        if (d.length > 0 || await this.app.vault.adapter.exists(fp)) {
+          await this.app.vault.adapter.write(fp, JSON.stringify(d));
+        }
+      }
     }
     this.depositsDirty.clear();
   }

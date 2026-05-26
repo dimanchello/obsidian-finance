@@ -1,7 +1,7 @@
 import { App, Modal, Notice } from 'obsidian';
 import { FinanceRecord, RecordType } from './types';
 
-type FileFormat = 'csv' | 'json' | 'xml';
+type FileFormat = 'csv' | 'json';
 
 // ── Our target fields ─────────────────────────────────────────────────────────
 const OUR_FIELDS = [
@@ -59,7 +59,6 @@ export class ImportExportModal extends Modal {
     const fmts: { fmt: FileFormat; label: string; icon: string }[] = [
       { fmt: 'csv',  label: 'CSV',  icon: '📊' },
       { fmt: 'json', label: 'JSON', icon: '{ }' },
-      { fmt: 'xml',  label: 'XML',  icon: '🗂️' },
     ];
 
     const grid = b.createDiv('finance-export-grid');
@@ -88,14 +87,6 @@ export class ImportExportModal extends Modal {
       content = JSON.stringify({ account: this.o.noteName, currency: this.o.currency, records: recs }, null, 2);
       mime    = 'application/json';
 
-    } else {
-      const esc   = (v: unknown) => { const s = v == null ? '' : typeof v === 'string' ? v : typeof v === 'number' || typeof v === 'boolean' ? String(v) : ''; return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
-      const inner = recs.map(r =>
-        `  <record>${['id','createdAt','date','time','type','amount','category','tag','payer','note','attachmentPath']
-          .map(k => `<${k}>${esc(r[k as keyof FinanceRecord])}</${k}>`).join('')}</record>`
-      ).join('\n');
-      content = `<?xml version="1.0" encoding="UTF-8"?>\n<account name="${esc(this.o.noteName)}" currency="${esc(this.o.currency)}">\n${inner}\n</account>`;
-      mime    = 'application/xml';
     }
 
     const blob = new Blob([content], { type: mime });
@@ -125,7 +116,7 @@ export class ImportExportModal extends Modal {
 
     // ── Step 1: File picker ────────────────────────────────────────────────
     const step1 = b.createDiv('finance-import-step');
-    step1.createEl('div', { text: 'Шаг 1 — Выберите файл (CSV, JSON, XML)', cls: 'finance-step-title' });
+    step1.createEl('div', { text: 'Шаг 1 — Выберите файл (CSV, JSON)', cls: 'finance-step-title' });
 
     const pickWrap = step1.createDiv('finance-attach-wrapper');
     const nameEl   = pickWrap.createEl('span', { text: 'Файл не выбран', cls: 'finance-attach-name' });
@@ -146,7 +137,7 @@ export class ImportExportModal extends Modal {
         const result = await electron.remote.dialog.showOpenDialog({
           properties: ['openFile'],
           filters: [
-            { name: 'Таблицы и данные', extensions: ['csv', 'json', 'xml'] },
+            { name: 'Таблицы и данные', extensions: ['csv', 'json'] },
             { name: 'Все файлы',        extensions: ['*'] },
           ],
         });
@@ -159,9 +150,7 @@ export class ImportExportModal extends Modal {
 
         const text = fs.readFileSync(filePath, 'utf8') as string;
 
-        const fmt = fileName.endsWith('.csv') ? 'csv'
-                  : fileName.endsWith('.xml') ? 'xml'
-                  : 'json';
+        const fmt = fileName.endsWith('.csv') ? 'csv' : 'json';
 
         this.rawData   = [];
         this.srcFields = [];
@@ -171,9 +160,8 @@ export class ImportExportModal extends Modal {
         try {
           if (fmt === 'csv')  this.parseCSV(text);
           if (fmt === 'json') this.parseJSON(text, stepsContainer);
-          if (fmt === 'xml')  this.parseXML(text, stepsContainer);
 
-          if (fmt !== 'json' && fmt !== 'xml') {
+          if (fmt !== 'json') {
             this.renderMappingStep(stepsContainer);
           }
         } catch (e) {
@@ -249,43 +237,6 @@ export class ImportExportModal extends Modal {
       const arr = tryArr(node);
       if (!arr) { new Notice('⚠️ По указанному пути не найден массив'); return; }
       this.setRawData(arr);
-      const next = container.createDiv();
-      this.renderMappingStep(next);
-    });
-  }
-
-  private parseXML(text: string, container: HTMLElement): void {
-    const doc  = new DOMParser().parseFromString(text, 'application/xml');
-    const err  = doc.querySelector('parseerror');
-    if (err) throw new Error('Невалидный XML');
-
-    // Auto-detect: find the most-repeated tag
-    const counts: Record<string, number> = {};
-    doc.querySelectorAll('*').forEach(el => { counts[el.tagName] = (counts[el.tagName] ?? 0) + 1; });
-    const autoTag = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? '';
-
-    const step = container.createDiv('finance-import-step');
-    step.createEl('div', { text: 'Шаг 1б — Тег одной записи', cls: 'finance-step-title' });
-
-    const row = step.createDiv('finance-filters-row');
-    const inp = row.createEl('input', { type: 'text', cls: 'finance-input', placeholder: 'record' });
-    inp.value      = autoTag;
-    inp.style.flex = '1';
-    const btn = row.createEl('button', { text: 'Далее →', cls: 'finance-btn-save' });
-    btn.style.marginTop = 'auto';
-
-    btn.addEventListener('click', () => {
-      const tag   = inp.value.trim();
-      const nodes = Array.from(doc.querySelectorAll(tag));
-      if (!nodes.length) { new Notice('⚠️ Тег не найден'); return; }
-      const data  = nodes.map(n => {
-        const obj: Record<string, string> = {};
-        Array.from(n.children).forEach(c => { obj[c.tagName] = c.textContent ?? ''; });
-        // also check attributes
-        Array.from(n.attributes).forEach(a => { obj[`@${a.name}`] = a.value; });
-        return obj;
-      });
-      this.setRawData(data);
       const next = container.createDiv();
       this.renderMappingStep(next);
     });

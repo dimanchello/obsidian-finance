@@ -1,25 +1,12 @@
 import { App, Modal, Notice } from 'obsidian';
-import { DepositRecord, DepositType, AccrualFrequency, DepositAccrualType } from './types';
+import { DepositRecord, DepositType, DepositAccrualType, AccrualFrequency } from './types';
+import { fmtAmount, parseAmount } from './utils';
 
 export interface DepositModalOptions {
-  title: string;
-  deposit?: DepositRecord;
-  allBanks: string[];
-  onSave: (deposit: DepositRecord) => void;
-}
-
-function fmtAmount(raw: string): string {
-  const clean = raw.replace(/[^\d.,]/g, '');
-  const dotPos = clean.search(/[.,]/);
-  let intPart = dotPos >= 0 ? clean.slice(0, dotPos) : clean;
-  let decPart = dotPos >= 0 ? clean.slice(dotPos + 1) : '';
-  decPart = decPart.slice(0, 2).replace(/[.,]/g, '');
-  intPart = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0');
-  return decPart.length > 0 ? `${intPart},${decPart}` : intPart;
-}
-
-function parseAmount(s: string): number {
-  return parseFloat(s.replace(/\u00a0|\s/g, '').replace(',', '.')) || 0;
+  title:     string;
+  deposit?:  DepositRecord;
+  banks:     string[];
+  onSave:    (deposit: DepositRecord) => void;
 }
 
 export class DepositModal extends Modal {
@@ -81,7 +68,7 @@ export class DepositModal extends Modal {
     bankIn.setAttribute('autocomplete', 'off');
 
     let dropdown: HTMLElement | null = null;
-    const bankOpts = this.o.allBanks;
+    const bankOpts = this.o.banks;
     const closeDropdown = () => { dropdown?.remove(); dropdown = null; };
     const openDropdown = (q: string) => {
       closeDropdown();

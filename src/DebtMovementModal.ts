@@ -1,34 +1,23 @@
 import { App, Modal, Notice } from 'obsidian';
 import { DebtMovement, DebtMovementType } from './types';
+import { fmtAmount, parseAmount } from './utils';
 
-export interface DebtMovementModalOptions {
+export interface DebtMovementOptions {
   title:           string;
   type:            DebtMovementType;
+  movement?:       DebtMovement;
   remainingAmount?: number;
-  currency?:        string;
-  onSave:          (mov: DebtMovement) => void;
-}
-
-function fmtAmount(raw: string): string {
-  const clean = raw.replace(/[^\d.,]/g, '');
-  const dotPos = clean.search(/[.,]/);
-  let intPart  = dotPos >= 0 ? clean.slice(0, dotPos)  : clean;
-  let decPart  = dotPos >= 0 ? clean.slice(dotPos + 1) : '';
-  decPart = decPart.slice(0, 2).replace(/[.,]/g, '');
-  intPart = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0');
-  return decPart.length > 0 ? `${intPart},${decPart}` : intPart;
-}
-
-function parseAmount(s: string): number {
-  return parseFloat(s.replace(/\u00a0|\s/g, '').replace(',', '.')) || 0;
+  currency?:       string;
+  onSave:          (m: DebtMovement) => void;
 }
 
 export class DebtMovementModal extends Modal {
-  private o: DebtMovementModalOptions;
+  private o: DebtMovementOptions;
   private mov: DebtMovement;
   private amountInput!: HTMLInputElement;
+  private typeInput!: HTMLSelectElement;
 
-  constructor(app: App, opts: DebtMovementModalOptions) {
+  constructor(app: App, opts: DebtMovementOptions) {
     super(app);
     this.o = opts;
     const nowStr = new Date().toISOString().split('T')[0];

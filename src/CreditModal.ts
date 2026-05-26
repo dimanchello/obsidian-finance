@@ -1,25 +1,12 @@
 import { App, Modal, Notice } from 'obsidian';
 import { CreditRecord, CreditType } from './types';
+import { fmtAmount, parseAmount } from './utils';
 
 export interface CreditModalOptions {
-  title: string;
-  credit?: CreditRecord;
-  allBanks: string[];
-  onSave: (credit: CreditRecord) => void;
-}
-
-function fmtAmount(raw: string): string {
-  const clean = raw.replace(/[^\d.,]/g, '');
-  const dotPos = clean.search(/[.,]/);
-  let intPart = dotPos >= 0 ? clean.slice(0, dotPos) : clean;
-  let decPart = dotPos >= 0 ? clean.slice(dotPos + 1) : '';
-  decPart = decPart.slice(0, 2).replace(/[.,]/g, '');
-  intPart = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0');
-  return decPart.length > 0 ? `${intPart},${decPart}` : intPart;
-}
-
-function parseAmount(s: string): number {
-  return parseFloat(s.replace(/\u00a0|\s/g, '').replace(',', '.')) || 0;
+  title:     string;
+  credit?:   CreditRecord;
+  banks:     string[];
+  onSave:    (credit: CreditRecord) => void;
 }
 
 export class CreditModal extends Modal {
@@ -82,7 +69,7 @@ export class CreditModal extends Modal {
     bankIn.setAttribute('autocomplete', 'off');
 
     let dropdown: HTMLElement | null = null;
-    const bankOpts = this.o.allBanks;
+    const bankOpts = this.o.banks;
     const closeDropdown = () => { dropdown?.remove(); dropdown = null; };
     const openDropdown = (q: string) => {
       closeDropdown();
