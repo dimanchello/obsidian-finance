@@ -1,4 +1,4 @@
-import { Plugin, PluginSettingTab, App, Setting, TFile } from 'obsidian';
+import { MarkdownView, Notice, Plugin, PluginSettingTab, App, Setting, TFile } from 'obsidian';
 import { FinanceStorage } from './src/storage';
 import { AccountView }    from './src/AccountView';
 import { PluginSettings, DEFAULT_SETTINGS } from './src/types';
@@ -22,6 +22,19 @@ export default class FinanceTrackerPlugin extends Plugin {
         await view.render();
       },
     );
+
+    this.addCommand({
+      id: 'insert-finance-account-template',
+      name: 'Вставить шаблон счёта',
+      icon: 'wallet',
+      editorCallback: (editor) => {
+        const template = '```finance-account\n\n```';
+        editor.replaceSelection(template);
+        const cursor = editor.getCursor();
+        editor.setCursor(cursor.line - 1, 0);
+        new Notice('✅ Шаблон счёта вставлен');
+      },
+    });
 
     this.registerEvent(
       this.app.vault.on('rename', (file: TFile, oldPath: string) => {

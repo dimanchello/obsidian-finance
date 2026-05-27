@@ -282,6 +282,8 @@ export class CreditsTab {
 
     const filteredCredits = this.getFilteredCredits();
 
+    this.ctx.renderRecordsStats(body);
+
     const summary = body.createDiv('finance-stats-container');
     summary.style.setProperty('grid-template-columns', 'repeat(2,1fr)', 'important');
     const activeCredits = allCredits.filter(c => c.status === 'active');

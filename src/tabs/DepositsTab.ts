@@ -310,6 +310,8 @@ export class DepositsTab {
 
     const filteredDeposits = this.getFilteredDeposits();
 
+    this.ctx.renderRecordsStats(body);
+
     const summary = body.createDiv('finance-stats-container');
     summary.style.setProperty('grid-template-columns', 'repeat(2,1fr)', 'important');
     const activeDeposits = allDeposits.filter(d => d.status === 'active');

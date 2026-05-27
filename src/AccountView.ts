@@ -1,4 +1,4 @@
-import { App, Notice, Platform } from 'obsidian';
+import { App, MarkdownView, Notice, Platform } from 'obsidian';
 import { FinanceStorage } from './storage';
 import {
   AccountData, FinanceRecord, PluginSettings, COMMON_CURRENCIES,
@@ -116,6 +116,13 @@ export class AccountView {
         mkDropdownItem('💳', 'Долги', 'debts');
         mkDropdownItem('🏦', 'Кредиты', 'credits');
         mkDropdownItem('📈', 'Вклады', 'deposits');
+        dropdown.createDiv('finance-dropdown-separator');
+        const tmplItem = dropdown.createDiv('finance-dropdown-item');
+        tmplItem.innerHTML = '📋 Вставить шаблон';
+        tmplItem.addEventListener('click', () => {
+          this.insertTemplate();
+          dropdown.style.display = 'none';
+        });
         dropdown.style.display = 'block';
       } else {
         dropdown.style.display = 'none';
@@ -293,6 +300,20 @@ export class AccountView {
         new Notice('✅ Запись добавлена');
       },
     }).open();
+  }
+
+  private insertTemplate(): void {
+    const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+    if (!view) {
+      new Notice('⚠️ Откройте заметку для вставки');
+      return;
+    }
+    const editor = view.editor;
+    const template = '```finance-account\n\n```';
+    editor.replaceSelection(template);
+    const cursor = editor.getCursor();
+    editor.setCursor(cursor.line - 1, 0);
+    new Notice('✅ Шаблон счёта вставлен');
   }
 
   private async checkAutoTransactions(): Promise<void> {

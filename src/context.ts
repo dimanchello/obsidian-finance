@@ -109,4 +109,31 @@ export class ViewContext {
   fmtDate(d: string, t?: string): string {
     return fmtDate(d, t);
   }
+
+  renderRecordsStats(container: HTMLElement): void {
+    if (!this._data) return;
+    const recs = this._data.records;
+    const inc = recs.filter(r => r.type === 'income' && !r.isInternal).reduce((s, r) => s + r.amount, 0);
+    const exp = recs.filter(r => r.type === 'expense' && !r.isInternal).reduce((s, r) => s + r.amount, 0);
+    const lent = this._data.debts.filter(d => d.direction === 'lent').reduce((s, d) => s + d.amount, 0);
+    const borrowed = this._data.debts.filter(d => d.direction === 'borrowed').reduce((s, d) => s + d.amount, 0);
+    const bal = inc - exp - lent + borrowed;
+
+    const el = container.createDiv('finance-stats-container');
+    const items = [
+      { label: 'Доходы', value: this.fmt(inc), mod: 'income', icon: '↑' },
+      { label: 'Расходы', value: this.fmt(exp), mod: 'expense', icon: '↓' },
+      {
+        label: 'Баланс', value: (bal >= 0 ? '+' : '') + this.fmt(bal),
+        mod: bal >= 0 ? 'positive' : 'negative', icon: '＝',
+      },
+    ];
+    items.forEach(item => {
+      const card = el.createDiv(`finance-stat-card finance-stat-${item.mod}`);
+      card.createEl('div', { text: item.icon, cls: 'finance-stat-icon' });
+      const info = card.createDiv('finance-stat-info');
+      info.createEl('div', { text: item.label, cls: 'finance-stat-label' });
+      info.createEl('div', { text: item.value, cls: 'finance-stat-value' });
+    });
+  }
 }
