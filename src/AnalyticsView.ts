@@ -1,10 +1,13 @@
 import { FinanceRecord } from './types';
 
 type ChartType = 'bar' | 'pie';
-type GroupBy   = 'category' | 'payer' | 'month';
+type GroupBy   = 'category' | 'payer' | 'month' | 'week' | 'year';
 type ShowType  = 'both' | 'income' | 'expense';
 
-interface Item { label: string; income: number; expense: number; }
+interface Item { label: string; rawKey: string; income: number; expense: number; }
+
+export interface BarClickAction { groupBy: GroupBy; rawKey: string; label: string; }
+export type OnBarClick = (action: BarClickAction) => void;
 
 const PALETTE = [
   '#6366f1','#f59e0b','#10b981','#f43f5e','#3b82f6',
@@ -16,6 +19,15 @@ function shortMonth(m: number, locale: string): string {
   const d = new Date(2024, m, 1);
   const s = d.toLocaleString(locale, { month: 'short' });
   return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+function getWeekNumber(dateStr: string): number {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const date = new Date(y, m - 1, d);
+  const start = new Date(date.getFullYear(), 0, 1);
+  const diff = date.getTime() - start.getTime();
+  const oneWeek = 604800000;
+  return Math.ceil((diff + (start.getDay() + 6) * 86400000) / oneWeek);
 }
 
 // ── SVG helper ────────────────────────────────────────────────────────────────
@@ -47,12 +59,14 @@ export class AnalyticsView {
   private dateTo = '';
   private timeFrom = '00:00';
   private timeTo = '23:59';
+  private onBarClick: OnBarClick | null;
 
-  constructor(el: HTMLElement, records: FinanceRecord[], currency: string, locale = 'ru') {
+  constructor(el: HTMLElement, records: FinanceRecord[], currency: string, locale = 'ru', onBarClick?: OnBarClick) {
     this.el       = el;
     this.records  = records;
     this.currency = currency;
     this.locale   = locale;
+    this.onBarClick = onBarClick ?? null;
   }
 
   /** Call when filter changes outside */
@@ -94,7 +108,7 @@ export class AnalyticsView {
     const gg = ctrl2.createDiv('finance-analytics-group');
     if (isMobile) { gg.style.flexDirection = 'column'; gg.style.alignItems = 'flex-start'; }
     gg.createEl('span', { text: 'Группировка:', cls: 'finance-analytics-label' });
-    const gSel = this.mkSelect(gg, [['category','По категории'],['payer','По плательщику'],['month','По месяцу']], this.groupBy);
+    const gSel = this.mkSelect(gg, [['category','По категории'],['payer','По плательщику'],['week','По неделе'],['month','По месяцу'],['year','По году']], this.groupBy);
     gSel.addEventListener('change', () => { this.groupBy = gSel.value as GroupBy; this.redrawChart(); });
 
     const sg = ctrl2.createDiv('finance-analytics-group');
@@ -174,7 +188,14 @@ export class AnalyticsView {
       let key: string;
       if      (this.groupBy === 'category') key = r.category || 'Без категории';
       else if (this.groupBy === 'payer')    key = r.payer    || 'Не указан';
-      else {
+      else if (this.groupBy === 'year') {
+        if (!r.date) return;
+        key = r.date.split('-')[0];
+      } else if (this.groupBy === 'week') {
+        if (!r.date) return;
+        const w = getWeekNumber(r.date);
+        key = `${r.date.split('-')[0]}-W${String(w).padStart(2, '0')}`;
+      } else {
         if (!r.date) return;
         const [y, m] = r.date.split('-');
         key = `${y}-${m}`; // for sort
@@ -185,15 +206,22 @@ export class AnalyticsView {
       map.set(key, cur);
     });
 
-    let items = Array.from(map.entries()).map(([label, v]) => ({ label, ...v }));
+    let items = Array.from(map.entries()).map(([rawKey, v]) => ({ label: rawKey, rawKey, ...v }));
 
     if (this.groupBy === 'month') {
-      // Sort chronologically, convert key to readable label
       items.sort((a, b) => a.label.localeCompare(b.label));
       items = items.map(d => {
         const [y, m] = d.label.split('-');
         return { ...d, label: `${shortMonth((parseInt(m) - 1) % 12, this.locale)} ${y}` };
       });
+    } else if (this.groupBy === 'week') {
+      items.sort((a, b) => a.label.localeCompare(b.label));
+      items = items.map(d => {
+        const [y, w] = d.label.split('-W');
+        return { ...d, label: `Н${w} ${y}` };
+      });
+    } else if (this.groupBy === 'year') {
+      items.sort((a, b) => a.label.localeCompare(b.label));
     } else {
       items.sort((a, b) => (b.income + b.expense) - (a.income + a.expense));
     }
@@ -227,12 +255,13 @@ export class AnalyticsView {
     const MAX = 20;
     let data = rawData;
 
-    if (this.groupBy !== 'month' && data.length > MAX) {
+    if (this.groupBy !== 'month' && this.groupBy !== 'week' && this.groupBy !== 'year' && data.length > MAX) {
       const rest = data.slice(MAX);
       data = [
         ...data.slice(0, MAX),
         {
           label:   'Другое',
+          rawKey:  'Другое',
           income:  rest.reduce((s, d) => s + d.income,  0),
           expense: rest.reduce((s, d) => s + d.expense, 0),
         },
@@ -300,12 +329,16 @@ export class AnalyticsView {
 
     data.forEach((d, i) => {
       const cx = PL + groupW * i + groupW / 2;
+      const fireClick = () => {
+        if (this.onBarClick) this.onBarClick({ groupBy: this.groupBy, rawKey: d.rawKey, label: d.label });
+      };
 
       if (this.showType !== 'expense' && d.income > 0) {
         const h = (d.income / maxVal) * chartH;
         const x = this.showType === 'both' ? cx - barW - gap / 2 : cx - barW / 2;
         const rect = svg('rect', { x, y: PT + chartH - h, width: barW, height: h, fill: '#22c55e', rx: 3 });
         rect.style.cursor = 'pointer';
+        rect.addEventListener('click', fireClick);
         rect.addEventListener('mouseenter', (e) => showTip(e, `${d.label} — доход: ${this.fmtNum(d.income)}`));
         rect.addEventListener('mousemove', (e) => showTip(e, `${d.label} — доход: ${this.fmtNum(d.income)}`));
         rect.addEventListener('mouseleave', hideTip);
@@ -317,6 +350,7 @@ export class AnalyticsView {
         const x = this.showType === 'both' ? cx + gap / 2 : cx - barW / 2;
         const rect = svg('rect', { x, y: PT + chartH - h, width: barW, height: h, fill: '#ef4444', rx: 3 });
         rect.style.cursor = 'pointer';
+        rect.addEventListener('click', fireClick);
         rect.addEventListener('mouseenter', (e) => showTip(e, `${d.label} — расход: ${this.fmtNum(d.expense)}`));
         rect.addEventListener('mousemove', (e) => showTip(e, `${d.label} — расход: ${this.fmtNum(d.expense)}`));
         rect.addEventListener('mouseleave', hideTip);

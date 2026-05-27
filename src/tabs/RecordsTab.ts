@@ -9,7 +9,7 @@ import {
 import { RecordModal } from '../RecordModal';
 import { ConfirmModal } from '../ConfirmModal';
 import { ImportExportModal } from '../ImportExportModal';
-import { AnalyticsView } from '../AnalyticsView';
+import { AnalyticsView, type BarClickAction } from '../AnalyticsView';
 import { noteFilename } from '../utils';
 
 export class RecordsTab {
@@ -149,15 +149,15 @@ export class RecordsTab {
   }
 
   private renderAnalytics(): void {
-    if (!this.analyticsEl) return;
-    const filtered = this.getFiltered();
+    if (!this.analyticsEl || !this.ctx.data) return;
+    const allRecords = this.ctx.data.records;
     const cur = this.ctx.currency;
 
     if (this.analyticsView) {
-      this.analyticsView.update(filtered, cur);
+      this.analyticsView.update(allRecords, cur);
     } else {
       const lang = (this.ctx.app.vault as any).getConfig?.('language') ?? 'ru';
-      this.analyticsView = new AnalyticsView(this.analyticsEl, filtered, cur, lang);
+      this.analyticsView = new AnalyticsView(this.analyticsEl, allRecords, cur, lang, (a) => this.onAnalyticsBarClick(a));
       this.analyticsView.render();
     }
   }
@@ -432,8 +432,8 @@ export class RecordsTab {
     const pageRows = filtered.slice(start, start + pageSize);
     const cur = this.ctx.currency;
 
-    if (this.analyticsOpen && this.analyticsView) {
-      this.analyticsView.update(filtered, cur);
+    if (this.analyticsOpen && this.analyticsView && this.ctx.data) {
+      this.analyticsView.update(this.ctx.data.records, cur);
     }
 
     if (!filtered.length) {
@@ -713,6 +713,60 @@ export class RecordsTab {
     this.renderTable();
     if (this.analyticsOpen) this.renderAnalytics();
     if (this.filtersOpen) this.renderFilters();
+  }
+
+  private onAnalyticsBarClick(action: BarClickAction): void {
+    const f = this.ctx.state.filter;
+    const { groupBy, rawKey } = action;
+
+    if (groupBy === 'category') {
+      f.category = rawKey === 'Без категории' ? '' : rawKey;
+      f.payer = '';
+      f.dateFrom = '';
+      f.dateTo = '';
+    } else if (groupBy === 'payer') {
+      f.payer = rawKey === 'Не указан' ? '' : rawKey;
+      f.category = '';
+      f.dateFrom = '';
+      f.dateTo = '';
+    } else if (groupBy === 'year') {
+      f.category = '';
+      f.payer = '';
+      f.dateFrom = `${rawKey}-01-01`;
+      f.dateTo = `${rawKey}-12-31`;
+    } else if (groupBy === 'month') {
+      const [y, m] = rawKey.split('-');
+      const lastDay = new Date(Number(y), Number(m), 0).getDate();
+      f.category = '';
+      f.payer = '';
+      f.dateFrom = `${y}-${m}-01`;
+      f.dateTo = `${y}-${m}-${String(lastDay).padStart(2, '0')}`;
+    } else if (groupBy === 'week') {
+      const [yStr, wStr] = rawKey.split('-W');
+      const y = Number(yStr);
+      const w = Number(wStr);
+      const jan4 = new Date(y, 0, 4);
+      const daysOffset = (w - 1) * 7 + (1 - jan4.getDay()) - 3;
+      const monday = new Date(y, 0, 4 + daysOffset);
+      const sunday = new Date(monday);
+      sunday.setDate(monday.getDate() + 6);
+      const pad = (d: Date) => {
+        const yy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        return `${yy}-${mm}-${dd}`;
+      };
+      f.category = '';
+      f.payer = '';
+      f.dateFrom = pad(monday);
+      f.dateTo = pad(sunday);
+    }
+
+    f.search = '';
+    this.ctx.state.page = 0;
+    this.ctx.saveState();
+    this.togglePanel('filters');
+    this.renderTable();
   }
 
   private renderSettings(): void {
