@@ -485,7 +485,7 @@ export class DepositsTab {
       progressFill.style.height = '100%';
       progressFill.style.width = `${progress}%`;
       progressFill.style.borderRadius = '4px';
-      progressFill.style.background = progress >= 100 ? '#22c55e' : '#7c3aed';
+      progressFill.style.background = progress >= 100 ? '#22c55e' : 'var(--ft-accent)';
       progressFill.style.transition = 'width 0.3s ease';
     }
 
