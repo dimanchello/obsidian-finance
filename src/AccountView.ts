@@ -1,7 +1,7 @@
 import { App, Notice, Platform } from 'obsidian';
 import { FinanceStorage } from './storage';
 import {
-  AccountData, FinanceRecord, PluginSettings, COMMON_CURRENCIES,
+  AccountData, FinanceRecord, PluginSettings,
   MOBILE_BREAKPOINT,
 } from './types';
 import { noteFilename } from './utils';
@@ -246,50 +246,32 @@ export class AccountView {
       this.renderCurrencyBadge(wrap);
     };
 
-    const badge = wrap.createEl('span', { text: cur, cls: 'finance-currency-label' });
+    const badge = wrap.createEl('span', { text: cur, cls: 'finance-cur-badge' });
 
     badge.addEventListener('click', (e) => {
       e.stopPropagation();
-      const select = document.createElement('select');
-      select.className = 'finance-currency-select';
-      COMMON_CURRENCIES.forEach(c => {
-        const o = document.createElement('option');
-        o.value = c; o.textContent = c;
-        if (c === cur) o.selected = true;
-        select.appendChild(o);
-      });
-      const customOpt = document.createElement('option');
-      customOpt.value = '__custom__'; customOpt.textContent = 'Своя…';
-      select.appendChild(customOpt);
+      const existing = wrap.querySelector('.finance-cur-popup');
+      if (existing) { existing.remove(); return; }
 
-      badge.innerHTML = '';
-      badge.appendChild(select);
-      select.focus();
+      const popup = wrap.createDiv('finance-cur-popup');
 
-      select.addEventListener('change', () => {
-        if (select.value !== '__custom__') {
-          applyCurrency(select.value);
-          return;
-        }
-        const input = document.createElement('input');
-        input.type = 'text';
-        input.value = cur;
-        input.className = 'finance-currency-input';
-        badge.innerHTML = '';
-        badge.appendChild(input);
-        input.focus();
-        input.select();
-
-        const onConfirm = () => {
-          const v = input.value.trim() || cur;
-          applyCurrency(v);
-        };
-        input.addEventListener('keydown', (ev) => {
-          if (ev.key === 'Enter') { ev.preventDefault(); onConfirm(); }
-          if (ev.key === 'Escape') { this.renderCurrencyBadge(wrap); }
+      const currencies = this.settings.customCurrencies;
+      currencies.forEach(c => {
+        const btn = popup.createEl('button', { text: c, cls: 'finance-cur-option' });
+        if (c === cur) btn.addClass('active');
+        btn.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          applyCurrency(c);
         });
-        input.addEventListener('blur', () => setTimeout(() => this.renderCurrencyBadge(wrap), 0));
       });
+
+      const close = (ev: MouseEvent) => {
+        if (!popup.contains(ev.target as Node)) {
+          popup.remove();
+          document.removeEventListener('click', close);
+        }
+      };
+      setTimeout(() => document.addEventListener('click', close), 0);
     });
   }
 

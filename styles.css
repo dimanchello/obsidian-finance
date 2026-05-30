@@ -99,7 +99,7 @@
 
 .finance-cur-popup {
   position: absolute; top: calc(100% + 6px); left: 0; z-index: 200;
-  background: var(--background-primary);
+  background: var(--background-secondary);
   border: 1.5px solid var(--ft-border); border-radius: var(--ft-radius);
   padding: 10px; box-shadow: 0 8px 28px rgba(0,0,0,.18);
   min-width: 190px; display: flex; flex-wrap: wrap; gap: 6px;
@@ -113,6 +113,7 @@
 .finance-cur-option:hover  { background: var(--background-modifier-hover); border-color: var(--ft-accent); }
 .finance-cur-option.active { background: var(--ft-accent); border-color: var(--ft-accent); color: #fff; }
 .finance-cur-custom-row    { display: flex; gap: 6px; width: 100%; padding-top: 8px; border-top: 1px solid var(--ft-border); }
+.finance-cur-custom-input  { flex: 1; min-width: 0; padding: 4px 8px; border-radius: var(--ft-radius); border: 1.5px solid var(--ft-border); background: var(--background-primary); color: var(--text-normal); font-size: .82em; }
 .finance-cur-ok            { padding: 6px 10px !important; }
 
 /* ── Currency manager (settings) ────────────────────────────────────────────── */
