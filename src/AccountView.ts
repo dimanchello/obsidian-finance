@@ -205,20 +205,20 @@ export class AccountView {
 
   private startNameEdit(el: HTMLElement): void {
     const current = el.textContent || '';
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.value = current;
-    input.className = 'finance-title-input';
-    input.style.fontSize = '1.3em';
-    input.style.fontWeight = '600';
+    el.contentEditable = 'true';
+    el.addClass('finance-title-editing');
+    el.focus();
 
-    el.innerHTML = '';
-    el.appendChild(input);
-    input.focus();
-    input.select();
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    const sel = window.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(range);
 
     const finish = async () => {
-      const val = input.value.trim() || current;
+      el.contentEditable = 'false';
+      el.removeClass('finance-title-editing');
+      const val = el.textContent?.trim() || current;
       if (val !== current && this.data) {
         this.data.name = val;
         await this.storage.updateMeta(this.notePath, { name: val });
@@ -226,10 +226,10 @@ export class AccountView {
       el.textContent = val;
     };
 
-    input.addEventListener('blur', finish);
-    input.addEventListener('keydown', async (e) => {
-      if (e.key === 'Enter') { input.blur(); }
-      if (e.key === 'Escape') { el.textContent = current; }
+    el.addEventListener('blur', finish, { once: true });
+    el.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); el.blur(); }
+      if (e.key === 'Escape') { el.textContent = current; el.blur(); }
     });
   }
 
