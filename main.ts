@@ -129,6 +129,95 @@ class FinanceSettingTab extends PluginSettingTab {
         .setValue(String(this.plugin.settings.defaultPageSize))
         .onChange(async v => { this.plugin.settings.defaultPageSize = parseInt(v); await this.plugin.saveSettings(); }));
 
+    containerEl.createEl('h3', { text: 'Управление валютами' });
+
+    const currencyListEl = containerEl.createDiv('finance-currency-list');
+
+    const renderCurrencyList = () => {
+      currencyListEl.empty();
+
+      this.plugin.settings.customCurrencies.forEach((c, i) => {
+        const row = currencyListEl.createDiv('finance-currency-row');
+        row.draggable = true;
+        row.setAttribute('data-index', String(i));
+
+        row.createEl('span', { text: '⠿', cls: 'finance-currency-grip' });
+        row.createSpan({ text: c });
+        const rmBtn = row.createEl('button', { text: '×', cls: 'finance-currency-remove' });
+        rmBtn.addEventListener('click', async () => {
+          this.plugin.settings.customCurrencies.splice(i, 1);
+          await this.plugin.saveSettings();
+          renderCurrencyList();
+        });
+
+        row.addEventListener('dragstart', (e) => {
+          row.addClass('finance-currency-dragging');
+          e.dataTransfer!.effectAllowed = 'move';
+          e.dataTransfer!.setData('text/plain', String(i));
+        });
+
+        row.addEventListener('dragover', (e) => {
+          e.preventDefault();
+          e.dataTransfer!.dropEffect = 'move';
+          currencyListEl.querySelectorAll('.finance-currency-row').forEach(el => el.removeClass('finance-currency-drop-target'));
+          row.addClass('finance-currency-drop-target');
+        });
+
+        row.addEventListener('dragleave', () => {
+          row.removeClass('finance-currency-drop-target');
+        });
+
+        row.addEventListener('drop', (e) => {
+          e.preventDefault();
+          row.removeClass('finance-currency-drop-target');
+          const fromIdx = parseInt(e.dataTransfer!.getData('text/plain'));
+          const toIdx = parseInt(row.getAttribute('data-index')!);
+          if (isNaN(fromIdx) || isNaN(toIdx) || fromIdx === toIdx) return;
+          const currencies = this.plugin.settings.customCurrencies;
+          const [moved] = currencies.splice(fromIdx, 1);
+          currencies.splice(toIdx, 0, moved);
+          this.plugin.saveSettings();
+          renderCurrencyList();
+        });
+
+        row.addEventListener('dragend', () => {
+          currencyListEl.querySelectorAll('.finance-currency-row').forEach(el => el.removeClass('finance-currency-dragging finance-currency-drop-target'));
+        });
+      });
+    };
+    renderCurrencyList();
+
+    new Setting(containerEl)
+      .setName('Добавить свою валюту')
+      .setDesc('Только добавленные здесь валюты будут доступны для выбора в счетах.')
+      .addText(t => {
+        const input = t;
+        t.setPlaceholder('напр. CNY, KRW, INR…');
+        t.inputEl.addEventListener('keydown', async (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            const v = t.getValue().trim();
+            if (v && !this.plugin.settings.customCurrencies.includes(v)) {
+              this.plugin.settings.customCurrencies.push(v);
+              await this.plugin.saveSettings();
+              renderCurrencyList();
+              t.setValue('');
+            }
+          }
+        });
+        return input;
+      })
+      .addButton(btn => btn.setButtonText('+').onClick(async () => {
+        const inputEl = btn.buttonEl.parentElement?.querySelector('input');
+        const v = inputEl?.value?.trim() || '';
+        if (v && !this.plugin.settings.customCurrencies.includes(v)) {
+          this.plugin.settings.customCurrencies.push(v);
+          await this.plugin.saveSettings();
+          renderCurrencyList();
+          if (inputEl) inputEl.value = '';
+        }
+      }));
+
     containerEl.createEl('h3', { text: 'Как использовать' });
     const ul = containerEl.createEl('ul', { cls: 'finance-settings-list' });
     [

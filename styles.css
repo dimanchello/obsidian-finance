@@ -115,6 +115,42 @@
 .finance-cur-custom-row    { display: flex; gap: 6px; width: 100%; padding-top: 8px; border-top: 1px solid var(--ft-border); }
 .finance-cur-ok            { padding: 6px 10px !important; }
 
+/* ── Currency manager (settings) ────────────────────────────────────────────── */
+.finance-currency-list {
+  display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px;
+}
+.finance-currency-row {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 8px 4px 12px;
+  background: var(--background-secondary);
+  border: 1.5px solid var(--ft-border);
+  border-radius: 20px;
+  font-size: .85em; font-weight: 600;
+}
+.finance-currency-remove {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; padding: 0;
+  background: none; border: none;
+  color: var(--text-muted); font-size: 1.1em;
+  cursor: pointer; border-radius: 50%;
+  transition: all .12s;
+}
+.finance-currency-remove:hover {
+  background: rgba(239,68,68,.12);
+  color: var(--ft-expense);
+}
+.finance-currency-grip {
+  cursor: grab; color: var(--text-faint); font-size: 1em; line-height: 1;
+  user-select: none; padding: 0 2px;
+}
+.finance-currency-dragging {
+  opacity: .4;
+}
+.finance-currency-drop-target {
+  border-color: var(--ft-accent) !important; background: var(--background-modifier-hover) !important;
+}
+
+
 /* ── Add buttons — clearly differentiated ───────────────────────────────────── */
 .finance-add-btn {
   display: inline-flex; align-items: center; gap: 7px;

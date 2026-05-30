@@ -6,6 +6,7 @@ import {
   DEFAULT_DEBT_FILTER,
 } from '../types';
 import { DebtModal } from '../DebtModal';
+import { ColumnVisibilityModal } from '../ColumnVisibilityModal';
 import { DebtMovementModal } from '../DebtMovementModal';
 import { ConfirmModal } from '../ConfirmModal';
 
@@ -416,10 +417,41 @@ export class DebtsTab {
       cls: 'finance-count-text',
     });
 
+    const allDebtCols: { key: string; label: string }[] = [
+      { key: 'direction', label: 'Тип' },
+      { key: 'person',    label: 'Кому' },
+      { key: 'original',  label: 'Сумма' },
+      { key: 'remaining', label: 'Остаток' },
+      { key: 'date',      label: 'Создан' },
+      { key: 'dueDate',   label: 'Вернуть до' },
+      { key: '_act',      label: '' },
+    ];
+
+    this.ctx.state.debtsColumns ??= {};
+
+    const visDebtCols = allDebtCols.filter(c => c.key === '_act' || this.ctx.state.debtsColumns![c.key] !== false);
+
+    if (!this.ctx.isMobile) {
+      const debtColVisCols = allDebtCols.filter(c => c.key !== '_act');
+      const gearBtn = infoBar.createEl('button', { cls: 'finance-colvis-btn', text: '⚙️' });
+      gearBtn.title = 'Настройка колонок';
+      gearBtn.addEventListener('click', () => {
+        new ColumnVisibilityModal(this.ctx.app, {
+          columns: debtColVisCols,
+          visibility: { ...this.ctx.state.debtsColumns! },
+          onSave: (updated) => {
+            this.ctx.state.debtsColumns = updated;
+            this.ctx.saveState();
+            this.render();
+          },
+        }).open();
+      });
+    }
+
     if (this.ctx.isMobile) {
       this.renderDebtsAsBlocks(container, pageDebts);
     } else {
-      this.renderDebtsAsTable(container, pageDebts);
+      this.renderDebtsAsTable(container, pageDebts, visDebtCols);
     }
 
     if (totalPages > 1) this.renderDebtPagination(totalPages, page);
@@ -540,25 +572,17 @@ export class DebtsTab {
     list.appendChild(frag);
   }
 
-  private renderDebtsAsTable(container: HTMLElement, pageDebts: DebtRecord[]): void {
+  private renderDebtsAsTable(container: HTMLElement, pageDebts: DebtRecord[], cols: { key: string; label: string }[]): void {
     const scroll = container.createDiv('finance-debt-table-scroll');
     const table = scroll.createEl('table', { cls: 'finance-debt-table' });
-
-    const cols = [
-      { key: 'direction', label: 'Тип' },
-      { key: 'person',    label: 'Кому' },
-      { key: 'original',  label: 'Сумма' },
-      { key: 'remaining', label: 'Остаток' },
-      { key: 'date',      label: 'Создан' },
-      { key: 'dueDate',   label: 'Вернуть до' },
-      { key: '_act',      label: '' },
-    ];
 
     const hRow = table.createEl('thead').createEl('tr');
     cols.forEach(c => hRow.createEl('th', { text: c.label, cls: 'finance-th' }));
 
     const tbody = table.createEl('tbody');
     const frag = document.createDocumentFragment();
+
+    const dataCols = cols.filter(c => c.key !== '_act');
 
     pageDebts.forEach(debt => {
       const tr = document.createElement('tr');
@@ -587,35 +611,54 @@ export class DebtsTab {
       const originalText = hasInterest
         ? `${this.ctx.fmt(original)} → ${this.ctx.fmt(withInterest)} (${debt.interestRate}%)`
         : this.ctx.fmt(original);
-      const cells: { key: string; text: string; cls?: string }[] = [
-        { key: 'direction', text: dirText, cls: dirCls },
-        { key: 'person',    text: debt.person || '—' },
-        { key: 'original',  text: originalText, cls: 'finance-amount-cell' },
-        { key: 'remaining', text: remaining > 0 ? this.ctx.fmt(remaining) : '—',
-          cls: remaining > 0 ? 'finance-amount-cell finance-amount-remaining' : 'finance-amount-cell' },
-        { key: 'date',      text: this.ctx.fmtDate(debt.date) },
-        { key: 'dueDate',   text: dueDateText, cls: dueDateCls },
-      ];
 
-      cells.forEach(c => {
+      dataCols.forEach(c => {
+        let text = '';
+        let cls = '';
+        switch (c.key) {
+          case 'direction':
+            text = dirText;
+            cls = dirCls;
+            break;
+          case 'person':
+            text = debt.person || '—';
+            break;
+          case 'original':
+            text = originalText;
+            cls = 'finance-amount-cell';
+            break;
+          case 'remaining':
+            text = remaining > 0 ? this.ctx.fmt(remaining) : '—';
+            cls = remaining > 0 ? 'finance-amount-cell finance-amount-remaining' : 'finance-amount-cell';
+            break;
+          case 'date':
+            text = this.ctx.fmtDate(debt.date);
+            break;
+          case 'dueDate':
+            text = dueDateText;
+            cls = dueDateCls;
+            break;
+        }
         const td = document.createElement('td');
         td.classList.add('finance-td');
-        if (c.cls) c.cls.split(' ').forEach(cls => td.classList.add(cls));
-        td.setAttribute('data-label', cols.find(co => co.key === c.key)?.label ?? '');
-        td.textContent = c.text;
+        if (cls) cls.split(' ').forEach(x => td.classList.add(x));
+        td.setAttribute('data-label', c.label);
+        td.textContent = text;
         tr.appendChild(td);
       });
 
-      const atd = document.createElement('td');
-      atd.classList.add('finance-td', 'finance-actions-td');
-      atd.setAttribute('data-label', '');
+      if (cols.find(c => c.key === '_act')) {
+        const atd = document.createElement('td');
+        atd.classList.add('finance-td', 'finance-actions-td');
+        atd.setAttribute('data-label', '');
 
-      this.mkActionBtn(atd, '💰', 'Погасить', () => this.openRepayModal(debt));
-      this.mkActionBtn(atd, '➕', 'Взять ещё', () => this.openBorrowMoreModal(debt));
-      this.mkActionBtn(atd, '✏️', 'Редактировать', () => this.openEditDebtModal(debt));
-      this.mkActionBtn(atd, '🗑️', 'Удалить', () => this.confirmDeleteDebt(debt), 'finance-delete-btn');
+        this.mkActionBtn(atd, '💰', 'Погасить', () => this.openRepayModal(debt));
+        this.mkActionBtn(atd, '➕', 'Взять ещё', () => this.openBorrowMoreModal(debt));
+        this.mkActionBtn(atd, '✏️', 'Редактировать', () => this.openEditDebtModal(debt));
+        this.mkActionBtn(atd, '🗑️', 'Удалить', () => this.confirmDeleteDebt(debt), 'finance-delete-btn');
 
-      tr.appendChild(atd);
+        tr.appendChild(atd);
+      }
 
       const expandRow = document.createElement('tr');
       expandRow.classList.add('finance-debt-expand-row');

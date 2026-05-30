@@ -94,16 +94,22 @@ export interface ViewState {
   depositPage?: number;
   depositSort?: { field: DepositSortField; dir: SortDir };
   depositFilter?: DepositFilterState;
+  recordsColumns?: Record<string, boolean>;
+  debtsColumns?: Record<string, boolean>;
+  creditsColumns?: Record<string, boolean>;
+  depositsColumns?: Record<string, boolean>;
 }
 
 export interface PluginSettings {
   defaultCurrency: string;
   defaultPageSize: number;
+  customCurrencies: string[];
 }
 
 export const DEFAULT_SETTINGS: PluginSettings = {
   defaultCurrency: '₽',
   defaultPageSize: 25,
+  customCurrencies: ['₽'],
 };
 
 export const DEFAULT_FILTER: FilterState = {

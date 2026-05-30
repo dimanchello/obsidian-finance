@@ -6,6 +6,7 @@ import {
   DEFAULT_DEPOSIT_FILTER,
 } from '../types';
 import { DepositModal } from '../DepositModal';
+import { ColumnVisibilityModal } from '../ColumnVisibilityModal';
 import { DepositTopUpModal } from '../DepositTopUpModal';
 import { DepositWithdrawalModal } from '../DepositWithdrawalModal';
 import { ConfirmModal } from '../ConfirmModal';
@@ -404,10 +405,43 @@ export class DepositsTab {
       cls: 'finance-count-text',
     });
 
+    const allDepositCols: { key: string; label: string }[] = [
+      { key: 'name',      label: 'Название' },
+      { key: 'bank',      label: 'Банк' },
+      { key: 'type',      label: 'Тип' },
+      { key: 'amount',    label: 'Сумма' },
+      { key: 'profit',    label: 'Начислено' },
+      { key: 'rate',      label: 'Ставка' },
+      { key: 'date',      label: 'Открыт' },
+      { key: 'endDate',   label: 'Окончание' },
+      { key: '_act',      label: '' },
+    ];
+
+    this.ctx.state.depositsColumns ??= {};
+
+    const visDepositCols = allDepositCols.filter(c => c.key === '_act' || this.ctx.state.depositsColumns![c.key] !== false);
+
+    if (!this.ctx.isMobile) {
+      const depositColVisCols = allDepositCols.filter(c => c.key !== '_act');
+      const gearBtn = infoBar.createEl('button', { cls: 'finance-colvis-btn', text: '⚙️' });
+      gearBtn.title = 'Настройка колонок';
+      gearBtn.addEventListener('click', () => {
+        new ColumnVisibilityModal(this.ctx.app, {
+          columns: depositColVisCols,
+          visibility: { ...this.ctx.state.depositsColumns! },
+          onSave: (updated) => {
+            this.ctx.state.depositsColumns = updated;
+            this.ctx.saveState();
+            this.render();
+          },
+        }).open();
+      });
+    }
+
     if (this.ctx.isMobile) {
       this.renderDepositsAsBlocks(container, pageDeposits);
     } else {
-      this.renderDepositsAsTable(container, pageDeposits);
+      this.renderDepositsAsTable(container, pageDeposits, visDepositCols);
     }
 
     if (totalPages > 1) this.renderPaginationDeposits(totalPages, page);
@@ -654,27 +688,17 @@ export class DepositsTab {
     list.appendChild(frag);
   }
 
-  private renderDepositsAsTable(container: HTMLElement, pageDeposits: DepositRecord[]): void {
+  private renderDepositsAsTable(container: HTMLElement, pageDeposits: DepositRecord[], cols: { key: string; label: string }[]): void {
     const scroll = container.createDiv('finance-table-scroll');
     const table = scroll.createEl('table', { cls: 'finance-table' });
-
-    const cols = [
-      { key: 'name',      label: 'Название' },
-      { key: 'bank',      label: 'Банк' },
-      { key: 'type',      label: 'Тип' },
-      { key: 'amount',    label: 'Сумма' },
-      { key: 'profit',    label: 'Начислено' },
-      { key: 'rate',      label: 'Ставка' },
-      { key: 'date',      label: 'Открыт' },
-      { key: 'endDate',   label: 'Окончание' },
-      { key: '_act',      label: '' },
-    ];
 
     const hRow = table.createEl('thead').createEl('tr');
     cols.forEach(c => hRow.createEl('th', { text: c.label, cls: 'finance-th' }));
 
     const tbody = table.createEl('tbody');
     const frag = document.createDocumentFragment();
+
+    const dataCols = cols.filter(c => c.key !== '_act');
 
     pageDeposits.forEach(deposit => {
       const tr = document.createElement('tr');
@@ -690,47 +714,68 @@ export class DepositsTab {
       const endDate = this.calculateDepositEndDate(deposit);
       const endDateText = endDate ? this.ctx.fmtDate(endDate) : '—';
 
-      const cells: { key: string; text: string; cls?: string }[] = [
-        { key: 'name', text: deposit.name || '—' },
-        { key: 'bank', text: deposit.bankName || '—' },
-        { key: 'type', text: typeLabel },
-        { key: 'amount', text: this.ctx.fmt(deposit.amount), cls: 'finance-amount-cell' },
-        { key: 'profit', text: profit > 0 ? this.ctx.fmt(profit) : '—',
-          cls: profit > 0 ? 'finance-amount-cell finance-amount-income' : 'finance-amount-cell' },
-        { key: 'rate', text: `${deposit.interestRate}%` },
-        { key: 'date', text: this.ctx.fmtDate(deposit.startDate) },
-        { key: 'endDate', text: endDateText, cls: endDate ? 'finance-due-date' : '' },
-      ];
-
-      cells.forEach(c => {
+      dataCols.forEach(c => {
+        let text = '';
+        let cls = '';
+        switch (c.key) {
+          case 'name':
+            text = deposit.name || '—';
+            break;
+          case 'bank':
+            text = deposit.bankName || '—';
+            break;
+          case 'type':
+            text = typeLabel;
+            break;
+          case 'amount':
+            text = this.ctx.fmt(deposit.amount);
+            cls = 'finance-amount-cell';
+            break;
+          case 'profit':
+            text = profit > 0 ? this.ctx.fmt(profit) : '—';
+            cls = profit > 0 ? 'finance-amount-cell finance-amount-income' : 'finance-amount-cell';
+            break;
+          case 'rate':
+            text = `${deposit.interestRate}%`;
+            break;
+          case 'date':
+            text = this.ctx.fmtDate(deposit.startDate);
+            break;
+          case 'endDate':
+            text = endDateText;
+            cls = endDate ? 'finance-due-date' : '';
+            break;
+        }
         const td = document.createElement('td');
         td.classList.add('finance-td');
-        if (c.cls) c.cls.split(' ').forEach(cls => td.classList.add(cls));
-        td.setAttribute('data-label', cols.find(co => co.key === c.key)?.label ?? '');
-        td.textContent = c.text;
+        if (cls) cls.split(' ').forEach(x => td.classList.add(x));
+        td.setAttribute('data-label', c.label);
+        td.textContent = text;
         tr.appendChild(td);
       });
 
-      const atd = document.createElement('td');
-      atd.classList.add('finance-td', 'finance-actions-td');
-      atd.setAttribute('data-label', '');
+      if (cols.find(c => c.key === '_act')) {
+        const atd = document.createElement('td');
+        atd.classList.add('finance-td', 'finance-actions-td');
+        atd.setAttribute('data-label', '');
 
-      const actionsWrap = document.createElement('div');
-      actionsWrap.style.display = 'flex';
-      actionsWrap.style.gap = '2px';
-      actionsWrap.style.justifyContent = 'flex-end';
-      actionsWrap.style.alignItems = 'center';
+        const actionsWrap = document.createElement('div');
+        actionsWrap.style.display = 'flex';
+        actionsWrap.style.gap = '2px';
+        actionsWrap.style.justifyContent = 'flex-end';
+        actionsWrap.style.alignItems = 'center';
 
-      if (deposit.status === 'active') {
-        this.mkActionBtn(actionsWrap, '💰', 'Пополнить', () => this.openDepositTopUpModal(deposit));
-        this.mkActionBtn(actionsWrap, '📤', 'Снять', () => this.openDepositWithdrawalModal(deposit));
-        this.mkActionBtn(actionsWrap, '✅', 'Закрыть вклад', () => this.confirmCloseDeposit(deposit));
+        if (deposit.status === 'active') {
+          this.mkActionBtn(actionsWrap, '💰', 'Пополнить', () => this.openDepositTopUpModal(deposit));
+          this.mkActionBtn(actionsWrap, '📤', 'Снять', () => this.openDepositWithdrawalModal(deposit));
+          this.mkActionBtn(actionsWrap, '✅', 'Закрыть вклад', () => this.confirmCloseDeposit(deposit));
+        }
+        this.mkActionBtn(actionsWrap, '✏️', 'Редактировать', () => this.openEditDepositModal(deposit));
+        this.mkActionBtn(actionsWrap, '🗑️', 'Удалить', () => this.confirmDeleteDeposit(deposit), 'finance-delete-btn');
+
+        atd.appendChild(actionsWrap);
+        tr.appendChild(atd);
       }
-      this.mkActionBtn(actionsWrap, '✏️', 'Редактировать', () => this.openEditDepositModal(deposit));
-      this.mkActionBtn(actionsWrap, '🗑️', 'Удалить', () => this.confirmDeleteDeposit(deposit), 'finance-delete-btn');
-
-      atd.appendChild(actionsWrap);
-      tr.appendChild(atd);
 
       const expandRow = document.createElement('tr');
       expandRow.classList.add('finance-debt-expand-row');

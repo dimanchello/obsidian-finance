@@ -9,6 +9,7 @@ import {
 import { RecordModal } from '../RecordModal';
 import { ConfirmModal } from '../ConfirmModal';
 import { ImportExportModal } from '../ImportExportModal';
+import { ColumnVisibilityModal } from '../ColumnVisibilityModal';
 import { AnalyticsView, type BarClickAction } from '../AnalyticsView';
 import { noteFilename } from '../utils';
 
@@ -466,7 +467,7 @@ export class RecordsTab {
     sums.createEl('span', { text: '·', cls: 'finance-sum-sep' });
     sums.createEl('span', { text: `↓\u00a0${this.ctx.fmt(fe)}`, cls: 'finance-sum-expense' });
 
-    const cols = [
+    const allCols: { key: string; label: string }[] = [
       { key: 'date', label: 'Дата / Время' },
       { key: 'type', label: 'Тип' },
       { key: 'amount', label: 'Сумма' },
@@ -477,10 +478,31 @@ export class RecordsTab {
       { key: '_act', label: '' },
     ];
 
+    this.ctx.state.recordsColumns ??= {};
+
+    const visCols = allCols.filter(c => c.key === '_act' || this.ctx.state.recordsColumns![c.key] !== false);
+
+    if (!this.ctx.isMobile) {
+      const colVisCols = allCols.filter(c => c.key !== '_act');
+      const gearBtn = infoBar.createEl('button', { cls: 'finance-colvis-btn', text: '⚙️' });
+      gearBtn.title = 'Настройка колонок';
+      gearBtn.addEventListener('click', () => {
+        new ColumnVisibilityModal(this.ctx.app, {
+          columns: colVisCols,
+          visibility: { ...this.ctx.state.recordsColumns! },
+          onSave: (updated) => {
+            this.ctx.state.recordsColumns = updated;
+            this.ctx.saveState();
+            this.renderTable();
+          },
+        }).open();
+      });
+    }
+
     if (this.ctx.isMobile) {
       this.renderRecordsAsBlocks(pageRows);
     } else {
-      this.renderRecordsAsTable(pageRows, cols);
+      this.renderRecordsAsTable(pageRows, visCols);
     }
     if (totalPages > 1) this.renderPagination(totalPages, page);
   }
@@ -546,48 +568,67 @@ export class RecordsTab {
     const tbody = table.createEl('tbody');
     const frag = document.createDocumentFragment();
 
+    const dataCols = cols.filter(c => c.key !== '_act');
+
     pageRows.forEach(rec => {
       const tr = document.createElement('tr');
       tr.classList.add('finance-tr', rec.type === 'income' ? 'finance-row-income' : 'finance-row-expense');
       if (rec.isInternal) tr.classList.add('finance-tr-internal');
 
-      const cells = [
-        { key: 'date', text: this.ctx.fmtDate(rec.date, rec.time), cls: 'finance-td-date' },
-        {
-          key: 'type', text: rec.type === 'income' ? '↑ Доход' : '↓ Расход',
-          cls: rec.type === 'income' ? 'finance-type-income' : 'finance-type-expense',
-        },
-        {
-          key: 'amount', text: (rec.type === 'income' ? '+' : '−') + this.ctx.fmt(rec.amount)
-            + (rec.exchangeRate ? ` @ ${rec.exchangeRate}` : ''),
-          cls: 'finance-amount-cell ' + (rec.type === 'income' ? 'finance-amount-income' : 'finance-amount-expense'),
-        },
-        { key: 'category', text: rec.category || '—', cls: '' },
-        { key: 'tag', text: rec.tag || '—', cls: 'finance-td-muted' },
-        { key: 'payer', text: rec.payer || '—', cls: '' },
-        { key: 'note', text: rec.note || '—', cls: 'finance-note-cell' },
-      ];
-
-      cells.forEach(c => {
+      dataCols.forEach(c => {
+        let text = '';
+        let cls = '';
+        switch (c.key) {
+          case 'date':
+            text = this.ctx.fmtDate(rec.date, rec.time);
+            cls = 'finance-td-date';
+            break;
+          case 'type':
+            text = rec.type === 'income' ? '↑ Доход' : '↓ Расход';
+            cls = rec.type === 'income' ? 'finance-type-income' : 'finance-type-expense';
+            break;
+          case 'amount':
+            text = (rec.type === 'income' ? '+' : '−') + this.ctx.fmt(rec.amount)
+              + (rec.exchangeRate ? ` @ ${rec.exchangeRate}` : '');
+            cls = 'finance-amount-cell ' + (rec.type === 'income' ? 'finance-amount-income' : 'finance-amount-expense');
+            break;
+          case 'category':
+            text = rec.category || '—';
+            break;
+          case 'tag':
+            text = rec.tag || '—';
+            cls = 'finance-td-muted';
+            break;
+          case 'payer':
+            text = rec.payer || '—';
+            break;
+          case 'note':
+            text = rec.note || '—';
+            cls = 'finance-note-cell';
+            break;
+        }
         const td = document.createElement('td');
         td.classList.add('finance-td');
-        if (c.cls) c.cls.split(' ').filter(Boolean).forEach(x => td.classList.add(x));
-        td.setAttribute('data-label', cols.find(co => co.key === c.key)?.label ?? '');
-        td.textContent = c.text;
+        if (cls) cls.split(' ').filter(Boolean).forEach(x => td.classList.add(x));
+        td.setAttribute('data-label', c.label);
+        td.textContent = text;
         tr.appendChild(td);
       });
 
-      const atd = document.createElement('td');
-      atd.classList.add('finance-td', 'finance-actions-td');
-      atd.setAttribute('data-label', '');
+      if (cols.find(c => c.key === '_act')) {
+        const atd = document.createElement('td');
+        atd.classList.add('finance-td', 'finance-actions-td');
+        atd.setAttribute('data-label', '');
 
-      if (rec.attachmentPath) {
-        this.mkActionBtn(atd, '📎', 'Открыть вложение', () => this.openAttachment(rec));
+        if (rec.attachmentPath) {
+          this.mkActionBtn(atd, '📎', 'Открыть вложение', () => this.openAttachment(rec));
+        }
+        this.mkActionBtn(atd, '✏️', 'Редактировать', () => this.openEditModal(rec));
+        this.mkActionBtn(atd, '🗑️', 'Удалить', () => this.confirmDelete(rec), 'finance-delete-btn');
+
+        tr.appendChild(atd);
       }
-      this.mkActionBtn(atd, '✏️', 'Редактировать', () => this.openEditModal(rec));
-      this.mkActionBtn(atd, '🗑️', 'Удалить', () => this.confirmDelete(rec), 'finance-delete-btn');
 
-      tr.appendChild(atd);
       frag.appendChild(tr);
     });
 

@@ -6,6 +6,7 @@ import {
   DEFAULT_CREDIT_FILTER,
 } from '../types';
 import { CreditModal } from '../CreditModal';
+import { ColumnVisibilityModal } from '../ColumnVisibilityModal';
 import { CreditPaymentModal } from '../CreditPaymentModal';
 import { CreditEarlyRepaymentModal } from '../CreditEarlyRepaymentModal';
 import { ConfirmModal } from '../ConfirmModal';
@@ -397,10 +398,43 @@ export class CreditsTab {
       cls: 'finance-count-text',
     });
 
+    const allCreditCols: { key: string; label: string }[] = [
+      { key: 'name',      label: 'Название' },
+      { key: 'bank',      label: 'Банк' },
+      { key: 'type',      label: 'Тип' },
+      { key: 'amount',    label: 'Остаток' },
+      { key: 'payment',   label: 'Платёж' },
+      { key: 'rate',      label: 'Ставка' },
+      { key: 'date',      label: 'Открыт' },
+      { key: 'endDate',   label: 'Окончание' },
+      { key: '_act',      label: '' },
+    ];
+
+    this.ctx.state.creditsColumns ??= {};
+
+    const visCreditCols = allCreditCols.filter(c => c.key === '_act' || this.ctx.state.creditsColumns![c.key] !== false);
+
+    if (!this.ctx.isMobile) {
+      const creditColVisCols = allCreditCols.filter(c => c.key !== '_act');
+      const gearBtn = infoBar.createEl('button', { cls: 'finance-colvis-btn', text: '⚙️' });
+      gearBtn.title = 'Настройка колонок';
+      gearBtn.addEventListener('click', () => {
+        new ColumnVisibilityModal(this.ctx.app, {
+          columns: creditColVisCols,
+          visibility: { ...this.ctx.state.creditsColumns! },
+          onSave: (updated) => {
+            this.ctx.state.creditsColumns = updated;
+            this.ctx.saveState();
+            this.render();
+          },
+        }).open();
+      });
+    }
+
     if (this.ctx.isMobile) {
       this.renderCreditsAsBlocks(container, pageCredits);
     } else {
-      this.renderCreditsAsTable(container, pageCredits);
+      this.renderCreditsAsTable(container, pageCredits, visCreditCols);
     }
 
     if (totalPages > 1) this.renderPaginationCredits(totalPages, page);
@@ -498,27 +532,17 @@ export class CreditsTab {
     return startDate.toISOString().split('T')[0];
   }
 
-  private renderCreditsAsTable(container: HTMLElement, pageCredits: CreditRecord[]): void {
+  private renderCreditsAsTable(container: HTMLElement, pageCredits: CreditRecord[], cols: { key: string; label: string }[]): void {
     const scroll = container.createDiv('finance-table-scroll');
     const table = scroll.createEl('table', { cls: 'finance-table' });
-
-    const cols = [
-      { key: 'name',      label: 'Название' },
-      { key: 'bank',      label: 'Банк' },
-      { key: 'type',      label: 'Тип' },
-      { key: 'amount',    label: 'Остаток' },
-      { key: 'payment',   label: 'Платёж' },
-      { key: 'rate',      label: 'Ставка' },
-      { key: 'date',      label: 'Открыт' },
-      { key: 'endDate',   label: 'Окончание' },
-      { key: '_act',      label: '' },
-    ];
 
     const hRow = table.createEl('thead').createEl('tr');
     cols.forEach(c => hRow.createEl('th', { text: c.label, cls: 'finance-th' }));
 
     const tbody = table.createEl('tbody');
     const frag = document.createDocumentFragment();
+
+    const dataCols = cols.filter(c => c.key !== '_act');
 
     pageCredits.forEach(credit => {
       const tr = document.createElement('tr');
@@ -535,45 +559,67 @@ export class CreditsTab {
       const endDate = this.calculateCreditEndDate(credit);
       const endDateText = endDate ? this.ctx.fmtDate(endDate) : '—';
 
-      const cells: { key: string; text: string; cls?: string }[] = [
-        { key: 'name', text: credit.name || '—' },
-        { key: 'bank', text: credit.bankName || '—' },
-        { key: 'type', text: typeLabel },
-        { key: 'amount', text: this.ctx.fmt(credit.currentAmount), cls: 'finance-amount-cell' },
-        { key: 'payment', text: this.ctx.fmt(credit.monthlyPayment), cls: 'finance-amount-cell' },
-        { key: 'rate', text: `${credit.interestRate}%` },
-        { key: 'date', text: this.ctx.fmtDate(credit.startDate) },
-        { key: 'endDate', text: endDateText, cls: endDate ? 'finance-due-date' : '' },
-      ];
-
-      cells.forEach(c => {
+      dataCols.forEach(c => {
+        let text = '';
+        let cls = '';
+        switch (c.key) {
+          case 'name':
+            text = credit.name || '—';
+            break;
+          case 'bank':
+            text = credit.bankName || '—';
+            break;
+          case 'type':
+            text = typeLabel;
+            break;
+          case 'amount':
+            text = this.ctx.fmt(credit.currentAmount);
+            cls = 'finance-amount-cell';
+            break;
+          case 'payment':
+            text = this.ctx.fmt(credit.monthlyPayment);
+            cls = 'finance-amount-cell';
+            break;
+          case 'rate':
+            text = `${credit.interestRate}%`;
+            break;
+          case 'date':
+            text = this.ctx.fmtDate(credit.startDate);
+            break;
+          case 'endDate':
+            text = endDateText;
+            cls = endDate ? 'finance-due-date' : '';
+            break;
+        }
         const td = document.createElement('td');
         td.classList.add('finance-td');
-        if (c.cls) c.cls.split(' ').forEach(cls => td.classList.add(cls));
-        td.setAttribute('data-label', cols.find(co => co.key === c.key)?.label ?? '');
-        td.textContent = c.text;
+        if (cls) cls.split(' ').forEach(x => td.classList.add(x));
+        td.setAttribute('data-label', c.label);
+        td.textContent = text;
         tr.appendChild(td);
       });
 
-      const atd = document.createElement('td');
-      atd.classList.add('finance-td', 'finance-actions-td');
-      atd.setAttribute('data-label', '');
+      if (cols.find(c => c.key === '_act')) {
+        const atd = document.createElement('td');
+        atd.classList.add('finance-td', 'finance-actions-td');
+        atd.setAttribute('data-label', '');
 
-      const actionsWrap = document.createElement('div');
-      actionsWrap.style.display = 'flex';
-      actionsWrap.style.gap = '2px';
-      actionsWrap.style.justifyContent = 'flex-end';
-      actionsWrap.style.alignItems = 'center';
+        const actionsWrap = document.createElement('div');
+        actionsWrap.style.display = 'flex';
+        actionsWrap.style.gap = '2px';
+        actionsWrap.style.justifyContent = 'flex-end';
+        actionsWrap.style.alignItems = 'center';
 
-      if (credit.status === 'active') {
-        this.mkActionBtn(actionsWrap, '💰', 'Добавить платёж', () => this.openAddCreditPaymentModal(credit));
-        this.mkActionBtn(actionsWrap, '⚡', 'Досрочное погашение', () => this.openEarlyRepaymentModal(credit));
+        if (credit.status === 'active') {
+          this.mkActionBtn(actionsWrap, '💰', 'Добавить платёж', () => this.openAddCreditPaymentModal(credit));
+          this.mkActionBtn(actionsWrap, '⚡', 'Досрочное погашение', () => this.openEarlyRepaymentModal(credit));
+        }
+        this.mkActionBtn(actionsWrap, '✏️', 'Редактировать', () => this.openEditCreditModal(credit));
+        this.mkActionBtn(actionsWrap, '🗑️', 'Удалить', () => this.confirmDeleteCredit(credit), 'finance-delete-btn');
+
+        atd.appendChild(actionsWrap);
+        tr.appendChild(atd);
       }
-      this.mkActionBtn(actionsWrap, '✏️', 'Редактировать', () => this.openEditCreditModal(credit));
-      this.mkActionBtn(actionsWrap, '🗑️', 'Удалить', () => this.confirmDeleteCredit(credit), 'finance-delete-btn');
-
-      atd.appendChild(actionsWrap);
-      tr.appendChild(atd);
 
       const expandRow = document.createElement('tr');
       expandRow.classList.add('finance-debt-expand-row');
