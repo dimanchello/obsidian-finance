@@ -95,7 +95,7 @@ export class DebtMovementModal extends Modal {
       const formatted = this.o.remainingAmount.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       const link = amtG.createEl('span');
       link.textContent = `→ ${formatted} ${cur}`;
-      link.style.cssText = 'cursor:pointer;color:var(--text-accent, #7c3aed);font-size:.85em;text-decoration:underline;display:inline-block;margin-top:4px;';
+      link.style.cssText = 'cursor:pointer;color:var(--ft-accent);font-size:.85em;text-decoration:underline;display:inline-block;margin-top:4px;';
       link.addEventListener('click', () => {
         this.amountInput.value = fmtAmount(String(this.o.remainingAmount!));
         this.mov.amount = this.o.remainingAmount!;

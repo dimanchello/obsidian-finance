@@ -318,7 +318,7 @@ export class CreditsTab {
     mkCreditCard('Погашенные', '✅', paidAmount, paidCredits.length, false);
 
     const toolbar = body.createDiv('finance-debt-toolbar');
-    const newCreditBtn = toolbar.createEl('button', { cls: 'finance-add-btn finance-expense-btn' });
+    const newCreditBtn = toolbar.createEl('button', { cls: 'finance-add-btn finance-accent-btn' });
     newCreditBtn.innerHTML = '<span class="btn-icon">＋</span><span>Новый кредит</span>';
     newCreditBtn.addEventListener('click', () => this.openNewCreditModal());
 

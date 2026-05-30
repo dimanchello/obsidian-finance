@@ -14,7 +14,7 @@
   --ft-radius:   10px;
   --ft-radius-sm: 7px;
   --ft-shadow:   0 1px 4px rgba(0,0,0,.07);
-  --ft-accent:   var(--color-accent, #7c3aed);
+  --ft-accent:   #7c3aed;
   --ft-table-header-bg: var(--background-secondary);
   --ft-table-header-fg: var(--text-normal);
   --ft-table-body-bg: var(--background-primary);
@@ -173,6 +173,12 @@
 /* Expense: vivid red-orange */
 .finance-expense-btn {
   background: linear-gradient(135deg, #dc2626, #ef4444);
+  color: #fff;
+  border: 2px solid transparent;
+}
+/* Accent-colored button (follows account accent) */
+.finance-tracker .finance-accent-btn {
+  background: var(--ft-accent) !important;
   color: #fff;
   border: 2px solid transparent;
 }

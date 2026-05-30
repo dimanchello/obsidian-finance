@@ -134,7 +134,7 @@ export class AccountView {
     if (moreBtn) {
       const isActive = this.mode === 'debts' || this.mode === 'credits' || this.mode === 'deposits';
       moreBtn.style.border = isActive
-        ? '2px solid var(--color-accent, #7c3aed)'
+        ? '2px solid var(--ft-accent)'
         : '2px solid transparent';
     }
   }
@@ -276,7 +276,7 @@ export class AccountView {
   }
 
   private applyAccentColor(color: string): void {
-    this.root.style.setProperty('--finance-accent', color);
+    this.root.style.setProperty('--ft-accent', color);
   }
 
   private openAddModal(type: 'income' | 'expense'): void {

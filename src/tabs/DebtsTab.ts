@@ -370,7 +370,7 @@ export class DebtsTab {
     mkDebtCard('Я должен', '💳', borrowedTotal, borrowedRemaining, borrowedDebts.length, false);
 
     const toolbar = body.createDiv('finance-debt-toolbar');
-    const newDebtBtn = toolbar.createEl('button', { cls: 'finance-add-btn finance-expense-btn' });
+    const newDebtBtn = toolbar.createEl('button', { cls: 'finance-add-btn finance-accent-btn' });
     newDebtBtn.innerHTML = '<span class="btn-icon">＋</span><span>Новый долг</span>';
     newDebtBtn.addEventListener('click', () => this.openNewDebtModal());
 

@@ -351,7 +351,7 @@ export class DepositsTab {
     mkDepositCard('Закрытые', '✅', closedAmount, closedProfit, closedDeposits.length, false);
 
     const toolbar = body.createDiv('finance-debt-toolbar');
-    const newDepositBtn = toolbar.createEl('button', { cls: 'finance-add-btn finance-expense-btn' });
+    const newDepositBtn = toolbar.createEl('button', { cls: 'finance-add-btn finance-accent-btn' });
     newDepositBtn.innerHTML = '<span class="btn-icon">＋</span><span>Новый вклад</span>';
     newDepositBtn.addEventListener('click', () => this.openNewDepositModal());
 
