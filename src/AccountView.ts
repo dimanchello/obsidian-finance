@@ -1,4 +1,4 @@
-import { App, MarkdownView, Notice, Platform } from 'obsidian';
+import { App, Notice, Platform } from 'obsidian';
 import { FinanceStorage } from './storage';
 import {
   AccountData, FinanceRecord, PluginSettings, COMMON_CURRENCIES,
@@ -49,12 +49,12 @@ export class AccountView {
     this.ctx.isMobile = this.isMobile;
     if (this.isMobile) this.root.addClass('finance-tracker--mobile');
 
+    this.data = await this.storage.load(this.notePath);
+    this.ctx.data = this.data;
+
     this.renderHeader();
 
     const body = this.root.createDiv('finance-body');
-
-    this.data = await this.storage.load(this.notePath);
-    this.ctx.data = this.data;
 
     if (this.data?.accentColor) {
       this.applyAccentColor(this.data.accentColor);
@@ -71,7 +71,7 @@ export class AccountView {
     const left   = header.createDiv('finance-header-left');
 
     const nameWrap   = left.createDiv('finance-account-name-wrap');
-    const displayName = this.data?.name ?? noteFilename(this.notePath);
+    const displayName = this.data?.name || noteFilename(this.notePath);
     const nameEl     = nameWrap.createEl('h2', { text: displayName, cls: 'finance-title' });
     nameEl.title     = 'Нажмите чтобы переименовать';
     nameEl.addEventListener('click', () => this.startNameEdit(nameEl));
@@ -117,12 +117,6 @@ export class AccountView {
         mkDropdownItem('🏦', 'Кредиты', 'credits');
         mkDropdownItem('📈', 'Вклады', 'deposits');
         dropdown.createDiv('finance-dropdown-separator');
-        const tmplItem = dropdown.createDiv('finance-dropdown-item');
-        tmplItem.innerHTML = '📋 Вставить шаблон';
-        tmplItem.addEventListener('click', () => {
-          this.insertTemplate();
-          dropdown.style.display = 'none';
-        });
         dropdown.style.display = 'block';
       } else {
         dropdown.style.display = 'none';
@@ -242,9 +236,19 @@ export class AccountView {
   private renderCurrencyBadge(wrap: HTMLElement): void {
     const cur = this.ctx.currency;
     wrap.empty();
+
+    const applyCurrency = async (newCur: string) => {
+      if (newCur !== cur && this.data) {
+        this.data.currency = newCur;
+        await this.storage.updateMeta(this.notePath, { currency: newCur });
+        this.ctx.data = this.data;
+      }
+      this.renderCurrencyBadge(wrap);
+    };
+
     const badge = wrap.createEl('span', { text: cur, cls: 'finance-currency-label' });
 
-    badge.addEventListener('click', async (e) => {
+    badge.addEventListener('click', (e) => {
       e.stopPropagation();
       const select = document.createElement('select');
       select.className = 'finance-currency-select';
@@ -262,17 +266,29 @@ export class AccountView {
       badge.appendChild(select);
       select.focus();
 
-      select.addEventListener('change', async () => {
-        let newCur = select.value;
-        if (newCur === '__custom__') {
-          newCur = prompt('Введите валюту:', cur) ?? cur;
+      select.addEventListener('change', () => {
+        if (select.value !== '__custom__') {
+          applyCurrency(select.value);
+          return;
         }
-        if (newCur !== cur && this.data) {
-          this.data.currency = newCur;
-          await this.storage.updateMeta(this.notePath, { currency: newCur });
-          this.ctx.data = this.data;
-        }
-        this.renderCurrencyBadge(wrap);
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.value = cur;
+        input.className = 'finance-currency-input';
+        badge.innerHTML = '';
+        badge.appendChild(input);
+        input.focus();
+        input.select();
+
+        const onConfirm = () => {
+          const v = input.value.trim() || cur;
+          applyCurrency(v);
+        };
+        input.addEventListener('keydown', (ev) => {
+          if (ev.key === 'Enter') { ev.preventDefault(); onConfirm(); }
+          if (ev.key === 'Escape') { this.renderCurrencyBadge(wrap); }
+        });
+        input.addEventListener('blur', () => setTimeout(() => this.renderCurrencyBadge(wrap), 0));
       });
     });
   }
@@ -300,20 +316,6 @@ export class AccountView {
         new Notice('✅ Запись добавлена');
       },
     }).open();
-  }
-
-  private insertTemplate(): void {
-    const view = this.app.workspace.getActiveViewOfType(MarkdownView);
-    if (!view) {
-      new Notice('⚠️ Откройте заметку для вставки');
-      return;
-    }
-    const editor = view.editor;
-    const template = '```finance-account\n\n```';
-    editor.replaceSelection(template);
-    const cursor = editor.getCursor();
-    editor.setCursor(cursor.line - 1, 0);
-    new Notice('✅ Шаблон счёта вставлен');
   }
 
   private async checkAutoTransactions(): Promise<void> {

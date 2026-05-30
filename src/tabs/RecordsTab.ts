@@ -306,6 +306,7 @@ export class RecordsTab {
     let dropdown: HTMLElement | null = null;
     let isOpen = false;
     let outsideHandler: ((e: MouseEvent) => void) | null = null;
+    let searchDebounce: ReturnType<typeof setTimeout> | null = null;
 
     const closeDropdown = () => {
       if (!isOpen) return;
@@ -358,7 +359,10 @@ export class RecordsTab {
       };
 
       renderList('');
-      searchInput.addEventListener('input', () => renderList(searchInput.value));
+      searchInput.addEventListener('input', () => {
+        if (searchDebounce) clearTimeout(searchDebounce);
+        searchDebounce = setTimeout(() => renderList(searchInput.value), SEARCH_DEBOUNCE_MS);
+      });
       searchInput.addEventListener('keydown', (e: KeyboardEvent) => {
         if (e.key === 'Enter') {
           e.preventDefault();
@@ -629,10 +633,11 @@ export class RecordsTab {
 
   private pageRange(cur: number, total: number): number[] {
     if (total <= PAGE_RANGE_THRESHOLD) return Array.from({ length: total }, (_, i) => i);
+    const radius = this.ctx.isMobile ? 1 : 3;
     const p: number[] = [0];
-    if (cur > 2) p.push(-1);
-    for (let i = Math.max(1, cur - 1); i <= Math.min(total - 2, cur + 1); i++) p.push(i);
-    if (cur < total - 3) p.push(-1);
+    if (cur > radius + 1) p.push(-1);
+    for (let i = Math.max(1, cur - radius); i <= Math.min(total - 2, cur + radius); i++) p.push(i);
+    if (cur < total - (radius + 2)) p.push(-1);
     p.push(total - 1);
     return p;
   }
@@ -712,7 +717,6 @@ export class RecordsTab {
     this.ctx.saveState();
     this.renderTable();
     if (this.analyticsOpen) this.renderAnalytics();
-    if (this.filtersOpen) this.renderFilters();
   }
 
   private onAnalyticsBarClick(action: BarClickAction): void {

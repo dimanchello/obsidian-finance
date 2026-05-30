@@ -341,7 +341,7 @@ export class ImportExportModal extends Modal {
       if (mode === 'field') {
         const row  = extraContainer.createDiv('finance-filters-row');
         const selG = row.createDiv('finance-filter-group');
-        selG.createEl('label', { text: 'Поле типа', cls: 'finance-filter-label' });
+        selG.createEl('label', { text: 'Поле типа', cls: 'finance-filter-label-sm' });
         const sel  = selG.createEl('select', { cls: 'finance-filter-select' });
         this.srcFields.forEach(f => { const o = sel.createEl('option',{text:f}); o.value=f; });
         sel.value      = this.mapping.type || this.srcFields[0] || '';
@@ -349,13 +349,13 @@ export class ImportExportModal extends Modal {
         sel.addEventListener('change', () => { this.typeField = sel.value; });
 
         const incG = row.createDiv('finance-filter-group');
-        incG.createEl('label', { text: 'Значение для «Доход»', cls: 'finance-filter-label' });
+        incG.createEl('label', { text: 'Значение для «Доход»', cls: 'finance-filter-label-sm' });
         const incI = incG.createEl('input', { type: 'text', cls: 'finance-input', placeholder: 'income' });
         incI.value = 'income';
         incI.addEventListener('input', () => { this.typeMap.incomeVal = incI.value; });
 
         const expG = row.createDiv('finance-filter-group');
-        expG.createEl('label', { text: 'Значение для «Расход»', cls: 'finance-filter-label' });
+        expG.createEl('label', { text: 'Значение для «Расход»', cls: 'finance-filter-label-sm' });
         const expI = expG.createEl('input', { type: 'text', cls: 'finance-input', placeholder: 'expense' });
         expI.value = 'expense';
         expI.addEventListener('input', () => { this.typeMap.expenseVal = expI.value; });

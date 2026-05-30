@@ -368,6 +368,7 @@
 .finance-filter-search { flex: 1; min-width: 140px; }   /* same as others — no flex:2 */
 .finance-filter-reset  { flex: 0; min-width: auto; }
 .finance-filter-label  { font-size: .7em; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .06em; }
+.finance-filter-label-sm { font-size: .58em; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em; white-space: nowrap; }
 
 /* ── Input / select shared styles — use theme's form-field background ────────── */
 .finance-filter-input,
