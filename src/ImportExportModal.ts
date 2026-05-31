@@ -13,6 +13,7 @@ const OUR_FIELDS = [
   { key: 'tag',      label: 'Тег' },
   { key: 'payer',    label: 'Плательщик' },
   { key: 'note',     label: 'Примечание' },
+  { key: 'exchangeRate', label: 'Курс' },
   { key: '_skip',    label: '— Не импортировать —' },
 ];
 
@@ -78,7 +79,7 @@ export class ImportExportModal extends Modal {
     let ext     = fmt;
 
     if (fmt === 'csv') {
-      const headers = ['id','createdAt','date','time','type','amount','category','tag','payer','note','attachmentPath'];
+      const headers = ['id','createdAt','date','time','type','amount','category','tag','payer','note','exchangeRate','attachmentPath'];
       const escape  = (v: unknown) => { const s = v == null ? '' : typeof v === 'string' ? v : typeof v === 'number' || typeof v === 'boolean' ? String(v) : ''; return `"${s.replace(/"/g, '""')}"`; };
       content = [headers.join(','), ...recs.map(r => headers.map(h => escape(r[h as keyof FinanceRecord])).join(','))].join('\n');
       mime    = 'text/csv;charset=utf-8;';
@@ -290,6 +291,7 @@ export class ImportExportModal extends Modal {
         tag:      ['tag','тег','label'],
         payer:    ['payer','плательщик','from','who','sender'],
         note:     ['note','примечание','desc','description','comment'],
+        exchangeRate: ['exchangerate','курс','rate','exchange_rate','fx'],
       };
       const lc = (this.srcFields.map(f => f.toLowerCase()));
       const alts = aliases[ourKey] ?? [ourKey];
@@ -402,6 +404,7 @@ export class ImportExportModal extends Modal {
       }
 
       const rawAmt = get('amount').replace(',', '.').replace(/[^\d.-]/g, '');
+      const rawEr  = get('exchangeRate').replace(',', '.').replace(/[^\d.]/g, '');
       return {
         id:             crypto.randomUUID(),
         createdAt:      now + i,
@@ -413,6 +416,7 @@ export class ImportExportModal extends Modal {
         tag:            get('tag'),
         payer:          get('payer'),
         note:           get('note'),
+        exchangeRate:   parseFloat(rawEr) || undefined,
         attachmentPath: '',
         linkedId:       '',
       };
