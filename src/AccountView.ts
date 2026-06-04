@@ -70,9 +70,9 @@ export class AccountView {
     const header = this.root.createDiv('finance-header');
     const left   = header.createDiv('finance-header-left');
 
-    const nameWrap   = left.createDiv('finance-account-name-wrap');
-    const displayName = this.data?.name ?? noteFilename(this.notePath);
-    const nameEl     = nameWrap.createEl('h2', { text: displayName, cls: 'finance-title' });
+    const rawName = this.data?.name;
+    const displayName = rawName?.trim() ? rawName : noteFilename(this.notePath);
+    const nameEl     = left.createEl('h2', { text: displayName, cls: 'finance-title' });
     nameEl.title     = 'Нажмите чтобы переименовать';
     nameEl.addEventListener('click', () => this.startNameEdit(nameEl));
 

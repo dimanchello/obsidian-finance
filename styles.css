@@ -71,8 +71,6 @@
 .finance-header-right { display: flex; gap: 8px; flex-wrap: wrap; }
 
 /* ── Account name ───────────────────────────────────────────────────────────── */
-.finance-account-name-wrap { display: flex; align-items: center; }
-
 .finance-title {
   font-size: 1.35em !important; font-weight: 700 !important;
   margin: 0 !important; padding: 2px 6px !important;
