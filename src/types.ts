@@ -164,8 +164,6 @@ export const PAGE_RANGE_THRESHOLD = 7;
 export const FOCUS_DELAY_MS = 20;
 export const SKELETON_CARD_COUNT = 3;
 export const PLURAL_THRESHOLD = 5;
-export const ACCRUAL_STEP_MONTHLY = 1;
-export const ACCRUAL_STEP_QUARTERLY = 3;
 
 export type CreditType = 'consumer' | 'auto' | 'mortgage';
 export type CreditStatus = 'active' | 'paid';
@@ -199,10 +197,9 @@ export interface CreditRecord {
 }
 
 export type DepositType = 'term' | 'demand' | 'savings';
-export type DepositAccrualType = 'capitalization' | 'end_of_term' | 'capitalization_at_end';
+export type DepositAccrualType = 'to_account' | 'capitalization';
 export type DepositStatus = 'active' | 'closed';
 export type DepositAccrualStatus = 'pending' | 'paid';
-export type AccrualFrequency = 'monthly' | 'quarterly' | 'end_of_term';
 
 export interface DepositAccrual {
   id: string;
@@ -241,7 +238,6 @@ export interface DepositRecord {
   startDate: string;
   termMonths: number;
   accrualType: DepositAccrualType;
-  paymentFrequency: AccrualFrequency;
   createdAt: number;
   note: string;
   status: DepositStatus;

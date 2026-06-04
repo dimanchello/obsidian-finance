@@ -71,7 +71,7 @@ export class AccountView {
     const left   = header.createDiv('finance-header-left');
 
     const nameWrap   = left.createDiv('finance-account-name-wrap');
-    const displayName = this.data?.name || noteFilename(this.notePath);
+    const displayName = this.data?.name ?? noteFilename(this.notePath);
     const nameEl     = nameWrap.createEl('h2', { text: displayName, cls: 'finance-title' });
     nameEl.title     = 'Нажмите чтобы переименовать';
     nameEl.addEventListener('click', () => this.startNameEdit(nameEl));
@@ -200,6 +200,7 @@ export class AccountView {
   private async refreshAndRender(): Promise<void> {
     this.data = await this.storage.load(this.notePath);
     this.ctx.data = this.data;
+    await this.checkAutoTransactions();
     this.renderBodyContent();
   }
 
@@ -310,21 +311,45 @@ export class AccountView {
 
     for (const deposit of this.data.deposits) {
       if (!deposit.accruals) deposit.accruals = [];
+
       if (!deposit.accruals.length && deposit.termMonths > 0 && deposit.amount > 0 && deposit.startDate) {
         const startDate = new Date(deposit.startDate);
-        const termMonths = deposit.termMonths;
-        const createAccruals = (accrualType: string) => {
-          if (accrualType === 'capitalization' || accrualType === 'capitalization_at_end') {
-            const monthsStep = deposit.paymentFrequency === 'monthly' ? 1 : 3;
-            for (let i = monthsStep; i <= termMonths; i += monthsStep) {
+        const monthlyRate = deposit.interestRate / 100 / 12;
+
+        if (deposit.accrualType === 'capitalization') {
+          let currentAmount = deposit.amount;
+          for (let i = 1; i <= deposit.termMonths; i++) {
+            const dueDate = new Date(startDate);
+            dueDate.setMonth(dueDate.getMonth() + i);
+            const dueDateStr = dueDate.toISOString().split('T')[0];
+            const interest = currentAmount * monthlyRate;
+            currentAmount += interest;
+            const isPast = dueDateStr <= today;
+            deposit.accruals.push({
+              id: crypto.randomUUID(),
+              amount: Math.round(interest * 100) / 100,
+              dueDate: dueDateStr,
+              status: isPast ? 'paid' : 'pending',
+              paidDate: isPast ? dueDateStr : undefined,
+            });
+          }
+          const pastPaidSum = deposit.accruals
+            .filter(a => a.status === 'paid')
+            .reduce((s, a) => s + a.amount, 0);
+          if (pastPaidSum > 0) {
+            deposit.amount = Math.round((deposit.amount + pastPaidSum) * 100) / 100;
+          }
+        } else {
+          const baseAmount = deposit.amount;
+          for (let i = 1; i <= deposit.termMonths; i++) {
               const dueDate = new Date(startDate);
               dueDate.setMonth(dueDate.getMonth() + i);
               const dueDateStr = dueDate.toISOString().split('T')[0];
-              const interestAmount = (deposit.amount * deposit.interestRate / 100) * (monthsStep / 12);
+              const interest = Math.round(baseAmount * monthlyRate * 100) / 100;
               const isPast = dueDateStr <= today;
               deposit.accruals.push({
                 id: crypto.randomUUID(),
-                amount: Math.round(interestAmount * 100) / 100,
+                amount: interest,
                 dueDate: dueDateStr,
                 status: isPast ? 'paid' : 'pending',
                 paidDate: isPast ? dueDateStr : undefined,
@@ -336,57 +361,32 @@ export class AccountView {
                   date: dueDateStr,
                   time: nowTime,
                   type: 'income',
-                  amount: Math.round(interestAmount * 100) / 100,
+                  amount: interest,
                   category: 'Проценты по вкладу',
                   tag: '',
                   payer: deposit.bankName,
                   note: `Начисление процентов по вкладу "${deposit.name}"`,
                   attachmentPath: '',
+                  linkedId: deposit.id,
                 });
                 recordsChanged = true;
               }
-            }
-          } else if (accrualType === 'end_of_term') {
-            const endDate = new Date(startDate);
-            endDate.setMonth(endDate.getMonth() + termMonths);
-            const endDateStr = endDate.toISOString().split('T')[0];
-            const totalInterest = (deposit.amount * deposit.interestRate / 100) * (termMonths / 12);
-            const isPast = endDateStr <= today;
-            deposit.accruals.push({
-              id: crypto.randomUUID(),
-              amount: Math.round(totalInterest * 100) / 100,
-              dueDate: endDateStr,
-              status: isPast ? 'paid' : 'pending',
-              paidDate: isPast ? endDateStr : undefined,
-            });
-            if (isPast && deposit.status === 'active') {
-              this.data!.records.push({
-                id: crypto.randomUUID(),
-                createdAt: Date.now(),
-                date: endDateStr,
-                time: nowTime,
-                type: 'income',
-                amount: Math.round(totalInterest * 100) / 100,
-                category: 'Проценты по вкладу',
-                tag: '',
-                payer: deposit.bankName,
-                note: `Начисление процентов по вкладу "${deposit.name}"`,
-                attachmentPath: '',
-              });
-              recordsChanged = true;
-            }
           }
-        };
-        createAccruals(deposit.accrualType);
-        depositsChanged = true;
+        }
       }
+      depositsChanged = true;
 
-      if (deposit.status !== 'active') continue;
-      for (const accrual of deposit.accruals) {
-        if (accrual.status === 'pending' && accrual.dueDate <= today) {
-          accrual.status = 'paid';
-          accrual.paidDate = accrual.dueDate;
+    if (deposit.status !== 'active') continue;
 
+    for (const accrual of deposit.accruals) {
+      if (accrual.status === 'pending' && accrual.dueDate <= today) {
+        accrual.status = 'paid';
+        accrual.paidDate = accrual.dueDate;
+
+        if (deposit.accrualType === 'capitalization') {
+          deposit.amount += accrual.amount;
+          depositsChanged = true;
+        } else {
           const record: FinanceRecord = {
             id: crypto.randomUUID(),
             createdAt: Date.now(),
@@ -405,31 +405,33 @@ export class AccountView {
           recordsChanged = true;
         }
       }
-      const allPastAccrued = deposit.accruals.length > 0 && deposit.accruals.every(a => a.dueDate <= today && a.status === 'paid');
-      if (allPastAccrued) {
-        deposit.status = 'closed';
-        depositsChanged = true;
-
-        const refundRec: FinanceRecord = {
-          id: crypto.randomUUID(),
-          createdAt: Date.now(),
-          date: today,
-          time: nowTime,
-          type: 'income',
-          amount: deposit.amount,
-          category: 'Возврат вклада',
-          tag: '',
-          payer: deposit.bankName,
-          note: `Возврат вклада "${deposit.name}"`,
-          attachmentPath: '',
-          linkedId: deposit.id,
-        };
-        this.data.records.push(refundRec);
-        recordsChanged = true;
-      }
     }
 
-    for (const credit of this.data.credits) {
+    const allAccrualsPaid = deposit.accruals.length > 0 && deposit.accruals.every(a => a.status === 'paid');
+    if (allAccrualsPaid) {
+      deposit.status = 'closed';
+      depositsChanged = true;
+
+      const refundRec: FinanceRecord = {
+        id: crypto.randomUUID(),
+        createdAt: Date.now(),
+        date: today,
+        time: nowTime,
+        type: 'income',
+        amount: deposit.amount,
+        category: 'Возврат вклада',
+        tag: '',
+        payer: deposit.bankName,
+        note: `Возврат вклада "${deposit.name}"`,
+        attachmentPath: '',
+        linkedId: deposit.id,
+      };
+      this.data.records.push(refundRec);
+      recordsChanged = true;
+    }
+  }
+
+  for (const credit of this.data.credits) {
       if (credit.status !== 'active') continue;
       if (!credit.payments) credit.payments = [];
       if (!credit.payments.length && credit.monthlyPayment > 0 && credit.startDate) {

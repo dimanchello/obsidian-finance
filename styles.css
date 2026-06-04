@@ -679,6 +679,11 @@
 .finance-modal { padding: 6px 4px 4px; }
 .finance-modal-title { font-size: 1.1em !important; font-weight: 700 !important; margin: 0 0 10px !important; }
 
+.modal.finance-colvis-modal {
+  max-width: 360px !important;
+  width: min(96vw, 360px) !important;
+}
+
 .finance-type-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
 .finance-type-toggle {
   padding: 8px; border: 2px solid var(--ft-border); border-radius: var(--ft-radius-sm);

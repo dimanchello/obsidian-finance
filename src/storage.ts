@@ -287,8 +287,7 @@ export class FinanceStorage {
         const data = JSON.parse(await this.app.vault.adapter.read(fp)) as DepositRecord[];
         data.forEach(d => {
           if (!d.termMonths) d.termMonths = 12;
-          if (!d.accrualType) d.accrualType = 'end_of_term';
-          if (!d.paymentFrequency) d.paymentFrequency = 'monthly';
+          if (!d.accrualType) d.accrualType = 'to_account';
           if (!d.type) d.type = 'term';
           d.status ??= 'active';
           if (!d.accruals) d.accruals = [];
@@ -611,12 +610,22 @@ export class FinanceStorage {
 
   private recalculateFutureAccruals(deposit: DepositRecord): void {
     const today = new Date().toISOString().split('T')[0];
-    const monthsStep = deposit.paymentFrequency === 'monthly' ? 1 : 3;
-    const accrualAmount = Math.round((deposit.amount * deposit.interestRate / 100) * (monthsStep / 12) * 100) / 100;
+    const futureAccruals = deposit.accruals
+      .filter(a => a.dueDate > today && a.status === 'pending')
+      .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+    if (!futureAccruals.length) return;
 
-    for (const accrual of deposit.accruals) {
-      if (accrual.dueDate > today && accrual.status === 'pending') {
-        accrual.amount = accrualAmount;
+    if (deposit.accrualType === 'capitalization') {
+      let currentAmount = deposit.amount;
+      for (const accrual of futureAccruals) {
+        const interest = currentAmount * (deposit.interestRate / 100 / 12);
+        currentAmount += interest;
+        accrual.amount = Math.round(interest * 100) / 100;
+      }
+    } else {
+      const monthlyRate = deposit.amount * (deposit.interestRate / 100 / 12);
+      for (const accrual of futureAccruals) {
+        accrual.amount = Math.round(monthlyRate * 100) / 100;
       }
     }
   }

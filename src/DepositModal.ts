@@ -1,12 +1,13 @@
 import { App, Modal, Notice } from 'obsidian';
-import { DepositRecord, DepositType, DepositAccrualType, AccrualFrequency } from './types';
+import { DepositRecord, DepositType, DepositAccrualType, FinanceRecord } from './types';
 import { fmtAmount, parseAmount } from './utils';
+import { InfoModal } from './InfoModal';
 
 export interface DepositModalOptions {
   title:     string;
   deposit?:  DepositRecord;
   banks:     string[];
-  onSave:    (deposit: DepositRecord) => void;
+  onSave:    (deposit: DepositRecord, interestRecords: FinanceRecord[]) => void;
 }
 
 export class DepositModal extends Modal {
@@ -14,7 +15,6 @@ export class DepositModal extends Modal {
   private deposit: DepositRecord;
   private amountInput!: HTMLInputElement;
   private rateInput!: HTMLInputElement;
-  private frequencyContainer!: HTMLElement;
 
   constructor(app: App, opts: DepositModalOptions) {
     super(app);
@@ -31,8 +31,7 @@ export class DepositModal extends Modal {
           interestRate: 0,
           startDate: nowStr,
           termMonths: 12,
-          accrualType: 'end_of_term',
-          paymentFrequency: 'monthly',
+          accrualType: 'to_account',
           createdAt: Date.now(),
           note: '',
           status: 'active',
@@ -51,7 +50,6 @@ export class DepositModal extends Modal {
 
     const form = contentEl.createDiv('finance-form finance-form-grid finance-form-compact');
 
-    // === РЯД 1: Название | Банк ===
     const row1 = form.createDiv('finance-form-row finance-full-width');
 
     const nameG = row1.createDiv('finance-field-group');
@@ -106,12 +104,10 @@ export class DepositModal extends Modal {
     bankIn.addEventListener('input', () => { this.deposit.bankName = bankIn.value; openDropdown(bankIn.value); });
     bankIn.addEventListener('blur', () => setTimeout(closeDropdown, 150));
 
-    // === РЯД 2: Сумма | Процентная ставка ===
     const row2 = form.createDiv('finance-form-row finance-full-width');
 
     const amtG = row2.createDiv('finance-field-group finance-amount-group');
     amtG.createEl('label', { text: 'Сумма', cls: 'finance-field-label' });
-    // Класс finance-amount-input сохранен для выравнивания текста, но его размер мы поправим в CSS
     this.amountInput = amtG.createEl('input', { type: 'text', cls: 'finance-input finance-amount-input' });
     this.amountInput.setAttribute('inputmode', 'decimal');
     this.amountInput.setAttribute('placeholder', '0');
@@ -160,7 +156,6 @@ export class DepositModal extends Modal {
       this.rateInput.value = rate > 0 ? String(rate) : '';
     });
 
-    // === РЯД 3: Дата начала | Срок ===
     const row3 = form.createDiv('finance-form-row finance-full-width');
 
     const dateG = row3.createDiv('finance-field-group');
@@ -177,7 +172,6 @@ export class DepositModal extends Modal {
     termIn.setAttribute('max', '360');
     termIn.addEventListener('change', () => { this.deposit.termMonths = parseInt(termIn.value) || 12; });
 
-    // === РЯД 4: Тип вклада | Тип начисления ===
     const row4 = form.createDiv('finance-form-row finance-full-width');
 
     const typeG = row4.createDiv('finance-field-group');
@@ -198,36 +192,18 @@ export class DepositModal extends Modal {
     accrualG.createEl('label', { text: 'Тип начисления', cls: 'finance-field-label' });
     const accrualSel = accrualG.createEl('select', { cls: 'finance-input finance-filter-select' });
     const accrualTypes: { value: DepositAccrualType; label: string }[] = [
-      { value: 'capitalization', label: 'На счёт (капитализация)' },
-      { value: 'end_of_term', label: 'В конце срока' },
-      { value: 'capitalization_at_end', label: 'В конце с капитал.' },
+      { value: 'to_account', label: 'На счёт' },
+      { value: 'capitalization', label: 'С капитализацией' },
     ];
     accrualTypes.forEach(t => {
       const opt = accrualSel.createEl('option', { value: t.value, text: t.label });
       if (t.value === this.deposit.accrualType) opt.selected = true;
     });
+
     accrualSel.addEventListener('change', () => {
       this.deposit.accrualType = accrualSel.value as DepositAccrualType;
-      this.frequencyContainer.style.display = (this.deposit.accrualType === 'end_of_term' || this.deposit.accrualType === 'capitalization_at_end') ? 'none' : 'block';
     });
 
-    // === ДИНАМИЧЕСКИЙ РЯД: Периодичность ===
-    this.frequencyContainer = form.createDiv('finance-form-row finance-full-width');
-    const freqG = this.frequencyContainer.createDiv('finance-field-group');
-    freqG.createEl('label', { text: 'Периодичность', cls: 'finance-field-label' });
-    const freqSel = freqG.createEl('select', { cls: 'finance-input finance-filter-select' });
-    const freqs: { value: AccrualFrequency; label: string }[] = [
-      { value: 'monthly', label: 'Ежемесячно' },
-      { value: 'quarterly', label: 'Ежеквартально' },
-    ];
-    freqs.forEach(f => {
-      const opt = freqSel.createEl('option', { value: f.value, text: f.label });
-      if (f.value === this.deposit.paymentFrequency) opt.selected = true;
-    });
-    freqSel.addEventListener('change', () => { this.deposit.paymentFrequency = freqSel.value as AccrualFrequency; });
-    this.frequencyContainer.style.display = (this.deposit.accrualType === 'end_of_term' || this.deposit.accrualType === 'capitalization_at_end') ? 'none' : 'block';
-
-    // === РЯД 5: Примечание ===
     const row5 = form.createDiv('finance-form-row finance-full-width');
     const noteG = row5.createDiv('finance-field-group');
     noteG.createEl('label', { text: 'Примечание', cls: 'finance-field-label' });
@@ -237,8 +213,10 @@ export class DepositModal extends Modal {
     noteIn.rows = 2;
     noteIn.addEventListener('input', () => { this.deposit.note = noteIn.value; });
 
-    // Кнопки управления
     const btnRow = contentEl.createDiv('finance-modal-btns');
+    const infoBtn = btnRow.createEl('button', { text: '❓', cls: 'finance-btn-cancel' });
+    infoBtn.style.marginRight = 'auto';
+    infoBtn.addEventListener('click', () => new InfoModal(this.app).open());
     btnRow.createEl('button', { text: 'Отмена', cls: 'finance-btn-cancel' })
         .addEventListener('click', () => this.close());
     btnRow.createEl('button', { text: 'Сохранить', cls: 'finance-btn-save' })
@@ -262,58 +240,12 @@ export class DepositModal extends Modal {
     }
     this.deposit.name = this.deposit.name.trim();
 
-    if (!this.deposit.accruals.length && this.deposit.termMonths > 0) {
-      const startDate = new Date(this.deposit.startDate);
-      const today = new Date().toISOString().split('T')[0];
-      if (this.deposit.accrualType === 'capitalization') {
-        const monthsStep = this.deposit.paymentFrequency === 'monthly' ? 1 : 3;
-        for (let i = monthsStep; i <= this.deposit.termMonths; i += monthsStep) {
-          const dueDate = new Date(startDate);
-          dueDate.setMonth(dueDate.getMonth() + i);
-          const dueDateStr = dueDate.toISOString().split('T')[0];
-          const interestAmount = (this.deposit.amount * this.deposit.interestRate / 100) * (monthsStep / 12);
-          const isPast = dueDateStr <= today;
-          this.deposit.accruals.push({
-            id: crypto.randomUUID(),
-            amount: Math.round(interestAmount * 100) / 100,
-            dueDate: dueDateStr,
-            status: isPast ? 'paid' : 'pending',
-            paidDate: isPast ? dueDateStr : undefined,
-          });
-        }
-      } else if (this.deposit.accrualType === 'capitalization_at_end') {
-        const monthsStep = this.deposit.paymentFrequency === 'monthly' ? 1 : 3;
-        for (let i = monthsStep; i <= this.deposit.termMonths; i += monthsStep) {
-          const dueDate = new Date(startDate);
-          dueDate.setMonth(dueDate.getMonth() + i);
-          const dueDateStr = dueDate.toISOString().split('T')[0];
-          const interestAmount = (this.deposit.amount * this.deposit.interestRate / 100) * (monthsStep / 12);
-          const isPast = dueDateStr <= today;
-          this.deposit.accruals.push({
-            id: crypto.randomUUID(),
-            amount: Math.round(interestAmount * 100) / 100,
-            dueDate: dueDateStr,
-            status: isPast ? 'paid' : 'pending',
-            paidDate: isPast ? dueDateStr : undefined,
-          });
-        }
-      } else if (this.deposit.accrualType === 'end_of_term') {
-        const endDate = new Date(startDate);
-        endDate.setMonth(endDate.getMonth() + this.deposit.termMonths);
-        const endDateStr = endDate.toISOString().split('T')[0];
-        const totalInterest = (this.deposit.amount * this.deposit.interestRate / 100) * (this.deposit.termMonths / 12);
-        const isPast = endDateStr <= today;
-        this.deposit.accruals.push({
-          id: crypto.randomUUID(),
-          amount: Math.round(totalInterest * 100) / 100,
-          dueDate: endDateStr,
-          status: isPast ? 'paid' : 'pending',
-          paidDate: isPast ? endDateStr : undefined,
-        });
-      }
+    if (!this.deposit.startDate || isNaN(new Date(this.deposit.startDate).getTime())) {
+      new Notice('⚠️ Укажите корректную дату начала');
+      return;
     }
 
-    this.o.onSave(this.deposit);
+    this.o.onSave(this.deposit, []);
     this.close();
   }
 

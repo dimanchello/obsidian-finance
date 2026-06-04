@@ -159,11 +159,12 @@ export interface Translations {
   depositTypeTerm: string;
   depositTypeDemand: string;
   depositTypeSavings: string;
-  capitalization: string;
-  endOfTerm: string;
-  capitalizationAtEnd: string;
+  accrualToAccount: string;
+  accrualCapitalization: string;
   paymentFrequencyMonthly: string;
-  paymentFrequencyQuarterly: string;
+  accumulatedIncome: string;
+  accrualIncluded: string;
+  accrualPaidToAccount: string;
   noCredits: string;
   noCreditsFiltered: string;
   noDeposits: string;
@@ -336,11 +337,12 @@ const ru: Translations = {
   depositTypeTerm: 'Срочный',
   depositTypeDemand: 'До востребования',
   depositTypeSavings: 'Накопительный',
-  capitalization: 'На счёт (капитализация)',
-  endOfTerm: 'В конце срока',
-  capitalizationAtEnd: 'В конце срока с капитализацией',
+  accrualToAccount: 'На счёт',
+  accrualCapitalization: 'С капитализацией',
   paymentFrequencyMonthly: 'Ежемесячно',
-  paymentFrequencyQuarterly: 'Ежеквартально',
+  accumulatedIncome: 'Накопленный доход',
+  accrualIncluded: '✓ Включено в сумму вклада',
+  accrualPaidToAccount: '✓ Начислено',
   noCredits: 'Нет кредитов',
   noCreditsFiltered: 'Кредитов не найдено',
   noDeposits: 'Нет вкладов',
@@ -513,11 +515,12 @@ const en: Translations = {
   depositTypeTerm: 'Term',
   depositTypeDemand: 'Demand',
   depositTypeSavings: 'Savings',
-  capitalization: 'To account (capitalization)',
-  endOfTerm: 'At end of term',
-  capitalizationAtEnd: 'At end with capitalization',
+  accrualToAccount: 'To account',
+  accrualCapitalization: 'Capitalization',
   paymentFrequencyMonthly: 'Monthly',
-  paymentFrequencyQuarterly: 'Quarterly',
+  accumulatedIncome: 'Accumulated income',
+  accrualIncluded: '✓ Included in deposit amount',
+  accrualPaidToAccount: '✓ Accrued',
   noCredits: 'No credits',
   noCreditsFiltered: 'No credits found',
   noDeposits: 'No deposits',

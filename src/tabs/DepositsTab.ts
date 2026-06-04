@@ -43,6 +43,9 @@ export class DepositsTab {
   }
 
   private getDepositTotal(deposit: DepositRecord): number {
+    if (deposit.accrualType === 'capitalization') {
+      return deposit.amount;
+    }
     return deposit.amount + this.getDepositAccrued(deposit);
   }
 
@@ -551,6 +554,16 @@ export class DepositsTab {
       withdrawalsSummary.textContent = `Всего снятий: ${withdrawals.length} · ${this.ctx.fmt(totalWithdrawals)}`;
     }
 
+    const accrued = this.getDepositAccrued(deposit);
+    if (accrued > 0) {
+      const incomeLabel = wrapper.createDiv('finance-deposit-summary');
+      incomeLabel.style.margin = '0 0 12px';
+      incomeLabel.style.fontSize = '13px';
+      incomeLabel.style.fontWeight = '600';
+      incomeLabel.style.color = '#16a34a';
+      incomeLabel.textContent = `Накопленный доход: ${this.ctx.fmt(accrued)}`;
+    }
+
     const accrualsHeader = wrapper.createEl('h4', { text: '📊 Начисления', cls: 'finance-section-title' });
     accrualsHeader.style.margin = '0 0 8px';
     accrualsHeader.style.fontSize = '13px';
@@ -601,7 +614,8 @@ export class DepositsTab {
       const statusCell = mr.createEl('td', { cls: 'finance-td' });
       statusCell.style.background = bgColor;
       if (isPaid) {
-        statusCell.textContent = '✓ Начислено';
+        const isCapitalization = deposit.accrualType === 'capitalization';
+        statusCell.textContent = isCapitalization ? '✓ Включено в сумму вклада' : '✓ Начислено';
         statusCell.style.color = '#16a34a';
       } else {
         statusCell.textContent = '⏳ Ожидает';
@@ -848,13 +862,17 @@ export class DepositsTab {
     new DepositModal(this.ctx.app, {
       title: '➕ Новый вклад',
       banks: allBanks,
-      onSave: async deposit => {
+      onSave: async (deposit, interestRecords) => {
         await this.ctx.storage.addDeposit(this.ctx.notePath, deposit);
+        for (const r of interestRecords) {
+          await this.ctx.storage.addRecord(this.ctx.notePath, r);
+        }
+        const nowTime = new Date().toTimeString().slice(0, 5);
         const rec: FinanceRecord = {
           id: crypto.randomUUID(),
           createdAt: Date.now(),
           date: deposit.startDate,
-          time: '',
+          time: nowTime,
           type: 'expense',
           amount: deposit.amount,
           category: 'Вклад',
@@ -879,8 +897,42 @@ export class DepositsTab {
       title: '✏️ Редактировать вклад',
       deposit,
       banks: allBanks,
-      onSave: async updated => {
-        await this.ctx.storage.updateDeposit(this.ctx.notePath, updated);
+      onSave: async (updated, _interestRecords) => {
+        const accrualFieldsChanged =
+          deposit.amount !== updated.amount ||
+          deposit.startDate !== updated.startDate ||
+          deposit.termMonths !== updated.termMonths ||
+          deposit.interestRate !== updated.interestRate ||
+          deposit.accrualType !== updated.accrualType;
+
+        if (accrualFieldsChanged && updated.status === 'active') {
+          const otherRecords = this.ctx.data!.records.filter(r => r.linkedId !== updated.id);
+
+          const nowTime = new Date().toTimeString().slice(0, 5);
+          const expenseRec: FinanceRecord = {
+            id: crypto.randomUUID(),
+            createdAt: Date.now(),
+            date: updated.startDate,
+            time: nowTime,
+            type: 'expense',
+            amount: updated.amount,
+            category: 'Вклад',
+            tag: '',
+            payer: updated.bankName,
+            note: `Открытие вклада "${updated.name}"`,
+            attachmentPath: '',
+            linkedId: updated.id,
+          };
+          otherRecords.push(expenseRec);
+
+          updated.accruals = [];
+
+          await this.ctx.storage.saveAllRecords(this.ctx.notePath, otherRecords);
+          await this.ctx.storage.updateDeposit(this.ctx.notePath, updated);
+        } else {
+          await this.ctx.storage.updateDeposit(this.ctx.notePath, updated);
+        }
+
         this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
         this.onUpdate?.();
         new Notice('✅ Вклад обновлён');
@@ -919,10 +971,33 @@ export class DepositsTab {
 
   private confirmDeleteDeposit(deposit: DepositRecord): void {
     const label = `${deposit.name} · ${this.ctx.fmt(deposit.amount)}`;
-    new ConfirmModal(this.ctx.app, `Удалить вклад?\n${label}`, async () => {
+    const refundNote = deposit.status === 'active'
+      ? `\n\nСумма ${this.ctx.fmt(deposit.amount)} будет возвращена на счёт.`
+      : '';
+    new ConfirmModal(this.ctx.app, `Удалить вклад?${refundNote}\n\n${label}`, async () => {
       await this.ctx.storage.deleteDeposit(this.ctx.notePath, deposit.id);
-      const recs = this.ctx.data!.records.filter(r => !(r.category === 'Вклад' && r.payer === deposit.bankName && r.note.includes(deposit.name)));
-      await this.ctx.storage.saveAllRecords(this.ctx.notePath, recs);
+      const otherRecords = this.ctx.data!.records.filter(r => r.linkedId !== deposit.id);
+
+      if (deposit.status === 'active') {
+        const nowDate = new Date().toISOString().split('T')[0];
+        const nowTime = new Date().toTimeString().slice(0, 5);
+        const refundRec: FinanceRecord = {
+          id: crypto.randomUUID(),
+          createdAt: Date.now(),
+          date: nowDate,
+          time: nowTime,
+          type: 'income',
+          amount: deposit.amount,
+          category: 'Возврат вклада',
+          tag: '',
+          payer: deposit.bankName,
+          note: `Возврат тела вклада "${deposit.name}"`,
+          attachmentPath: '',
+        };
+        otherRecords.push(refundRec);
+      }
+
+      await this.ctx.storage.saveAllRecords(this.ctx.notePath, otherRecords);
       this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
       this.onUpdate?.();
       new Notice('🗑️ Вклад удалён');

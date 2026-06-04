@@ -13,6 +13,7 @@ export class ColumnVisibilityModal extends Modal {
   constructor(app: App, opts: ColumnVisibilityModalOptions) {
     super(app);
     this.opts = opts;
+    this.modalEl.addClass('finance-colvis-modal');
   }
 
   onOpen(): void {
