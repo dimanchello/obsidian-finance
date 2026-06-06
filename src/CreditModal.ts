@@ -118,19 +118,19 @@ export class CreditModal extends Modal {
     this.amountInput.setAttribute('placeholder', '0');
     this.amountInput.setAttribute('autocomplete', 'off');
 
-    if (this.credit.currentAmount > 0) {
-      this.amountInput.value = fmtAmount(String(this.credit.currentAmount));
+    if (this.credit.originalAmount > 0) {
+      this.amountInput.value = fmtAmount(String(this.credit.originalAmount));
     }
 
     this.amountInput.addEventListener('focus', () => {
-      if (this.credit.currentAmount > 0) {
-        this.amountInput.value = String(this.credit.currentAmount).replace('.', ',');
+      if (this.credit.originalAmount > 0) {
+        this.amountInput.value = String(this.credit.originalAmount).replace('.', ',');
       }
     });
 
     this.amountInput.addEventListener('input', () => {
       const raw = this.amountInput.value;
-      this.credit.currentAmount = parseAmount(raw);
+      this.credit.originalAmount = parseAmount(raw);
       const sel = this.amountInput.selectionStart ?? raw.length;
       const rawBefore = raw.slice(0, sel).replace(/[^\d.,]/g, '').length;
       const formatted = fmtAmount(raw);
@@ -149,7 +149,6 @@ export class CreditModal extends Modal {
     this.amountInput.addEventListener('blur', () => {
       const n = parseAmount(this.amountInput.value);
       this.credit.originalAmount = n;
-      this.credit.currentAmount = n;
       this.amountInput.value = n > 0 ? fmtAmount(String(n)) : '';
     });
 
@@ -292,6 +291,7 @@ export class CreditModal extends Modal {
 
   private handleSave(): void {
     const amount = parseAmount(this.amountInput.value);
+    this.credit.originalAmount = amount;
     if (!amount || amount <= 0) {
       new Notice('⚠️ Укажите сумму больше нуля');
       this.amountInput.focus();
@@ -307,10 +307,15 @@ export class CreditModal extends Modal {
     }
     this.credit.name = this.credit.name.trim();
 
-    if (!this.credit.payments.length && this.credit.termMonths > 0 && this.credit.monthlyPayment > 0) {
-      const startDate = new Date(this.credit.startDate);
+    if (this.credit.termMonths > 0 && this.credit.monthlyPayment > 0) {
       const today = new Date().toISOString().split('T')[0];
-      for (let i = 1; i <= this.credit.termMonths; i++) {
+      const startDate = new Date(this.credit.startDate);
+
+      const kept = this.credit.payments.filter(p => p.status === 'paid');
+      for (const p of kept) p.amount = this.credit.monthlyPayment;
+      this.credit.payments = [...kept];
+
+      for (let i = kept.length + 1; i <= this.credit.termMonths; i++) {
         const dueDate = new Date(startDate);
         dueDate.setMonth(dueDate.getMonth() + i);
         const dueDateStr = dueDate.toISOString().split('T')[0];
@@ -324,6 +329,9 @@ export class CreditModal extends Modal {
         });
       }
     }
+
+    const paidSum = this.credit.payments.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0);
+    this.credit.currentAmount = Math.max(0, this.credit.originalAmount - paidSum);
 
     this.o.onSave(this.credit);
     this.close();

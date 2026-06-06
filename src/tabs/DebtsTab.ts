@@ -15,6 +15,7 @@ export class DebtsTab {
   private el: HTMLElement;
   private debtPaginationEl?: HTMLElement;
   private filterDebounce: ReturnType<typeof setTimeout> | null = null;
+  private filtersOpen = false;
   onUpdate: (() => void) | null = null;
 
   constructor(ctx: ViewContext, el: HTMLElement) {
@@ -113,12 +114,12 @@ export class DebtsTab {
     parent.appendChild(btn);
   }
 
-  private renderDebtFilters(body: HTMLElement): void {
+  private renderDebtFilters(container: HTMLElement): void {
     const f = this.ctx.state.debtFilter ?? DEFAULT_DEBT_FILTER;
 
-    const filtersContainer = body.createDiv('finance-filters-container');
 
-    const row1 = filtersContainer.createDiv('finance-filters-row');
+
+    const row1 = container.createDiv('finance-filters-row');
 
     const sg = row1.createDiv('finance-filter-group finance-filter-search');
     sg.createEl('label', { text: 'Поиск', cls: 'finance-filter-label' });
@@ -168,7 +169,7 @@ export class DebtsTab {
       this.resetDebtPage();
     });
 
-    const row2 = filtersContainer.createDiv('finance-filters-row');
+    const row2 = container.createDiv('finance-filters-row');
 
     const dfG = row2.createDiv('finance-filter-group');
     dfG.createEl('label', { text: 'С', cls: 'finance-filter-label' });
@@ -203,7 +204,7 @@ export class DebtsTab {
         this.resetDebtPage();
       });
 
-    const sortRow = filtersContainer.createDiv('finance-sort-row');
+    const sortRow = container.createDiv('finance-sort-row');
     sortRow.createEl('span', { text: 'Сортировка:', cls: 'finance-sort-label' });
 
     const sortFields: { field: DebtSortField; label: string }[] = [
@@ -374,7 +375,22 @@ export class DebtsTab {
     newDebtBtn.innerHTML = '<span class="btn-icon">＋</span><span>Новый долг</span>';
     newDebtBtn.addEventListener('click', () => this.openNewDebtModal());
 
-    this.renderDebtFilters(body);
+    const filtBtn = toolbar.createEl('button', { cls: 'finance-analytics-toggle-btn' });
+    const updateFiltBtn = () => {
+      filtBtn.textContent = `🔍 Фильтры ${this.filtersOpen ? '▲' : '▼'}`;
+      filtBtn.classList.toggle('active', this.filtersOpen);
+    };
+    updateFiltBtn();
+    filtBtn.addEventListener('click', () => {
+      this.filtersOpen = !this.filtersOpen;
+      this.render();
+    });
+
+    const container = body.createDiv('finance-filters-container');
+    container.style.display = this.filtersOpen ? 'block' : 'none';
+    if (this.filtersOpen) {
+      this.renderDebtFilters(container);
+    }
 
     if (!allDebts.length) {
       const e = body.createDiv('finance-empty-state');

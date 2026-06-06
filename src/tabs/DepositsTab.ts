@@ -16,6 +16,7 @@ export class DepositsTab {
   private el: HTMLElement;
   private depositPaginationEl?: HTMLElement;
   private filterDebounce: ReturnType<typeof setTimeout> | null = null;
+  private filtersOpen = false;
   onUpdate: (() => void) | null = null;
 
   constructor(ctx: ViewContext, el: HTMLElement) {
@@ -194,12 +195,12 @@ export class DepositsTab {
     trigger.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDropdown(); });
   }
 
-  private renderDepositFilters(body: HTMLElement): void {
+  private renderDepositFilters(container: HTMLElement): void {
     const f = this.ctx.state.depositFilter ?? DEFAULT_DEPOSIT_FILTER;
 
-    const filtersContainer = body.createDiv('finance-filters-container');
 
-    const row1 = filtersContainer.createDiv('finance-filters-row');
+
+    const row1 = container.createDiv('finance-filters-row');
 
     const sg = row1.createDiv('finance-filter-group finance-filter-search');
     sg.createEl('label', { text: 'Поиск', cls: 'finance-filter-label' });
@@ -239,7 +240,7 @@ export class DepositsTab {
       this.resetDepositPage();
     });
 
-    const row2 = filtersContainer.createDiv('finance-filters-row');
+    const row2 = container.createDiv('finance-filters-row');
 
     const dfG = row2.createDiv('finance-filter-group');
     dfG.createEl('label', { text: 'С', cls: 'finance-filter-label' });
@@ -285,7 +286,7 @@ export class DepositsTab {
         this.resetDepositPage();
       });
 
-    const sortRow = filtersContainer.createDiv('finance-sort-row');
+    const sortRow = container.createDiv('finance-sort-row');
     sortRow.createEl('span', { text: 'Сортировка:', cls: 'finance-sort-label' });
 
     const sortFields: { field: DepositSortField; label: string }[] = [
@@ -358,7 +359,22 @@ export class DepositsTab {
     newDepositBtn.innerHTML = '<span class="btn-icon">＋</span><span>Новый вклад</span>';
     newDepositBtn.addEventListener('click', () => this.openNewDepositModal());
 
-    this.renderDepositFilters(body);
+    const filtBtn = toolbar.createEl('button', { cls: 'finance-analytics-toggle-btn' });
+    const updateFiltBtn = () => {
+      filtBtn.textContent = `🔍 Фильтры ${this.filtersOpen ? '▲' : '▼'}`;
+      filtBtn.classList.toggle('active', this.filtersOpen);
+    };
+    updateFiltBtn();
+    filtBtn.addEventListener('click', () => {
+      this.filtersOpen = !this.filtersOpen;
+      this.render();
+    });
+
+    const container = body.createDiv('finance-filters-container');
+    container.style.display = this.filtersOpen ? 'block' : 'none';
+    if (this.filtersOpen) {
+      this.renderDepositFilters(container);
+    }
 
     if (!allDeposits.length) {
       const e = body.createDiv('finance-empty-state');

@@ -16,6 +16,7 @@ export class CreditsTab {
   private el: HTMLElement;
   private creditPaginationEl?: HTMLElement;
   private filterDebounce: ReturnType<typeof setTimeout> | null = null;
+  private filtersOpen = false;
   private expandedCreditId: string | null = null;
   private creditPaymentPages = new Map<string, number>();
 
@@ -163,12 +164,12 @@ export class CreditsTab {
     });
   }
 
-  private renderCreditFilters(body: HTMLElement): void {
+  private renderCreditFilters(container: HTMLElement): void {
     const f = this.ctx.state.creditFilter ?? DEFAULT_CREDIT_FILTER;
 
-    const filtersContainer = body.createDiv('finance-filters-container');
 
-    const row1 = filtersContainer.createDiv('finance-filters-row');
+
+    const row1 = container.createDiv('finance-filters-row');
 
     const sg = row1.createDiv('finance-filter-group finance-filter-search');
     sg.createEl('label', { text: 'Поиск', cls: 'finance-filter-label' });
@@ -208,7 +209,7 @@ export class CreditsTab {
       this.resetCreditPage();
     });
 
-    const row2 = filtersContainer.createDiv('finance-filters-row');
+    const row2 = container.createDiv('finance-filters-row');
 
     const dfG = row2.createDiv('finance-filter-group');
     dfG.createEl('label', { text: 'С', cls: 'finance-filter-label' });
@@ -254,7 +255,7 @@ export class CreditsTab {
         this.resetCreditPage();
       });
 
-    const sortRow = filtersContainer.createDiv('finance-sort-row');
+    const sortRow = container.createDiv('finance-sort-row');
     sortRow.createEl('span', { text: 'Сортировка:', cls: 'finance-sort-label' });
 
     const sortFields: { field: CreditSortField; label: string }[] = [
@@ -322,7 +323,22 @@ export class CreditsTab {
     newCreditBtn.innerHTML = '<span class="btn-icon">＋</span><span>Новый кредит</span>';
     newCreditBtn.addEventListener('click', () => this.openNewCreditModal());
 
-    this.renderCreditFilters(body);
+    const filtBtn = toolbar.createEl('button', { cls: 'finance-analytics-toggle-btn' });
+    const updateFiltBtn = () => {
+      filtBtn.textContent = `🔍 Фильтры ${this.filtersOpen ? '▲' : '▼'}`;
+      filtBtn.classList.toggle('active', this.filtersOpen);
+    };
+    updateFiltBtn();
+    filtBtn.addEventListener('click', () => {
+      this.filtersOpen = !this.filtersOpen;
+      this.render();
+    });
+
+    const container = body.createDiv('finance-filters-container');
+    container.style.display = this.filtersOpen ? 'block' : 'none';
+    if (this.filtersOpen) {
+      this.renderCreditFilters(container);
+    }
 
     if (!allCredits.length) {
       const e = body.createDiv('finance-empty-state');
@@ -838,11 +854,12 @@ export class CreditsTab {
       banks: allBanks,
       onSave: async credit => {
         await this.ctx.storage.addCredit(this.ctx.notePath, credit);
+        const nowTime = new Date().toTimeString().slice(0, 5);
         const rec: FinanceRecord = {
           id: crypto.randomUUID(),
           createdAt: Date.now(),
           date: credit.startDate,
-          time: '',
+          time: nowTime,
           type: 'income',
           amount: credit.originalAmount,
           category: 'Кредит',
@@ -853,6 +870,24 @@ export class CreditsTab {
           linkedId: credit.id,
         };
         await this.ctx.storage.addRecord(this.ctx.notePath, rec);
+        for (const payment of credit.payments) {
+          if (payment.status === 'paid') {
+            await this.ctx.storage.addRecord(this.ctx.notePath, {
+              id: crypto.randomUUID(),
+              createdAt: Date.now(),
+              date: payment.dueDate,
+              time: nowTime,
+              type: 'expense',
+              amount: payment.amount,
+              category: 'Кредит',
+              tag: '',
+              payer: credit.bankName,
+              note: `Платёж по кредиту "${credit.name}"`,
+              attachmentPath: '',
+              linkedId: credit.id,
+            });
+          }
+        }
         this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
         this.render();
         new Notice('✅ Кредит добавлен');
@@ -869,6 +904,36 @@ export class CreditsTab {
       banks: allBanks,
       onSave: async updated => {
         await this.ctx.storage.updateCredit(this.ctx.notePath, updated);
+        const nowTime = new Date().toTimeString().slice(0, 5);
+        const existingRecs = this.ctx.data!.records;
+        for (const payment of updated.payments) {
+          if (payment.status === 'paid') {
+            const existingRec = existingRecs.find(r =>
+              r.linkedId === updated.id && r.date === payment.dueDate && r.type === 'expense'
+            );
+            if (existingRec) {
+              if (existingRec.amount !== payment.amount) {
+                existingRec.amount = payment.amount;
+              }
+            } else {
+              existingRecs.push({
+                id: crypto.randomUUID(),
+                createdAt: Date.now(),
+                date: payment.dueDate,
+                time: nowTime,
+                type: 'expense',
+                amount: payment.amount,
+                category: 'Кредит',
+                tag: '',
+                payer: updated.bankName,
+                note: `Платёж по кредиту "${updated.name}"`,
+                attachmentPath: '',
+                linkedId: updated.id,
+              });
+            }
+          }
+        }
+        await this.ctx.storage.saveAllRecords(this.ctx.notePath, existingRecs);
         this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
         this.render();
         new Notice('✅ Кредит обновлён');
