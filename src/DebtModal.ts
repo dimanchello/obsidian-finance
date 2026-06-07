@@ -2,6 +2,7 @@ import { App, Modal, Notice } from 'obsidian';
 import { getLocaleFromApp, t, Translations } from './i18n';
 import { DebtRecord } from './types';
 import { fmtAmount, parseAmount } from './utils';
+import { DebtInfoModal } from './DebtInfoModal';
 
 export interface DebtModalOptions {
   title:   string;
@@ -260,6 +261,9 @@ export class DebtModal extends Modal {
 
     // ── Buttons ──────────────────────────────────────────────────────────
     const btnRow = contentEl.createDiv('finance-modal-btns');
+    const infoBtn = btnRow.createEl('button', { text: '❓', cls: 'finance-btn-cancel' });
+    infoBtn.style.marginRight = 'auto';
+    infoBtn.addEventListener('click', () => new DebtInfoModal(this.app).open());
     btnRow.createEl('button', { text: this.tr.cancel, cls: 'finance-btn-cancel' })
       .addEventListener('click', () => this.close());
     btnRow.createEl('button', { text: this.tr.save, cls: 'finance-btn-save' })

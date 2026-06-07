@@ -2,6 +2,7 @@ import { App, Modal, Notice } from 'obsidian';
 import { getLocaleFromApp, t, Translations } from './i18n';
 import { CreditRecord, CreditType } from './types';
 import { fmtAmount, parseAmount } from './utils';
+import { CreditInfoModal } from './CreditInfoModal';
 
 export interface CreditModalOptions {
   title:     string;
@@ -264,6 +265,9 @@ export class CreditModal extends Modal {
     noteIn.addEventListener('input', () => { this.credit.note = noteIn.value; });
 
     const btnRow = contentEl.createDiv('finance-modal-btns');
+    const infoBtn = btnRow.createEl('button', { text: '❓', cls: 'finance-btn-cancel' });
+    infoBtn.style.marginRight = 'auto';
+    infoBtn.addEventListener('click', () => new CreditInfoModal(this.app).open());
     btnRow.createEl('button', { text: this.tr.cancel, cls: 'finance-btn-cancel' })
       .addEventListener('click', () => this.close());
     btnRow.createEl('button', { text: this.tr.save, cls: 'finance-btn-save' })

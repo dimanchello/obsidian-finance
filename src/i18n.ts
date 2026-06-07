@@ -346,6 +346,21 @@ export interface Translations {
   closeDepositRefund: string;
   confirmDeleteRecord: string;
   fileNotFoundWithPath: string;
+  creditFieldDescriptionsSub: string;
+  debtFieldDescriptionsSub: string;
+  fieldDescCreditAmount: string;
+  fieldDescCreditRate: string;
+  fieldDescCreditStartDate: string;
+  fieldDescCreditTerm: string;
+  fieldDescCreditType: string;
+  fieldDescCreditMonthlyPayment: string;
+  fieldDescCreditBank: string;
+  fieldDescDebtAmount: string;
+  fieldDescDebtRate: string;
+  fieldDescDebtDateCreated: string;
+  fieldDescDebtDueDate: string;
+  fieldDescDebtPerson: string;
+  fieldDescDebtDirection: string;
 }
 
 const ru: Translations = {
@@ -687,6 +702,21 @@ const ru: Translations = {
   fieldDescAccrual: 'На счёт: проценты выплачиваются на основной счёт. С капитализацией: проценты увеличивают сумму вклада.',
   fieldDescFrequency: 'Как часто начисляются проценты. Для «На счёт»: ежемесячно или в конце срока. При капитализации всегда ежемесячно.',
   fieldDescNote: 'Необязательное примечание.',
+  creditFieldDescriptionsSub: 'Краткое описание каждого поля формы кредита',
+  debtFieldDescriptionsSub: 'Краткое описание каждого поля формы долга',
+  fieldDescCreditAmount: 'Сумма основного долга — то, что вы взяли в банке. Проценты и ежемесячные платежи рассчитываются от этой суммы.',
+  fieldDescCreditRate: 'Годовая процентная ставка. Используется для расчёта ежемесячного платежа.',
+  fieldDescCreditStartDate: 'Дата выдачи кредита. Если указана в прошлом, будет учтена при расчёте графика платежей.',
+  fieldDescCreditTerm: 'Срок кредита в месяцах. От него зависит сумма ежемесячного платежа и общая переплата.',
+  fieldDescCreditType: 'Тип кредита: потребительский, автокредит или ипотека. Влияет на группировку и фильтрацию.',
+  fieldDescCreditMonthlyPayment: 'Фиксированная сумма, которую нужно платить каждый месяц. Рассчитывается автоматически на основе суммы, ставки и срока.',
+  fieldDescCreditBank: 'Название банка, в котором оформлен кредит. Используется для группировки и фильтрации.',
+  fieldDescDebtAmount: 'Сумма долга. Если указан процент, итоговая сумма будет увеличена на процент.',
+  fieldDescDebtRate: 'Процент за пользование деньгами. Итоговая сумма долга = сумма + процент.',
+  fieldDescDebtDateCreated: 'Дата, когда долг был оформлен.',
+  fieldDescDebtDueDate: 'Крайний срок возврата долга. Если не указана, долг считается бессрочным.',
+  fieldDescDebtPerson: 'Кому вы должны или кто должен вам. Зависит от выбранного направления.',
+  fieldDescDebtDirection: '«Мне должны» — вы дали в долг. «Я должен» — вы взяли в долг.',
 };
 
 const en: Translations = {
@@ -1028,6 +1058,21 @@ const en: Translations = {
   fieldDescAccrual: 'To account: interest is paid to the main account. Capitalization: interest increases the deposit amount.',
   fieldDescFrequency: 'How often interest is accrued. For "To account": monthly or at term end. Capitalization is always monthly.',
   fieldDescNote: 'Optional note.',
+  creditFieldDescriptionsSub: 'Brief description of each credit form field',
+  debtFieldDescriptionsSub: 'Brief description of each debt form field',
+  fieldDescCreditAmount: 'Principal loan amount — what you borrowed from the bank. Interest and monthly payments are calculated from this amount.',
+  fieldDescCreditRate: 'Annual interest rate. Used to calculate the monthly payment.',
+  fieldDescCreditStartDate: 'Loan origination date. If set in the past, it will be considered in the payment schedule calculation.',
+  fieldDescCreditTerm: 'Loan term in months. Affects the monthly payment amount and total overpayment.',
+  fieldDescCreditType: 'Credit type: consumer, auto loan, or mortgage. Used for grouping and filtering.',
+  fieldDescCreditMonthlyPayment: 'Fixed monthly payment amount. Calculated automatically based on amount, rate, and term.',
+  fieldDescCreditBank: 'Bank name where the loan was taken. Used for grouping and filtering.',
+  fieldDescDebtAmount: 'Debt amount. If interest is set, the total amount is increased by the interest.',
+  fieldDescDebtRate: 'Interest rate for borrowing. Total debt = amount + interest.',
+  fieldDescDebtDateCreated: 'Date when the debt was created.',
+  fieldDescDebtDueDate: 'Deadline for debt repayment. If not set, the debt is considered indefinite.',
+  fieldDescDebtPerson: 'Who owes you or who you owe. Depends on the selected direction.',
+  fieldDescDebtDirection: '"Owed to me" — you lent money. "I owe" — you borrowed money.',
 };
 
 const translations: Record<Locale, Translations> = { ru, en };
