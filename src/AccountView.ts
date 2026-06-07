@@ -73,20 +73,20 @@ export class AccountView {
     const rawName = this.data?.name;
     const displayName = rawName?.trim() ? rawName : noteFilename(this.notePath);
     const nameEl     = left.createEl('h2', { text: displayName, cls: 'finance-title' });
-    nameEl.title     = 'Нажмите чтобы переименовать';
+    nameEl.title     = this.ctx.tr.clickToRename;
     nameEl.addEventListener('click', () => this.startNameEdit(nameEl));
 
     const curWrap = left.createDiv('finance-currency-badge');
-    curWrap.title = 'Изменить валюту';
+    curWrap.title = this.ctx.tr.changeCurrency;
     this.renderCurrencyBadge(curWrap);
 
     const right  = header.createDiv('finance-header-right');
 
     const incBtn = right.createEl('button', { cls: 'finance-add-btn finance-income-btn' });
-    incBtn.innerHTML = '<span class="btn-icon">↑</span><span>Доход</span>';
+    incBtn.innerHTML = `<span class="btn-icon">↑</span><span>${this.ctx.tr.typeIncome}</span>`;
 
     const expBtn = right.createEl('button', { cls: 'finance-add-btn finance-expense-btn' });
-    expBtn.innerHTML = '<span class="btn-icon">↓</span><span>Расход</span>';
+    expBtn.innerHTML = `<span class="btn-icon">↓</span><span>${this.ctx.tr.typeExpense}</span>`;
 
     const moreWrap = right.createDiv('finance-more-dropdown');
     const moreBtn = moreWrap.createEl('button', { cls: 'finance-add-btn finance-more-btn' });
@@ -112,10 +112,10 @@ export class AccountView {
       e.stopPropagation();
       if (dropdown.style.display === 'none') {
         dropdown.innerHTML = '';
-        mkDropdownItem('📄', 'Записи', 'records');
-        mkDropdownItem('💳', 'Долги', 'debts');
-        mkDropdownItem('🏦', 'Кредиты', 'credits');
-        mkDropdownItem('📈', 'Вклады', 'deposits');
+        mkDropdownItem('📄', this.ctx.tr.records, 'records');
+        mkDropdownItem('💳', this.ctx.tr.debts, 'debts');
+        mkDropdownItem('🏦', this.ctx.tr.credits, 'credits');
+        mkDropdownItem('📈', this.ctx.tr.deposits, 'deposits');
         dropdown.createDiv('finance-dropdown-separator');
         dropdown.style.display = 'block';
       } else {
@@ -296,7 +296,7 @@ export class AccountView {
         this.data = await this.storage.load(this.notePath);
         this.ctx.data = this.data;
         this.renderBodyContent();
-        new Notice('✅ Запись добавлена');
+        new Notice(this.ctx.tr.recordAdded);
       },
     }).open();
   }

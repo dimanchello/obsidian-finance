@@ -52,7 +52,7 @@ npm run build
 
 Доступна команда `Вставить шаблон счёта` из палитры команд.
 
-<img src="assets/screenshots/records_usage.png" width="900" alt="Пример блока finance-account в заметке">
+<img src="assets/screenshots/records_usage_ru.png" width="900" alt="Пример блока finance-account в заметке">
 
 ---
 
@@ -80,16 +80,16 @@ npm run build
 - **Внутренние операции**: кнопка 🔄 в поле «Плательщик» помечает запись как внутреннюю — она не учитывается в статистике. Фильтр «Внутренние» позволяет показать только такие записи.
 - **Калькулятор**: кнопка 🧮 в поле суммы открывает встроенный калькулятор
 
-<img src="assets/screenshots/records_add.png" width="400" alt="Модальное окно добавления записи">
+<img src="assets/screenshots/records_add_ru.png" width="400" alt="Модальное окно добавления записи">
 
 ### Таблица
 - На десктопе — полноценная таблица с закреплённым заголовком
 - На мобильном — каждая запись отображается как карточка с подписями полей
 - **Настройка колонок**: скрытие/отображение колонок через меню ⚙️
 
-<img src="assets/screenshots/records_table.png" width="600" alt="Таблица записей на десктопе">
+<img src="assets/screenshots/records_table_ru.png" width="600" alt="Таблица записей на десктопе">
 <br>
-<img src="assets/screenshots/mobile_cards.png" width="200" alt="Мобильный вид: карточки">
+<img src="assets/screenshots/mobile_cards_ru.png" width="200" alt="Мобильный вид: карточки">
 
 ### Фильтры и сортировка
 - Поиск по всем полям
@@ -97,15 +97,15 @@ npm run build
 - Сортировка по дате, сумме, категории, дате добавления
 - Состояние фильтров сохраняется для каждой заметки
 
-<!-- ![Панель фильтров и сортировки](assets/screenshots/filters.png) -->
+<!-- ![Панель фильтров и сортировки](assets/screenshots/filters_ru.png) -->
 
 ### Аналитика
 - Статистика: доходы, расходы, баланс (с учётом долгов)
 - Графики по категориям и месяцам
 
-<img src="assets/screenshots/analytic_charts.png" width="600" alt="Аналитика график: бары">
+<img src="assets/screenshots/analytic_charts_ru.png" width="600" alt="Аналитика график: бары">
 <br>
-<img src="assets/screenshots/analytic_pie.png" width="600" alt="Аналитика график: пирог">
+<img src="assets/screenshots/analytic_pie_ru.png" width="600" alt="Аналитика график: пирог">
 
 ### Вложения
 - Фото чеков и документов
@@ -122,11 +122,11 @@ npm run build
 5. Укажите как определять тип: по полю, по знаку суммы, или все доходы/расходы
 6. Нажмите «Импортировать»
 
-<img src="assets/screenshots/import1.png" width="450" alt="Окно импорта">
+<img src="assets/screenshots/import1_ru.png" width="450" alt="Окно импорта">
 <br>
-<img src="assets/screenshots/import2.png" width="450" alt="Окно импорта">
+<img src="assets/screenshots/import2_ru.png" width="450" alt="Окно импорта">
 <br>
-<img src="assets/screenshots/import3.png" width="450" alt="Окно импорта">
+<img src="assets/screenshots/import3_ru.png" width="450" alt="Окно импорта">
 
 ### Долги
 - Два направления: «Мне должны» (lent) и «Я должен» (borrowed)
@@ -136,9 +136,9 @@ npm run build
 - Фильтры по статусу (погашен/не погашен), направлению, человеку, датам
 - История движений по каждому долгу
 
-<img src="assets/screenshots/debt_usage.png" width="600" alt="Список долгов">
+<img src="assets/screenshots/debt_usage_ru.png" width="600" alt="Список долгов">
 <br>
-<img src="assets/screenshots/debt_add.png" width="450" alt="Добавление долга">
+<img src="assets/screenshots/debt_add_ru.png" width="450" alt="Добавление долга">
 
 ### Кредиты
 - Типы: потребительский, автокредит, ипотека
@@ -147,11 +147,11 @@ npm run build
 - Досрочное погашение (с уменьшением суммы или срока)
 - Отслеживание статуса: активен / погашен
 
-<img src="assets/screenshots/credit_view.png" width="700" alt="Список кредитов">
+<img src="assets/screenshots/credit_view_ru.png" width="700" alt="Список кредитов">
 <br>
-<img src="assets/screenshots/credit_modals.png" width="450" alt="Добавление кредита">
+<img src="assets/screenshots/credit_modals_ru.png" width="450" alt="Добавление кредита">
 <br>
-<img src="assets/screenshots/credit_early_repayment.png" width="450" alt="Досрочное погашение">
+<img src="assets/screenshots/credit_early_repayment_ru.png" width="450" alt="Досрочное погашение">
 
 ### Вклады
 - Типы: срочный, до востребования, накопительный
@@ -161,11 +161,11 @@ npm run build
 - Автоматическое создание записей о доходах при начислении процентов
 - Автоматическое закрытие вклада по окончании срока
 
-<img src="assets/screenshots/deposits_usage.png" width="700" alt="Список вкладов">
+<img src="assets/screenshots/deposits_usage_ru.png" width="700" alt="Список вкладов">
 <br>
-<img src="assets/screenshots/deposits_view.png" width="600" alt="Деталка вклада">
+<img src="assets/screenshots/deposits_view_ru.png" width="600" alt="Деталка вклада">
 <br>
-<img src="assets/screenshots/deposits_modal.png" width="450" alt="Добавление вклада">
+<img src="assets/screenshots/deposits_modal_ru.png" width="450" alt="Добавление вклада">
 
 ### Настройки плагина
 - **Валюта по умолчанию** для новых счетов

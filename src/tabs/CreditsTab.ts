@@ -20,6 +20,8 @@ export class CreditsTab {
   private expandedCreditId: string | null = null;
   private creditPaymentPages = new Map<string, number>();
 
+  private get tr() { return this.ctx.tr; }
+
   constructor(ctx: ViewContext, el: HTMLElement) {
     this.ctx = ctx;
     this.el = el;
@@ -106,7 +108,7 @@ export class CreditsTab {
       const searchInput = dropdown.createEl('input', {
         type: 'text',
         cls: 'finance-custom-select-search',
-        placeholder: 'Поиск…',
+        placeholder: this.tr.searchPlaceholder,
       });
 
       const list = dropdown.createDiv('finance-custom-select-list');
@@ -116,7 +118,7 @@ export class CreditsTab {
         const lq = q.toLowerCase();
         const filtered = opts.filter(o => !lq || o.l.toLowerCase().includes(lq) || o.v.toLowerCase().includes(lq));
         if (!filtered.length) {
-          list.createDiv({ cls: 'finance-custom-select-empty', text: 'Нет вариантов' });
+          list.createDiv({ cls: 'finance-custom-select-empty', text: this.tr.noOptions });
           return;
         }
         filtered.forEach(({ v, l }) => {
@@ -172,9 +174,9 @@ export class CreditsTab {
     const row1 = container.createDiv('finance-filters-row');
 
     const sg = row1.createDiv('finance-filter-group finance-filter-search');
-    sg.createEl('label', { text: 'Поиск', cls: 'finance-filter-label' });
+    sg.createEl('label', { text: this.tr.search, cls: 'finance-filter-label' });
     const si = sg.createEl('input', {
-      type: 'text', cls: 'finance-filter-input', placeholder: 'Поиск по названию или банку…',
+      type: 'text', cls: 'finance-filter-input', placeholder: this.tr.searchByName,
     });
     si.value = f.search;
     si.addEventListener('input', () => {
@@ -186,12 +188,12 @@ export class CreditsTab {
     });
 
     const statusG = row1.createDiv('finance-filter-group');
-    statusG.createEl('label', { text: 'Статус', cls: 'finance-filter-label' });
+    statusG.createEl('label', { text: this.tr.status, cls: 'finance-filter-label' });
     const statusSel = statusG.createEl('select', { cls: 'finance-filter-select' });
     [
-      { v: 'all', l: 'Все' },
-      { v: 'active', l: 'Активные' },
-      { v: 'paid', l: 'Погашенные' },
+      { v: 'all', l: this.tr.all },
+      { v: 'active', l: this.tr.creditActive },
+      { v: 'paid', l: this.tr.creditPaid },
     ].forEach(({ v, l }) => {
       const o = statusSel.createEl('option', { text: l });
       o.value = v;
@@ -203,8 +205,8 @@ export class CreditsTab {
     });
 
     const allBanks = this.ctx.data ? [...new Set(this.ctx.data.credits.map(c => c.bankName).filter(Boolean))] : [];
-    const bankOpts = [{ v: '', l: 'Все банки' }, ...allBanks.map(b => ({ v: b, l: b }))];
-    this.mkSearchSelect(row1, 'Банк', bankOpts, f.bankName, (v) => {
+    const bankOpts = [{ v: '', l: this.tr.allBanks }, ...allBanks.map(b => ({ v: b, l: b }))];
+    this.mkSearchSelect(row1, this.tr.bankName, bankOpts, f.bankName, (v) => {
       this.ctx.state.creditFilter!.bankName = v;
       this.resetCreditPage();
     });
@@ -212,7 +214,7 @@ export class CreditsTab {
     const row2 = container.createDiv('finance-filters-row');
 
     const dfG = row2.createDiv('finance-filter-group');
-    dfG.createEl('label', { text: 'С', cls: 'finance-filter-label' });
+    dfG.createEl('label', { text: this.tr.from, cls: 'finance-filter-label' });
     const dfI = dfG.createEl('input', { type: 'date', cls: 'finance-filter-input' });
     dfI.value = f.dateFrom;
     dfI.addEventListener('change', () => {
@@ -221,7 +223,7 @@ export class CreditsTab {
     });
 
     const dtG = row2.createDiv('finance-filter-group');
-    dtG.createEl('label', { text: 'По', cls: 'finance-filter-label' });
+    dtG.createEl('label', { text: this.tr.to, cls: 'finance-filter-label' });
     const dtI = dtG.createEl('input', { type: 'date', cls: 'finance-filter-input' });
     dtI.value = f.dateTo;
     dtI.addEventListener('change', () => {
@@ -230,13 +232,13 @@ export class CreditsTab {
     });
 
     const typeG = row2.createDiv('finance-filter-group');
-    typeG.createEl('label', { text: 'Тип', cls: 'finance-filter-label' });
+    typeG.createEl('label', { text: this.tr.type, cls: 'finance-filter-label' });
     const typeSel = typeG.createEl('select', { cls: 'finance-filter-select' });
     [
-      { v: 'all', l: 'Все типы' },
-      { v: 'consumer', l: 'Потребительский' },
-      { v: 'auto', l: 'Автокредит' },
-      { v: 'mortgage', l: 'Ипотека' },
+      { v: 'all', l: this.tr.allCreditTypes },
+      { v: 'consumer', l: this.tr.creditTypeConsumer },
+      { v: 'auto', l: this.tr.creditTypeAuto },
+      { v: 'mortgage', l: this.tr.creditTypeMortgage },
     ].forEach(({ v, l }) => {
       const o = typeSel.createEl('option', { text: l });
       o.value = v;
@@ -249,20 +251,20 @@ export class CreditsTab {
 
     const rG = row2.createDiv('finance-filter-group finance-filter-reset');
     rG.createEl('label', { text: '\u00A0', cls: 'finance-filter-label' });
-    rG.createEl('button', { text: '✕ Сбросить', cls: 'finance-reset-btn' })
+    rG.createEl('button', { text: this.tr.reset, cls: 'finance-reset-btn' })
       .addEventListener('click', () => {
         this.ctx.state.creditFilter = { ...DEFAULT_CREDIT_FILTER };
         this.resetCreditPage();
       });
 
     const sortRow = container.createDiv('finance-sort-row');
-    sortRow.createEl('span', { text: 'Сортировка:', cls: 'finance-sort-label' });
+    sortRow.createEl('span', { text: this.tr.sortBy, cls: 'finance-sort-label' });
 
     const sortFields: { field: CreditSortField; label: string }[] = [
-      { field: 'createdAt', label: 'Добавлен' },
-      { field: 'date', label: 'Дата открытия' },
-      { field: 'amount', label: 'Сумма' },
-      { field: 'bankName', label: 'Банк' },
+      { field: 'createdAt', label: this.tr.sortAdded },
+      { field: 'date', label: this.tr.startDate },
+      { field: 'amount', label: this.tr.sum },
+      { field: 'bankName', label: this.tr.bankName },
     ];
     const s = this.ctx.state.creditSort ?? { field: 'createdAt' as CreditSortField, dir: 'desc' };
     sortFields.forEach(({ field, label }) => {
@@ -310,22 +312,22 @@ export class CreditsTab {
         cls: 'finance-debt-summary-main',
       });
       content.createEl('div', {
-        text: `${count} ${count === 1 ? 'кредит' : count < PLURAL_THRESHOLD ? 'кредита' : 'кредитов'}`,
+        text: `${count} ${count === 1 ? this.tr.creditCount_one : count < PLURAL_THRESHOLD ? this.tr.creditCount_few : this.tr.creditCount_many}`,
         cls: 'finance-debt-summary-sub',
       });
     };
 
-    mkCreditCard('Активные', '💳', totalAmount, activeCredits.length, true);
-    mkCreditCard('Погашенные', '✅', paidAmount, paidCredits.length, false);
+    mkCreditCard(this.tr.activeCards, '💳', totalAmount, activeCredits.length, true);
+    mkCreditCard(this.tr.paidCards, '✅', paidAmount, paidCredits.length, false);
 
     const toolbar = body.createDiv('finance-debt-toolbar');
     const newCreditBtn = toolbar.createEl('button', { cls: 'finance-add-btn finance-accent-btn' });
-    newCreditBtn.innerHTML = '<span class="btn-icon">＋</span><span>Новый кредит</span>';
+    newCreditBtn.innerHTML = '<span class="btn-icon">＋</span><span>' + this.tr.newCredit + '</span>';
     newCreditBtn.addEventListener('click', () => this.openNewCreditModal());
 
     const filtBtn = toolbar.createEl('button', { cls: 'finance-analytics-toggle-btn' });
     const updateFiltBtn = () => {
-      filtBtn.textContent = `🔍 Фильтры ${this.filtersOpen ? '▲' : '▼'}`;
+      filtBtn.textContent = `🔍 ${this.tr.filters} ${this.filtersOpen ? '▲' : '▼'}`;
       filtBtn.classList.toggle('active', this.filtersOpen);
     };
     updateFiltBtn();
@@ -343,16 +345,16 @@ export class CreditsTab {
     if (!allCredits.length) {
       const e = body.createDiv('finance-empty-state');
       e.createEl('div', { text: '🏦', cls: 'finance-empty-icon' });
-      e.createEl('p', { text: 'Нет кредитов', cls: 'finance-empty-title' });
-      e.createEl('p', { text: 'Нажмите «Новый кредит»', cls: 'finance-empty-sub' });
+      e.createEl('p', { text: this.tr.noCredits, cls: 'finance-empty-title' });
+      e.createEl('p', { text: this.tr.addNewDebt, cls: 'finance-empty-sub' });
       return;
     }
 
     if (!filteredCredits.length) {
       const e = body.createDiv('finance-empty-state');
       e.createEl('div', { text: '🔍', cls: 'finance-empty-icon' });
-      e.createEl('p', { text: 'Кредитов не найдено', cls: 'finance-empty-title' });
-      e.createEl('p', { text: 'Попробуйте изменить фильтры', cls: 'finance-empty-sub' });
+      e.createEl('p', { text: this.tr.noCreditsFiltered, cls: 'finance-empty-title' });
+      e.createEl('p', { text: this.tr.tryChangeFilters, cls: 'finance-empty-sub' });
       return;
     }
 
@@ -403,26 +405,26 @@ export class CreditsTab {
     if (!pageCredits.length) {
       const e = container.createDiv('finance-empty-state');
       e.createEl('div', { text: '📊', cls: 'finance-empty-icon' });
-      e.createEl('p', { text: 'Нет записей на этой странице', cls: 'finance-empty-title' });
+      e.createEl('p', { text: this.tr.noRecordsPage, cls: 'finance-empty-title' });
       return;
     }
 
     const infoBar = container.createDiv('finance-table-info-bar');
     const metaLeft = infoBar.createDiv('finance-table-meta');
     metaLeft.createEl('span', {
-      text: `${start + 1}–${Math.min(start + pageSize, filteredCredits.length)} из ${filteredCredits.length}`,
+      text: `${start + 1}–${Math.min(start + pageSize, filteredCredits.length)} ${this.tr.fromLower} ${filteredCredits.length}`,
       cls: 'finance-count-text',
     });
 
     const allCreditCols: { key: string; label: string }[] = [
-      { key: 'name',      label: 'Название' },
-      { key: 'bank',      label: 'Банк' },
-      { key: 'type',      label: 'Тип' },
-      { key: 'amount',    label: 'Остаток' },
-      { key: 'payment',   label: 'Платёж' },
-      { key: 'rate',      label: 'Ставка' },
-      { key: 'date',      label: 'Открыт' },
-      { key: 'endDate',   label: 'Окончание' },
+      { key: 'name',      label: this.tr.name },
+      { key: 'bank',      label: this.tr.bankName },
+      { key: 'type',      label: this.tr.type },
+      { key: 'amount',    label: this.tr.remaining },
+      { key: 'payment',   label: this.tr.monthlyPayment },
+      { key: 'rate',      label: this.tr.rate },
+      { key: 'date',      label: this.tr.opened },
+      { key: 'endDate',   label: this.tr.endDate },
       { key: '_act',      label: '' },
     ];
 
@@ -433,7 +435,7 @@ export class CreditsTab {
     if (!this.ctx.isMobile) {
       const creditColVisCols = allCreditCols.filter(c => c.key !== '_act');
       const gearBtn = infoBar.createEl('button', { cls: 'finance-colvis-btn', text: '⚙️' });
-      gearBtn.title = 'Настройка колонок';
+      gearBtn.title = this.tr.columnSettings;
       gearBtn.addEventListener('click', () => {
         new ColumnVisibilityModal(this.ctx.app, {
           columns: creditColVisCols,
@@ -475,24 +477,24 @@ export class CreditsTab {
         text: amount,
         cls: 'finance-record-amount finance-amount-expense',
       });
-      const typeLabel = credit.type === 'consumer' ? 'Потребительский'
-        : credit.type === 'auto' ? 'Автокредит'
-        : credit.type === 'mortgage' ? 'Ипотека' : 'Кредит';
+      const typeLabel = credit.type === 'consumer' ? this.tr.creditTypeConsumer
+        : credit.type === 'auto' ? this.tr.creditTypeAuto
+        : credit.type === 'mortgage' ? this.tr.creditTypeMortgage : this.tr.creditTypeCredit;
       header.createEl('span', { text: `${credit.bankName} · ${typeLabel}`, cls: 'finance-record-date' });
 
       const details = block.createDiv('finance-record-details');
-      details.createEl('span', { text: `📊 ${credit.interestRate}% годовых`, cls: 'finance-record-detail' });
-      details.createEl('span', { text: `💰 Платёж: ${this.ctx.fmt(credit.monthlyPayment)}`, cls: 'finance-record-detail' });
+      details.createEl('span', { text: `📊 ${credit.interestRate}${this.tr.percentPerAnnum}`, cls: 'finance-record-detail' });
+      details.createEl('span', { text: `💰 ${this.tr.paymentLabel}: ${this.ctx.fmt(credit.monthlyPayment)}`, cls: 'finance-record-detail' });
 
       const paidCount = credit.payments.filter(p => p.status === 'paid').length;
       const totalCount = credit.payments.length;
       if (totalCount > 0) {
-        details.createEl('span', { text: `✅ ${paidCount}/${totalCount} платежей`, cls: 'finance-record-detail' });
+        details.createEl('span', { text: `✅ ${paidCount}/${totalCount} ${this.tr.paymentsCount}`, cls: 'finance-record-detail' });
       }
 
       const endDate = this.calculateCreditEndDate(credit);
       if (endDate && credit.status === 'active') {
-        details.createEl('span', { text: `📅 до ${this.ctx.fmtDate(endDate)}`, cls: 'finance-record-detail' });
+        details.createEl('span', { text: `${this.tr.dueBy} ${this.ctx.fmtDate(endDate)}`, cls: 'finance-record-detail' });
       }
 
       if (credit.note) {
@@ -501,7 +503,7 @@ export class CreditsTab {
 
       const historyToggle = block.createEl('button', {
         cls: 'finance-debt-history-toggle',
-        text: `📋 Платежи (${credit.payments.length}) ▼`,
+        text: `📋 ${this.tr.creditPayments} (${credit.payments.length}) ▼`,
       });
       const historyWrap = block.createDiv('finance-debt-history-panel');
       historyWrap.setAttribute('data-credit-id', credit.id);
@@ -511,7 +513,7 @@ export class CreditsTab {
       if (isExpanded) {
         historyWrap.addClass('finance-debt-history-open');
         block.addClass('finance-debt-block-expanded');
-        historyToggle.textContent = `📋 Платежи (${credit.payments.length}) ▲`;
+        historyToggle.textContent = `📋 ${this.tr.creditPayments} (${credit.payments.length}) ▲`;
       }
 
       historyToggle.addEventListener('click', (e) => {
@@ -521,17 +523,17 @@ export class CreditsTab {
         historyWrap.toggleClass('finance-debt-history-open', open);
         block.toggleClass('finance-debt-block-expanded', open);
         historyToggle.textContent = open
-          ? `📋 Платежи (${credit.payments.length}) ▲`
-          : `📋 Платежи (${credit.payments.length}) ▼`;
+          ? `📋 ${this.tr.creditPayments} (${credit.payments.length}) ▲`
+          : `📋 ${this.tr.creditPayments} (${credit.payments.length}) ▼`;
       });
 
       const actions = block.createDiv('finance-record-actions');
       if (credit.status === 'active') {
-        this.mkActionBtn(actions, '💰', 'Добавить платёж', () => this.openAddCreditPaymentModal(credit));
-        this.mkActionBtn(actions, '⚡', 'Досрочное погашение', () => this.openEarlyRepaymentModal(credit));
+        this.mkActionBtn(actions, '💰', this.tr.addMovement, () => this.openAddCreditPaymentModal(credit));
+        this.mkActionBtn(actions, '⚡', this.tr.earlyRepayment, () => this.openEarlyRepaymentModal(credit));
       }
-      this.mkActionBtn(actions, '✏️', 'Редактировать', () => this.openEditCreditModal(credit));
-      this.mkActionBtn(actions, '🗑️', 'Удалить', () => this.confirmDeleteCredit(credit), 'finance-delete-btn');
+      this.mkActionBtn(actions, '✏️', this.tr.edit, () => this.openEditCreditModal(credit));
+      this.mkActionBtn(actions, '🗑️', this.tr.delete, () => this.confirmDeleteCredit(credit), 'finance-delete-btn');
 
       frag.appendChild(block);
     });
@@ -569,9 +571,9 @@ export class CreditsTab {
         tr.classList.add('finance-row-expense');
       }
 
-      const typeLabel = credit.type === 'consumer' ? 'Потребительский'
-        : credit.type === 'auto' ? 'Автокредит'
-        : credit.type === 'mortgage' ? 'Ипотека' : 'Кредит';
+      const typeLabel = credit.type === 'consumer' ? this.tr.creditTypeConsumer
+        : credit.type === 'auto' ? this.tr.creditTypeAuto
+        : credit.type === 'mortgage' ? this.tr.creditTypeMortgage : this.tr.creditTypeCredit;
       const endDate = this.calculateCreditEndDate(credit);
       const endDateText = endDate ? this.ctx.fmtDate(endDate) : '—';
 
@@ -627,11 +629,11 @@ export class CreditsTab {
         actionsWrap.style.alignItems = 'center';
 
         if (credit.status === 'active') {
-          this.mkActionBtn(actionsWrap, '💰', 'Добавить платёж', () => this.openAddCreditPaymentModal(credit));
-          this.mkActionBtn(actionsWrap, '⚡', 'Досрочное погашение', () => this.openEarlyRepaymentModal(credit));
+          this.mkActionBtn(actionsWrap, '💰', this.tr.addMovement, () => this.openAddCreditPaymentModal(credit));
+          this.mkActionBtn(actionsWrap, '⚡', this.tr.earlyRepayment, () => this.openEarlyRepaymentModal(credit));
         }
-        this.mkActionBtn(actionsWrap, '✏️', 'Редактировать', () => this.openEditCreditModal(credit));
-        this.mkActionBtn(actionsWrap, '🗑️', 'Удалить', () => this.confirmDeleteCredit(credit), 'finance-delete-btn');
+        this.mkActionBtn(actionsWrap, '✏️', this.tr.edit, () => this.openEditCreditModal(credit));
+        this.mkActionBtn(actionsWrap, '🗑️', this.tr.delete, () => this.confirmDeleteCredit(credit), 'finance-delete-btn');
 
         atd.appendChild(actionsWrap);
         tr.appendChild(atd);
@@ -737,13 +739,13 @@ export class CreditsTab {
       progressFill.style.transition = 'width 0.3s ease';
     }
 
-    const paymentsHeader = wrapper.createEl('h4', { text: '📋 Платежи', cls: 'finance-section-title' });
+    const paymentsHeader = wrapper.createEl('h4', { text: this.tr.creditPayments, cls: 'finance-section-title' });
     paymentsHeader.style.margin = '0 0 8px';
     paymentsHeader.style.fontSize = '13px';
     paymentsHeader.style.color = '#6b7280';
 
     if (!credit.payments.length) {
-      wrapper.createEl('p', { text: 'Нет запланированных платежей', cls: 'finance-empty-text' });
+      wrapper.createEl('p', { text: this.tr.noScheduledPayments, cls: 'finance-empty-text' });
       return;
     }
 
@@ -764,7 +766,7 @@ export class CreditsTab {
     const scrollWrapper = wrapper.createDiv({ cls: 'finance-mov-scroll' });
     const movTable = scrollWrapper.createEl('table', { cls: 'finance-mov-table' });
     const movHead = movTable.createEl('thead').createEl('tr');
-    ['#', 'Дата', 'Сумма', 'Статус'].forEach(l => {
+    ['#', this.tr.date, this.tr.sum, this.tr.status].forEach(l => {
       movHead.createEl('th', { text: l, cls: 'finance-th finance-mov-th' });
     });
     const movBody = movTable.createEl('tbody');
@@ -794,10 +796,10 @@ export class CreditsTab {
       const statusCell = mr.createEl('td', { cls: 'finance-td' });
       statusCell.style.background = bgColor;
       if (isPaid) {
-        statusCell.textContent = '✓ Оплачено';
+        statusCell.textContent = this.tr.paidStatus;
         statusCell.style.color = '#16a34a';
       } else {
-        statusCell.textContent = '⏳ Ожидает';
+        statusCell.textContent = this.tr.pendingStatus;
         statusCell.style.color = '#6b7280';
       }
     });
@@ -847,10 +849,10 @@ export class CreditsTab {
   }
 
   private openNewCreditModal(): void {
-    if (!this.ctx.data) { new Notice('⏳ Загрузка…'); return; }
+    if (!this.ctx.data) { new Notice(this.tr.loading); return; }
     const allBanks = this.ctx.data.credits.map(c => c.bankName).filter(Boolean);
     new CreditModal(this.ctx.app, {
-      title: '➕ Новый кредит',
+      title: this.tr.newCredit,
       banks: allBanks,
       onSave: async credit => {
         await this.ctx.storage.addCredit(this.ctx.notePath, credit);
@@ -890,7 +892,7 @@ export class CreditsTab {
         }
         this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
         this.render();
-        new Notice('✅ Кредит добавлен');
+        new Notice(this.tr.creditAdded);
       },
     }).open();
   }
@@ -899,7 +901,7 @@ export class CreditsTab {
     if (!this.ctx.data) return;
     const allBanks = this.ctx.data.credits.map(c => c.bankName).filter(Boolean);
     new CreditModal(this.ctx.app, {
-      title: '✏️ Редактировать кредит',
+      title: this.tr.editRecord,
       credit,
       banks: allBanks,
       onSave: async updated => {
@@ -936,14 +938,14 @@ export class CreditsTab {
         await this.ctx.storage.saveAllRecords(this.ctx.notePath, existingRecs);
         this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
         this.render();
-        new Notice('✅ Кредит обновлён');
+        new Notice(this.tr.creditUpdated);
       },
     }).open();
   }
 
   private openAddCreditPaymentModal(credit: CreditRecord): void {
     new CreditPaymentModal(this.ctx.app, {
-      title: `💰 Платёж по кредиту — ${credit.name}`,
+      title: `💰 ${this.tr.paymentLabel} — ${credit.name}`,
       credit,
       onSave: async payment => {
         credit.payments.push(payment);
@@ -955,34 +957,34 @@ export class CreditsTab {
         await this.ctx.storage.updateCredit(this.ctx.notePath, credit);
         this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
         this.render();
-        new Notice('✅ Платёж записан');
+        new Notice(this.tr.creditPaymentRecorded);
       },
     }).open();
   }
 
   private openEarlyRepaymentModal(credit: CreditRecord): void {
     new CreditEarlyRepaymentModal(this.ctx.app, {
-      title: `⚡ Досрочное погашение — ${credit.name}`,
+      title: `${this.tr.earlyRepayment} — ${credit.name}`,
       credit,
       currency: this.ctx.currency,
       onSave: async updated => {
         await this.ctx.storage.updateCredit(this.ctx.notePath, updated);
         this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
         this.render();
-        new Notice('✅ Досрочное погашение выполнено');
+        new Notice(this.tr.creditPaymentRecorded);
       },
     }).open();
   }
 
   private confirmDeleteCredit(credit: CreditRecord): void {
     const label = `${credit.name} · ${this.ctx.fmt(credit.currentAmount)}`;
-    new ConfirmModal(this.ctx.app, `Удалить кредит?\n${label}`, async () => {
+    new ConfirmModal(this.ctx.app, `${this.tr.confirmDeleteCredit}\n${label}`, async () => {
       await this.ctx.storage.deleteCredit(this.ctx.notePath, credit.id);
-      const recs = this.ctx.data!.records.filter(r => !(r.category === 'Кредит' && r.payer === credit.bankName && r.note.includes(credit.name)));
+      const recs = this.ctx.data!.records.filter(r => !(r.category === this.tr.creditDefaultCat && r.payer === credit.bankName && r.note.includes(credit.name)));
       await this.ctx.storage.saveAllRecords(this.ctx.notePath, recs);
       this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
       this.render();
-      new Notice('🗑️ Кредит удалён');
+      new Notice(this.tr.creditDeleted);
     }).open();
   }
 }

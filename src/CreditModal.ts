@@ -1,4 +1,5 @@
 import { App, Modal, Notice } from 'obsidian';
+import { getLocaleFromApp, t, Translations } from './i18n';
 import { CreditRecord, CreditType } from './types';
 import { fmtAmount, parseAmount } from './utils';
 
@@ -10,6 +11,7 @@ export interface CreditModalOptions {
 }
 
 export class CreditModal extends Modal {
+  private tr: Translations;
   private o: CreditModalOptions;
   private credit: CreditRecord;
   private amountInput!: HTMLInputElement;
@@ -20,6 +22,7 @@ export class CreditModal extends Modal {
 
   constructor(app: App, opts: CreditModalOptions) {
     super(app);
+    this.tr = t(getLocaleFromApp(app));
     this.o = opts;
     const nowStr = new Date().toISOString().split('T')[0];
     this.credit = opts.credit
@@ -56,13 +59,13 @@ export class CreditModal extends Modal {
     const row1 = form.createDiv('finance-form-row finance-full-width');
 
     const nameG = row1.createDiv('finance-field-group');
-    nameG.createEl('label', { text: 'Название', cls: 'finance-field-label' });
+    nameG.createEl('label', { text: this.tr.name, cls: 'finance-field-label' });
     const nameIn = nameG.createEl('input', { type: 'text', cls: 'finance-input' });
     nameIn.value = this.credit.name;
     nameIn.addEventListener('input', () => { this.credit.name = nameIn.value; });
 
     const bankG = row1.createDiv('finance-field-group');
-    bankG.createEl('label', { text: 'Банк *', cls: 'finance-field-label' });
+    bankG.createEl('label', { text: this.tr.bankName + ' *', cls: 'finance-field-label' });
     const bankWrap = bankG.createDiv('finance-combobox');
     const bankIn = bankWrap.createEl('input', { type: 'text', cls: 'finance-input finance-combobox-input' });
     bankIn.value = this.credit.bankName;
@@ -112,7 +115,7 @@ export class CreditModal extends Modal {
     const row2 = form.createDiv('finance-form-row finance-full-width');
 
     const amtG = row2.createDiv('finance-field-group finance-amount-group');
-    amtG.createEl('label', { text: 'Сумма *', cls: 'finance-field-label' });
+    amtG.createEl('label', { text: this.tr.amountLabel, cls: 'finance-field-label' });
     this.amountInput = amtG.createEl('input', { type: 'text', cls: 'finance-input finance-amount-input' });
     this.amountInput.setAttribute('inputmode', 'decimal');
     this.amountInput.setAttribute('placeholder', '0');
@@ -153,7 +156,7 @@ export class CreditModal extends Modal {
     });
 
     const rateG = row2.createDiv('finance-field-group');
-    rateG.createEl('label', { text: 'Процентная ставка (%)', cls: 'finance-field-label' });
+    rateG.createEl('label', { text: this.tr.interestRate + ' (%)', cls: 'finance-field-label' });
     this.rateInput = rateG.createEl('input', { type: 'text', cls: 'finance-input' });
     this.rateInput.setAttribute('inputmode', 'decimal');
     this.rateInput.setAttribute('placeholder', '0');
@@ -179,7 +182,7 @@ export class CreditModal extends Modal {
     const row3 = form.createDiv('finance-form-row finance-full-width');
 
     const paymentG = row3.createDiv('finance-field-group finance-amount-group');
-    paymentG.createEl('label', { text: 'Ежемесячный платёж', cls: 'finance-field-label' });
+    paymentG.createEl('label', { text: this.tr.monthlyPayment, cls: 'finance-field-label' });
     this.paymentInput = paymentG.createEl('input', { type: 'text', cls: 'finance-input finance-amount-input' });
     this.paymentInput.setAttribute('inputmode', 'decimal');
     this.paymentInput.setAttribute('placeholder', '0');
@@ -219,7 +222,7 @@ export class CreditModal extends Modal {
     });
 
     const termG = row3.createDiv('finance-field-group');
-    termG.createEl('label', { text: 'Срок (мес)', cls: 'finance-field-label' });
+    termG.createEl('label', { text: this.tr.termLabel, cls: 'finance-field-label' });
     this.termInput = termG.createEl('input', { type: 'number', cls: 'finance-input' });
     this.termInput.value = String(this.credit.termMonths || 12);
     this.termInput.setAttribute('min', '1');
@@ -231,18 +234,18 @@ export class CreditModal extends Modal {
     const row4 = form.createDiv('finance-form-row finance-full-width');
 
     const dateG = row4.createDiv('finance-field-group');
-    dateG.createEl('label', { text: 'Дата начала', cls: 'finance-field-label' });
+    dateG.createEl('label', { text: this.tr.startDate, cls: 'finance-field-label' });
     const dateIn = dateG.createEl('input', { type: 'date', cls: 'finance-input' });
     dateIn.value = this.credit.startDate;
     dateIn.addEventListener('change', () => { this.credit.startDate = dateIn.value; });
 
     const typeG = row4.createDiv('finance-field-group');
-    typeG.createEl('label', { text: 'Тип кредита', cls: 'finance-field-label' });
+    typeG.createEl('label', { text: this.tr.creditTypeLabel, cls: 'finance-field-label' });
     const typeSel = typeG.createEl('select', { cls: 'finance-input finance-filter-select' });
     const types: { value: CreditType; label: string }[] = [
-      { value: 'consumer', label: 'Потребительский' },
-      { value: 'auto', label: 'Автокредит' },
-      { value: 'mortgage', label: 'Ипотека' },
+      { value: 'consumer', label: this.tr.creditTypeConsumer },
+      { value: 'auto', label: this.tr.creditTypeAuto },
+      { value: 'mortgage', label: this.tr.creditTypeMortgage },
     ];
     types.forEach(t => {
       const opt = typeSel.createEl('option', { value: t.value, text: t.label });
@@ -253,17 +256,17 @@ export class CreditModal extends Modal {
     // === РЯД 5: Примечание (на всю ширину) ===
     const row5 = form.createDiv('finance-form-row finance-full-width');
     const noteG = row5.createDiv('finance-field-group');
-    noteG.createEl('label', { text: 'Примечание', cls: 'finance-field-label' });
+    noteG.createEl('label', { text: this.tr.note, cls: 'finance-field-label' });
     const noteIn = noteG.createEl('textarea', { cls: 'finance-textarea finance-note-field' });
-    noteIn.placeholder = 'Необязательно';
+    noteIn.placeholder = this.tr.optional;
     noteIn.value = this.credit.note;
     noteIn.rows = 2;
     noteIn.addEventListener('input', () => { this.credit.note = noteIn.value; });
 
     const btnRow = contentEl.createDiv('finance-modal-btns');
-    btnRow.createEl('button', { text: 'Отмена', cls: 'finance-btn-cancel' })
+    btnRow.createEl('button', { text: this.tr.cancel, cls: 'finance-btn-cancel' })
       .addEventListener('click', () => this.close());
-    btnRow.createEl('button', { text: 'Сохранить', cls: 'finance-btn-save' })
+    btnRow.createEl('button', { text: this.tr.save, cls: 'finance-btn-save' })
       .addEventListener('click', () => this.handleSave());
   }
 
@@ -293,12 +296,12 @@ export class CreditModal extends Modal {
     const amount = parseAmount(this.amountInput.value);
     this.credit.originalAmount = amount;
     if (!amount || amount <= 0) {
-      new Notice('⚠️ Укажите сумму больше нуля');
+      new Notice(this.tr.invalidAmount);
       this.amountInput.focus();
       return;
     }
     if (!this.credit.bankName.trim()) {
-      new Notice('⚠️ Укажите банк');
+      new Notice(this.tr.specifyBank);
       return;
     }
     this.credit.bankName = this.credit.bankName.trim();

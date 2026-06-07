@@ -5,6 +5,7 @@ import {
   DEFAULT_FILTER, DEFAULT_SORT, DEFAULT_DEBT_FILTER, DEFAULT_CREDIT_FILTER, DEFAULT_DEPOSIT_FILTER,
 } from './types';
 import { fmt, fmtDate } from './utils';
+import { getLocaleFromApp, t, type Translations, type Locale } from './i18n';
 
 const LS = (pid: string) => `ft-view:${pid}:`;
 
@@ -16,6 +17,9 @@ export class ViewContext {
   settings: PluginSettings;
   isMobile: boolean;
   container: HTMLElement;
+
+  locale: Locale;
+  tr: Translations;
 
   private _data: AccountData | null = null;
   private _state: ViewState;
@@ -34,6 +38,8 @@ export class ViewContext {
     this.pluginId = pluginId;
     this.settings = settings;
     this.container = container;
+    this.locale = getLocaleFromApp(app);
+    this.tr = t(this.locale);
     this.isMobile = (app as any).isMobile ?? window.innerWidth <= 480;
     this._state = this.loadState(this.settings.defaultPageSize);
   }
@@ -121,10 +127,10 @@ export class ViewContext {
 
     const el = container.createDiv('finance-stats-container');
     const items = [
-      { label: 'Доходы', value: this.fmt(inc), mod: 'income', icon: '↑' },
-      { label: 'Расходы', value: this.fmt(exp), mod: 'expense', icon: '↓' },
+      { label: this.tr.incomeStat, value: this.fmt(inc), mod: 'income', icon: '↑' },
+      { label: this.tr.expenseStat, value: this.fmt(exp), mod: 'expense', icon: '↓' },
       {
-        label: 'Баланс', value: (bal >= 0 ? '+' : '') + this.fmt(bal),
+        label: this.tr.balance, value: (bal >= 0 ? '+' : '') + this.fmt(bal),
         mod: bal >= 0 ? 'positive' : 'negative', icon: '＝',
       },
     ];

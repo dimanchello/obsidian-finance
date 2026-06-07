@@ -1,3 +1,5 @@
+import { App } from 'obsidian';
+
 export type Locale = 'ru' | 'en';
 
 export const LOCALES: Record<Locale, string> = {
@@ -67,6 +69,48 @@ export interface Translations {
   tryChangeFilters: string;
   addRecord: string;
   settings: string;
+  chartView: string;
+  barChart: string;
+  pieChart: string;
+  groupBy: string;
+  byCategory: string;
+  byPayer: string;
+  byWeek: string;
+  byMonth: string;
+  byYear: string;
+  showData: string;
+  noChartData: string;
+  other: string;
+  weekLetter: string;
+  noData: string;
+  total: string;
+  amountRequired: string;
+  calculatorTitle: string;
+  exchangeRateQuestion: string;
+  exchangeRateExample: string;
+  exchangeRateHide: string;
+  exchangeRateShow: string;
+  dateTime: string;
+  internalOpDesc: string;
+  notePlaceholder: string;
+  autofillFromDate: string;
+  notSelected: string;
+  amountLabel: string;
+  interestRateLabel: string;
+  totalReturnLent: string;
+  totalReturnBorrowed: string;
+  specifyPerson: string;
+  borrowAmountLabel: string;
+  repayAmountLabel: string;
+  debtNotePlaceholder: string;
+  fieldDescSum: string;
+  fieldDescRate: string;
+  fieldDescStartDate: string;
+  fieldDescTerm: string;
+  fieldDescType: string;
+  fieldDescAccrual: string;
+  fieldDescFrequency: string;
+  fieldDescNote: string;
   pageSizeLabel: string;
   accentColor: string;
   resetColor: string;
@@ -181,6 +225,127 @@ export interface Translations {
   repaymentDate: string;
   allCreditTypes: string;
   allDepositTypes: string;
+  edit: string;
+  delete: string;
+  status: string;
+  filters: string;
+  settingsPanel: string;
+  searchPlaceholder: string;
+  all: string;
+  noOptions: string;
+  openAttachment: string;
+  download: string;
+  topUp: string;
+  withdraw: string;
+  closeAccount: string;
+  repay: string;
+  borrowMore: string;
+  movementHistory: string;
+  payments: string;
+  accruals: string;
+  paidStatus: string;
+  pendingStatus: string;
+  editMovement: string;
+  deleteMovement: string;
+  deleteConfirm: string;
+  confirm: string;
+  accruedIncome: string;
+  totalTopUps: string;
+  totalWithdrawals: string;
+  noScheduledPayments: string;
+  noScheduledAccruals: string;
+  fromLower: string;
+  columnSettings: string;
+  categories: string;
+  internalOnly: string;
+  internal: string;
+  showInternal: string;
+  allBanks: string;
+  rate: string;
+  opened: string;
+  endDate: string;
+  percentPerAnnum: string;
+  paymentLabel: string;
+  noRecordsPage: string;
+  searchAllFields: string;
+  searchByName: string;
+  debtCount_one: string;
+  debtCount_few: string;
+  debtCount_many: string;
+  creditCount_one: string;
+  creditCount_few: string;
+  creditCount_many: string;
+  depositCount_one: string;
+  depositCount_few: string;
+  depositCount_many: string;
+  profitLabel: string;
+  activeCards: string;
+  paidCards: string;
+  closedCards: string;
+  summaryAmount: string;
+  summaryProfit: string;
+  withInterest: string;
+  dueBy: string;
+  gaveMore: string;
+  tookMore: string;
+  returned: string;
+  repaymentAct: string;
+  paymentsCount: string;
+  topUpsHeader: string;
+  withdrawalsHeader: string;
+  accrualsHeader: string;
+  noRecordsFilterTip: string;
+  addNewRecord: string;
+  optional: string;
+  available: string;
+  depositAvailable: string;
+  remainingCredit: string;
+  remainingPayments: string;
+  withdrawalAmountLabel: string;
+  paymentDateLabel: string;
+  earlyRepaymentAmount: string;
+  reduceTermLabel: string;
+  somethingWentWrong: string;
+  termLabel: string;
+  depositType: string;
+  accrualType: string;
+  frequency: string;
+  currency: string;
+  close: string;
+  fieldDescriptions: string;
+  fieldDescriptionsSub: string;
+  currencyManagement: string;
+  addCurrency: string;
+  addCurrencyDesc: string;
+  currencyPlaceholder: string;
+  templateInserted: string;
+  commandInsertTemplate: string;
+  uncategorized: string;
+  notSpecified: string;
+  lentGiven: string;
+  borrowedTaken: string;
+  creditDefaultCat: string;
+  remainingCreditLabel: string;
+  monthlyPaymentLabel: string;
+  remainingPaymentsLabel: string;
+  repayAmountShort: string;
+  repayTermShort: string;
+  addBtn: string;
+  specifyBank: string;
+  specifyValidDate: string;
+  creditTypeLabel: string;
+  topUpAmountLabel: string;
+  exceedsBalance: string;
+  confirmDeleteDebt: string;
+  confirmDeleteMovement: string;
+  confirmDeleteCredit: string;
+  confirmDeleteDeposit: string;
+  confirmDeleteTopUp: string;
+  confirmDeleteWithdrawal: string;
+  confirmCloseDeposit: string;
+  closeDepositRefund: string;
+  confirmDeleteRecord: string;
+  fileNotFoundWithPath: string;
 }
 
 const ru: Translations = {
@@ -218,9 +383,9 @@ const ru: Translations = {
   importSuccess: '✅ Импортировано',
   income: '↑ Доход',
   expense: '↓ Расход',
-  debts: '💳 Долги',
-  credits: '🏦 Кредиты',
-  deposits: '📈 Вклады',
+  debts: 'Долги',
+  credits: 'Кредиты',
+  deposits: 'Вклады',
   newDebt: 'Новый долг',
   newCredit: 'Новый кредит',
   newDeposit: 'Новый вклад',
@@ -268,8 +433,8 @@ const ru: Translations = {
   paid: 'Погашены',
   direction: 'Направление',
   allDirections: 'Все',
-  lent: '💸 Мне должны',
-  borrowed: '💳 Я должен',
+  lent: 'Мне должны',
+  borrowed: 'Я должен',
   person: 'Кому',
   originalAmount: 'Сумма',
   remaining: 'Остаток',
@@ -287,7 +452,7 @@ const ru: Translations = {
   noDebtsFiltered: 'Долгов не найдено',
   selectCurrency: 'Изменить валюту',
   ownCurrency: 'Своя…',
-  analytics: '📈 Аналитика',
+  analytics: 'Аналитика',
   balance: 'Баланс',
   incomeStat: 'Доходы',
   expenseStat: 'Расходы',
@@ -359,6 +524,169 @@ const ru: Translations = {
   repaymentDate: 'Дата погашения',
   allCreditTypes: 'Все типы',
   allDepositTypes: 'Все типы',
+  edit: 'Редактировать',
+  delete: 'Удалить',
+  status: 'Статус',
+  filters: 'Фильтры',
+  settingsPanel: 'Настройки',
+  searchPlaceholder: 'Поиск…',
+  all: 'Все',
+  noOptions: 'Нет вариантов',
+  openAttachment: 'Открыть вложение',
+  download: 'Скачать',
+  topUp: 'Пополнить',
+  withdraw: 'Снять',
+  closeAccount: 'Закрыть вклад',
+  repay: 'Погасить',
+  borrowMore: '➕ Взять ещё',
+  movementHistory: 'История операций',
+  payments: 'Платежи',
+  accruals: 'Начисления',
+  paidStatus: '✓ Оплачено',
+  pendingStatus: '⏳ Ожидает',
+  editMovement: 'Редактировать движение',
+  deleteMovement: 'Удалить движение',
+  deleteConfirm: 'Удалить',
+  confirm: 'Подтвердить',
+  accruedIncome: 'Накопленный доход',
+  totalTopUps: 'Всего пополнений',
+  totalWithdrawals: 'Всего снятий',
+  noScheduledPayments: 'Нет запланированных платежей',
+  noScheduledAccruals: 'Нет запланированных начислений',
+  fromLower: 'из',
+  columnSettings: 'Настройка колонок',
+  categories: 'Категории',
+  internalOnly: 'Показать только внутренние операции',
+  internal: 'Внутренние',
+  showInternal: 'Только внутр.',
+  allBanks: 'Все банки',
+  rate: 'Ставка',
+  opened: 'Открыт',
+  endDate: 'Окончание',
+  percentPerAnnum: '% годовых',
+  paymentLabel: 'Платёж',
+  noRecordsPage: 'Нет записей на этой странице',
+  searchAllFields: 'Поиск по всем полям…',
+  searchByName: 'Поиск по названию или банку…',
+  debtCount_one: 'долг',
+  debtCount_few: 'долга',
+  debtCount_many: 'долгов',
+  creditCount_one: 'кредит',
+  creditCount_few: 'кредита',
+  creditCount_many: 'кредитов',
+  depositCount_one: 'вклад',
+  depositCount_few: 'вклада',
+  depositCount_many: 'вкладов',
+  profitLabel: 'Прибыль',
+  activeCards: 'Активные',
+  paidCards: 'Погашенные',
+  closedCards: 'Закрытые',
+  summaryAmount: 'Сумма',
+  summaryProfit: 'Прибыль',
+  withInterest: 'Сумма + %',
+  dueBy: '📅 до',
+  gaveMore: '➕ Дал ещё',
+  tookMore: '➕ Взял ещё',
+  returned: '💰 Вернули',
+  repaymentAct: '💰 Погашение',
+  paymentsCount: 'платежей',
+  topUpsHeader: '💰 Пополнения',
+  withdrawalsHeader: '📤 Снятия',
+  accrualsHeader: '📊 Начисления',
+  noRecordsFilterTip: 'Нажмите «Доход» или «Расход»',
+  addNewRecord: 'Добавить запись',
+  optional: 'Необязательно',
+  available: 'Доступно',
+  depositAvailable: 'Доступно для снятия',
+  remainingCredit: 'Остаток кредита',
+  remainingPayments: 'Осталось платежей',
+  withdrawalAmountLabel: 'Сумма снятия',
+  paymentDateLabel: 'Дата платежа',
+  earlyRepaymentAmount: 'Сумма досрочного погашения',
+  reduceTermLabel: 'На сколько месяцев сократить срок?',
+  somethingWentWrong: 'Что-то пошло не так',
+  termLabel: 'Срок (мес)',
+  depositType: 'Тип вклада',
+  accrualType: 'Тип начисления',
+  frequency: 'Периодичность',
+  currency: 'Валюта',
+  close: 'Закрыть',
+  fieldDescriptions: 'Описание полей',
+  fieldDescriptionsSub: 'Краткое описание каждого поля формы вклада',
+  currencyManagement: 'Управление валютами',
+  addCurrency: 'Добавить свою валюту',
+  addCurrencyDesc: 'Только добавленные здесь валюты будут доступны для выбора в счетах.',
+  currencyPlaceholder: 'напр. CNY, KRW, INR…',
+  templateInserted: '✅ Шаблон счёта вставлен',
+  commandInsertTemplate: 'Вставить шаблон счёта',
+  uncategorized: 'Без категории',
+  notSpecified: 'Не указан',
+  lentGiven: 'Дано в долг',
+  borrowedTaken: 'Взято в долг',
+  creditDefaultCat: 'Кредит',
+  remainingCreditLabel: 'Остаток кредита',
+  monthlyPaymentLabel: 'Ежемесячный платёж',
+  remainingPaymentsLabel: 'Осталось платежей',
+  repayAmountShort: 'Гасить сумму',
+  repayTermShort: 'Гасить срок',
+  addBtn: 'Добавить',
+  specifyBank: '⚠️ Укажите банк',
+  specifyValidDate: '⚠️ Укажите корректную дату начала',
+  creditTypeLabel: 'Тип кредита',
+  topUpAmountLabel: 'Сумма пополнения',
+  exceedsBalance: '⚠️ Сумма превышает доступный остаток ({max} {currency})',
+  confirmDeleteDebt: 'Удалить долг?',
+  confirmDeleteMovement: 'Удалить движение?',
+  confirmDeleteCredit: 'Удалить кредит?',
+  confirmDeleteDeposit: 'Удалить вклад?',
+  confirmDeleteTopUp: 'Удалить пополнение?',
+  confirmDeleteWithdrawal: 'Удалить снятие?',
+  confirmCloseDeposit: 'Закрыть вклад?',
+  closeDepositRefund: 'Сумма {amount} будет возвращена на счёт.',
+  confirmDeleteRecord: 'Удалить запись?',
+  fileNotFoundWithPath: '⚠️ Файл не найден: {path}',
+  chartView: 'Вид:',
+  barChart: '▮▮ Столбцы',
+  pieChart: '◕ Пирог',
+  groupBy: 'Группировка:',
+  byCategory: 'По категории',
+  byPayer: 'По плательщику',
+  byWeek: 'По неделе',
+  byMonth: 'По месяцу',
+  byYear: 'По году',
+  showData: 'Данные:',
+  noChartData: '📊 Нет данных для отображения',
+  other: 'Другое',
+  weekLetter: 'Н',
+  noData: 'Нет данных',
+  total: 'Итого',
+  amountRequired: 'Сумма * ({currency})',
+  calculatorTitle: 'Калькулятор',
+  exchangeRateQuestion: 'Курс (1 {currency} = ?)',
+  exchangeRateExample: 'напр. 95,50',
+  exchangeRateHide: '− Курс',
+  exchangeRateShow: '+ Курс',
+  dateTime: 'Дата и время',
+  internalOpDesc: 'Внутренняя операция (не учитывается в статистике)',
+  notePlaceholder: 'Необязательно — любой комментарий к записи…',
+  autofillFromDate: '✨ Подставлено из записи от {date}',
+  notSelected: 'Не выбран',
+  amountLabel: 'Сумма *',
+  interestRateLabel: 'Процент (%)',
+  totalReturnLent: 'Итого мне вернут',
+  totalReturnBorrowed: 'Итого к возврату',
+  specifyPerson: '⚠️ Укажите кому',
+  borrowAmountLabel: 'Сумма (увеличить долг) *',
+  repayAmountLabel: 'Сумма (погашение) *',
+  debtNotePlaceholder: 'Необязательно — любой комментарий…',
+  fieldDescSum: 'Основная сумма вклада. При капитализации будет расти за счёт процентов.',
+  fieldDescRate: 'Годовая процентная ставка. Для ежемесячного расчёта делится на 12.',
+  fieldDescStartDate: 'Дата открытия вклада. Если указана в прошлом, будут рассчитаны пропущенные начисления.',
+  fieldDescTerm: 'Срок вклада в месяцах. По окончании вклад закрывается.',
+  fieldDescType: 'Метка для группировки и фильтрации. На расчёты не влияет.',
+  fieldDescAccrual: 'На счёт: проценты выплачиваются на основной счёт. С капитализацией: проценты увеличивают сумму вклада.',
+  fieldDescFrequency: 'Как часто начисляются проценты. Для «На счёт»: ежемесячно или в конце срока. При капитализации всегда ежемесячно.',
+  fieldDescNote: 'Необязательное примечание.',
 };
 
 const en: Translations = {
@@ -396,9 +724,9 @@ const en: Translations = {
   importSuccess: '✅ Imported',
   income: '↑ Income',
   expense: '↓ Expense',
-  debts: '💳 Debts',
-  credits: '🏦 Credits',
-  deposits: '📈 Deposits',
+  debts: 'Debts',
+  credits: 'Credits',
+  deposits: 'Deposits',
   newDebt: 'New debt',
   newCredit: 'New credit',
   newDeposit: 'New deposit',
@@ -446,8 +774,8 @@ const en: Translations = {
   paid: 'Paid',
   direction: 'Direction',
   allDirections: 'All',
-  lent: '💸 Owed to me',
-  borrowed: '💳 I owe',
+  lent: 'Owed to me',
+  borrowed: 'I owe',
   person: 'Person',
   originalAmount: 'Amount',
   remaining: 'Remaining',
@@ -465,7 +793,7 @@ const en: Translations = {
   noDebtsFiltered: 'No debts found',
   selectCurrency: 'Change currency',
   ownCurrency: 'Custom…',
-  analytics: '📈 Analytics',
+  analytics: 'Analytics',
   balance: 'Balance',
   incomeStat: 'Income',
   expenseStat: 'Expense',
@@ -537,13 +865,192 @@ const en: Translations = {
   repaymentDate: 'Repayment date',
   allCreditTypes: 'All types',
   allDepositTypes: 'All types',
+  edit: 'Edit',
+  delete: 'Delete',
+  status: 'Status',
+  filters: 'Filters',
+  settingsPanel: 'Settings',
+  searchPlaceholder: 'Search…',
+  all: 'All',
+  noOptions: 'No options',
+  openAttachment: 'Open attachment',
+  download: 'Download',
+  topUp: 'Top up',
+  withdraw: 'Withdraw',
+  closeAccount: 'Close account',
+  repay: 'Repay',
+  borrowMore: 'Borrow more',
+  movementHistory: 'Movement history',
+  payments: 'Payments',
+  accruals: 'Accruals',
+  paidStatus: '✓ Paid',
+  pendingStatus: '⏳ Pending',
+  editMovement: 'Edit movement',
+  deleteMovement: 'Delete movement',
+  deleteConfirm: 'Delete',
+  confirm: 'Confirm',
+  accruedIncome: 'Accrued income',
+  totalTopUps: 'Total top-ups',
+  totalWithdrawals: 'Total withdrawals',
+  noScheduledPayments: 'No scheduled payments',
+  noScheduledAccruals: 'No scheduled accruals',
+  fromLower: 'of',
+  columnSettings: 'Column settings',
+  categories: 'Categories',
+  internalOnly: 'Show internal operations only',
+  internal: 'Internal',
+  showInternal: 'Internal only',
+  allBanks: 'All banks',
+  rate: 'Rate',
+  opened: 'Opened',
+  endDate: 'End date',
+  percentPerAnnum: '% p.a.',
+  paymentLabel: 'Payment',
+  noRecordsPage: 'No records on this page',
+  searchAllFields: 'Search all fields…',
+  searchByName: 'Search by name or bank…',
+  debtCount_one: 'debt',
+  debtCount_few: 'debts',
+  debtCount_many: 'debts',
+  creditCount_one: 'credit',
+  creditCount_few: 'credits',
+  creditCount_many: 'credits',
+  depositCount_one: 'deposit',
+  depositCount_few: 'deposits',
+  depositCount_many: 'deposits',
+  profitLabel: 'Profit',
+  activeCards: 'Active',
+  paidCards: 'Paid',
+  closedCards: 'Closed',
+  summaryAmount: 'Amount',
+  summaryProfit: 'Profit',
+  withInterest: 'Amount + %',
+  dueBy: '📅 due',
+  gaveMore: '➕ Lent more',
+  tookMore: '➕ Borrowed more',
+  returned: '💰 Returned',
+  repaymentAct: '💰 Repayment',
+  paymentsCount: 'payments',
+  topUpsHeader: '💰 Top-ups',
+  withdrawalsHeader: '📤 Withdrawals',
+  accrualsHeader: '📊 Accruals',
+  noRecordsFilterTip: 'Click "Income" or "Expense"',
+  addNewRecord: 'Add record',
+  optional: 'Optional',
+  available: 'Available',
+  depositAvailable: 'Available for withdrawal',
+  remainingCredit: 'Remaining credit',
+  remainingPayments: 'Remaining payments',
+  withdrawalAmountLabel: 'Withdrawal amount',
+  paymentDateLabel: 'Payment date',
+  earlyRepaymentAmount: 'Early repayment amount',
+  reduceTermLabel: 'Reduce term by how many months?',
+  somethingWentWrong: 'Something went wrong',
+  termLabel: 'Term (months)',
+  depositType: 'Deposit type',
+  accrualType: 'Accrual type',
+  frequency: 'Frequency',
+  currency: 'Currency',
+  close: 'Close',
+  fieldDescriptions: 'Field descriptions',
+  fieldDescriptionsSub: 'Brief description of each deposit form field',
+  currencyManagement: 'Currency management',
+  addCurrency: 'Add custom currency',
+  addCurrencyDesc: 'Only currencies added here will be available for selection in accounts.',
+  currencyPlaceholder: 'e.g. CNY, KRW, INR…',
+  templateInserted: '✅ Account template inserted',
+  commandInsertTemplate: 'Insert account template',
+  uncategorized: 'Uncategorized',
+  notSpecified: 'Not specified',
+  lentGiven: 'Given as debt',
+  borrowedTaken: 'Taken as debt',
+  creditDefaultCat: 'Credit',
+  remainingCreditLabel: 'Remaining credit',
+  monthlyPaymentLabel: 'Monthly payment',
+  remainingPaymentsLabel: 'Remaining payments',
+  repayAmountShort: 'Repay amount',
+  repayTermShort: 'Repay term',
+  addBtn: 'Add',
+  specifyBank: '⚠️ Specify a bank',
+  specifyValidDate: '⚠️ Specify a valid start date',
+  creditTypeLabel: 'Credit type',
+  topUpAmountLabel: 'Top-up amount',
+  exceedsBalance: '⚠️ Amount exceeds available balance ({max} {currency})',
+  confirmDeleteDebt: 'Delete debt?',
+  confirmDeleteMovement: 'Delete movement?',
+  confirmDeleteCredit: 'Delete credit?',
+  confirmDeleteDeposit: 'Delete deposit?',
+  confirmDeleteTopUp: 'Delete top-up?',
+  confirmDeleteWithdrawal: 'Delete withdrawal?',
+  confirmCloseDeposit: 'Close deposit?',
+  closeDepositRefund: 'Amount {amount} will be refunded to account.',
+  confirmDeleteRecord: 'Delete record?',
+  fileNotFoundWithPath: '⚠️ File not found: {path}',
+  chartView: 'View:',
+  barChart: '▮▮ Bars',
+  pieChart: '◕ Pie',
+  groupBy: 'Group by:',
+  byCategory: 'By category',
+  byPayer: 'By payer',
+  byWeek: 'By week',
+  byMonth: 'By month',
+  byYear: 'By year',
+  showData: 'Show:',
+  noChartData: '📊 No data to display',
+  other: 'Other',
+  weekLetter: 'W',
+  noData: 'No data',
+  total: 'Total',
+  amountRequired: 'Amount * ({currency})',
+  calculatorTitle: 'Calculator',
+  exchangeRateQuestion: 'Rate (1 {currency} = ?)',
+  exchangeRateExample: 'e.g. 95.50',
+  exchangeRateHide: '− Rate',
+  exchangeRateShow: '+ Rate',
+  dateTime: 'Date and time',
+  internalOpDesc: 'Internal operation (not counted in statistics)',
+  notePlaceholder: 'Optional — any comment on this record…',
+  autofillFromDate: '✨ Filled from record {date}',
+  notSelected: 'Not selected',
+  amountLabel: 'Amount *',
+  interestRateLabel: 'Interest (%)',
+  totalReturnLent: 'Total to be returned',
+  totalReturnBorrowed: 'Total to repay',
+  specifyPerson: '⚠️ Specify a person',
+  borrowAmountLabel: 'Amount (increase debt) *',
+  repayAmountLabel: 'Amount (repayment) *',
+  debtNotePlaceholder: 'Optional — any comment…',
+  fieldDescSum: 'Principal deposit amount. With capitalization, it grows due to interest.',
+  fieldDescRate: 'Annual interest rate. Divided by 12 for monthly calculation.',
+  fieldDescStartDate: 'Deposit opening date. If set in the past, missed accruals will be calculated.',
+  fieldDescTerm: 'Deposit term in months. At the end, the deposit is closed.',
+  fieldDescType: 'Label for grouping and filtering. Does not affect calculations.',
+  fieldDescAccrual: 'To account: interest is paid to the main account. Capitalization: interest increases the deposit amount.',
+  fieldDescFrequency: 'How often interest is accrued. For "To account": monthly or at term end. Capitalization is always monthly.',
+  fieldDescNote: 'Optional note.',
 };
 
 const translations: Record<Locale, Translations> = { ru, en };
 
 export function getLocale(lang: string | undefined): Locale {
-  if (lang?.startsWith('en')) return 'en';
+  if (lang?.toLowerCase().startsWith('en')) return 'en';
   return 'ru';
+}
+
+export function getLocaleFromApp(app: App): Locale {
+  try {
+    const fromHtml = document.documentElement.lang;
+    if (fromHtml) return getLocale(fromHtml);
+  } catch {}
+  try {
+    const fromLocal = localStorage.getItem('language');
+    if (fromLocal) return getLocale(fromLocal);
+  } catch {}
+  try {
+    const fromConfig = (app.vault as any).getConfig?.('language');
+    if (fromConfig) return getLocale(fromConfig);
+  } catch {}
+  return getLocale(navigator.language);
 }
 
 export function t(locale: Locale): Translations {

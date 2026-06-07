@@ -1,4 +1,5 @@
 import { App, Modal, Notice, normalizePath } from 'obsidian';
+import { getLocaleFromApp, t, Translations } from './i18n';
 import { FinanceRecord, RecordType, PluginSettings } from './types';
 import { fmtAmount, parseAmount } from './utils';
 import { CalculatorModal } from './CalculatorModal';
@@ -18,6 +19,7 @@ export interface RecordModalOptions {
 // ── modal ─────────────────────────────────────────────────────────────────────
 
 export class RecordModal extends Modal {
+  private tr: Translations;
   private o:   RecordModalOptions;
   private rec: Partial<FinanceRecord>;
 
@@ -34,6 +36,7 @@ export class RecordModal extends Modal {
 
   constructor(app: App, opts: RecordModalOptions) {
     super(app);
+    this.tr = t(getLocaleFromApp(app));
     this.o   = opts;
     this.rec = {
       date: new Date().toISOString().split('T')[0],
@@ -51,14 +54,14 @@ export class RecordModal extends Modal {
 
     const isEdit = !!this.o.initial.id;
     contentEl.createEl('h2', {
-      text: isEdit ? '✏️ Редактировать запись' : '➕ Новая запись',
+      text: isEdit ? '✏️ ' + this.tr.editRecord : '➕ ' + this.tr.newRecord,
       cls:  'finance-modal-title',
     });
 
     // ── Type toggle ──────────────────────────────────────────────────────
     const typeRow    = contentEl.createDiv('finance-type-row');
-    this.incomeBtn   = typeRow.createEl('button', { cls: 'finance-type-toggle', text: '↑ Доход' });
-    this.expenseBtn  = typeRow.createEl('button', { cls: 'finance-type-toggle', text: '↓ Расход' });
+    this.incomeBtn   = typeRow.createEl('button', { cls: 'finance-type-toggle', text: this.tr.income });
+    this.expenseBtn  = typeRow.createEl('button', { cls: 'finance-type-toggle', text: this.tr.expense });
     this.applyType(this.rec.type ?? 'expense');
     this.incomeBtn .addEventListener('click', () => { this.applyType('income');  this.updateAmountColor(); });
     this.expenseBtn.addEventListener('click', () => { this.applyType('expense'); this.updateAmountColor(); });
@@ -67,7 +70,7 @@ export class RecordModal extends Modal {
 
     // ── Amount ───────────────────────────────────────────────────────────
     const amtG = form.createDiv('finance-field-group finance-amount-group');
-    amtG.createEl('label', { text: `Сумма * (${this.o.currency})`, cls: 'finance-field-label' });
+    amtG.createEl('label', { text: this.tr.amountRequired.replace('{currency}', this.o.currency), cls: 'finance-field-label' });
 
     const amtRow = amtG.createDiv('finance-amount-row');
 
@@ -124,7 +127,7 @@ export class RecordModal extends Modal {
 
     const calcIconBtn = document.createElement('button');
     calcIconBtn.className = 'finance-calc-icon-btn';
-    calcIconBtn.title = 'Калькулятор';
+    calcIconBtn.title = this.tr.calculatorTitle;
     calcIconBtn.innerHTML = `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><rect x="3" y="2" width="14" height="16" rx="1.5"/><line x1="7" y1="6" x2="13" y2="6"/><circle cx="7" cy="10" r=".8" fill="currentColor"/><circle cx="13" cy="10" r=".8" fill="currentColor"/><circle cx="7" cy="14" r=".8" fill="currentColor"/><circle cx="13" cy="14" r=".8" fill="currentColor"/></svg>`;
     amtRow.appendChild(calcIconBtn);
     calcIconBtn.addEventListener('click', () => {
@@ -142,7 +145,7 @@ export class RecordModal extends Modal {
     this.exchangeRateWrap.style.display = 'none';
 
     const erLabelRow = this.exchangeRateWrap.createDiv('finance-exrate-label-row');
-    erLabelRow.createEl('label', { text: `Курс (1 ${this.o.currency} = ?)`, cls: 'finance-field-label' });
+    erLabelRow.createEl('label', { text: this.tr.exchangeRateQuestion.replace('{currency}', this.o.currency), cls: 'finance-field-label' });
     erLabelRow.createEl('span', { text: '💱', cls: 'finance-exrate-icon' });
 
     this.exchangeRateInput = this.exchangeRateWrap.createEl('input', {
@@ -150,7 +153,7 @@ export class RecordModal extends Modal {
       cls:  'finance-input finance-exrate-input',
     });
     this.exchangeRateInput.setAttribute('inputmode', 'decimal');
-    this.exchangeRateInput.setAttribute('placeholder', 'напр. 95,50');
+    this.exchangeRateInput.setAttribute('placeholder', this.tr.exchangeRateExample);
     this.exchangeRateInput.setAttribute('autocomplete', 'off');
 
     if (this.rec.exchangeRate && this.rec.exchangeRate > 0) {
@@ -164,11 +167,11 @@ export class RecordModal extends Modal {
     });
 
     const erToggle = form.createDiv('finance-exrate-toggle');
-    erToggle.textContent = this.rec.exchangeRate ? '− Курс' : '+ Курс';
+    erToggle.textContent = this.rec.exchangeRate ? this.tr.exchangeRateHide : this.tr.exchangeRateShow;
     erToggle.addEventListener('click', () => {
       const shown = this.exchangeRateWrap!.style.display !== 'none';
       this.exchangeRateWrap!.style.display = shown ? 'none' : '';
-      erToggle.textContent = shown ? '+ Курс' : '− Курс';
+      erToggle.textContent = shown ? this.tr.exchangeRateShow : this.tr.exchangeRateHide;
       if (!shown) setTimeout(() => this.exchangeRateInput!.focus(), 50);
     });
 
@@ -181,7 +184,7 @@ export class RecordModal extends Modal {
 
     // Date+Time (single datetime-local picker)
     const dtG = grid.createDiv('finance-field-group');
-    dtG.createEl('label', { text: 'Дата и время', cls: 'finance-field-label' });
+    dtG.createEl('label', { text: this.tr.dateTime, cls: 'finance-field-label' });
     const dtIn = dtG.createEl('input', { type: 'datetime-local', cls: 'finance-input' });
     const nowStr = new Date().toISOString().slice(0, 16);
     dtIn.value = this.rec.date
@@ -197,7 +200,7 @@ export class RecordModal extends Modal {
 
     // Payer — autofill trigger + internal toggle inline
     this.payerInput = this.buildAutocomplete(
-      grid, 'Плательщик', this.rec.payer ?? '', this.o.payers,
+      grid, this.tr.payer, this.rec.payer ?? '', this.o.payers,
       v => { this.rec.payer = v; this.scheduleAutofill('payer', v); },
       {
         withInternalToggle: true,
@@ -208,24 +211,24 @@ export class RecordModal extends Modal {
 
     // Category — autofill trigger
     this.categoryInput = this.buildAutocomplete(
-      grid, 'Категория', this.rec.category ?? '', this.o.categories,
+      grid, this.tr.category, this.rec.category ?? '', this.o.categories,
       v => { this.rec.category = v; this.scheduleAutofill('category', v); },
     );
 
     // Tag
     this.tagInput = this.buildAutocomplete(
-      grid, 'Тег', this.rec.tag ?? '', this.o.tags,
+      grid, this.tr.tag, this.rec.tag ?? '', this.o.tags,
       v => { this.rec.tag = v; },
     );
 
     // ── Note — visually distinct ─────────────────────────────────────────
     const noteG = form.createDiv('finance-field-group');
     const noteLabelRow = noteG.createDiv('finance-note-label-row');
-    noteLabelRow.createEl('label', { text: 'Примечание', cls: 'finance-field-label' });
+    noteLabelRow.createEl('label', { text: this.tr.note, cls: 'finance-field-label' });
     noteLabelRow.createEl('span', { text: '📝', cls: 'finance-note-icon' });
 
     const noteIn = noteG.createEl('textarea', { cls: 'finance-textarea finance-note-field' });
-    noteIn.placeholder = 'Необязательно — любой комментарий к записи…';
+    noteIn.placeholder = this.tr.notePlaceholder;
     noteIn.value = this.rec.note ?? '';
     noteIn.rows  = 3;
     noteIn.addEventListener('input', () => { this.rec.note = noteIn.value; });
@@ -235,10 +238,10 @@ export class RecordModal extends Modal {
 
     // ── Buttons ──────────────────────────────────────────────────────────
     const btnRow = contentEl.createDiv('finance-modal-btns');
-    btnRow.createEl('button', { text: 'Отмена', cls: 'finance-btn-cancel' })
+    btnRow.createEl('button', { text: this.tr.cancel, cls: 'finance-btn-cancel' })
           .addEventListener('click', () => this.close());
     btnRow.createEl('button', {
-      text: isEdit ? 'Сохранить' : 'Добавить',
+      text: isEdit ? this.tr.save : this.tr.addBtn,
       cls:  'finance-btn-save',
     }).addEventListener('click', () => this.handleSave());
 
@@ -287,7 +290,7 @@ export class RecordModal extends Modal {
       const intBtn = wrapper.createEl('button', {
         type: 'button',
         cls: `finance-internal-btn${internalState ? ' is-active' : ''}`,
-        attr: { title: 'Внутренняя операция (не учитывается в статистике)' },
+        attr: { title: this.tr.internalOpDesc },
       });
       intBtn.innerHTML = '🔄';
       intBtn.addEventListener('click', () => {
@@ -386,7 +389,7 @@ export class RecordModal extends Modal {
         this.exchangeRateInput.value = String(match.exchangeRate).replace('.', ',');
         this.rec.exchangeRate = match.exchangeRate;
         const toggle = this.exchangeRateWrap.parentElement?.querySelector('.finance-exrate-toggle');
-        if (toggle) toggle.textContent = '− Курс';
+        if (toggle) toggle.textContent = this.tr.exchangeRateHide;
         filled = true;
       }
     }
@@ -394,7 +397,7 @@ export class RecordModal extends Modal {
     if (filled) {
       this.autofillBadge.style.display = 'flex';
       const d = match.date.split('-');
-      this.autofillBadge.textContent = `✨ Подставлено из записи от ${d[2]}.${d[1]}.${d[0]}`;
+      this.autofillBadge.textContent = this.tr.autofillFromDate.replace('{date}', `${d[2]}.${d[1]}.${d[0]}`);
       setTimeout(() => { this.autofillBadge.style.display = 'none'; }, 6000);
     }
   }
@@ -403,7 +406,7 @@ export class RecordModal extends Modal {
 
   private buildAttachmentField(form: HTMLElement): void {
     const g   = form.createDiv('finance-field-group');
-    g.createEl('label', { text: 'Вложение', cls: 'finance-field-label' });
+    g.createEl('label', { text: this.tr.attachment, cls: 'finance-field-label' });
 
     const wrap   = g.createDiv('finance-attach-wrapper');
     const fi     = wrap.createEl('input', { type: 'file', cls: 'finance-file-input' });
@@ -412,11 +415,11 @@ export class RecordModal extends Modal {
     fi.id        = uid;
     const lbl    = wrap.createEl('label', { cls: 'finance-attach-label' });
     lbl.setAttribute('for', uid);
-    lbl.innerHTML = '<span>📎</span><span>Выбрать файл</span>';
+    lbl.innerHTML = `<span>📎</span><span>${this.tr.selectFile}</span>`;
     const nameEl = wrap.createEl('span', {
       text: this.rec.attachmentPath
         ? (this.rec.attachmentPath.split('/').pop() ?? this.rec.attachmentPath)
-        : 'Не выбран',
+        : this.tr.notSelected,
       cls: 'finance-attach-name',
     });
     const preview = g.createDiv('finance-image-preview');
@@ -466,7 +469,7 @@ export class RecordModal extends Modal {
         this.rec.attachmentPath = dest;
         nameEl.textContent = `✓ ${file.name}`;
         nameEl.classList.add('finance-attach-ok');
-      } catch { new Notice('⚠️ Не удалось сохранить вложение'); }
+      } catch { new Notice(this.tr.saveError); }
     });
   }
 
@@ -475,7 +478,7 @@ export class RecordModal extends Modal {
   private handleSave(): void {
     const amount = parseAmount(this.amountInput.value);
     if (!amount || amount <= 0) {
-      new Notice('⚠️ Укажите сумму больше нуля');
+      new Notice(this.tr.invalidAmount);
       this.amountInput.focus();
       return;
     }

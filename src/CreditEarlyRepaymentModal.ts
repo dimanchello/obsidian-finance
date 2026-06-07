@@ -1,4 +1,5 @@
 import { App, Modal, Notice } from 'obsidian';
+import { getLocaleFromApp, t, Translations } from './i18n';
 import { CreditRecord, CreditPayment } from './types';
 import { fmtAmount, parseAmount } from './utils';
 
@@ -10,6 +11,7 @@ export interface EarlyRepaymentOptions {
 }
 
 export class CreditEarlyRepaymentModal extends Modal {
+  private tr: Translations;
   private o: EarlyRepaymentOptions;
   private credit: CreditRecord;
   private actualRemaining: number;
@@ -19,6 +21,7 @@ export class CreditEarlyRepaymentModal extends Modal {
 
   constructor(app: App, opts: EarlyRepaymentOptions) {
     super(app);
+    this.tr = t(getLocaleFromApp(app));
     this.o = opts;
     this.credit = { ...opts.credit, payments: [...opts.credit.payments] };
 
@@ -37,14 +40,14 @@ export class CreditEarlyRepaymentModal extends Modal {
     const cur = this.o.currency;
 
     const info = contentEl.createDiv('finance-early-info');
-    info.createEl('p', { text: `Остаток кредита: ${fmtAmount(String(this.actualRemaining))} ${cur}` });
-    info.createEl('p', { text: `Ежемесячный платёж: ${fmtAmount(String(this.credit.monthlyPayment))} ${cur}` });
-    info.createEl('p', { text: `Осталось платежей: ${this.pendingPayments.length}` });
+    info.createEl('p', { text: `${this.tr.remainingCreditLabel}: ${fmtAmount(String(this.actualRemaining))} ${cur}` });
+    info.createEl('p', { text: `${this.tr.monthlyPaymentLabel}: ${fmtAmount(String(this.credit.monthlyPayment))} ${cur}` });
+    info.createEl('p', { text: `${this.tr.remainingPaymentsLabel}: ${this.pendingPayments.length}` });
 
     const form = contentEl.createDiv('finance-form');
 
     const dateG = form.createDiv('finance-field-group');
-    dateG.createEl('label', { text: 'Дата погашения', cls: 'finance-field-label' });
+    dateG.createEl('label', { text: this.tr.repaymentDate, cls: 'finance-field-label' });
     const dateIn = dateG.createEl('input', { type: 'date', cls: 'finance-input' });
     const today = new Date().toISOString().split('T')[0];
     dateIn.value = today;
@@ -79,16 +82,16 @@ export class CreditEarlyRepaymentModal extends Modal {
       btn.style.borderColor = '#e5e7eb';
     };
 
-    const amountBtn = optRow.createEl('button', { text: 'Гасить сумму' });
+    const amountBtn = optRow.createEl('button', { text: this.tr.repayAmountShort });
     baseBtnStyle(amountBtn);
     activeBtnStyle(amountBtn);
 
-    const termBtn = optRow.createEl('button', { text: 'Гасить срок' });
+    const termBtn = optRow.createEl('button', { text: this.tr.repayTermShort });
     baseBtnStyle(termBtn);
     inactiveBtnStyle(termBtn);
 
     const amountSection = form.createDiv('finance-early-amount-section');
-    amountSection.createEl('label', { text: 'Сумма досрочного погашения', cls: 'finance-field-label' });
+    amountSection.createEl('label', { text: this.tr.earlyRepaymentAmount, cls: 'finance-field-label' });
 
     this.amountInput = amountSection.createEl('input', {
       type: 'text',
@@ -123,7 +126,7 @@ export class CreditEarlyRepaymentModal extends Modal {
 
     const termSection = form.createDiv('finance-early-term-section');
     termSection.style.display = 'none';
-    termSection.createEl('label', { text: 'На сколько месяцев сократить срок?', cls: 'finance-field-label' });
+    termSection.createEl('label', { text: this.tr.reduceTermLabel, cls: 'finance-field-label' });
     const termInput = termSection.createEl('input', {
       type: 'number',
       cls: 'finance-input',
@@ -149,15 +152,15 @@ export class CreditEarlyRepaymentModal extends Modal {
     });
 
     const noteG = form.createDiv('finance-field-group');
-    noteG.createEl('label', { text: 'Примечание', cls: 'finance-field-label' });
+    noteG.createEl('label', { text: this.tr.note, cls: 'finance-field-label' });
     const noteIn = noteG.createEl('textarea', { cls: 'finance-textarea finance-note-field' });
-    noteIn.placeholder = 'Необязательно';
+    noteIn.placeholder = this.tr.optional;
     noteIn.rows = 2;
 
     const btnRow = contentEl.createDiv('finance-modal-btns');
-    btnRow.createEl('button', { text: 'Отмена', cls: 'finance-btn-cancel' })
+    btnRow.createEl('button', { text: this.tr.cancel, cls: 'finance-btn-cancel' })
       .addEventListener('click', () => this.close());
-    btnRow.createEl('button', { text: 'Погасить', cls: 'finance-btn-save' })
+    btnRow.createEl('button', { text: this.tr.repay, cls: 'finance-btn-save' })
       .addEventListener('click', () => {
         const todayStr = new Date().toISOString().split('T')[0];
         const repaymentDate = dateIn.value || todayStr;
@@ -165,7 +168,7 @@ export class CreditEarlyRepaymentModal extends Modal {
         if (this.selectedOption === 'amount') {
           const amount = parseAmount(this.amountInput.value);
           if (!amount || amount <= 0) {
-            new Notice('⚠️ Укажите сумму больше нуля');
+            new Notice(this.tr.invalidAmount);
             this.amountInput.focus();
             return;
           }

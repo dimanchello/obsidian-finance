@@ -2,6 +2,7 @@ import { MarkdownView, Notice, Plugin, PluginSettingTab, App, Setting, TFile } f
 import { FinanceStorage } from './src/storage';
 import { AccountView }    from './src/AccountView';
 import { PluginSettings, DEFAULT_SETTINGS } from './src/types';
+import { getLocaleFromApp, t } from './src/i18n';
 
 export default class FinanceTrackerPlugin extends Plugin {
   settings: PluginSettings;
@@ -25,14 +26,15 @@ export default class FinanceTrackerPlugin extends Plugin {
 
     this.addCommand({
       id: 'insert-finance-account-template',
-      name: 'Вставить шаблон счёта',
+      name: t(getLocaleFromApp(this.app)).commandInsertTemplate,
       icon: 'wallet',
       editorCallback: (editor) => {
         const template = '```finance-account\n\n```';
         editor.replaceSelection(template);
         const cursor = editor.getCursor();
         editor.setCursor(cursor.line - 1, 0);
-        new Notice('✅ Шаблон счёта вставлен');
+        const tr = t(getLocaleFromApp(this.app));
+        new Notice(tr.templateInserted);
       },
     });
 
@@ -110,26 +112,29 @@ class FinanceSettingTab extends PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
     containerEl.addClass('finance-settings');
-    containerEl.createEl('h2', { text: '💰 Finance Tracker' });
+
+    const tr = t(getLocaleFromApp(this.app));
+
+    containerEl.createEl('h2', { text: tr.pluginTitle });
     containerEl.createEl('p', {
-      text: 'Глобальные настройки плагина. Валюта и название счёта настраиваются прямо в заметке.',
+      text: tr.pluginDesc,
       cls: 'finance-settings-desc',
     });
 
     new Setting(containerEl)
-      .setName('Валюта по умолчанию')
-      .setDesc('Используется для новых счетов. Уже существующие счета имеют свою валюту.')
+      .setName(tr.defaultCurrency)
+      .setDesc(tr.defaultCurrencyDesc)
       .addText(t => t.setPlaceholder('₽').setValue(this.plugin.settings.defaultCurrency)
         .onChange(async v => { this.plugin.settings.defaultCurrency = v || '₽'; await this.plugin.saveSettings(); }));
 
     new Setting(containerEl)
-      .setName('Записей на странице')
+      .setName(tr.pageSize)
       .addDropdown(d => d
         .addOptions({ '25':'25','50':'50','100':'100','200':'200','500':'500' })
         .setValue(String(this.plugin.settings.defaultPageSize))
         .onChange(async v => { this.plugin.settings.defaultPageSize = parseInt(v); await this.plugin.saveSettings(); }));
 
-    containerEl.createEl('h3', { text: 'Управление валютами' });
+    containerEl.createEl('h3', { text: tr.currencyManagement });
 
     const currencyListEl = containerEl.createDiv('finance-currency-list');
 
@@ -188,11 +193,11 @@ class FinanceSettingTab extends PluginSettingTab {
     renderCurrencyList();
 
     new Setting(containerEl)
-      .setName('Добавить свою валюту')
-      .setDesc('Только добавленные здесь валюты будут доступны для выбора в счетах.')
+      .setName(tr.addCurrency)
+      .setDesc(tr.addCurrencyDesc)
       .addText(t => {
         const input = t;
-        t.setPlaceholder('напр. CNY, KRW, INR…');
+        t.setPlaceholder(tr.currencyPlaceholder);
         t.inputEl.addEventListener('keydown', async (e) => {
           if (e.key === 'Enter') {
             e.preventDefault();
@@ -218,13 +223,8 @@ class FinanceSettingTab extends PluginSettingTab {
         }
       }));
 
-    containerEl.createEl('h3', { text: 'Как использовать' });
+    containerEl.createEl('h3', { text: tr.howToUse });
     const ul = containerEl.createEl('ul', { cls: 'finance-settings-list' });
-    [
-      'Создайте заметку для каждого счёта (Наличные, Карта, Крипто-кошелёк).',
-      'Вставьте в заметку блок кода с языком finance-account.',
-      'Название счёта и валюта редактируются прямо в шапке блока.',
-      'Данные хранятся в .obsidian/plugins/obsidian-finance/accounts/{название_заметки}/',
-    ].forEach(t => ul.createEl('li', { text: t }));
+    [tr.usage1, tr.usage2, tr.usage3, tr.usage4].forEach(t => ul.createEl('li', { text: t }));
   }
 }

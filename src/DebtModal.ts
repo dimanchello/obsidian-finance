@@ -1,4 +1,5 @@
 import { App, Modal, Notice } from 'obsidian';
+import { getLocaleFromApp, t, Translations } from './i18n';
 import { DebtRecord } from './types';
 import { fmtAmount, parseAmount } from './utils';
 
@@ -10,6 +11,7 @@ export interface DebtModalOptions {
 }
 
 export class DebtModal extends Modal {
+  private tr: Translations;
   private o: DebtModalOptions;
   private debt: DebtRecord;
   private amountInput!: HTMLInputElement;
@@ -18,6 +20,7 @@ export class DebtModal extends Modal {
 
   constructor(app: App, opts: DebtModalOptions) {
     super(app);
+    this.tr = t(getLocaleFromApp(app));
     this.o = opts;
     const nowStr = new Date().toISOString().split('T')[0];
     this.debt = opts.debt
@@ -51,15 +54,15 @@ export class DebtModal extends Modal {
     // ── Direction toggle ───────────────────────────────────────────────
     const dirRow = contentEl.createDiv('finance-type-row');
     const lentBtn = dirRow.createEl('button', {
-      text: '💸 Мне должны',
+      text: this.tr.lent,
       cls: `finance-type-toggle${this.debt.direction === 'lent' ? ' active lent' : ''}`,
     });
     const borrowedBtn = dirRow.createEl('button', {
-      text: '💳 Я должен',
+      text: this.tr.borrowed,
       cls: `finance-type-toggle${this.debt.direction === 'borrowed' ? ' active borrowed' : ''}`,
     });
 
-    let personLabelText = this.debt.direction === 'lent' ? 'Кто *' : 'Кому *';
+    let personLabelText = this.debt.direction === 'lent' ? `${this.tr.who} *` : `${this.tr.person} *`;
 
     const setDirection = (dir: 'lent' | 'borrowed') => {
       this.debt.direction = dir;
@@ -67,8 +70,8 @@ export class DebtModal extends Modal {
       lentBtn.classList.toggle('lent', dir === 'lent');
       borrowedBtn.classList.toggle('active', dir === 'borrowed');
       borrowedBtn.classList.toggle('borrowed', dir === 'borrowed');
-      if (personLabel) personLabel.textContent = dir === 'lent' ? 'Кто *' : 'Кому *';
-      if (totalLabel) totalLabel.textContent = dir === 'lent' ? 'Итого мне вернут' : 'Итого к возврату';
+      if (personLabel) personLabel.textContent = dir === 'lent' ? `${this.tr.who} *` : `${this.tr.person} *`;
+      if (totalLabel) totalLabel.textContent = dir === 'lent' ? this.tr.totalReturnLent : this.tr.totalReturnBorrowed;
     };
 
     lentBtn.addEventListener('click', () => setDirection('lent'));
@@ -148,7 +151,7 @@ export class DebtModal extends Modal {
     });
 
     const amtG = row1.createDiv('finance-field-group finance-amount-group');
-    amtG.createEl('label', { text: 'Сумма *', cls: 'finance-field-label' });
+    amtG.createEl('label', { text: this.tr.amountLabel, cls: 'finance-field-label' });
     this.amountInput = amtG.createEl('input', { type: 'text', cls: 'finance-input finance-amount-input' });
     this.amountInput.setAttribute('inputmode', 'decimal');
     this.amountInput.setAttribute('placeholder', '0');
@@ -194,13 +197,13 @@ export class DebtModal extends Modal {
     const row2 = form.createDiv('finance-form-row finance-full-width');
 
     const dateG = row2.createDiv('finance-field-group');
-    dateG.createEl('label', { text: 'Дата создания', cls: 'finance-field-label' });
+    dateG.createEl('label', { text: this.tr.dateCreated, cls: 'finance-field-label' });
     const dateIn = dateG.createEl('input', { type: 'date', cls: 'finance-input' });
     dateIn.value = this.debt.date;
     dateIn.addEventListener('change', () => { this.debt.date = dateIn.value; });
 
     const dueDateG = row2.createDiv('finance-field-group');
-    dueDateG.createEl('label', { text: 'Дата возврата', cls: 'finance-field-label' });
+    dueDateG.createEl('label', { text: this.tr.dueDate, cls: 'finance-field-label' });
     const dueDateIn = dueDateG.createEl('input', { type: 'date', cls: 'finance-input' });
     dueDateIn.value = this.debt.dueDate || '';
     dueDateIn.addEventListener('change', () => { this.debt.dueDate = dueDateIn.value; });
@@ -209,7 +212,7 @@ export class DebtModal extends Modal {
     const row3 = form.createDiv('finance-form-row finance-full-width');
 
     const interestG = row3.createDiv('finance-field-group');
-    interestG.createEl('label', { text: 'Процент (%)', cls: 'finance-field-label' });
+    interestG.createEl('label', { text: this.tr.interestRateLabel, cls: 'finance-field-label' });
     this.interestInput = interestG.createEl('input', { type: 'text', cls: 'finance-input' });
     this.interestInput.setAttribute('inputmode', 'decimal');
     this.interestInput.setAttribute('placeholder', '0');
@@ -236,7 +239,7 @@ export class DebtModal extends Modal {
 
     const totalG = row3.createDiv('finance-field-group');
     const totalLabel = totalG.createEl('label', {
-      text: this.debt.direction === 'lent' ? 'Итого мне вернут' : 'Итого к возврату',
+      text: this.debt.direction === 'lent' ? this.tr.totalReturnLent : this.tr.totalReturnBorrowed,
       cls: 'finance-field-label',
     });
     this.totalInput = totalG.createEl('input', { type: 'text', cls: 'finance-input' });
@@ -248,18 +251,18 @@ export class DebtModal extends Modal {
     // === РЯД 4: Примечание (на всю ширину) ===
     const row4 = form.createDiv('finance-form-row finance-full-width');
     const noteG = row4.createDiv('finance-field-group');
-    noteG.createEl('label', { text: 'Примечание', cls: 'finance-field-label' });
+    noteG.createEl('label', { text: this.tr.note, cls: 'finance-field-label' });
     const noteIn = noteG.createEl('textarea', { cls: 'finance-textarea finance-note-field' });
-    noteIn.placeholder = 'Необязательно';
+    noteIn.placeholder = this.tr.optional;
     noteIn.value = this.debt.note;
     noteIn.rows = 2;
     noteIn.addEventListener('input', () => { this.debt.note = noteIn.value; });
 
     // ── Buttons ──────────────────────────────────────────────────────────
     const btnRow = contentEl.createDiv('finance-modal-btns');
-    btnRow.createEl('button', { text: 'Отмена', cls: 'finance-btn-cancel' })
+    btnRow.createEl('button', { text: this.tr.cancel, cls: 'finance-btn-cancel' })
       .addEventListener('click', () => this.close());
-    btnRow.createEl('button', { text: 'Сохранить', cls: 'finance-btn-save' })
+    btnRow.createEl('button', { text: this.tr.save, cls: 'finance-btn-save' })
       .addEventListener('click', () => this.handleSave());
   }
 
@@ -268,12 +271,12 @@ export class DebtModal extends Modal {
     this.debt.originalAmount = amount;
     this.debt.amount = this.calculateTotalAmount(amount, this.debt.interestRate);
     if (!amount || amount <= 0) {
-      new Notice('⚠️ Укажите сумму больше нуля');
+      new Notice(this.tr.invalidAmount);
       this.amountInput.focus();
       return;
     }
     if (!this.debt.person.trim()) {
-      new Notice('⚠️ Укажите кому');
+      new Notice(this.tr.specifyPerson);
       return;
     }
     this.debt.person = this.debt.person.trim();

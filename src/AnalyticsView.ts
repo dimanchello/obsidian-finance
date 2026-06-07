@@ -1,4 +1,5 @@
 import { FinanceRecord } from './types';
+import { Translations } from './i18n';
 
 type ChartType = 'bar' | 'pie';
 type GroupBy   = 'category' | 'payer' | 'month' | 'week' | 'year';
@@ -40,8 +41,8 @@ function svg<K extends keyof SVGElementTagNameMap>(
 }
 
 function fmtShort(n: number): string {
-  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'М';
-  if (n >= 1_000)     return (n / 1_000).toFixed(0) + 'К';
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
+  if (n >= 1_000)     return (n / 1_000).toFixed(0) + 'K';
   return String(Math.round(n));
 }
 
@@ -50,7 +51,7 @@ export class AnalyticsView {
   private el:        HTMLElement;
   private records:   FinanceRecord[];
   private currency:  string;
-  private locale:    string;
+  private tr:        Translations;
   private chartType: ChartType = 'bar';
   private groupBy:   GroupBy   = 'category';
   private showType:  ShowType  = 'both';
@@ -61,12 +62,16 @@ export class AnalyticsView {
   private timeTo = '23:59';
   private onBarClick: OnBarClick | null;
 
-  constructor(el: HTMLElement, records: FinanceRecord[], currency: string, locale = 'ru', onBarClick?: OnBarClick) {
+  constructor(el: HTMLElement, records: FinanceRecord[], currency: string, tr: Translations, onBarClick?: OnBarClick) {
     this.el       = el;
     this.records  = records;
     this.currency = currency;
-    this.locale   = locale;
+    this.tr       = tr;
     this.onBarClick = onBarClick ?? null;
+  }
+
+  private get locale(): string {
+    return this.tr.income === '↑ Доход' ? 'ru' : 'en';
   }
 
   /** Call when filter changes outside */
@@ -88,13 +93,13 @@ export class AnalyticsView {
     // chart type (row 1)
     const tg = ctrl.createDiv('finance-analytics-group');
     if (isMobile) { tg.style.flexDirection = 'column'; tg.style.alignItems = 'flex-start'; }
-    tg.createEl('span', { text: 'Вид:', cls: 'finance-analytics-label' });
+    tg.createEl('span', { text: this.tr.chartView, cls: 'finance-analytics-label' });
     const tgBtnWrap = tg.createDiv();
     tgBtnWrap.style.display = 'flex';
     tgBtnWrap.style.gap = '6px';
     if (isMobile) { tgBtnWrap.style.width = '100%'; }
-    const barBtn = this.mkToggle(tgBtnWrap, '▮▮ Столбцы', this.chartType === 'bar');
-    const pieBtn = this.mkToggle(tgBtnWrap, '◕ Пирог',    this.chartType === 'pie');
+    const barBtn = this.mkToggle(tgBtnWrap, this.tr.barChart, this.chartType === 'bar');
+    const pieBtn = this.mkToggle(tgBtnWrap, this.tr.pieChart, this.chartType === 'pie');
     barBtn.addEventListener('click', () => { this.chartType = 'bar'; barBtn.classList.add('active'); pieBtn.classList.remove('active'); this.redrawChart(); });
     pieBtn.addEventListener('click', () => { this.chartType = 'pie'; pieBtn.classList.add('active'); barBtn.classList.remove('active'); this.redrawChart(); });
 
@@ -107,21 +112,21 @@ export class AnalyticsView {
 
     const gg = ctrl2.createDiv('finance-analytics-group');
     if (isMobile) { gg.style.flexDirection = 'column'; gg.style.alignItems = 'flex-start'; }
-    gg.createEl('span', { text: 'Группировка:', cls: 'finance-analytics-label' });
-    const gSel = this.mkSelect(gg, [['category','По категории'],['payer','По плательщику'],['week','По неделе'],['month','По месяцу'],['year','По году']], this.groupBy);
+    gg.createEl('span', { text: this.tr.groupBy, cls: 'finance-analytics-label' });
+    const gSel = this.mkSelect(gg, [['category',this.tr.byCategory],['payer',this.tr.byPayer],['week',this.tr.byWeek],['month',this.tr.byMonth],['year',this.tr.byYear]], this.groupBy);
     gSel.addEventListener('change', () => { this.groupBy = gSel.value as GroupBy; this.redrawChart(); });
 
     const sg = ctrl2.createDiv('finance-analytics-group');
     if (isMobile) { sg.style.flexDirection = 'column'; sg.style.alignItems = 'flex-start'; }
-    sg.createEl('span', { text: 'Данные:', cls: 'finance-analytics-label' });
-    const sSel = this.mkSelect(sg, [['both','Все'],['income','Доходы'],['expense','Расходы']], this.showType);
+    sg.createEl('span', { text: this.tr.showData, cls: 'finance-analytics-label' });
+    const sSel = this.mkSelect(sg, [['both',this.tr.all],['income',this.tr.incomeStat],['expense',this.tr.expenseStat]], this.showType);
     sSel.addEventListener('change', () => { this.showType = sSel.value as ShowType; this.redrawChart(); });
 
     // ── date/time range ───────────────────────────────────────────────────
     const dateRow = this.el.createDiv('finance-filters-row finance-analytics-date-row');
 
     const dfG = dateRow.createDiv('finance-filter-group');
-    dfG.createEl('label', { text: 'С', cls: 'finance-filter-label' });
+    dfG.createEl('label', { text: this.tr.from, cls: 'finance-filter-label' });
     const dfI = dfG.createEl('input', { type: 'datetime-local', cls: 'finance-filter-input' });
     if (this.dateFrom) dfI.value = `${this.dateFrom}T${this.timeFrom || '00:00'}`;
     dfI.addEventListener('change', () => {
@@ -137,7 +142,7 @@ export class AnalyticsView {
     });
 
     const dtG = dateRow.createDiv('finance-filter-group');
-    dtG.createEl('label', { text: 'По', cls: 'finance-filter-label' });
+    dtG.createEl('label', { text: this.tr.to, cls: 'finance-filter-label' });
     const dtI = dtG.createEl('input', { type: 'datetime-local', cls: 'finance-filter-input' });
     if (this.dateTo) dtI.value = `${this.dateTo}T${this.timeTo || '23:59'}`;
     dtI.addEventListener('change', () => {
@@ -186,8 +191,8 @@ export class AnalyticsView {
       if (this.dateTo && r.date === this.dateTo && r.time > this.timeTo) return;
 
       let key: string;
-      if      (this.groupBy === 'category') key = r.category || 'Без категории';
-      else if (this.groupBy === 'payer')    key = r.payer    || 'Не указан';
+      if      (this.groupBy === 'category') key = r.category || this.tr.uncategorized;
+      else if (this.groupBy === 'payer')    key = r.payer    || this.tr.notSpecified;
       else if (this.groupBy === 'year') {
         if (!r.date) return;
         key = r.date.split('-')[0];
@@ -218,7 +223,7 @@ export class AnalyticsView {
       items.sort((a, b) => a.label.localeCompare(b.label));
       items = items.map(d => {
         const [y, w] = d.label.split('-W');
-        return { ...d, label: `Н${w} ${y}` };
+        return { ...d, label: `${this.tr.weekLetter}${w} ${y}` };
       });
     } else if (this.groupBy === 'year') {
       items.sort((a, b) => a.label.localeCompare(b.label));
@@ -241,7 +246,7 @@ export class AnalyticsView {
     if (!data.length) {
       const e = this.chartEl.createDiv('finance-empty-state');
       e.style.padding = '32px';
-      e.createEl('p', { text: '📊 Нет данных для отображения', cls: 'finance-empty-sub' });
+      e.createEl('p', { text: this.tr.noChartData, cls: 'finance-empty-sub' });
       return;
     }
 
@@ -260,7 +265,7 @@ export class AnalyticsView {
       data = [
         ...data.slice(0, MAX),
         {
-          label:   'Другое',
+          label:   this.tr.other,
           rawKey:  'Другое',
           income:  rest.reduce((s, d) => s + d.income,  0),
           expense: rest.reduce((s, d) => s + d.expense, 0),
@@ -339,8 +344,8 @@ export class AnalyticsView {
         const rect = svg('rect', { x, y: PT + chartH - h, width: barW, height: h, fill: '#22c55e', rx: 3 });
         rect.style.cursor = 'pointer';
         rect.addEventListener('click', fireClick);
-        rect.addEventListener('mouseenter', (e) => showTip(e, `${d.label} — доход: ${this.fmtNum(d.income)}`));
-        rect.addEventListener('mousemove', (e) => showTip(e, `${d.label} — доход: ${this.fmtNum(d.income)}`));
+        rect.addEventListener('mouseenter', (e) => showTip(e, `${d.label} — ${this.tr.incomeStat.toLowerCase()}: ${this.fmtNum(d.income)}`));
+        rect.addEventListener('mousemove', (e) => showTip(e, `${d.label} — ${this.tr.incomeStat.toLowerCase()}: ${this.fmtNum(d.income)}`));
         rect.addEventListener('mouseleave', hideTip);
         root.appendChild(rect);
       }
@@ -351,8 +356,8 @@ export class AnalyticsView {
         const rect = svg('rect', { x, y: PT + chartH - h, width: barW, height: h, fill: '#ef4444', rx: 3 });
         rect.style.cursor = 'pointer';
         rect.addEventListener('click', fireClick);
-        rect.addEventListener('mouseenter', (e) => showTip(e, `${d.label} — расход: ${this.fmtNum(d.expense)}`));
-        rect.addEventListener('mousemove', (e) => showTip(e, `${d.label} — расход: ${this.fmtNum(d.expense)}`));
+        rect.addEventListener('mouseenter', (e) => showTip(e, `${d.label} — ${this.tr.expenseStat.toLowerCase()}: ${this.fmtNum(d.expense)}`));
+        rect.addEventListener('mousemove', (e) => showTip(e, `${d.label} — ${this.tr.expenseStat.toLowerCase()}: ${this.fmtNum(d.expense)}`));
         rect.addEventListener('mouseleave', hideTip);
         root.appendChild(rect);
       }
@@ -377,7 +382,7 @@ export class AnalyticsView {
 
     if (this.showType === 'both') {
       const legEl = this.chartEl.createDiv('finance-chart-legend');
-      [['#22c55e', 'Доходы'], ['#ef4444', 'Расходы']].forEach(([c, lbl]) => {
+      [['#22c55e', this.tr.incomeStat], ['#ef4444', this.tr.expenseStat]].forEach(([c, lbl]) => {
         const row = legEl.createDiv('finance-chart-legend-row');
         const dot = row.createDiv('finance-chart-legend-dot');
         dot.style.background = c;
@@ -403,12 +408,12 @@ export class AnalyticsView {
 
     if (items.length > MAX) {
       const rest = items.slice(MAX).reduce((s, d) => s + d.value, 0);
-      items = [...items.slice(0, MAX), { label: 'Другое', value: rest }];
+      items = [...items.slice(0, MAX), { label: this.tr.other, value: rest }];
     }
 
     const total = items.reduce((s, d) => s + d.value, 0);
     if (!total) {
-      this.chartEl.createEl('p', { text: 'Нет данных', cls: 'finance-empty-sub' });
+      this.chartEl.createEl('p', { text: this.tr.noData, cls: 'finance-empty-sub' });
       return;
     }
 
@@ -468,7 +473,7 @@ export class AnalyticsView {
 
     // Center label
     const tc = svg('text', { x: cx, y: cy - 6, 'text-anchor': 'middle', fill: 'var(--text-muted)', 'font-size': 9 });
-    tc.textContent = 'Итого';
+    tc.textContent = this.tr.total;
     root.appendChild(tc);
     const tv = svg('text', { x: cx, y: cy + 8, 'text-anchor': 'middle', fill: 'var(--text-normal)', 'font-size': 12, 'font-weight': 'bold' });
     tv.textContent = fmtShort(total);

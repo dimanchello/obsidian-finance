@@ -1,6 +1,8 @@
 import { App, Modal } from 'obsidian';
+import { getLocaleFromApp, t, Translations } from './i18n';
 
 export class CalculatorModal extends Modal {
+  private tr: Translations;
   private displayEl!: HTMLElement;
   private display = '0';
   private previousValue: number | null = null;
@@ -14,6 +16,7 @@ export class CalculatorModal extends Modal {
     initialValue?: string,
   ) {
     super(app);
+    this.tr = t(getLocaleFromApp(app));
     if (initialValue) {
       const parsed = parseFloat(initialValue.replace(',', '.'));
       if (!isNaN(parsed)) {
@@ -57,9 +60,9 @@ export class CalculatorModal extends Modal {
     eqBtn.addEventListener('click', () => this.handleEquals());
 
     const btns = contentEl.createDiv('finance-modal-btns');
-    btns.createEl('button', { text: 'Отмена', cls: 'finance-btn-cancel' })
+    btns.createEl('button', { text: this.tr.cancel, cls: 'finance-btn-cancel' })
       .addEventListener('click', () => this.close());
-    btns.createEl('button', { text: 'Ок', cls: 'finance-btn-save' })
+    btns.createEl('button', { text: this.tr.confirm, cls: 'finance-btn-save' })
       .addEventListener('click', () => this.handleOk());
   }
 

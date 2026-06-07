@@ -1,4 +1,5 @@
 import { App, Modal, Notice } from 'obsidian';
+import { getLocaleFromApp, t, Translations } from './i18n';
 import { CreditPayment, CreditRecord } from './types';
 import { fmtAmount, parseAmount } from './utils';
 
@@ -10,12 +11,14 @@ export interface CreditPaymentOptions {
 }
 
 export class CreditPaymentModal extends Modal {
+  private tr: Translations;
   private o: CreditPaymentOptions;
   private payment: Partial<CreditPayment>;
   private amountInput!: HTMLInputElement;
 
   constructor(app: App, opts: CreditPaymentOptions) {
     super(app);
+    this.tr = t(getLocaleFromApp(app));
     this.o = opts;
   }
 
@@ -29,13 +32,13 @@ export class CreditPaymentModal extends Modal {
     const form = contentEl.createDiv('finance-form');
 
     const dateG = form.createDiv('finance-field-group');
-    dateG.createEl('label', { text: 'Дата платежа', cls: 'finance-field-label' });
+    dateG.createEl('label', { text: this.tr.paymentDateLabel, cls: 'finance-field-label' });
     const dateIn = dateG.createEl('input', { type: 'date', cls: 'finance-input' });
     const today = new Date().toISOString().split('T')[0];
     dateIn.value = today;
 
     const amtG = form.createDiv('finance-field-group finance-amount-group');
-    amtG.createEl('label', { text: 'Сумма', cls: 'finance-field-label' });
+    amtG.createEl('label', { text: this.tr.sum, cls: 'finance-field-label' });
 
     this.amountInput = amtG.createEl('input', { type: 'text', cls: 'finance-input finance-amount-input' });
     this.amountInput.setAttribute('inputmode', 'decimal');
@@ -66,19 +69,19 @@ export class CreditPaymentModal extends Modal {
     });
 
     const noteG = form.createDiv('finance-field-group');
-    noteG.createEl('label', { text: 'Примечание', cls: 'finance-field-label' });
+    noteG.createEl('label', { text: this.tr.note, cls: 'finance-field-label' });
     const noteIn = noteG.createEl('textarea', { cls: 'finance-textarea finance-note-field' });
-    noteIn.placeholder = 'Необязательно';
+    noteIn.placeholder = this.tr.optional;
     noteIn.rows = 2;
 
     const btnRow = contentEl.createDiv('finance-modal-btns');
-    btnRow.createEl('button', { text: 'Отмена', cls: 'finance-btn-cancel' })
+    btnRow.createEl('button', { text: this.tr.cancel, cls: 'finance-btn-cancel' })
       .addEventListener('click', () => this.close());
-    btnRow.createEl('button', { text: 'Добавить', cls: 'finance-btn-save' })
+    btnRow.createEl('button', { text: this.tr.addBtn, cls: 'finance-btn-save' })
       .addEventListener('click', () => {
         const amount = parseAmount(this.amountInput.value);
         if (!amount || amount <= 0) {
-          new Notice('⚠️ Укажите сумму больше нуля');
+          new Notice(this.tr.invalidAmount);
           this.amountInput.focus();
           return;
         }

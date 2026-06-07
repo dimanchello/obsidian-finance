@@ -52,7 +52,7 @@ Insert in any note:
 
 Use `Insert account template` command from the command palette.
 
-<img src="assets/screenshots/records_usage.png" width="700" alt="Finance-account code block in a note">
+<img src="assets/screenshots/records_usage_en.png" width="900" alt="Finance-account code block in a note">
 
 ---
 
@@ -71,9 +71,6 @@ Each account has four tabs, switched via the `•••` menu:
 |---|---|
 | **Name** | Click the title → edit inline |
 | **Currency** | Click the badge next to the title → select from list or custom |
-| **Accent color** | Picker in the account header |
-
-<img src="assets/screenshots/account-header.png" width="700" alt="Account header: name, currency, accent color">
 
 ### Records
 - Only **Amount** is required
@@ -83,15 +80,16 @@ Each account has four tabs, switched via the `•••` menu:
 - **Internal operations**: 🔄 button in the "Payer" field marks a record as internal — excluded from stats. Filter "Internal" in the filter panel shows only such records.
 - **Calculator**: 🧮 button in the amount field opens a built-in calculator
 
-<img src="assets/screenshots/records_add.png" width="700" alt="Add record modal">
+<img src="assets/screenshots/records_add_en.png" width="400" alt="Add record modal">
 
 ### Table
 - Desktop: full table with sticky header
 - Mobile: each record renders as a card with field labels
 - **Column visibility**: show/hide columns via ⚙️ menu
 
-<img src="assets/screenshots/records-table.png" width="700" alt="Records table on desktop">
-<img src="assets/screenshots/mobile-cards.png" width="700" alt="Mobile card layout">
+<img src="assets/screenshots/records_table_en.png" width="600" alt="Records table on desktop">
+<br>
+<img src="assets/screenshots/mobile_cards_en.png" width="200" alt="Mobile card layout">
 
 ### Filters & Sorting
 - Search across all fields
@@ -99,13 +97,15 @@ Each account has four tabs, switched via the `•••` menu:
 - Sort by date, amount, category, date added
 - Filter state persists per note
 
-<img src="assets/screenshots/filters.png" width="700" alt="Filters and sorting panel">
+<!-- ![Filters and sorting panel](assets/screenshots/filters_en.png) -->
 
 ### Analytics
 - Statistics: income, expenses, balance (including debts)
 - Charts by category and month
 
-<img src="assets/screenshots/analytics.png" width="700" alt="Analytics charts">
+<img src="assets/screenshots/analytic_charts_en.png" width="600" alt="Analytics bar chart">
+<br>
+<img src="assets/screenshots/analytic_pie_en.png" width="600" alt="Analytics pie chart">
 
 ### Attachments
 - Photo receipts and documents
@@ -122,7 +122,11 @@ Each account has four tabs, switched via the `•••` menu:
 5. Choose type detection: by field, by amount sign, or all income/expense
 6. Click "Import"
 
-<img src="assets/screenshots/import.png" width="700" alt="Import window with field mapping">
+<img src="assets/screenshots/import1_en.png" width="450" alt="Import window step 1">
+<br>
+<img src="assets/screenshots/import2_en.png" width="450" alt="Import window step 2">
+<br>
+<img src="assets/screenshots/import3_en.png" width="450" alt="Import window step 3">
 
 ### Debts
 - Two directions: "Owed to me" (lent) and "I owe" (borrowed)
@@ -132,7 +136,9 @@ Each account has four tabs, switched via the `•••` menu:
 - Filters by status (paid/unpaid), direction, person, dates
 - Movement history for each debt
 
-<img src="assets/screenshots/debts.png" width="700" alt="Debts tab">
+<img src="assets/screenshots/debt_usage_en.png" width="600" alt="Debt list">
+<br>
+<img src="assets/screenshots/debt_add_en.png" width="450" alt="Add debt">
 
 ### Credits
 - Types: consumer, auto loan, mortgage
@@ -141,7 +147,11 @@ Each account has four tabs, switched via the `•••` menu:
 - Early repayment (reduce amount or term)
 - Status tracking: active / paid
 
-<img src="assets/screenshots/credits.png" width="700" alt="Credits tab">
+<img src="assets/screenshots/credit_view_en.png" width="700" alt="Credit list">
+<br>
+<img src="assets/screenshots/credit_modals_en.png" width="450" alt="Add credit">
+<br>
+<img src="assets/screenshots/credit_early_repayment_en.png" width="450" alt="Early repayment">
 
 ### Deposits
 - Types: term, demand, savings
@@ -151,7 +161,11 @@ Each account has four tabs, switched via the `•••` menu:
 - Automatic income records on interest accrual
 - Automatic deposit closure at term end
 
-<img src="assets/screenshots/deposits.png" width="700" alt="Deposits tab">
+<img src="assets/screenshots/deposits_usage_en.png" width="700" alt="Deposit list">
+<br>
+<img src="assets/screenshots/deposits_view_en.png" width="600" alt="Deposit details">
+<br>
+<img src="assets/screenshots/deposits_modal_en.png" width="450" alt="Add deposit">
 
 ### Plugin Settings
 - **Default currency** for new accounts

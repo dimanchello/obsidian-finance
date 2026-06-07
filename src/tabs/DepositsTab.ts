@@ -19,6 +19,8 @@ export class DepositsTab {
   private filtersOpen = false;
   onUpdate: (() => void) | null = null;
 
+  private get tr() { return this.ctx.tr; }
+
   constructor(ctx: ViewContext, el: HTMLElement) {
     this.ctx = ctx;
     this.el = el;
@@ -149,7 +151,7 @@ export class DepositsTab {
       const searchInput = dropdown.createEl('input', {
         type: 'text',
         cls: 'finance-custom-select-search',
-        placeholder: 'Поиск…',
+        placeholder: this.tr.searchPlaceholder,
       });
 
       const list = dropdown.createDiv('finance-custom-select-options');
@@ -203,9 +205,9 @@ export class DepositsTab {
     const row1 = container.createDiv('finance-filters-row');
 
     const sg = row1.createDiv('finance-filter-group finance-filter-search');
-    sg.createEl('label', { text: 'Поиск', cls: 'finance-filter-label' });
+    sg.createEl('label', { text: this.tr.search, cls: 'finance-filter-label' });
     const si = sg.createEl('input', {
-      type: 'text', cls: 'finance-filter-input', placeholder: 'Поиск по названию или банку…',
+      type: 'text', cls: 'finance-filter-input', placeholder: this.tr.searchByName,
     });
     si.value = f.search;
     si.addEventListener('input', () => {
@@ -217,12 +219,12 @@ export class DepositsTab {
     });
 
     const statusG = row1.createDiv('finance-filter-group');
-    statusG.createEl('label', { text: 'Статус', cls: 'finance-filter-label' });
+    statusG.createEl('label', { text: this.tr.status, cls: 'finance-filter-label' });
     const statusSel = statusG.createEl('select', { cls: 'finance-filter-select' });
     [
-      { v: 'all', l: 'Все' },
-      { v: 'active', l: 'Активные' },
-      { v: 'closed', l: 'Закрытые' },
+      { v: 'all', l: this.tr.all },
+      { v: 'active', l: this.tr.depositActive },
+      { v: 'closed', l: this.tr.depositClosed },
     ].forEach(({ v, l }) => {
       const o = statusSel.createEl('option', { text: l });
       o.value = v;
@@ -234,8 +236,8 @@ export class DepositsTab {
     });
 
     const allBanks = this.ctx.data ? [...new Set(this.ctx.data.deposits.map(d => d.bankName).filter(Boolean))] : [];
-    const bankOpts = [{ v: '', l: 'Все банки' }, ...allBanks.map(b => ({ v: b, l: b }))];
-    this.mkSearchSelect(row1, 'Банк', bankOpts, f.bankName, (v) => {
+    const bankOpts = [{ v: '', l: this.tr.allBanks }, ...allBanks.map(b => ({ v: b, l: b }))];
+    this.mkSearchSelect(row1, this.tr.bankName, bankOpts, f.bankName, (v) => {
       this.ctx.state.depositFilter!.bankName = v;
       this.resetDepositPage();
     });
@@ -243,7 +245,7 @@ export class DepositsTab {
     const row2 = container.createDiv('finance-filters-row');
 
     const dfG = row2.createDiv('finance-filter-group');
-    dfG.createEl('label', { text: 'С', cls: 'finance-filter-label' });
+    dfG.createEl('label', { text: this.tr.from, cls: 'finance-filter-label' });
     const dfI = dfG.createEl('input', { type: 'date', cls: 'finance-filter-input' });
     dfI.value = f.dateFrom;
     dfI.addEventListener('change', () => {
@@ -252,7 +254,7 @@ export class DepositsTab {
     });
 
     const dtG = row2.createDiv('finance-filter-group');
-    dtG.createEl('label', { text: 'По', cls: 'finance-filter-label' });
+    dtG.createEl('label', { text: this.tr.to, cls: 'finance-filter-label' });
     const dtI = dtG.createEl('input', { type: 'date', cls: 'finance-filter-input' });
     dtI.value = f.dateTo;
     dtI.addEventListener('change', () => {
@@ -261,13 +263,13 @@ export class DepositsTab {
     });
 
     const typeG = row2.createDiv('finance-filter-group');
-    typeG.createEl('label', { text: 'Тип', cls: 'finance-filter-label' });
+    typeG.createEl('label', { text: this.tr.type, cls: 'finance-filter-label' });
     const typeSel = typeG.createEl('select', { cls: 'finance-filter-select' });
     [
-      { v: 'all', l: 'Все типы' },
-      { v: 'term', l: 'Срочный' },
-      { v: 'demand', l: 'До требования' },
-      { v: 'savings', l: 'Накопительный' },
+      { v: 'all', l: this.tr.allDepositTypes },
+      { v: 'term', l: this.tr.depositTypeTerm },
+      { v: 'demand', l: this.tr.depositTypeDemand },
+      { v: 'savings', l: this.tr.depositTypeSavings },
     ].forEach(({ v, l }) => {
       const o = typeSel.createEl('option', { text: l });
       o.value = v;
@@ -280,20 +282,20 @@ export class DepositsTab {
 
     const rG = row2.createDiv('finance-filter-group finance-filter-reset');
     rG.createEl('label', { text: '\u00A0', cls: 'finance-filter-label' });
-    rG.createEl('button', { text: '✕ Сбросить', cls: 'finance-reset-btn' })
+    rG.createEl('button', { text: this.tr.reset, cls: 'finance-reset-btn' })
       .addEventListener('click', () => {
         this.ctx.state.depositFilter = { ...DEFAULT_DEPOSIT_FILTER };
         this.resetDepositPage();
       });
 
     const sortRow = container.createDiv('finance-sort-row');
-    sortRow.createEl('span', { text: 'Сортировка:', cls: 'finance-sort-label' });
+    sortRow.createEl('span', { text: this.tr.sortBy, cls: 'finance-sort-label' });
 
     const sortFields: { field: DepositSortField; label: string }[] = [
-      { field: 'createdAt', label: 'Добавлен' },
-      { field: 'date', label: 'Дата открытия' },
-      { field: 'amount', label: 'Сумма' },
-      { field: 'bankName', label: 'Банк' },
+      { field: 'createdAt', label: this.tr.sortAdded },
+      { field: 'date', label: this.tr.startDate },
+      { field: 'amount', label: this.tr.sum },
+      { field: 'bankName', label: this.tr.bankName },
     ];
     const s = this.ctx.state.depositSort ?? { field: 'createdAt' as DepositSortField, dir: 'desc' };
     sortFields.forEach(({ field, label }) => {
@@ -342,26 +344,27 @@ export class DepositsTab {
         text: amount > 0 ? this.ctx.fmt(amount) : '—',
         cls: 'finance-debt-summary-main',
       });
+      const countLabel = count === 1 ? this.tr.depositCount_one : count < PLURAL_THRESHOLD ? this.tr.depositCount_few : this.tr.depositCount_many;
       const subText = profit > 0
-        ? `${count} ${count === 1 ? 'вклад' : count < PLURAL_THRESHOLD ? 'вклада' : 'вкладов'} · Прибыль: ${this.ctx.fmt(profit)}`
-        : `${count} ${count === 1 ? 'вклад' : count < PLURAL_THRESHOLD ? 'вклада' : 'вкладов'}`;
+        ? `${count} ${countLabel} · ${this.tr.profitLabel}: ${this.ctx.fmt(profit)}`
+        : `${count} ${countLabel}`;
       content.createEl('div', {
         text: subText,
         cls: 'finance-debt-summary-sub',
       });
     };
 
-    mkDepositCard('Активные', '💰', activeAmount, activeProfit, activeDeposits.length, true);
-    mkDepositCard('Закрытые', '✅', closedAmount, closedProfit, closedDeposits.length, false);
+    mkDepositCard(this.tr.activeCards, '💰', activeAmount, activeProfit, activeDeposits.length, true);
+    mkDepositCard(this.tr.closedCards, '✅', closedAmount, closedProfit, closedDeposits.length, false);
 
     const toolbar = body.createDiv('finance-debt-toolbar');
     const newDepositBtn = toolbar.createEl('button', { cls: 'finance-add-btn finance-accent-btn' });
-    newDepositBtn.innerHTML = '<span class="btn-icon">＋</span><span>Новый вклад</span>';
+    newDepositBtn.innerHTML = '<span class="btn-icon">＋</span><span>' + this.tr.newDeposit + '</span>';
     newDepositBtn.addEventListener('click', () => this.openNewDepositModal());
 
     const filtBtn = toolbar.createEl('button', { cls: 'finance-analytics-toggle-btn' });
     const updateFiltBtn = () => {
-      filtBtn.textContent = `🔍 Фильтры ${this.filtersOpen ? '▲' : '▼'}`;
+      filtBtn.textContent = `🔍 ${this.tr.filters} ${this.filtersOpen ? '▲' : '▼'}`;
       filtBtn.classList.toggle('active', this.filtersOpen);
     };
     updateFiltBtn();
@@ -379,16 +382,16 @@ export class DepositsTab {
     if (!allDeposits.length) {
       const e = body.createDiv('finance-empty-state');
       e.createEl('div', { text: '📈', cls: 'finance-empty-icon' });
-      e.createEl('p', { text: 'Нет вкладов', cls: 'finance-empty-title' });
-      e.createEl('p', { text: 'Нажмите «Новый вклад»', cls: 'finance-empty-sub' });
+      e.createEl('p', { text: this.tr.noDeposits, cls: 'finance-empty-title' });
+      e.createEl('p', { text: this.tr.addNewDebt, cls: 'finance-empty-sub' });
       return;
     }
 
     if (!filteredDeposits.length) {
       const e = body.createDiv('finance-empty-state');
       e.createEl('div', { text: '🔍', cls: 'finance-empty-icon' });
-      e.createEl('p', { text: 'Вкладов не найдено', cls: 'finance-empty-title' });
-      e.createEl('p', { text: 'Попробуйте изменить фильтры', cls: 'finance-empty-sub' });
+      e.createEl('p', { text: this.tr.noDepositsFiltered, cls: 'finance-empty-title' });
+      e.createEl('p', { text: this.tr.tryChangeFilters, cls: 'finance-empty-sub' });
       return;
     }
 
@@ -413,26 +416,26 @@ export class DepositsTab {
     if (!pageDeposits.length) {
       const e = container.createDiv('finance-empty-state');
       e.createEl('div', { text: '📊', cls: 'finance-empty-icon' });
-      e.createEl('p', { text: 'Нет записей на этой странице', cls: 'finance-empty-title' });
+      e.createEl('p', { text: this.tr.noRecordsPage, cls: 'finance-empty-title' });
       return;
     }
 
     const infoBar = container.createDiv('finance-table-info-bar');
     const metaLeft = infoBar.createDiv('finance-table-meta');
     metaLeft.createEl('span', {
-      text: `${start + 1}–${Math.min(start + pageSize, filteredDeposits.length)} из ${filteredDeposits.length}`,
+      text: `${start + 1}–${Math.min(start + pageSize, filteredDeposits.length)} ${this.tr.fromLower} ${filteredDeposits.length}`,
       cls: 'finance-count-text',
     });
 
     const allDepositCols: { key: string; label: string }[] = [
-      { key: 'name',      label: 'Название' },
-      { key: 'bank',      label: 'Банк' },
-      { key: 'type',      label: 'Тип' },
-      { key: 'amount',    label: 'Сумма' },
-      { key: 'profit',    label: 'Начислено' },
-      { key: 'rate',      label: 'Ставка' },
-      { key: 'date',      label: 'Открыт' },
-      { key: 'endDate',   label: 'Окончание' },
+      { key: 'name',      label: this.tr.name },
+      { key: 'bank',      label: this.tr.bankName },
+      { key: 'type',      label: this.tr.type },
+      { key: 'amount',    label: this.tr.sum },
+      { key: 'profit',    label: this.tr.depositAccruals },
+      { key: 'rate',      label: this.tr.rate },
+      { key: 'date',      label: this.tr.opened },
+      { key: 'endDate',   label: this.tr.endDate },
       { key: '_act',      label: '' },
     ];
 
@@ -443,7 +446,7 @@ export class DepositsTab {
     if (!this.ctx.isMobile) {
       const depositColVisCols = allDepositCols.filter(c => c.key !== '_act');
       const gearBtn = infoBar.createEl('button', { cls: 'finance-colvis-btn', text: '⚙️' });
-      gearBtn.title = 'Настройка колонок';
+      gearBtn.title = this.tr.columnSettings;
       gearBtn.addEventListener('click', () => {
         new ColumnVisibilityModal(this.ctx.app, {
           columns: depositColVisCols,
@@ -510,14 +513,14 @@ export class DepositsTab {
 
     const topUps = deposit.topUps || [];
     if (topUps.length > 0) {
-      const topUpsHeader = wrapper.createEl('h4', { text: '💰 Пополнения', cls: 'finance-section-title' });
+      const topUpsHeader = wrapper.createEl('h4', { text: this.tr.topUpsHeader, cls: 'finance-section-title' });
       topUpsHeader.style.margin = '0 0 8px';
       topUpsHeader.style.fontSize = '13px';
       topUpsHeader.style.color = '#6b7280';
 
       const topUpsTable = wrapper.createEl('table', { cls: 'finance-mov-table' });
       const topUpsHead = topUpsTable.createEl('thead').createEl('tr');
-      ['Дата', 'Сумма', 'Примечание', ''].forEach(l => {
+      [this.tr.date, this.tr.sum, this.tr.note, ''].forEach(l => {
         topUpsHead.createEl('th', { text: l, cls: 'finance-th finance-mov-th' });
       });
       const topUpsBody = topUpsTable.createEl('tbody');
@@ -528,7 +531,7 @@ export class DepositsTab {
         tr.createEl('td', { text: '+' + this.ctx.fmt(tu.amount), cls: 'finance-td finance-td-mov-repay' });
         tr.createEl('td', { text: tu.note || '—', cls: 'finance-td' });
         const actTd = tr.createEl('td', { cls: 'finance-td' });
-        this.mkActionBtn(actTd, '🗑️', 'Удалить', () => this.confirmDeleteDepositTopUp(deposit, tu), 'finance-delete-btn');
+        this.mkActionBtn(actTd, '🗑️', this.tr.delete, () => this.confirmDeleteDepositTopUp(deposit, tu), 'finance-delete-btn');
       });
 
       const totalTopUps = topUps.reduce((s, t) => s + t.amount, 0);
@@ -536,19 +539,19 @@ export class DepositsTab {
       topUpsSummary.style.margin = '8px 0 16px';
       topUpsSummary.style.fontSize = '13px';
       topUpsSummary.style.color = '#6b7280';
-      topUpsSummary.textContent = `Всего пополнений: ${topUps.length} · ${this.ctx.fmt(totalTopUps)}`;
+      topUpsSummary.textContent = `${this.tr.totalTopUps}: ${topUps.length} · ${this.ctx.fmt(totalTopUps)}`;
     }
 
     const withdrawals = deposit.withdrawals || [];
     if (withdrawals.length > 0) {
-      const withdrawalsHeader = wrapper.createEl('h4', { text: '📤 Снятия', cls: 'finance-section-title' });
+      const withdrawalsHeader = wrapper.createEl('h4', { text: this.tr.withdrawalsHeader, cls: 'finance-section-title' });
       withdrawalsHeader.style.margin = '0 0 8px';
       withdrawalsHeader.style.fontSize = '13px';
       withdrawalsHeader.style.color = '#6b7280';
 
       const withdrawalsTable = wrapper.createEl('table', { cls: 'finance-mov-table' });
       const withdrawalsHead = withdrawalsTable.createEl('thead').createEl('tr');
-      ['Дата', 'Сумма', 'Примечание', ''].forEach(l => {
+      [this.tr.date, this.tr.sum, this.tr.note, ''].forEach(l => {
         withdrawalsHead.createEl('th', { text: l, cls: 'finance-th finance-mov-th' });
       });
       const withdrawalsBody = withdrawalsTable.createEl('tbody');
@@ -559,7 +562,7 @@ export class DepositsTab {
         tr.createEl('td', { text: '−' + this.ctx.fmt(w.amount), cls: 'finance-td finance-td-mov-borrow' });
         tr.createEl('td', { text: w.note || '—', cls: 'finance-td' });
         const actTd = tr.createEl('td', { cls: 'finance-td' });
-        this.mkActionBtn(actTd, '🗑️', 'Удалить', () => this.confirmDeleteDepositWithdrawal(deposit, w), 'finance-delete-btn');
+        this.mkActionBtn(actTd, '🗑️', this.tr.delete, () => this.confirmDeleteDepositWithdrawal(deposit, w), 'finance-delete-btn');
       });
 
       const totalWithdrawals = withdrawals.reduce((s, w) => s + w.amount, 0);
@@ -567,7 +570,7 @@ export class DepositsTab {
       withdrawalsSummary.style.margin = '8px 0 16px';
       withdrawalsSummary.style.fontSize = '13px';
       withdrawalsSummary.style.color = '#6b7280';
-      withdrawalsSummary.textContent = `Всего снятий: ${withdrawals.length} · ${this.ctx.fmt(totalWithdrawals)}`;
+      withdrawalsSummary.textContent = `${this.tr.totalWithdrawals}: ${withdrawals.length} · ${this.ctx.fmt(totalWithdrawals)}`;
     }
 
     const accrued = this.getDepositAccrued(deposit);
@@ -577,16 +580,16 @@ export class DepositsTab {
       incomeLabel.style.fontSize = '13px';
       incomeLabel.style.fontWeight = '600';
       incomeLabel.style.color = '#16a34a';
-      incomeLabel.textContent = `Накопленный доход: ${this.ctx.fmt(accrued)}`;
+      incomeLabel.textContent = `${this.tr.accruedIncome}: ${this.ctx.fmt(accrued)}`;
     }
 
-    const accrualsHeader = wrapper.createEl('h4', { text: '📊 Начисления', cls: 'finance-section-title' });
+    const accrualsHeader = wrapper.createEl('h4', { text: this.tr.accrualsHeader, cls: 'finance-section-title' });
     accrualsHeader.style.margin = '0 0 8px';
     accrualsHeader.style.fontSize = '13px';
     accrualsHeader.style.color = '#6b7280';
 
     if (!deposit.accruals.length) {
-      wrapper.createEl('p', { text: 'Нет запланированных начислений', cls: 'finance-empty-text' });
+      wrapper.createEl('p', { text: this.tr.noScheduledAccruals, cls: 'finance-empty-text' });
       return;
     }
 
@@ -600,7 +603,7 @@ export class DepositsTab {
     const scrollWrapper = wrapper.createDiv({ cls: 'finance-mov-scroll' });
     const movTable = scrollWrapper.createEl('table', { cls: 'finance-mov-table' });
     const movHead = movTable.createEl('thead').createEl('tr');
-    ['#', 'Дата', 'Сумма', 'Статус'].forEach(l => {
+    ['#', this.tr.date, this.tr.sum, this.tr.status].forEach(l => {
       movHead.createEl('th', { text: l, cls: 'finance-th finance-mov-th' });
     });
     const movBody = movTable.createEl('tbody');
@@ -631,10 +634,10 @@ export class DepositsTab {
       statusCell.style.background = bgColor;
       if (isPaid) {
         const isCapitalization = deposit.accrualType === 'capitalization';
-        statusCell.textContent = isCapitalization ? '✓ Включено в сумму вклада' : '✓ Начислено';
+        statusCell.textContent = isCapitalization ? this.tr.accrualIncluded : this.tr.accrualPaidToAccount;
         statusCell.style.color = '#16a34a';
       } else {
-        statusCell.textContent = '⏳ Ожидает';
+        statusCell.textContent = this.tr.pendingStatus;
         statusCell.style.color = '#6b7280';
       }
     });
@@ -645,7 +648,7 @@ export class DepositsTab {
       pagInfo.style.marginTop = '8px';
       pagInfo.style.fontSize = '12px';
       pagInfo.style.color = '#6b7280';
-      pagInfo.textContent = `${start + 1}–${Math.min(start + ACCRUAL_PAGE_SIZE, totalAccruals)} из ${totalAccruals}`;
+      pagInfo.textContent = `${start + 1}–${Math.min(start + ACCRUAL_PAGE_SIZE, totalAccruals)} ${this.tr.fromLower} ${totalAccruals}`;
     }
   }
 
@@ -668,18 +671,18 @@ export class DepositsTab {
         text: amountText,
         cls: 'finance-record-amount finance-amount-income',
       });
-      const typeLabel = deposit.type === 'term' ? 'Срочный' : deposit.type === 'demand' ? 'До требования' : 'Накопительный';
+      const typeLabel = deposit.type === 'term' ? this.tr.depositTypeTerm : deposit.type === 'demand' ? this.tr.depositTypeDemand : this.tr.depositTypeSavings;
       header.createEl('span', { text: `${deposit.bankName} · ${typeLabel}`, cls: 'finance-record-date' });
 
       const details = block.createDiv('finance-record-details');
-      details.createEl('span', { text: `📊 ${deposit.interestRate}% годовых`, cls: 'finance-record-detail' });
+      details.createEl('span', { text: `📊 ${deposit.interestRate}${this.tr.percentPerAnnum}`, cls: 'finance-record-detail' });
       const profit = this.getDepositProfit(deposit);
       if (profit > 0) {
-        details.createEl('span', { text: `💰 Начислено: ${this.ctx.fmt(profit)}`, cls: 'finance-record-detail' });
+        details.createEl('span', { text: `💰 ${this.tr.depositAccruals}: ${this.ctx.fmt(profit)}`, cls: 'finance-record-detail' });
       }
       const endDate = this.calculateDepositEndDate(deposit);
       if (endDate && deposit.status === 'active') {
-        details.createEl('span', { text: `📅 до ${this.ctx.fmtDate(endDate)}`, cls: 'finance-record-detail' });
+        details.createEl('span', { text: `${this.tr.dueBy} ${this.ctx.fmtDate(endDate)}`, cls: 'finance-record-detail' });
       }
 
       if (deposit.note) {
@@ -688,7 +691,7 @@ export class DepositsTab {
 
       const historyToggle = block.createEl('button', {
         cls: 'finance-debt-history-toggle',
-        text: `📋 Начисления (${deposit.accruals.length}) ▼`,
+        text: `📋 ${this.tr.depositAccruals} (${deposit.accruals.length}) ▼`,
       });
       const historyWrap = block.createDiv('finance-debt-history-panel');
       this.renderDepositAccrualsPanel(historyWrap, deposit);
@@ -699,18 +702,18 @@ export class DepositsTab {
         historyWrap.toggleClass('finance-debt-history-open', open);
         block.toggleClass('finance-debt-block-expanded', open);
         historyToggle.textContent = open
-          ? `📋 Начисления (${deposit.accruals.length}) ▲`
-          : `📋 Начисления (${deposit.accruals.length}) ▼`;
+          ? `📋 ${this.tr.depositAccruals} (${deposit.accruals.length}) ▲`
+          : `📋 ${this.tr.depositAccruals} (${deposit.accruals.length}) ▼`;
       });
 
       const actions = block.createDiv('finance-record-actions');
       if (deposit.status === 'active') {
-        this.mkActionBtn(actions, '💰', 'Пополнить', () => this.openDepositTopUpModal(deposit));
-        this.mkActionBtn(actions, '📤', 'Снять', () => this.openDepositWithdrawalModal(deposit));
-        this.mkActionBtn(actions, '✅', 'Закрыть вклад', () => this.confirmCloseDeposit(deposit));
+        this.mkActionBtn(actions, '💰', this.tr.topUp, () => this.openDepositTopUpModal(deposit));
+        this.mkActionBtn(actions, '📤', this.tr.withdraw, () => this.openDepositWithdrawalModal(deposit));
+        this.mkActionBtn(actions, '✅', this.tr.closeAccount, () => this.confirmCloseDeposit(deposit));
       }
-      this.mkActionBtn(actions, '✏️', 'Редактировать', () => this.openEditDepositModal(deposit));
-      this.mkActionBtn(actions, '🗑️', 'Удалить', () => this.confirmDeleteDeposit(deposit), 'finance-delete-btn');
+      this.mkActionBtn(actions, '✏️', this.tr.edit, () => this.openEditDepositModal(deposit));
+      this.mkActionBtn(actions, '🗑️', this.tr.delete, () => this.confirmDeleteDeposit(deposit), 'finance-delete-btn');
 
       frag.appendChild(block);
     });
@@ -739,7 +742,7 @@ export class DepositsTab {
         tr.classList.add('finance-row-expense');
       }
 
-      const typeLabel = deposit.type === 'term' ? 'Срочный' : deposit.type === 'demand' ? 'До требования' : 'Накопительный';
+      const typeLabel = deposit.type === 'term' ? this.tr.depositTypeTerm : deposit.type === 'demand' ? this.tr.depositTypeDemand : this.tr.depositTypeSavings;
       const profit = this.getDepositProfit(deposit);
       const endDate = this.calculateDepositEndDate(deposit);
       const endDateText = endDate ? this.ctx.fmtDate(endDate) : '—';
@@ -796,12 +799,12 @@ export class DepositsTab {
         actionsWrap.style.alignItems = 'center';
 
         if (deposit.status === 'active') {
-          this.mkActionBtn(actionsWrap, '💰', 'Пополнить', () => this.openDepositTopUpModal(deposit));
-          this.mkActionBtn(actionsWrap, '📤', 'Снять', () => this.openDepositWithdrawalModal(deposit));
-          this.mkActionBtn(actionsWrap, '✅', 'Закрыть вклад', () => this.confirmCloseDeposit(deposit));
+          this.mkActionBtn(actionsWrap, '💰', this.tr.topUp, () => this.openDepositTopUpModal(deposit));
+          this.mkActionBtn(actionsWrap, '📤', this.tr.withdraw, () => this.openDepositWithdrawalModal(deposit));
+          this.mkActionBtn(actionsWrap, '✅', this.tr.closeAccount, () => this.confirmCloseDeposit(deposit));
         }
-        this.mkActionBtn(actionsWrap, '✏️', 'Редактировать', () => this.openEditDepositModal(deposit));
-        this.mkActionBtn(actionsWrap, '🗑️', 'Удалить', () => this.confirmDeleteDeposit(deposit), 'finance-delete-btn');
+        this.mkActionBtn(actionsWrap, '✏️', this.tr.edit, () => this.openEditDepositModal(deposit));
+        this.mkActionBtn(actionsWrap, '🗑️', this.tr.delete, () => this.confirmDeleteDeposit(deposit), 'finance-delete-btn');
 
         atd.appendChild(actionsWrap);
         tr.appendChild(atd);
@@ -873,10 +876,10 @@ export class DepositsTab {
   }
 
   private openNewDepositModal(): void {
-    if (!this.ctx.data) { new Notice('⏳ Загрузка…'); return; }
+    if (!this.ctx.data) { new Notice(this.tr.loading); return; }
     const allBanks = this.ctx.data.deposits.map(d => d.bankName).filter(Boolean);
     new DepositModal(this.ctx.app, {
-      title: '➕ Новый вклад',
+      title: this.tr.newDeposit,
       banks: allBanks,
       onSave: async (deposit, interestRecords) => {
         await this.ctx.storage.addDeposit(this.ctx.notePath, deposit);
@@ -901,7 +904,7 @@ export class DepositsTab {
         await this.ctx.storage.addRecord(this.ctx.notePath, rec);
         this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
         this.onUpdate?.();
-        new Notice('✅ Вклад добавлен');
+        new Notice(this.tr.depositAdded);
       },
     }).open();
   }
@@ -910,7 +913,7 @@ export class DepositsTab {
     if (!this.ctx.data) return;
     const allBanks = this.ctx.data.deposits.map(d => d.bankName).filter(Boolean);
     new DepositModal(this.ctx.app, {
-      title: '✏️ Редактировать вклад',
+      title: this.tr.editRecord,
       deposit,
       banks: allBanks,
       onSave: async (updated, _interestRecords) => {
@@ -951,7 +954,7 @@ export class DepositsTab {
 
         this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
         this.onUpdate?.();
-        new Notice('✅ Вклад обновлён');
+        new Notice(this.tr.depositUpdated);
       },
     }).open();
   }
@@ -959,7 +962,7 @@ export class DepositsTab {
   private confirmCloseDeposit(deposit: DepositRecord): void {
     const label = `${deposit.name} · ${this.ctx.fmt(deposit.amount)}`;
     const nowTime = new Date().toTimeString().slice(0, 5);
-    new ConfirmModal(this.ctx.app, `Закрыть вклад?\n${label}`, async () => {
+    new ConfirmModal(this.ctx.app, `${this.tr.confirmCloseDeposit}\n${label}`, async () => {
       deposit.status = 'closed';
       await this.ctx.storage.updateDeposit(this.ctx.notePath, deposit);
 
@@ -981,16 +984,16 @@ export class DepositsTab {
 
       this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
       this.onUpdate?.();
-      new Notice('✅ Вклад закрыт, средства возвращены');
+      new Notice(this.tr.depositClosed);
     }).open();
   }
 
   private confirmDeleteDeposit(deposit: DepositRecord): void {
     const label = `${deposit.name} · ${this.ctx.fmt(deposit.amount)}`;
     const refundNote = deposit.status === 'active'
-      ? `\n\nСумма ${this.ctx.fmt(deposit.amount)} будет возвращена на счёт.`
+      ? `\n\n${this.tr.closeDepositRefund.replace('{amount}', this.ctx.fmt(deposit.amount))}`
       : '';
-    new ConfirmModal(this.ctx.app, `Удалить вклад?${refundNote}\n\n${label}`, async () => {
+    new ConfirmModal(this.ctx.app, `${this.tr.confirmDeleteDeposit}${refundNote}\n\n${label}`, async () => {
       await this.ctx.storage.deleteDeposit(this.ctx.notePath, deposit.id);
       const otherRecords = this.ctx.data!.records.filter(r => r.linkedId !== deposit.id);
 
@@ -1016,37 +1019,37 @@ export class DepositsTab {
       await this.ctx.storage.saveAllRecords(this.ctx.notePath, otherRecords);
       this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
       this.onUpdate?.();
-      new Notice('🗑️ Вклад удалён');
+      new Notice(this.tr.depositDeleted);
     }).open();
   }
 
   private openDepositTopUpModal(deposit: DepositRecord): void {
     new DepositTopUpModal(this.ctx.app, {
-      title: `💰 Пополнение — ${deposit.name}`,
+      title: `💰 ${this.tr.topUp} — ${deposit.name}`,
       deposit,
       onSave: async topUp => {
         await this.ctx.storage.addDepositTopUp(this.ctx.notePath, deposit.id, topUp);
         this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
         this.onUpdate?.();
-        new Notice('✅ Вклад пополнен');
+        new Notice(this.tr.depositUpdated);
       },
     }).open();
   }
 
   private confirmDeleteDepositTopUp(deposit: DepositRecord, topUp: DepositTopUp): void {
     const label = `${deposit.name} · ${this.ctx.fmt(topUp.amount)} · ${this.ctx.fmtDate(topUp.date, topUp.time)}`;
-    new ConfirmModal(this.ctx.app, `Удалить пополнение?\n${label}`, async () => {
+    new ConfirmModal(this.ctx.app, `${this.tr.confirmDeleteTopUp}\n${label}`, async () => {
       await this.ctx.storage.deleteDepositTopUp(this.ctx.notePath, deposit.id, topUp.id);
       this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
       this.onUpdate?.();
-      new Notice('🗑️ Пополнение удалено');
+      new Notice(this.tr.deleted);
     }).open();
   }
 
   private openDepositWithdrawalModal(deposit: DepositRecord): void {
     const cur = this.ctx.currency;
     new DepositWithdrawalModal(this.ctx.app, {
-      title: `📤 Снятие — ${deposit.name}`,
+      title: `${this.tr.withdraw} — ${deposit.name}`,
       deposit,
       maxAmount: deposit.amount,
       currency: cur,
@@ -1054,18 +1057,18 @@ export class DepositsTab {
         await this.ctx.storage.addDepositWithdrawal(this.ctx.notePath, deposit.id, withdrawal);
         this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
         this.onUpdate?.();
-        new Notice('✅ Средства сняты');
+        new Notice(this.tr.depositUpdated);
       },
     }).open();
   }
 
   private confirmDeleteDepositWithdrawal(deposit: DepositRecord, withdrawal: DepositWithdrawal): void {
     const label = `${deposit.name} · ${this.ctx.fmt(withdrawal.amount)} · ${this.ctx.fmtDate(withdrawal.date, withdrawal.time)}`;
-    new ConfirmModal(this.ctx.app, `Удалить снятие?\n${label}`, async () => {
+    new ConfirmModal(this.ctx.app, `${this.tr.confirmDeleteWithdrawal}\n${label}`, async () => {
       await this.ctx.storage.deleteDepositWithdrawal(this.ctx.notePath, deposit.id, withdrawal.id);
       this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
       this.onUpdate?.();
-      new Notice('🗑️ Снятие удалено');
+      new Notice(this.tr.deleted);
     }).open();
   }
 }

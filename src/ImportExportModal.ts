@@ -1,4 +1,5 @@
 import { App, Modal, Notice } from 'obsidian';
+import { getLocaleFromApp, t, Translations } from './i18n';
 import { FinanceRecord, RecordType } from './types';
 
 type FileFormat = 'csv' | 'json';
@@ -26,11 +27,12 @@ export interface ImportExportOptions {
 }
 
 export class ImportExportModal extends Modal {
+  private tr: Translations;
   private o:      ImportExportOptions;
   private body!:  HTMLElement;
 
   constructor(app: App, opts: ImportExportOptions) {
-    super(app);
+    super(app);this.tr = t(getLocaleFromApp(app));
     this.o   = opts;
     this.modalEl.addClass('finance-ie-modal');
   }
@@ -40,7 +42,7 @@ export class ImportExportModal extends Modal {
     contentEl.empty();
     contentEl.addClass('finance-modal');
     contentEl.createEl('h2', {
-      text: this.o.mode === 'export' ? '📤 Экспорт' : '📥 Импорт',
+      text: this.o.mode === 'export' ? this.tr.export : this.tr.import,
       cls: 'finance-modal-title',
     });
 
@@ -55,7 +57,7 @@ export class ImportExportModal extends Modal {
 
   private renderExport(): void {
     const b = this.body;
-    b.createEl('p', { text: `Записей для экспорта: ${this.o.records.length}`, cls: 'finance-ie-desc' });
+    b.createEl('p', { text: `${this.tr.exported}: ${this.o.records.length}`, cls: 'finance-ie-desc' });
 
     const fmts: { fmt: FileFormat; label: string; icon: string }[] = [
       { fmt: 'csv',  label: 'CSV',  icon: '📊' },
@@ -67,7 +69,7 @@ export class ImportExportModal extends Modal {
       const card = grid.createDiv('finance-export-card');
       card.createEl('div',    { text: icon,  cls: 'finance-export-icon' });
       card.createEl('strong', { text: label });
-      const btn  = card.createEl('button', { text: 'Скачать', cls: 'finance-btn-save finance-export-btn' });
+      const btn  = card.createEl('button', { text: this.tr.download, cls: 'finance-btn-save finance-export-btn' });
       btn.addEventListener('click', () => this.doExport(fmt));
     });
   }
@@ -97,7 +99,7 @@ export class ImportExportModal extends Modal {
     a.download = `${this.o.noteName.replace(/[^\w\s-]/g, '')}.${ext}`;
     a.click();
     URL.revokeObjectURL(url);
-    new Notice(`✅ Экспортировано ${recs.length} записей`);
+    new Notice(`${this.tr.exportSuccess} — ${recs.length} ${this.tr.exported}`);
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -236,7 +238,7 @@ export class ImportExportModal extends Modal {
       let   node: unknown = parsed;
       if (path) path.split('.').forEach(k => { node = (node as any)?.[k]; });
       const arr = tryArr(node);
-      if (!arr) { new Notice('⚠️ По указанному пути не найден массив'); return; }
+      if (!arr) { new Notice(this.tr.arrayNotFound); return; }
       this.setRawData(arr);
       const next = container.createDiv();
       this.renderMappingStep(next);
@@ -255,7 +257,7 @@ export class ImportExportModal extends Modal {
   // ── mapping step ──────────────────────────────────────────────────────────
 
   private renderMappingStep(container: HTMLElement): void {
-    if (!this.rawData.length) { container.createEl('p', { text: '⚠️ Записей не обнаружено', cls: 'finance-error' }); return; }
+    if (!this.rawData.length) { container.createEl('p', { text: this.tr.noRecords, cls: 'finance-error' }); return; }
 
     const step = container.createDiv('finance-import-step');
     step.createEl('div', {

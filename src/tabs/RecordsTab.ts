@@ -33,6 +33,8 @@ export class RecordsTab {
   private filtBtn?: HTMLButtonElement;
   private setBtn?: HTMLButtonElement;
 
+  private get tr() { return this.ctx.tr; }
+
   constructor(ctx: ViewContext, el: HTMLElement) {
     this.ctx = ctx;
     this.el = el;
@@ -48,15 +50,15 @@ export class RecordsTab {
 
     this.analBtn = toggleRow.createEl('button', {
       cls: 'finance-analytics-toggle-btn',
-      text: '📈 Аналитика ▼',
+      text: `📈 ${this.tr.analytics} ▼`,
     });
     this.filtBtn = toggleRow.createEl('button', {
       cls: 'finance-analytics-toggle-btn',
-      text: '🔍 Фильтры ▼',
+      text: `🔍 ${this.tr.filters} ▼`,
     });
     this.setBtn = toggleRow.createEl('button', {
       cls: 'finance-analytics-toggle-btn',
-      text: '⚙️ Настройки ▼',
+      text: this.tr.settings + ' ▼',
     });
 
     this.analyticsEl = this.el.createDiv('finance-analytics-panel');
@@ -112,9 +114,9 @@ export class RecordsTab {
     this.filtBtn!.classList.toggle('active', this.filtersOpen);
     this.setBtn!.classList.toggle('active', this.settingsOpen);
 
-    this.analBtn!.textContent = `📈 Аналитика ${this.analyticsOpen ? '▲' : '▼'}`;
-    this.filtBtn!.textContent = `🔍 Фильтры ${this.filtersOpen ? '▲' : '▼'}`;
-    this.setBtn!.textContent = `⚙️ Настройки ${this.settingsOpen ? '▲' : '▼'}`;
+    this.analBtn!.textContent = `📈 ${this.tr.analytics} ${this.analyticsOpen ? '▲' : '▼'}`;
+    this.filtBtn!.textContent = `🔍 ${this.tr.filters} ${this.filtersOpen ? '▲' : '▼'}`;
+    this.setBtn!.textContent = `${this.tr.settings} ${this.settingsOpen ? '▲' : '▼'}`;
   }
 
   update(): void {
@@ -134,10 +136,10 @@ export class RecordsTab {
     const bal = inc - exp - lent + borrowed;
 
     [
-      { label: 'Доходы', value: this.ctx.fmt(inc), mod: 'income', icon: '↑' },
-      { label: 'Расходы', value: this.ctx.fmt(exp), mod: 'expense', icon: '↓' },
+      { label: this.tr.incomeStat, value: this.ctx.fmt(inc), mod: 'income', icon: '↑' },
+      { label: this.tr.expenseStat, value: this.ctx.fmt(exp), mod: 'expense', icon: '↓' },
       {
-        label: 'Баланс', value: (bal >= 0 ? '+' : '') + this.ctx.fmt(bal),
+        label: this.tr.balance, value: (bal >= 0 ? '+' : '') + this.ctx.fmt(bal),
         mod: bal >= 0 ? 'positive' : 'negative', icon: '＝',
       },
     ].forEach(item => {
@@ -157,8 +159,7 @@ export class RecordsTab {
     if (this.analyticsView) {
       this.analyticsView.update(allRecords, cur);
     } else {
-      const lang = (this.ctx.app.vault as any).getConfig?.('language') ?? 'ru';
-      this.analyticsView = new AnalyticsView(this.analyticsEl, allRecords, cur, lang, (a) => this.onAnalyticsBarClick(a));
+      this.analyticsView = new AnalyticsView(this.analyticsEl, allRecords, cur, this.tr, (a) => this.onAnalyticsBarClick(a));
       this.analyticsView.render();
     }
   }
@@ -171,9 +172,9 @@ export class RecordsTab {
     const row1 = this.filtersEl.createDiv('finance-filters-row');
 
     const sg = row1.createDiv('finance-filter-group finance-filter-search');
-    sg.createEl('label', { text: 'Поиск', cls: 'finance-filter-label' });
+    sg.createEl('label', { text: this.tr.search, cls: 'finance-filter-label' });
     const si = sg.createEl('input', {
-      type: 'text', cls: 'finance-filter-input', placeholder: 'Поиск по всем полям…',
+      type: 'text', cls: 'finance-filter-input', placeholder: this.tr.searchAllFields,
     });
     si.value = f.search;
     si.addEventListener('input', () => {
@@ -184,34 +185,34 @@ export class RecordsTab {
       }, SEARCH_DEBOUNCE_MS);
     });
 
-    this.mkSelect(row1, 'Тип',
-      [{ v: 'all', l: 'Все типы' }, { v: 'income', l: '↑ Доходы' }, { v: 'expense', l: '↓ Расходы' }],
+    this.mkSelect(row1, this.tr.type,
+      [{ v: 'all', l: this.tr.allTypes }, { v: 'income', l: '↑ ' + this.tr.incomeStat }, { v: 'expense', l: '↓ ' + this.tr.expenseStat }],
       f.type, v => { this.ctx.state.filter.type = v as any; this.resetPage(); });
 
-    this.mkSearchSelect(row1, 'Категория',
-      [{ v: '', l: 'Все' }, ...this.ctx.data.categories.map(c => ({ v: c, l: c }))],
+    this.mkSearchSelect(row1, this.tr.category,
+      [{ v: '', l: this.tr.all }, ...this.ctx.data.categories.map(c => ({ v: c, l: c }))],
       f.category, v => { this.ctx.state.filter.category = v; this.resetPage(); });
 
     const row2 = this.filtersEl.createDiv('finance-filters-row');
 
     const dfG = row2.createDiv('finance-filter-group');
-    dfG.createEl('label', { text: 'С', cls: 'finance-filter-label' });
+    dfG.createEl('label', { text: this.tr.from, cls: 'finance-filter-label' });
     const dfI = dfG.createEl('input', { type: 'date', cls: 'finance-filter-input' });
     dfI.value = f.dateFrom;
     dfI.addEventListener('change', () => { this.ctx.state.filter.dateFrom = dfI.value; this.resetPage(); });
 
     const dtG = row2.createDiv('finance-filter-group');
-    dtG.createEl('label', { text: 'По', cls: 'finance-filter-label' });
+    dtG.createEl('label', { text: this.tr.to, cls: 'finance-filter-label' });
     const dtI = dtG.createEl('input', { type: 'date', cls: 'finance-filter-input' });
     dtI.value = f.dateTo;
     dtI.addEventListener('change', () => { this.ctx.state.filter.dateTo = dtI.value; this.resetPage(); });
 
-    this.mkSearchSelect(row2, 'Плательщик',
-      [{ v: '', l: 'Все' }, ...this.ctx.data.payers.map(p => ({ v: p, l: p }))],
+    this.mkSearchSelect(row2, this.tr.payer,
+      [{ v: '', l: this.tr.all }, ...this.ctx.data.payers.map(p => ({ v: p, l: p }))],
       f.payer, v => { this.ctx.state.filter.payer = v; this.resetPage(); });
 
-    this.mkSearchSelect(row2, 'Тег',
-      [{ v: '', l: 'Все' }, ...this.ctx.data.tags.map(t => ({ v: t, l: t }))],
+    this.mkSearchSelect(row2, this.tr.tag,
+      [{ v: '', l: this.tr.all }, ...this.ctx.data.tags.map(t => ({ v: t, l: t }))],
       f.tag, v => { this.ctx.state.filter.tag = v; this.resetPage(); });
 
     const intG = row2.createDiv('finance-filter-group finance-filter-internal');
@@ -219,12 +220,12 @@ export class RecordsTab {
     const intBtn = intG.createEl('button', {
       type: 'button',
       cls: 'finance-internal-btn',
-      attr: { title: 'Показать только внутренние операции' },
+      attr: { title: this.tr.internalOnly },
     });
     intBtn.innerHTML = '🔄';
     const applyInternalLabel = () => {
       const only = f.showInternal === 'only';
-      intLabel.textContent = only ? 'Только внутр.' : 'Внутренние';
+      intLabel.textContent = only ? this.tr.showInternal : this.tr.internal;
       intBtn.style.opacity = only ? '1' : '.4';
     };
     applyInternalLabel();
@@ -236,7 +237,7 @@ export class RecordsTab {
 
     const rG = row2.createDiv('finance-filter-group finance-filter-reset');
     rG.createEl('label', { text: '\u00A0', cls: 'finance-filter-label' });
-    rG.createEl('button', { text: '✕ Сбросить', cls: 'finance-reset-btn' })
+    rG.createEl('button', { text: this.tr.reset, cls: 'finance-reset-btn' })
       .addEventListener('click', () => {
         this.ctx.state.filter = { ...DEFAULT_FILTER };
         this.ctx.state.page = 0;
@@ -247,15 +248,15 @@ export class RecordsTab {
       });
 
     const sortRow = this.filtersEl.createDiv('finance-sort-row');
-    sortRow.createEl('span', { text: 'Сортировка:', cls: 'finance-sort-label' });
+    sortRow.createEl('span', { text: this.tr.sortBy, cls: 'finance-sort-label' });
 
     const sortFields: { field: SortField; label: string }[] = [
-      { field: 'createdAt', label: 'Добавлена' },
-      { field: 'date', label: 'Дата' },
-      { field: 'amount', label: 'Сумма' },
-      { field: 'category', label: 'Категория' },
-      { field: 'type', label: 'Тип' },
-      { field: 'payer', label: 'Плательщик' },
+      { field: 'createdAt', label: this.tr.sortAdded },
+      { field: 'date', label: this.tr.sortDate },
+      { field: 'amount', label: this.tr.sum },
+      { field: 'category', label: this.tr.category },
+      { field: 'type', label: this.tr.type },
+      { field: 'payer', label: this.tr.payer },
     ];
     sortFields.forEach(({ field, label }) => {
       const active = this.ctx.state.sort.field === field;
@@ -333,7 +334,7 @@ export class RecordsTab {
       const searchInput = dropdown.createEl('input', {
         type: 'text',
         cls: 'finance-custom-select-search',
-        placeholder: 'Поиск…',
+        placeholder: this.tr.searchPlaceholder,
       });
 
       const list = dropdown.createDiv('finance-custom-select-list');
@@ -343,7 +344,7 @@ export class RecordsTab {
         const lq = q.toLowerCase();
         const filtered = opts.filter(o => !lq || o.l.toLowerCase().includes(lq) || o.v.toLowerCase().includes(lq));
         if (!filtered.length) {
-          list.createDiv({ cls: 'finance-custom-select-empty', text: 'Нет вариантов' });
+          list.createDiv({ cls: 'finance-custom-select-empty', text: this.tr.noOptions });
           return;
         }
         filtered.forEach(({ v, l }) => {
@@ -444,9 +445,9 @@ export class RecordsTab {
     if (!filtered.length) {
       const e = this.tableEl.createDiv('finance-empty-state');
       e.createEl('div', { text: '📊', cls: 'finance-empty-icon' });
-      e.createEl('p', { text: 'Записей не найдено', cls: 'finance-empty-title' });
+      e.createEl('p', { text: this.tr.noRecords, cls: 'finance-empty-title' });
       e.createEl('p', {
-        text: this.ctx.data?.records.length ? 'Попробуйте изменить фильтры' : 'Нажмите «Доход» или «Расход»',
+        text: this.ctx.data?.records.length ? this.tr.tryChangeFilters : this.tr.noRecordsFilter,
         cls: 'finance-empty-sub',
       });
       return;
@@ -456,7 +457,7 @@ export class RecordsTab {
 
     const metaLeft = infoBar.createDiv('finance-table-meta');
     metaLeft.createEl('span', {
-      text: `${start + 1}–${Math.min(start + pageSize, filtered.length)} из ${filtered.length}`,
+      text: `${start + 1}–${Math.min(start + pageSize, filtered.length)} ${this.tr.fromLower} ${filtered.length}`,
       cls: 'finance-count-text',
     });
 
@@ -468,13 +469,13 @@ export class RecordsTab {
     sums.createEl('span', { text: `↓\u00a0${this.ctx.fmt(fe)}`, cls: 'finance-sum-expense' });
 
     const allCols: { key: string; label: string }[] = [
-      { key: 'date', label: 'Дата / Время' },
-      { key: 'type', label: 'Тип' },
-      { key: 'amount', label: 'Сумма' },
-      { key: 'category', label: 'Категория' },
-      { key: 'tag', label: 'Тег' },
-      { key: 'payer', label: 'Плательщик' },
-      { key: 'note', label: 'Примечание' },
+      { key: 'date', label: this.tr.date + ' / ' + this.tr.time },
+      { key: 'type', label: this.tr.type },
+      { key: 'amount', label: this.tr.sum },
+      { key: 'category', label: this.tr.category },
+      { key: 'tag', label: this.tr.tag },
+      { key: 'payer', label: this.tr.payer },
+      { key: 'note', label: this.tr.note },
       { key: '_act', label: '' },
     ];
 
@@ -485,7 +486,7 @@ export class RecordsTab {
     if (!this.ctx.isMobile) {
       const colVisCols = allCols.filter(c => c.key !== '_act');
       const gearBtn = infoBar.createEl('button', { cls: 'finance-colvis-btn', text: '⚙️' });
-      gearBtn.title = 'Настройка колонок';
+      gearBtn.title = this.tr.columnSettings;
       gearBtn.addEventListener('click', () => {
         new ColumnVisibilityModal(this.ctx.app, {
           columns: colVisCols,
@@ -546,10 +547,10 @@ export class RecordsTab {
 
       const actions = block.createDiv('finance-record-actions');
       if (rec.attachmentPath) {
-        this.mkActionBtn(actions, '📎', 'Открыть вложение', () => this.openAttachment(rec));
+        this.mkActionBtn(actions, '📎', this.tr.openAttachment, () => this.openAttachment(rec));
       }
-      this.mkActionBtn(actions, '✏️', 'Редактировать', () => this.openEditModal(rec));
-      this.mkActionBtn(actions, '🗑️', 'Удалить', () => this.confirmDelete(rec), 'finance-delete-btn');
+      this.mkActionBtn(actions, '✏️', this.tr.edit, () => this.openEditModal(rec));
+      this.mkActionBtn(actions, '🗑️', this.tr.delete, () => this.confirmDelete(rec), 'finance-delete-btn');
 
       frag.appendChild(block);
     });
@@ -584,7 +585,7 @@ export class RecordsTab {
             cls = 'finance-td-date';
             break;
           case 'type':
-            text = rec.type === 'income' ? '↑ Доход' : '↓ Расход';
+            text = rec.type === 'income' ? this.tr.typeIncome : this.tr.typeExpense;
             cls = rec.type === 'income' ? 'finance-type-income' : 'finance-type-expense';
             break;
           case 'amount':
@@ -621,10 +622,10 @@ export class RecordsTab {
         atd.setAttribute('data-label', '');
 
         if (rec.attachmentPath) {
-          this.mkActionBtn(atd, '📎', 'Открыть вложение', () => this.openAttachment(rec));
+          this.mkActionBtn(atd, '📎', this.tr.openAttachment, () => this.openAttachment(rec));
         }
-        this.mkActionBtn(atd, '✏️', 'Редактировать', () => this.openEditModal(rec));
-        this.mkActionBtn(atd, '🗑️', 'Удалить', () => this.confirmDelete(rec), 'finance-delete-btn');
+        this.mkActionBtn(atd, '✏️', this.tr.edit, () => this.openEditModal(rec));
+        this.mkActionBtn(atd, '🗑️', this.tr.delete, () => this.confirmDelete(rec), 'finance-delete-btn');
 
         tr.appendChild(atd);
       }
@@ -684,7 +685,7 @@ export class RecordsTab {
   }
 
   private openAddModal(type: 'income' | 'expense'): void {
-    if (!this.ctx.data) { new Notice('⏳ Загрузка…'); return; }
+    if (!this.ctx.data) { new Notice(this.ctx.tr.loading); return; }
     const cur = this.ctx.currency;
     new RecordModal(this.ctx.app, {
       initial: { type }, records: this.ctx.data.records,
@@ -696,7 +697,7 @@ export class RecordsTab {
         this.renderStats();
         this.renderFilters();
         this.renderTable();
-        new Notice('✅ Запись добавлена');
+        new Notice(this.tr.recordAdded);
       },
     }).open();
   }
@@ -713,30 +714,30 @@ export class RecordsTab {
         this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
         this.renderStats();
         this.renderTable();
-        new Notice('✅ Запись обновлена');
+        new Notice(this.tr.recordUpdated);
       },
     }).open();
   }
 
   private confirmDelete(rec: FinanceRecord): void {
     const label = `${rec.type === 'income' ? '+' : '−'}${this.ctx.fmt(rec.amount)}  ·  ${rec.category || '—'}  ·  ${this.ctx.fmtDate(rec.date, rec.time)}`;
-    new ConfirmModal(this.ctx.app, `Удалить запись?\n${label}`, async () => {
+    new ConfirmModal(this.ctx.app, `${this.tr.confirmDeleteRecord}\n${label}`, async () => {
       await this.ctx.storage.deleteRecord(this.ctx.notePath, rec.id);
       this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
       this.renderStats();
       this.renderTable();
-      new Notice('🗑️ Удалено');
+      new Notice(this.tr.deleted);
     }).open();
   }
 
   private openAttachment(rec: FinanceRecord): void {
     const f = this.ctx.app.vault.getAbstractFileByPath(rec.attachmentPath);
     if (f instanceof TFile) this.ctx.app.workspace.getLeaf(false).openFile(f);
-    else new Notice(`⚠️ Файл не найден: ${rec.attachmentPath}`);
+    else new Notice(this.tr.fileNotFoundWithPath.replace('{path}', rec.attachmentPath));
   }
 
   private openIEModal(mode: 'export' | 'import'): void {
-    if (!this.ctx.data) { new Notice('⏳ Загрузка…'); return; }
+    if (!this.ctx.data) { new Notice(this.ctx.tr.loading); return; }
     const modal = new ImportExportModal(this.ctx.app, {
       noteName: this.ctx.data.name || noteFilename(this.ctx.notePath),
       currency: this.ctx.currency,
@@ -765,12 +766,12 @@ export class RecordsTab {
     const { groupBy, rawKey } = action;
 
     if (groupBy === 'category') {
-      f.category = rawKey === 'Без категории' ? '' : rawKey;
+      f.category = rawKey === this.tr.uncategorized ? '' : rawKey;
       f.payer = '';
       f.dateFrom = '';
       f.dateTo = '';
     } else if (groupBy === 'payer') {
-      f.payer = rawKey === 'Не указан' ? '' : rawKey;
+      f.payer = rawKey === this.tr.notSpecified ? '' : rawKey;
       f.category = '';
       f.dateFrom = '';
       f.dateTo = '';
@@ -824,7 +825,7 @@ export class RecordsTab {
 
     // ── Page size ────────────────────────────────────────────────────────
     const psRow = row();
-    psRow.createEl('label', { text: 'Записей на странице', cls: 'finance-filter-label' });
+    psRow.createEl('label', { text: this.tr.pageSizeLabel, cls: 'finance-filter-label' });
     const psSel = psRow.createEl('select', { cls: 'finance-filter-select' });
     PAGE_SIZE_OPTIONS.forEach(n => {
       const o = psSel.createEl('option', { text: String(n) });
@@ -840,7 +841,7 @@ export class RecordsTab {
 
     // ── Accent color ─────────────────────────────────────────────────────
     const acRow = row();
-    acRow.createEl('label', { text: 'Цвет акцента счёта', cls: 'finance-filter-label' });
+    acRow.createEl('label', { text: this.tr.accentColor, cls: 'finance-filter-label' });
     const acC = acRow.createDiv('finance-settings-controls');
     const acIn = acC.createEl('input', { type: 'color', cls: 'finance-settings-color-input' });
     acIn.value = this.ctx.data.accentColor ?? '#7c3aed';
@@ -851,7 +852,7 @@ export class RecordsTab {
       this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
       this.applyAccentColor(acIn.value);
     });
-    const rstBtn = acC.createEl('button', { text: 'Сбросить', cls: 'finance-btn-cancel' });
+    const rstBtn = acC.createEl('button', { text: this.tr.resetColor, cls: 'finance-btn-cancel' });
     rstBtn.style.padding = '4px 12px';
     rstBtn.style.fontSize = '.8em';
     rstBtn.addEventListener('click', async () => {
@@ -865,31 +866,31 @@ export class RecordsTab {
     // ── Import / Export ────────────────────────────────────────────────────
     const ieRow = row();
     ieRow.classList.add('finance-settings-sep');
-    ieRow.createEl('label', { text: 'Импорт / Экспорт', cls: 'finance-filter-label' });
+    ieRow.createEl('label', { text: this.tr.importExport, cls: 'finance-filter-label' });
     const ieC = ieRow.createDiv('finance-settings-controls');
-    const expBtn = ieC.createEl('button', { cls: 'finance-add-btn finance-ie-btn', text: '📤 Экспорт' });
-    const impBtn = ieC.createEl('button', { cls: 'finance-add-btn finance-ie-btn', text: '📥 Импорт' });
+    const expBtn = ieC.createEl('button', { cls: 'finance-add-btn finance-ie-btn', text: this.tr.export });
+    const impBtn = ieC.createEl('button', { cls: 'finance-add-btn finance-ie-btn', text: this.tr.import });
     expBtn.addEventListener('click', () => this.openIEModal('export'));
     impBtn.addEventListener('click', () => this.openIEModal('import'));
 
     // ── Danger zone ───────────────────────────────────────────────────────
     const dgRow = row();
     dgRow.classList.add('finance-settings-danger');
-    dgRow.createEl('label', { text: 'ОПАСНАЯ ЗОНА', cls: 'finance-danger-label' });
+    dgRow.createEl('label', { text: this.tr.dangerZone, cls: 'finance-danger-label' });
 
     const dangerDesc = el.createDiv('finance-danger-desc');
-    dangerDesc.textContent = 'Введите "Yes" и нажмите кнопку ниже, чтобы удалить ВСЕ записи и долги безвозвратно.';
+    dangerDesc.textContent = this.ctx.tr.confirmDeleteAll;
 
     const cfRow = row();
     cfRow.classList.add('finance-settings-cf');
     const cfIn = cfRow.createEl('input', {
-      type: 'text', cls: 'finance-input', placeholder: 'Введите Yes для подтверждения',
+      type: 'text', cls: 'finance-input', placeholder: this.ctx.tr.enterYes,
     });
     cfIn.style.borderColor = '#dc2626';
-    const delBtn = cfRow.createEl('button', { text: '🗑️ Удалить ВСЕ данные', cls: 'finance-btn-danger' });
+    const delBtn = cfRow.createEl('button', { text: this.tr.deleteAllData, cls: 'finance-btn-danger' });
     delBtn.addEventListener('click', async () => {
       if (cfIn.value.trim() !== 'Yes') {
-        new Notice('⚠️ Введите "Yes" для подтверждения');
+        new Notice(this.ctx.tr.enterYes);
         return;
       }
       await this.ctx.storage.resetAllData(this.ctx.notePath);
@@ -897,7 +898,7 @@ export class RecordsTab {
       this.renderStats();
       this.renderFilters();
       this.renderTable();
-      new Notice('🗑️ Все данные удалены');
+      new Notice(this.ctx.tr.allDataDeleted);
     });
   }
 

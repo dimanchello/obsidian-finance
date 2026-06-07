@@ -11,6 +11,7 @@ describe('i18n', () => {
     it('detects English', () => {
       expect(getLocale('en')).toBe('en');
       expect(getLocale('en-US')).toBe('en');
+      expect(getLocale('English')).toBe('en');
     });
   });
 
