@@ -4,7 +4,7 @@
 
 **Name:** Finance Tracker  
 **Type:** Obsidian plugin (Community plugin for Obsidian.md)  
-**Version:** 1.0.0  
+**Version:** 2.0.0  
 **Min Obsidian Version:** 1.4.0  
 **Languages:** Russian (default), English (Obsidian setting)
 
@@ -36,7 +36,7 @@ npm test       # Run unit tests
 2. esbuild bundles `main.ts` → `main.js`
 3. External modules: `obsidian`, `electron`, all `@codemirror/*`, `@lezer/*`, node built-ins
 
-**Output:** `main.js` in root directory — copy to `.obsidian/plugins/obsidian-finance/`
+**Output:** `dist/main.js` plus `manifest.json` and `styles.css` — copy `dist/` folder to `.obsidian/plugins/obsidian-finance/`
 
 ---
 
@@ -113,7 +113,16 @@ npm test       # Run unit tests
 │   ├── CreditEarlyRepaymentModal.ts
 │   ├── DepositModal.ts
 │   ├── DepositTopUpModal.ts
-│   └── DepositWithdrawalModal.ts
+│   ├── DepositWithdrawalModal.ts
+│   ├── CalculatorModal.ts
+│   ├── ColumnVisibilityModal.ts
+│   ├── context.ts
+│   ├── InfoModal.ts
+│   └── tabs/
+│       ├── RecordsTab.ts
+│       ├── DebtsTab.ts
+│       ├── CreditsTab.ts
+│       └── DepositsTab.ts
 ├── src/__tests__/       # Unit tests
 ├── esbuild.config.mjs   # Build configuration
 ├── vitest.config.ts     # Test configuration
@@ -200,8 +209,8 @@ interface AccountData {
 - **Caching:** In-memory Map<string, AccountData>
 - **Lazy loading:** `load(notePath)` returns cached or loads from file
 - **Debounced writes:** 500ms delay before flushing to disk
-- **Location:** `.obsidian/plugins/obsidian-finance/accounts/{sanitized-path}.json`
-- **Versioning:** DATA_VERSION = 3 (handles backward compat for missing fields)
+- **Location:** `.obsidian/plugins/obsidian-finance/accounts/{sanitized-path}/` (folder per account with meta.json, records.json, debts.json, credits.json, deposits.json)
+- **Versioning:** DATA_VERSION = 4 (handles backward compat for missing fields)
 
 ### View State
 - Saved to localStorage: `ft-view:{pluginId}:{notePath}`
@@ -340,10 +349,19 @@ npm run test:watch   # Run tests in watch mode
 - [x] Export CSV/JSON/XML
 - [x] Mobile card layout
 - [x] Analytics: charts by category/month
-- [ ] Transfers between accounts
-- [ ] Recurring payments
+- [x] Credits management
+- [x] Deposits management
+- [x] Column visibility
+- [x] Built-in calculator
 
 ---
+
+## Documentation
+
+### Bilingual README
+- `README.md` — Russian (primary, with link to English)
+- `README.en.md` — English (with link to Russian)
+- **Both files must be updated** when adding/modifying features, changing the roadmap, or updating installation instructions
 
 ## Contributing Notes
 

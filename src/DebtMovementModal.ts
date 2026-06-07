@@ -20,17 +20,21 @@ export class DebtMovementModal extends Modal {
   constructor(app: App, opts: DebtMovementOptions) {
     super(app);
     this.o = opts;
-    const nowStr = new Date().toISOString().split('T')[0];
-    const timeStr = new Date().toTimeString().slice(0, 5);
-    this.mov = {
-      id: crypto.randomUUID(),
-      type: opts.type,
-      amount: 0,
-      date: nowStr,
-      time: timeStr,
-      createdAt: Date.now(),
-      note: '',
-    };
+    if (opts.movement) {
+      this.mov = { ...opts.movement };
+    } else {
+      const nowStr = new Date().toISOString().split('T')[0];
+      const timeStr = new Date().toTimeString().slice(0, 5);
+      this.mov = {
+        id: crypto.randomUUID(),
+        type: opts.type,
+        amount: 0,
+        date: nowStr,
+        time: timeStr,
+        createdAt: Date.now(),
+        note: '',
+      };
+    }
   }
 
   onOpen(): void {

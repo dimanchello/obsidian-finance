@@ -503,6 +503,28 @@ export class FinanceStorage {
     this.scheduleDebts(notePath);
   }
 
+  async updateDebtMovement(notePath: string, debtId: string, mov: DebtMovement): Promise<void> {
+    const d   = await this.loadDebts(notePath);
+    const idx = d.findIndex(x => x.id === debtId);
+    if (idx === -1) return;
+    const debt = d[idx];
+    const mIdx = debt.movements.findIndex(m => m.id === mov.id);
+    if (mIdx === -1) return;
+    debt.movements[mIdx] = mov;
+    debt.amount = debt.movements.reduce((sum, m) => m.type === 'borrow' ? sum + m.amount : sum - m.amount, 0);
+    this.scheduleDebts(notePath);
+  }
+
+  async deleteDebtMovement(notePath: string, debtId: string, movementId: string): Promise<void> {
+    const d   = await this.loadDebts(notePath);
+    const idx = d.findIndex(x => x.id === debtId);
+    if (idx === -1) return;
+    const debt = d[idx];
+    debt.movements = debt.movements.filter(m => m.id !== movementId);
+    debt.amount = debt.movements.reduce((sum, m) => m.type === 'borrow' ? sum + m.amount : sum - m.amount, 0);
+    this.scheduleDebts(notePath);
+  }
+
   // ── Credit CRUD ──────────────────────────────────────────────────────────────
 
   async addCredit(notePath: string, credit: CreditRecord): Promise<void> {

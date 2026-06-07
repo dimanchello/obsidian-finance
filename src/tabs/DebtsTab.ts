@@ -483,7 +483,7 @@ export class DebtsTab {
     const scrollWrapper = wrapper.createDiv({ cls: 'finance-mov-scroll' });
     const movTable = scrollWrapper.createEl('table', { cls: 'finance-mov-table' });
     const movHead = movTable.createEl('thead').createEl('tr');
-    ['Тип', 'Сумма', 'Дата', 'Примечание'].forEach(l => {
+    ['Тип', 'Сумма', 'Дата', 'Примечание', ''].forEach(l => {
       movHead.createEl('th', { text: l, cls: 'finance-th finance-mov-th' });
     });
     const movBody = movTable.createEl('tbody');
@@ -500,6 +500,9 @@ export class DebtsTab {
       });
       mr.createEl('td', { text: this.ctx.fmtDate(m.date, m.time), cls: 'finance-td' });
       mr.createEl('td', { text: m.note || '—', cls: 'finance-td' });
+      const atd = mr.createEl('td', { cls: 'finance-td finance-actions-td' });
+      this.mkActionBtn(atd, '✏️', 'Редактировать', () => this.openEditMovementModal(debt, m));
+      this.mkActionBtn(atd, '🗑️', 'Удалить', () => this.confirmDeleteMovement(debt, m), 'finance-delete-btn');
     });
   }
 
@@ -877,6 +880,32 @@ export class DebtsTab {
         this.onUpdate?.();
         new Notice('✅ Сумма долга увеличена');
       },
+    }).open();
+  }
+
+  private openEditMovementModal(debt: DebtRecord, mov: DebtMovement): void {
+    const cur = this.ctx.currency;
+    new DebtMovementModal(this.ctx.app, {
+      title: `✏️ Редактировать движение — ${debt.person}`,
+      type: mov.type,
+      movement: mov,
+      currency: cur,
+      onSave: async updated => {
+        await this.ctx.storage.updateDebtMovement(this.ctx.notePath, debt.id, updated);
+        this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
+        this.onUpdate?.();
+        new Notice('✅ Движение обновлено');
+      },
+    }).open();
+  }
+
+  private confirmDeleteMovement(debt: DebtRecord, mov: DebtMovement): void {
+    const label = `${mov.type === 'borrow' ? '−' : '+'}${this.ctx.fmt(mov.amount)}  ·  ${this.ctx.fmtDate(mov.date, mov.time)}`;
+    new ConfirmModal(this.ctx.app, `Удалить движение?\n${label}`, async () => {
+      await this.ctx.storage.deleteDebtMovement(this.ctx.notePath, debt.id, mov.id);
+      this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
+      this.onUpdate?.();
+      new Notice('🗑️ Движение удалено');
     }).open();
   }
 
