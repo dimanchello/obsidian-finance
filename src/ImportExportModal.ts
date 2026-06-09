@@ -4,19 +4,7 @@ import { FinanceRecord, RecordType } from './types';
 
 type FileFormat = 'csv' | 'json';
 
-// ── Our target fields ─────────────────────────────────────────────────────────
-const OUR_FIELDS = [
-  { key: 'date',     label: 'Дата (YYYY-MM-DD)' },
-  { key: 'time',     label: 'Время (HH:MM)' },
-  { key: 'type',     label: 'Тип (income/expense)' },
-  { key: 'amount',   label: 'Сумма' },
-  { key: 'category', label: 'Категория' },
-  { key: 'tag',      label: 'Тег' },
-  { key: 'payer',    label: 'Плательщик' },
-  { key: 'note',     label: 'Примечание' },
-  { key: 'exchangeRate', label: 'Курс' },
-  { key: '_skip',    label: '— Не импортировать —' },
-];
+interface OurFieldDef { key: string; labelKey: keyof Translations; }
 
 export interface ImportExportOptions {
   noteName: string;
@@ -35,6 +23,21 @@ export class ImportExportModal extends Modal {
     super(app);this.tr = t(getLocaleFromApp(app));
     this.o   = opts;
     this.modalEl.addClass('finance-ie-modal');
+  }
+
+  private getOurFields(): OurFieldDef[] {
+    return [
+      { key: 'date',     labelKey: 'importFieldDate' },
+      { key: 'time',     labelKey: 'importFieldTime' },
+      { key: 'type',     labelKey: 'importFieldType' },
+      { key: 'amount',   labelKey: 'importFieldAmount' },
+      { key: 'category', labelKey: 'importFieldCategory' },
+      { key: 'tag',      labelKey: 'importFieldTag' },
+      { key: 'payer',    labelKey: 'importFieldPayer' },
+      { key: 'note',     labelKey: 'importFieldNote' },
+      { key: 'exchangeRate', labelKey: 'importFieldExchangeRate' },
+      { key: '_skip',    labelKey: 'importNotImport' },
+    ];
   }
 
   onOpen(): void {
@@ -59,16 +62,16 @@ export class ImportExportModal extends Modal {
     const b = this.body;
     b.createEl('p', { text: `${this.tr.exported}: ${this.o.records.length}`, cls: 'finance-ie-desc' });
 
-    const fmts: { fmt: FileFormat; label: string; icon: string }[] = [
-      { fmt: 'csv',  label: 'CSV',  icon: '📊' },
-      { fmt: 'json', label: 'JSON', icon: '{ }' },
+    const fmts: { fmt: FileFormat; labelKey: keyof Translations; icon: string }[] = [
+      { fmt: 'csv',  labelKey: 'exportFormatCsv',  icon: '📊' },
+      { fmt: 'json', labelKey: 'exportFormatJson', icon: '{ }' },
     ];
 
     const grid = b.createDiv('finance-export-grid');
-    fmts.forEach(({ fmt, label, icon }) => {
+    fmts.forEach(({ fmt, labelKey, icon }) => {
       const card = grid.createDiv('finance-export-card');
       card.createEl('div',    { text: icon,  cls: 'finance-export-icon' });
-      card.createEl('strong', { text: label });
+      card.createEl('strong', { text: this.tr[labelKey] });
       const btn  = card.createEl('button', { text: this.tr.download, cls: 'finance-btn-save finance-export-btn' });
       btn.addEventListener('click', () => this.doExport(fmt));
     });
@@ -114,19 +117,25 @@ export class ImportExportModal extends Modal {
   private typeMode:   'field' | 'sign' | 'all_income' | 'all_expense' = 'field';
   private typeField = '';
 
+  private tpl(s: string, params: Record<string, string | number>): string {
+    let r = s;
+    for (const [k, v] of Object.entries(params)) r = r.replace(`{${k}}`, String(v));
+    return r;
+  }
+
   private renderImport(): void {
     const b = this.body;
 
     // ── Step 1: File picker ────────────────────────────────────────────────
     const step1 = b.createDiv('finance-import-step');
-    step1.createEl('div', { text: 'Шаг 1 — Выберите файл (CSV, JSON)', cls: 'finance-step-title' });
+    step1.createEl('div', { text: this.tr.importStep1, cls: 'finance-step-title' });
 
     const pickWrap = step1.createDiv('finance-attach-wrapper');
-    const nameEl   = pickWrap.createEl('span', { text: 'Файл не выбран', cls: 'finance-attach-name' });
+    const nameEl   = pickWrap.createEl('span', { text: this.tr.importNoFile, cls: 'finance-attach-name' });
 
     // Button — opens native Electron dialog (bypasses all browser file-API restrictions)
     const openBtn = pickWrap.createEl('label', { cls: 'finance-attach-label' });
-    openBtn.innerHTML = '<span>📂</span><span>Открыть файл…</span>';
+    openBtn.innerHTML = `<span>📂</span><span>${this.tr.importOpenFile}</span>`;
 
     // Steps 2+ appear here after file load
     const stepsContainer = b.createDiv('finance-import-steps');
@@ -140,8 +149,8 @@ export class ImportExportModal extends Modal {
         const result = await electron.remote.dialog.showOpenDialog({
           properties: ['openFile'],
           filters: [
-            { name: 'Таблицы и данные', extensions: ['csv', 'json'] },
-            { name: 'Все файлы',        extensions: ['*'] },
+            { name: this.tr.importFileFilterData, extensions: ['csv', 'json'] },
+            { name: this.tr.importFileFilterAll,  extensions: ['*'] },
           ],
         });
 
@@ -168,11 +177,15 @@ export class ImportExportModal extends Modal {
             this.renderMappingStep(stepsContainer);
           }
         } catch (e) {
-          stepsContainer.createEl('p', { text: `⚠️ Ошибка разбора файла: ${e}`, cls: 'finance-error' });
+          const errMsg = e instanceof Error ? e.message : String(e);
+          stepsContainer.createEl('p', {
+            text: this.tpl(this.tr.importParseError, { error: errMsg }),
+            cls: 'finance-error',
+          });
         }
 
       } catch (err) {
-        new Notice('Ошибка открытия файла: ' + String(err));
+        new Notice(`${this.tr.importError}: ${String(err)}`);
       }
     });
   }
@@ -181,7 +194,7 @@ export class ImportExportModal extends Modal {
 
   private parseCSV(text: string): void {
     const lines   = text.split(/\r?\n/).filter(l => l.trim());
-    if (!lines.length) throw new Error('Файл пустой');
+    if (!lines.length) throw new Error(this.tr.importEmptyFile);
     const headers = this.csvRow(lines[0]);
     this.srcFields= headers;
     this.rawData  = lines.slice(1).map(l => {
@@ -224,13 +237,13 @@ export class ImportExportModal extends Modal {
 
     // Object — need to pick path
     const step = container.createDiv('finance-import-step');
-    step.createEl('div', { text: 'Шаг 1б — Укажите путь к массиву записей', cls: 'finance-step-title' });
-    step.createEl('small', { text: 'Например: records  или  data.transactions', cls: 'finance-hint-text' });
+    step.createEl('div', { text: this.tr.importStep1b, cls: 'finance-step-title' });
+    step.createEl('small', { text: this.tr.importJsonPathHint, cls: 'finance-hint-text' });
 
     const row  = step.createDiv('finance-filters-row');
     const inp  = row.createEl('input', { type: 'text', cls: 'finance-input', placeholder: 'records' });
     inp.style.flex = '1';
-    const btn  = row.createEl('button', { text: 'Далее →', cls: 'finance-btn-save' });
+    const btn  = row.createEl('button', { text: this.tr.importNext, cls: 'finance-btn-save' });
     btn.style.marginTop = 'auto';
 
     btn.addEventListener('click', () => {
@@ -261,26 +274,27 @@ export class ImportExportModal extends Modal {
 
     const step = container.createDiv('finance-import-step');
     step.createEl('div', {
-      text: `Шаг 2 — Соотнесение полей  (найдено ${this.rawData.length} записей)`,
+      text: this.tpl(this.tr.importStep2, { count: this.rawData.length }),
       cls: 'finance-step-title',
     });
 
     const sample = this.rawData[0];
-    step.createEl('p', { text: 'Первая запись из файла:', cls: 'finance-hint-text' });
+    step.createEl('p', { text: this.tr.importFirstRecord, cls: 'finance-hint-text' });
     const sampleBox = step.createEl('pre', { cls: 'finance-sample-box' });
     sampleBox.textContent = JSON.stringify(sample, null, 2).slice(0, 600);
 
     // Mapping table
-    step.createEl('p', { text: 'Настройте соответствие полей:', cls: 'finance-hint-text' });
+    step.createEl('p', { text: this.tr.importFieldMapping, cls: 'finance-hint-text' });
     const tbl  = step.createDiv('finance-mapping-table');
 
     // header row
     const hRow = tbl.createDiv('finance-mapping-row finance-mapping-header');
-    hRow.createEl('div', { text: 'Поле счёта',       cls: 'finance-mapping-cell' });
-    hRow.createEl('div', { text: 'Поле из файла',    cls: 'finance-mapping-cell' });
-    hRow.createEl('div', { text: 'Значение (1-я запись)', cls: 'finance-mapping-cell' });
+    hRow.createEl('div', { text: this.tr.importAccountField, cls: 'finance-mapping-cell' });
+    hRow.createEl('div', { text: this.tr.importFileField,    cls: 'finance-mapping-cell' });
+    hRow.createEl('div', { text: this.tr.importSampleValue,  cls: 'finance-mapping-cell' });
 
-    const srcOptions = ['— не импортировать —', ...this.srcFields];
+    const notImport = this.tr.importNotImport;
+    const srcOptions = [notImport, ...this.srcFields];
 
     // Auto-guess mapping by name similarity
     const guess = (ourKey: string): string => {
@@ -304,16 +318,16 @@ export class ImportExportModal extends Modal {
       return '';
     };
 
-    OUR_FIELDS.filter(f => f.key !== '_skip').forEach(f => {
+    this.getOurFields().filter(f => f.key !== '_skip').forEach(f => {
       const row = tbl.createDiv('finance-mapping-row');
 
-      row.createEl('div', { text: f.label, cls: 'finance-mapping-cell finance-mapping-label' });
+      row.createEl('div', { text: this.tr[f.labelKey], cls: 'finance-mapping-cell finance-mapping-label' });
 
       const selWrapper = row.createDiv('finance-mapping-cell');
       const sel        = selWrapper.createEl('select', { cls: 'finance-filter-select' });
       srcOptions.forEach(opt => {
         const o = sel.createEl('option', { text: opt });
-        o.value = opt === '— не импортировать —' ? '' : opt;
+        o.value = opt === notImport ? '' : opt;
       });
       const guessed = guess(f.key);
       sel.value = guessed || '';
@@ -325,7 +339,7 @@ export class ImportExportModal extends Modal {
     });
 
     // Type interpretation
-    step.createEl('p', { text: 'Как определять тип (доход/расход):', cls: 'finance-step-title finance-step-title-sm' });
+    step.createEl('p', { text: this.tr.importTypeDetection, cls: 'finance-step-title finance-step-title-sm' });
     const typeSec = step.createDiv('finance-type-mode-section');
 
     const mkRadio = (value: string, label: string) => {
@@ -345,7 +359,7 @@ export class ImportExportModal extends Modal {
       if (mode === 'field') {
         const row  = extraContainer.createDiv('finance-filters-row');
         const selG = row.createDiv('finance-filter-group');
-        selG.createEl('label', { text: 'Поле типа', cls: 'finance-filter-label-sm' });
+        selG.createEl('label', { text: this.tr.importTypeField, cls: 'finance-filter-label-sm' });
         const sel  = selG.createEl('select', { cls: 'finance-filter-select' });
         this.srcFields.forEach(f => { const o = sel.createEl('option',{text:f}); o.value=f; });
         sel.value      = this.mapping.type || this.srcFields[0] || '';
@@ -353,29 +367,29 @@ export class ImportExportModal extends Modal {
         sel.addEventListener('change', () => { this.typeField = sel.value; });
 
         const incG = row.createDiv('finance-filter-group');
-        incG.createEl('label', { text: 'Значение для «Доход»', cls: 'finance-filter-label-sm' });
+        incG.createEl('label', { text: this.tr.importIncomeValue, cls: 'finance-filter-label-sm' });
         const incI = incG.createEl('input', { type: 'text', cls: 'finance-input', placeholder: 'income' });
         incI.value = 'income';
         incI.addEventListener('input', () => { this.typeMap.incomeVal = incI.value; });
 
         const expG = row.createDiv('finance-filter-group');
-        expG.createEl('label', { text: 'Значение для «Расход»', cls: 'finance-filter-label-sm' });
+        expG.createEl('label', { text: this.tr.importExpenseValue, cls: 'finance-filter-label-sm' });
         const expI = expG.createEl('input', { type: 'text', cls: 'finance-input', placeholder: 'expense' });
         expI.value = 'expense';
         expI.addEventListener('input', () => { this.typeMap.expenseVal = expI.value; });
       }
     };
 
-    mkRadio('field',       'По значению поля (income/expense, приход/расход и т.п.)').addEventListener('change', () => { this.typeMode='field';       renderExtra('field'); });
-    mkRadio('sign',        'По знаку суммы (+ = доход, − = расход)').addEventListener('change', () => { this.typeMode='sign';        extraContainer.empty(); });
-    mkRadio('all_income',  'Все записи — доходы').addEventListener('change',  () => { this.typeMode='all_income';  extraContainer.empty(); });
-    mkRadio('all_expense', 'Все записи — расходы').addEventListener('change', () => { this.typeMode='all_expense'; extraContainer.empty(); });
+    mkRadio('field',       this.tr.importByFieldValue).addEventListener('change', () => { this.typeMode='field';       renderExtra('field'); });
+    mkRadio('sign',        this.tr.importByAmountSign).addEventListener('change', () => { this.typeMode='sign';        extraContainer.empty(); });
+    mkRadio('all_income',  this.tr.importAllIncome).addEventListener('change',  () => { this.typeMode='all_income';  extraContainer.empty(); });
+    mkRadio('all_expense', this.tr.importAllExpense).addEventListener('change', () => { this.typeMode='all_expense'; extraContainer.empty(); });
     renderExtra('field');
 
     // Import button
     const btnRow = step.createDiv('finance-modal-btns');
     const impBtn = btnRow.createEl('button', {
-      text: `📥 Импортировать ${this.rawData.length} записей`,
+      text: `${this.tr.importBtn} ${this.rawData.length} ${this.tr.imported}`,
       cls:  'finance-btn-save',
     });
     impBtn.addEventListener('click', () => this.doImport());
@@ -426,7 +440,7 @@ export class ImportExportModal extends Modal {
 
     const valid = records.filter(r => r.amount > 0);
     this.o.onImport(valid);
-    new Notice(`✅ Импортировано ${valid.length} записей`);
+    new Notice(`${this.tr.importSuccess} — ${valid.length} ${this.tr.imported}`);
     this.close();
   }
 

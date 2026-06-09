@@ -361,6 +361,42 @@ export interface Translations {
   fieldDescDebtDueDate: string;
   fieldDescDebtPerson: string;
   fieldDescDebtDirection: string;
+  importStep1: string;
+  importStep1b: string;
+  importStep2: string;
+  importNoFile: string;
+  importOpenFile: string;
+  importJsonPathHint: string;
+  importNext: string;
+  importFirstRecord: string;
+  importFieldMapping: string;
+  importAccountField: string;
+  importFileField: string;
+  importSampleValue: string;
+  importTypeDetection: string;
+  importByFieldValue: string;
+  importByAmountSign: string;
+  importAllIncome: string;
+  importAllExpense: string;
+  importFieldDate: string;
+  importFieldTime: string;
+  importFieldType: string;
+  importFieldAmount: string;
+  importFieldCategory: string;
+  importFieldTag: string;
+  importFieldPayer: string;
+  importFieldNote: string;
+  importFieldExchangeRate: string;
+  importNotImport: string;
+  importTypeField: string;
+  importIncomeValue: string;
+  importExpenseValue: string;
+  importParseError: string;
+  importFileFilterData: string;
+  importFileFilterAll: string;
+  importEmptyFile: string;
+  exportFormatCsv: string;
+  exportFormatJson: string;
 }
 
 const ru: Translations = {
@@ -717,6 +753,42 @@ const ru: Translations = {
   fieldDescDebtDueDate: 'Крайний срок возврата долга. Если не указана, долг считается бессрочным.',
   fieldDescDebtPerson: 'Кому вы должны или кто должен вам. Зависит от выбранного направления.',
   fieldDescDebtDirection: '«Мне должны» — вы дали в долг. «Я должен» — вы взяли в долг.',
+  importStep1: 'Шаг 1 — Выберите файл (CSV, JSON)',
+  importStep1b: 'Шаг 1б — Укажите путь к массиву записей',
+  importStep2: 'Шаг 2 — Соотнесение полей  (найдено {count} записей)',
+  importNoFile: 'Файл не выбран',
+  importOpenFile: 'Открыть файл…',
+  importJsonPathHint: 'Например: records  или  data.transactions',
+  importNext: 'Далее →',
+  importFirstRecord: 'Первая запись из файла:',
+  importFieldMapping: 'Настройте соответствие полей:',
+  importAccountField: 'Поле счёта',
+  importFileField: 'Поле из файла',
+  importSampleValue: 'Значение (1-я запись)',
+  importTypeDetection: 'Как определять тип (доход/расход):',
+  importByFieldValue: 'По значению поля (income/expense, приход/расход и т.п.)',
+  importByAmountSign: 'По знаку суммы (+ = доход, − = расход)',
+  importAllIncome: 'Все записи — доходы',
+  importAllExpense: 'Все записи — расходы',
+  importFieldDate: 'Дата (YYYY-MM-DD)',
+  importFieldTime: 'Время (HH:MM)',
+  importFieldType: 'Тип (income/expense)',
+  importFieldAmount: 'Сумма',
+  importFieldCategory: 'Категория',
+  importFieldTag: 'Тег',
+  importFieldPayer: 'Плательщик',
+  importFieldNote: 'Примечание',
+  importFieldExchangeRate: 'Курс',
+  importNotImport: '— Не импортировать —',
+  importTypeField: 'Поле типа',
+  importIncomeValue: 'Значение для «Доход»',
+  importExpenseValue: 'Значение для «Расход»',
+  importParseError: '⚠️ Ошибка разбора файла: {error}',
+  importFileFilterData: 'Таблицы и данные',
+  importFileFilterAll: 'Все файлы',
+  importEmptyFile: 'Файл пустой',
+  exportFormatCsv: 'CSV',
+  exportFormatJson: 'JSON',
 };
 
 const en: Translations = {
@@ -1073,6 +1145,42 @@ const en: Translations = {
   fieldDescDebtDueDate: 'Deadline for debt repayment. If not set, the debt is considered indefinite.',
   fieldDescDebtPerson: 'Who owes you or who you owe. Depends on the selected direction.',
   fieldDescDebtDirection: '"Owed to me" — you lent money. "I owe" — you borrowed money.',
+  importStep1: 'Step 1 — Select a file (CSV, JSON)',
+  importStep1b: 'Step 1b — Specify the path to the records array',
+  importStep2: 'Step 2 — Field mapping  ({count} records found)',
+  importNoFile: 'No file selected',
+  importOpenFile: 'Open file…',
+  importJsonPathHint: 'e.g. records  or  data.transactions',
+  importNext: 'Next →',
+  importFirstRecord: 'First record from file:',
+  importFieldMapping: 'Configure field mapping:',
+  importAccountField: 'Account field',
+  importFileField: 'File field',
+  importSampleValue: 'Value (1st record)',
+  importTypeDetection: 'Type detection (income/expense):',
+  importByFieldValue: 'By field value (income/expense, revenue/expense, etc.)',
+  importByAmountSign: 'By amount sign (+ = income, − = expense)',
+  importAllIncome: 'All records — income',
+  importAllExpense: 'All records — expense',
+  importFieldDate: 'Date (YYYY-MM-DD)',
+  importFieldTime: 'Time (HH:MM)',
+  importFieldType: 'Type (income/expense)',
+  importFieldAmount: 'Amount',
+  importFieldCategory: 'Category',
+  importFieldTag: 'Tag',
+  importFieldPayer: 'Payer',
+  importFieldNote: 'Note',
+  importFieldExchangeRate: 'Exchange rate',
+  importNotImport: '— Do not import —',
+  importTypeField: 'Type field',
+  importIncomeValue: 'Income value',
+  importExpenseValue: 'Expense value',
+  importParseError: '⚠️ File parse error: {error}',
+  importFileFilterData: 'Tables and data',
+  importFileFilterAll: 'All files',
+  importEmptyFile: 'File is empty',
+  exportFormatCsv: 'CSV',
+  exportFormatJson: 'JSON',
 };
 
 const translations: Record<Locale, Translations> = { ru, en };
