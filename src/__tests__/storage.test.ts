@@ -7,6 +7,7 @@ interface MockAdapter {
   write: ReturnType<typeof vi.fn>;
   mkdir: ReturnType<typeof vi.fn>;
   remove: ReturnType<typeof vi.fn>;
+  rename: ReturnType<typeof vi.fn>;
 }
 
 interface MockApp {
@@ -27,6 +28,7 @@ describe('FinanceStorage', () => {
           write: vi.fn().mockResolvedValue(undefined),
           mkdir: vi.fn().mockResolvedValue(undefined),
           remove: vi.fn().mockResolvedValue(undefined),
+          rename: vi.fn().mockResolvedValue(undefined),
         },
       },
     };
@@ -188,6 +190,37 @@ describe('FinanceStorage', () => {
       const data = await storage.load('test/path.md');
       expect(data.currency).toBe('₽');
       expect(data.records[0].time).toBe('');
+    });
+  });
+
+  describe('noteFolder', () => {
+    it('uses last 2 segments for nested paths', () => {
+      const result = (storage as any).noteFolder('Люди/Я/Финансы/Счета/Доллары.md');
+      expect(result).toContain('Счета_Доллары');
+    });
+
+    it('uses single segment for root notes', () => {
+      const result = (storage as any).noteFolder('Доллары.md');
+      expect(result).toContain('accounts_Доллары');
+    });
+  });
+
+  describe('saveViewState / loadViewState', () => {
+    it('saves and loads view state', async () => {
+      mockAdapter.exists.mockResolvedValue(true);
+      const state = { filter: { search: '' }, sort: { field: 'date' as const, dir: 'asc' as const }, page: 0, pageSize: 25 };
+      await storage.saveViewState('test/note.md', state as any);
+      expect(mockAdapter.write).toHaveBeenCalled();
+
+      mockAdapter.read.mockResolvedValue(JSON.stringify(state));
+      const loaded = await storage.loadViewState('test/note.md');
+      expect(loaded).toEqual(state);
+    });
+
+    it('returns null when no state file exists', async () => {
+      mockAdapter.exists.mockResolvedValue(false);
+      const result = await storage.loadViewState('test/note.md');
+      expect(result).toBeNull();
     });
   });
 });

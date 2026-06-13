@@ -164,6 +164,8 @@ export const PAGE_RANGE_THRESHOLD = 7;
 export const FOCUS_DELAY_MS = 20;
 export const SKELETON_CARD_COUNT = 3;
 export const PLURAL_THRESHOLD = 5;
+export const DAYS_IN_YEAR = 365;
+export const ACCRUAL_STEP_MONTHLY = 12;
 
 export type CreditType = 'consumer' | 'auto' | 'mortgage';
 export type CreditStatus = 'active' | 'paid';

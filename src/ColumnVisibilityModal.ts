@@ -5,6 +5,7 @@ export interface ColumnVisibilityModalOptions {
   columns: { key: string; label: string }[];
   visibility: Record<string, boolean>;
   onSave: (visibility: Record<string, boolean>) => void;
+  accentColor?: string;
 }
 
 export class ColumnVisibilityModal extends Modal {
@@ -22,6 +23,9 @@ export class ColumnVisibilityModal extends Modal {
   onOpen(): void {
     const { contentEl } = this;
     contentEl.addClass('finance-modal');
+    if (this.opts.accentColor) {
+      contentEl.style.setProperty('--ft-accent', this.opts.accentColor);
+    }
     contentEl.createEl('h2', { text: this.tr.columnSettings, cls: 'finance-modal-title' });
 
     const list = contentEl.createDiv('finance-colvis-list');
@@ -40,7 +44,7 @@ export class ColumnVisibilityModal extends Modal {
     const btns = contentEl.createDiv('finance-modal-btns');
     btns.createEl('button', { text: this.tr.cancel, cls: 'finance-btn-cancel' })
       .addEventListener('click', () => this.close());
-    btns.createEl('button', { text: this.tr.save, cls: 'finance-add-btn' })
+    btns.createEl('button', { text: this.tr.save, cls: 'finance-accent-btn' })
       .addEventListener('click', () => {
         const result: Record<string, boolean> = {};
         this.checkboxes.forEach((cb, key) => {

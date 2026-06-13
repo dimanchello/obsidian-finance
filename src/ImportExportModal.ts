@@ -421,6 +421,7 @@ export class ImportExportModal extends Modal {
 
       const rawAmt = get('amount').replace(',', '.').replace(/[^\d.-]/g, '');
       const rawEr  = get('exchangeRate').replace(',', '.').replace(/[^\d.]/g, '');
+      const er     = parseFloat(rawEr);
       return {
         id:             crypto.randomUUID(),
         createdAt:      now + i,
@@ -432,7 +433,7 @@ export class ImportExportModal extends Modal {
         tag:            get('tag'),
         payer:          get('payer'),
         note:           get('note'),
-        exchangeRate:   parseFloat(rawEr) || undefined,
+        exchangeRate:   er > 0 && er !== 1 ? er : undefined,
         attachmentPath: '',
         linkedId:       '',
       };

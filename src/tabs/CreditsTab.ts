@@ -440,6 +440,7 @@ export class CreditsTab {
         new ColumnVisibilityModal(this.ctx.app, {
           columns: creditColVisCols,
           visibility: { ...this.ctx.state.creditsColumns! },
+          accentColor: this.ctx.data?.accentColor,
           onSave: (updated) => {
             this.ctx.state.creditsColumns = updated;
             this.ctx.saveState();

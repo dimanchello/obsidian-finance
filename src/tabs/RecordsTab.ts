@@ -491,6 +491,7 @@ export class RecordsTab {
         new ColumnVisibilityModal(this.ctx.app, {
           columns: colVisCols,
           visibility: { ...this.ctx.state.recordsColumns! },
+          accentColor: this.ctx.data?.accentColor,
           onSave: (updated) => {
             this.ctx.state.recordsColumns = updated;
             this.ctx.saveState();

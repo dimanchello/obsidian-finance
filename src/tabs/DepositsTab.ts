@@ -451,6 +451,7 @@ export class DepositsTab {
         new ColumnVisibilityModal(this.ctx.app, {
           columns: depositColVisCols,
           visibility: { ...this.ctx.state.depositsColumns! },
+          accentColor: this.ctx.data?.accentColor,
           onSave: (updated) => {
             this.ctx.state.depositsColumns = updated;
             this.ctx.saveState();

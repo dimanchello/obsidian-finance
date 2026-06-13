@@ -87,7 +87,6 @@ export class DebtsTab {
   }
 
   private getDebtOriginal(debt: DebtRecord): number {
-    if (debt.originalAmount > 0) return debt.originalAmount;
     return debt.movements
       .filter(m => m.type === 'borrow')
       .reduce((s, m) => s + m.amount, 0);
@@ -457,6 +456,7 @@ export class DebtsTab {
         new ColumnVisibilityModal(this.ctx.app, {
           columns: debtColVisCols,
           visibility: { ...this.ctx.state.debtsColumns! },
+          accentColor: this.ctx.data?.accentColor,
           onSave: (updated) => {
             this.ctx.state.debtsColumns = updated;
             this.ctx.saveState();

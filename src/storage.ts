@@ -1,5 +1,6 @@
 import { App, normalizePath } from 'obsidian';
-import { AccountData, AccountMeta, CreditRecord, DebtMovement, DebtRecord, DepositRecord, DepositTopUp, DepositWithdrawal, FinanceRecord } from './types';
+import { AccountData, AccountMeta, CreditRecord, DebtMovement, DebtRecord, DepositRecord, DepositTopUp, DepositWithdrawal, FinanceRecord, DAYS_IN_YEAR } from './types';
+import { getDaysBetween } from './utils';
 
 const DATA_VERSION = 4;
 
@@ -8,6 +9,7 @@ interface AccountMetaFile {
   name: string;
   currency: string;
   accentColor?: string;
+  sourcePath?: string;
 }
 
 interface AccountRecordsFile {
@@ -19,7 +21,7 @@ interface AccountRecordsFile {
 }
 
 function emptyMeta(defaultCurrency: string): AccountMetaFile {
-  return { version: DATA_VERSION, name: '', currency: defaultCurrency };
+  return { version: DATA_VERSION, name: '', currency: defaultCurrency, sourcePath: '' };
 }
 
 function emptyRecords(): AccountRecordsFile {
@@ -50,6 +52,8 @@ export class FinanceStorage {
   private depositsCache = new Map<string, DepositRecord[]>();
   private depositsDirty = new Set<string>();
 
+  private folderOverrides = new Map<string, string>();
+
   private timer: ReturnType<typeof setTimeout> | null = null;
   private defaultCurrency: string;
 
@@ -61,8 +65,19 @@ export class FinanceStorage {
 
   setDefaultCurrency(c: string) { this.defaultCurrency = c; }
 
+  private getFolderBaseName(notePath: string): string {
+    const withoutExt = notePath.replace(/\.md$/i, '');
+    const segments = withoutExt.split(/[\\/]/);
+    const folderName = segments.length >= 2
+      ? segments.slice(-2).join('_')
+      : segments[0];
+    return folderName.replace(/[\\/:"*?<>|]/g, '_');
+  }
+
   private noteFolder(notePath: string): string {
-    const safe = notePath.replace(/\.md$/i, '').replace(/[\\/:"*?<>|]/g, '_');
+    const override = this.folderOverrides.get(notePath);
+    if (override) return normalizePath(`${this.base}/${override}`);
+    const safe = this.getFolderBaseName(notePath);
     return normalizePath(`${this.base}/${safe}`);
   }
 
@@ -76,9 +91,34 @@ export class FinanceStorage {
   }
 
   private async ensureNoteFolder(notePath: string): Promise<void> {
-    const folder = this.noteFolder(notePath);
     const a = this.app.vault.adapter;
-    if (!(await a.exists(folder))) await a.mkdir(folder);
+    const folder = this.noteFolder(notePath);
+
+    if (!(await a.exists(folder))) {
+      await a.mkdir(folder);
+      return;
+    }
+
+    const metaPath = normalizePath(`${folder}/meta.json`);
+    if (await a.exists(metaPath)) {
+      try {
+        const meta = JSON.parse(await a.read(metaPath)) as AccountMetaFile;
+        if (meta.sourcePath && meta.sourcePath !== notePath) {
+          const base = this.getFolderBaseName(notePath);
+          let suffix = 1;
+          while (true) {
+            const newName = `${base}_${suffix}`;
+            const newFolder = normalizePath(`${this.base}/${newName}`);
+            if (!(await a.exists(newFolder))) {
+              await a.mkdir(newFolder);
+              this.folderOverrides.set(notePath, newName);
+              return;
+            }
+            suffix++;
+          }
+        }
+      } catch { /* ignore corrupt meta */ }
+    }
   }
 
   // ── Legacy migration ──────────────────────────────────────────────────────
@@ -196,6 +236,58 @@ export class FinanceStorage {
     }
   }
 
+  private async migrateToShortFolder(notePath: string): Promise<void> {
+    const a = this.app.vault.adapter;
+    const newFolder = this.noteFolder(notePath);
+
+    const safe = notePath.replace(/\.md$/i, '').replace(/[\\/:"*?<>|]/g, '_');
+    const oldFolder = normalizePath(`${this.base}/${safe}`);
+
+    if (newFolder === oldFolder) return;
+    if (!(await a.exists(oldFolder))) return;
+
+    const suffixes = ['meta', 'records', 'debts', 'credits', 'deposits', 'state'];
+
+    if (await a.exists(newFolder)) {
+      const metaPath = normalizePath(`${newFolder}/meta.json`);
+      if (await a.exists(metaPath)) {
+        await this.removeFolderFiles(oldFolder, suffixes);
+      } else {
+        await this.copyFolderFiles(oldFolder, newFolder, suffixes);
+        await this.removeFolderFiles(oldFolder, suffixes);
+      }
+    } else {
+      try {
+        await a.rename(oldFolder, newFolder);
+      } catch {
+        await this.copyFolderFiles(oldFolder, newFolder, suffixes);
+        await this.removeFolderFiles(oldFolder, suffixes);
+      }
+    }
+  }
+
+  private async copyFolderFiles(src: string, dst: string, suffixes: string[]): Promise<void> {
+    const a = this.app.vault.adapter;
+    for (const suffix of suffixes) {
+      const srcFile = normalizePath(`${src}/${suffix}.json`);
+      if (await a.exists(srcFile)) {
+        const content = await a.read(srcFile);
+        await a.write(normalizePath(`${dst}/${suffix}.json`), content);
+      }
+    }
+  }
+
+  private async removeFolderFiles(folder: string, suffixes: string[]): Promise<void> {
+    const a = this.app.vault.adapter;
+    for (const suffix of suffixes) {
+      const fp = normalizePath(`${folder}/${suffix}.json`);
+      if (await a.exists(fp)) {
+        try { await a.remove(fp); } catch { /* ignore */ }
+      }
+    }
+    try { await a.remove(folder); } catch { /* ignore */ }
+  }
+
   // ── Load methods ──────────────────────────────────────────────────────────
 
   private async loadMeta(notePath: string): Promise<AccountMetaFile> {
@@ -204,11 +296,13 @@ export class FinanceStorage {
     if (await this.app.vault.adapter.exists(fp)) {
       try {
         const data = JSON.parse(await this.app.vault.adapter.read(fp)) as AccountMetaFile;
+        data.sourcePath ??= '';
         this.metaCache.set(notePath, data);
         return data;
       } catch { /* corrupt */ }
     }
     const empty = emptyMeta(this.defaultCurrency);
+    empty.sourcePath = notePath;
     this.metaCache.set(notePath, empty);
     return empty;
   }
@@ -307,6 +401,7 @@ export class FinanceStorage {
 
   async load(notePath: string): Promise<AccountData> {
     await this.migrateLegacy(notePath);
+    await this.migrateToShortFolder(notePath);
 
     const meta = await this.loadMeta(notePath);
     const recs = await this.loadRecords(notePath);
@@ -358,7 +453,10 @@ export class FinanceStorage {
 
     for (const np of this.metaDirty) {
       const d = this.metaCache.get(np);
-      if (d) await this.app.vault.adapter.write(this.fp(np, 'meta'), JSON.stringify(d));
+      if (d) {
+        d.sourcePath = np;
+        await this.app.vault.adapter.write(this.fp(np, 'meta'), JSON.stringify(d));
+      }
     }
     this.metaDirty.clear();
 
@@ -639,15 +737,30 @@ export class FinanceStorage {
 
     if (deposit.accrualType === 'capitalization') {
       let currentAmount = deposit.amount;
-      for (const accrual of futureAccruals) {
-        const interest = currentAmount * (deposit.interestRate / 100 / 12);
+      for (let i = 0; i < futureAccruals.length; i++) {
+        const accrual = futureAccruals[i];
+        const prevAccrual = i > 0 ? futureAccruals[i - 1] : null;
+        const lastPaid = deposit.accruals
+          .filter(a => a.status === 'paid')
+          .sort((a, b) => b.dueDate.localeCompare(a.dueDate))[0];
+        const prevDate = prevAccrual?.dueDate ?? lastPaid?.dueDate ?? deposit.startDate;
+        const days = getDaysBetween(prevDate, accrual.dueDate);
+        const interest = currentAmount * (deposit.interestRate / 100) * days / DAYS_IN_YEAR;
         currentAmount += interest;
         accrual.amount = Math.round(interest * 100) / 100;
       }
     } else {
-      const monthlyRate = deposit.amount * (deposit.interestRate / 100 / 12);
-      for (const accrual of futureAccruals) {
-        accrual.amount = Math.round(monthlyRate * 100) / 100;
+      const baseAmount = deposit.amount;
+      for (let i = 0; i < futureAccruals.length; i++) {
+        const accrual = futureAccruals[i];
+        const prevAccrual = i > 0 ? futureAccruals[i - 1] : null;
+        const lastPaid = deposit.accruals
+          .filter(a => a.status === 'paid')
+          .sort((a, b) => b.dueDate.localeCompare(a.dueDate))[0];
+        const prevDate = prevAccrual?.dueDate ?? lastPaid?.dueDate ?? deposit.startDate;
+        const days = getDaysBetween(prevDate, accrual.dueDate);
+        const interest = baseAmount * (deposit.interestRate / 100) * days / DAYS_IN_YEAR;
+        accrual.amount = Math.round(interest * 100) / 100;
       }
     }
   }
@@ -657,9 +770,29 @@ export class FinanceStorage {
     this.scheduleCredits(notePath);
   }
 
+  // ── View State ──────────────────────────────────────────────────────────
+
+  async saveViewState(notePath: string, state: Record<string, unknown>): Promise<void> {
+    const a = this.app.vault.adapter;
+    await this.ensureNoteFolder(notePath);
+    const fp = this.fp(notePath, 'state');
+    await a.write(fp, JSON.stringify(state));
+  }
+
+  async loadViewState(notePath: string): Promise<Record<string, unknown> | null> {
+    const fp = this.fp(notePath, 'state');
+    if (await this.app.vault.adapter.exists(fp)) {
+      try {
+        return JSON.parse(await this.app.vault.adapter.read(fp));
+      } catch { /* ignore */ }
+    }
+    return null;
+  }
+
   // ── Utility ───────────────────────────────────────────────────────────────
 
   invalidate(notePath: string): void {
+    this.folderOverrides.delete(notePath);
     this.metaCache.delete(notePath);
     this.recordsCache.delete(notePath);
     this.debtsCache.delete(notePath);

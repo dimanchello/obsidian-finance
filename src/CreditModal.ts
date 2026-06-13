@@ -1,6 +1,6 @@
 import { App, Modal, Notice } from 'obsidian';
 import { getLocaleFromApp, t, Translations } from './i18n';
-import { CreditRecord, CreditType } from './types';
+import { CreditRecord, CreditType, ACCRUAL_STEP_MONTHLY } from './types';
 import { fmtAmount, parseAmount } from './utils';
 import { CreditInfoModal } from './CreditInfoModal';
 
@@ -284,7 +284,7 @@ export class CreditModal extends Modal {
     const rate = parseFloat(this.rateInput.value.replace(',', '.')) || 0;
     const term = parseInt(this.termInput.value) || 0;
     if (amount <= 0 || term <= 0) return;
-    const monthlyRate = rate / 100 / 12;
+    const monthlyRate = rate / 100 / ACCRUAL_STEP_MONTHLY;
     let payment: number;
     if (monthlyRate > 0) {
       const factor = Math.pow(1 + monthlyRate, term);

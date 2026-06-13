@@ -85,7 +85,7 @@ Each account has four tabs, switched via the `•••` menu:
 ### Table
 - Desktop: full table with sticky header
 - Mobile: each record renders as a card with field labels
-- **Column visibility**: show/hide columns via ⚙️ menu
+- **Column visibility**: show/hide columns via ⚙️ menu — settings persist across Obsidian restarts
 
 <img src="assets/screenshots/records_table_en.png" width="600" alt="Records table on desktop">
 <br>
@@ -122,6 +122,8 @@ Each account has four tabs, switched via the `•••` menu:
 5. Choose type detection: by field, by amount sign, or all income/expense
 6. Click "Import"
 
+> **Exchange rate** is imported only when explicitly specified in the file and not equal to 1. Empty value or rate = 1 is not stored.
+
 <img src="assets/screenshots/import1_en.png" width="450" alt="Import window step 1">
 <br>
 <img src="assets/screenshots/import2_en.png" width="450" alt="Import window step 2">
@@ -131,7 +133,7 @@ Each account has four tabs, switched via the `•••` menu:
 ### Debts
 - Two directions: "Owed to me" (lent) and "I owe" (borrowed)
 - Payment tracking: borrow → repay
-- Auto-calculated balance
+- Auto-calculated balance accounting for all additional disbursements
 - Interest rate and due date
 - Filters by status (paid/unpaid), direction, person, dates
 - Movement history for each debt
@@ -155,7 +157,7 @@ Each account has four tabs, switched via the `•••` menu:
 
 ### Deposits
 - Types: term, demand, savings
-- Automatic monthly interest calculation
+- Automatic interest calculation based on actual calendar days (rate × days / 365)
 - Accrual type: to account or capitalization
 - Top-ups and partial withdrawals
 - Automatic income records on interest accrual
@@ -176,16 +178,17 @@ Each account has four tabs, switched via the `•••` menu:
 
 ## Data Structure
 
-Data is stored in `.obsidian/plugins/obsidian-finance/accounts/` in separate files per account:
+Data is stored in `.obsidian/plugins/obsidian-finance/accounts/` in separate folders per account. The folder name is derived from the last two path segments of the note. On collisions, a `_1`, `_2` suffix is added.
 
 ```
 .obsidian/plugins/obsidian-finance/accounts/
-  Finance_Accounts_Cash.md/
-    meta.json       # name, currency, accent color
+  Accounts_Cash.md/
+    meta.json       # name, currency, accent color, note path
     records.json    # income/expense records
     debts.json      # debts
     credits.json    # credits
     deposits.json   # deposits
+    state.json      # column visibility settings
 ```
 
 ### meta.json

@@ -68,6 +68,16 @@ export class ViewContext {
     try {
       localStorage.setItem(LS(this.pluginId) + this.notePath, JSON.stringify({ ...this._state, page: 0 }));
     } catch { /* ignore */ }
+    this.storage.saveViewState(this.notePath, { ...this._state, page: 0 }).catch(() => {});
+  }
+
+  async loadStateFromFile(): Promise<void> {
+    try {
+      const fileState = await this.storage.loadViewState(this.notePath);
+      if (fileState) {
+        this._state = { ...this._state, ...fileState } as ViewState;
+      }
+    } catch { /* ignore */ }
   }
 
   loadState(pageSize: number): ViewState {
