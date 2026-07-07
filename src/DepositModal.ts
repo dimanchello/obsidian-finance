@@ -1,7 +1,7 @@
 import { App, Modal, Notice } from 'obsidian';
 import { getLocaleFromApp, t, Translations } from './i18n';
 import { DepositRecord, DepositType, DepositAccrualType, FinanceRecord } from './types';
-import { fmtAmount, parseAmount } from './utils';
+import { fmtAmount, parseAmount, getTodayStr } from './utils';
 import { InfoModal } from './InfoModal';
 
 export interface DepositModalOptions {
@@ -22,7 +22,7 @@ export class DepositModal extends Modal {
     super(app);
     this.tr = t(getLocaleFromApp(app));
     this.o = opts;
-    const nowStr = new Date().toISOString().split('T')[0];
+    const nowStr = getTodayStr();
     this.deposit = opts.deposit
         ? { ...opts.deposit, accruals: [...opts.deposit.accruals], topUps: [...(opts.deposit.topUps || [])], withdrawals: [...(opts.deposit.withdrawals || [])] }
         : {

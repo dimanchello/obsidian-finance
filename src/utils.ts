@@ -25,3 +25,14 @@ export function fmt(n: number, cur: string): string {
 export function noteFilename(p: string): string {
   return p.split('/').pop()?.replace(/\.md$/i, '') ?? p;
 }
+
+export function getDaysBetween(date1: string, date2: string): number {
+  const d1 = new Date(date1);
+  const d2 = new Date(date2);
+  return Math.round((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+export function getTodayStr(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}

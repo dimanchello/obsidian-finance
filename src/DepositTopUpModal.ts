@@ -1,7 +1,7 @@
 import { App, Modal, Notice } from 'obsidian';
 import { getLocaleFromApp, t, Translations } from './i18n';
 import { DepositTopUp, DepositRecord } from './types';
-import { fmtAmount, parseAmount } from './utils';
+import { fmtAmount, parseAmount, getTodayStr } from './utils';
 
 export interface DepositTopUpOptions {
   title: string;
@@ -65,7 +65,7 @@ export class DepositTopUpModal extends Modal {
     const dateG = row2.createDiv('finance-field-group');
     dateG.createEl('label', { text: this.tr.date, cls: 'finance-field-label' });
     const dateIn = dateG.createEl('input', { type: 'date', cls: 'finance-input' });
-    dateIn.value = new Date().toISOString().split('T')[0];
+    dateIn.value = getTodayStr();
 
     const timeG = row2.createDiv('finance-field-group');
     timeG.createEl('label', { text: this.tr.time, cls: 'finance-field-label' });

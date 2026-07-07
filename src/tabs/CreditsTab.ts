@@ -10,7 +10,7 @@ import { ColumnVisibilityModal } from '../ColumnVisibilityModal';
 import { CreditPaymentModal } from '../CreditPaymentModal';
 import { CreditEarlyRepaymentModal } from '../CreditEarlyRepaymentModal';
 import { ConfirmModal } from '../ConfirmModal';
-
+import { getTodayStr } from '../utils';
 export class CreditsTab {
   private ctx: ViewContext;
   private el: HTMLElement;
@@ -440,6 +440,7 @@ export class CreditsTab {
         new ColumnVisibilityModal(this.ctx.app, {
           columns: creditColVisCols,
           visibility: { ...this.ctx.state.creditsColumns! },
+          accentColor: this.ctx.data?.accentColor,
           onSave: (updated) => {
             this.ctx.state.creditsColumns = updated;
             this.ctx.saveState();
@@ -546,7 +547,7 @@ export class CreditsTab {
     const startDate = new Date(credit.startDate);
     if (isNaN(startDate.getTime())) return '';
     const term = credit.termMonths || 0;
-    startDate.setMonth(startDate.getMonth() + term);
+    startDate.setUTCMonth(startDate.getUTCMonth() + term);
     return startDate.toISOString().split('T')[0];
   }
 
@@ -700,7 +701,7 @@ export class CreditsTab {
   private renderCreditPaymentsPanel(parent: HTMLElement, credit: CreditRecord): void {
     const wrapper = parent.createDiv();
     wrapper.style.padding = '12px';
-    const today = new Date().toISOString().split('T')[0];
+    const today = getTodayStr();
 
     const startDate = credit.startDate ? new Date(credit.startDate) : null;
     const endDate = this.calculateCreditEndDate(credit);
@@ -950,8 +951,9 @@ export class CreditsTab {
       onSave: async payment => {
         credit.payments.push(payment);
         const paidAmount = credit.payments.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0);
-        credit.currentAmount = Math.max(0, credit.originalAmount - paidAmount);
-        if (credit.currentAmount <= 0) {
+        const totalToPay = credit.monthlyPayment * credit.termMonths;
+        credit.currentAmount = Math.max(0, totalToPay - paidAmount);
+        if (paidAmount >= totalToPay) {
           credit.status = 'paid';
         }
         await this.ctx.storage.updateCredit(this.ctx.notePath, credit);

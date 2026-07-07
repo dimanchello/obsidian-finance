@@ -1,7 +1,7 @@
 import { App, Modal, Notice } from 'obsidian';
 import { getLocaleFromApp, t, Translations } from './i18n';
 import { DebtRecord } from './types';
-import { fmtAmount, parseAmount } from './utils';
+import { fmtAmount, parseAmount, getTodayStr } from './utils';
 import { DebtInfoModal } from './DebtInfoModal';
 
 export interface DebtModalOptions {
@@ -23,7 +23,7 @@ export class DebtModal extends Modal {
     super(app);
     this.tr = t(getLocaleFromApp(app));
     this.o = opts;
-    const nowStr = new Date().toISOString().split('T')[0];
+    const nowStr = getTodayStr();
     this.debt = opts.debt
       ? { ...opts.debt, direction: (opts.debt.direction || 'borrowed'), movements: [...opts.debt.movements] }
       : {
@@ -170,7 +170,8 @@ export class DebtModal extends Modal {
 
     this.amountInput.addEventListener('input', () => {
       const raw = this.amountInput.value;
-      this.debt.amount = parseAmount(raw);
+      this.debt.originalAmount = parseAmount(raw);
+      this.debt.amount = this.debt.originalAmount;
       const sel = this.amountInput.selectionStart ?? raw.length;
       const rawBefore = raw.slice(0, sel).replace(/[^\d.,]/g, '').length;
       const formatted = fmtAmount(raw);
@@ -189,7 +190,7 @@ export class DebtModal extends Modal {
     this.amountInput.addEventListener('blur', () => {
       const n = parseAmount(this.amountInput.value);
       this.debt.originalAmount = n;
-      this.debt.amount = this.calculateTotalAmount(n, this.debt.interestRate);
+      this.debt.amount = n;
       this.amountInput.value = n > 0 ? fmtAmount(String(n)) : '';
       this.updateTotalReadonly();
     });
@@ -226,14 +227,12 @@ export class DebtModal extends Modal {
     this.interestInput.addEventListener('input', () => {
       const rate = parseFloat(this.interestInput.value.replace(',', '.')) || 0;
       this.debt.interestRate = rate;
-      this.debt.amount = this.calculateTotalAmount(this.debt.originalAmount, rate);
       this.updateTotalReadonly();
     });
 
     this.interestInput.addEventListener('blur', () => {
       const rate = parseFloat(this.interestInput.value.replace(',', '.')) || 0;
       this.debt.interestRate = rate;
-      this.debt.amount = this.calculateTotalAmount(this.debt.originalAmount, rate);
       this.interestInput.value = rate > 0 ? String(rate) : '';
       this.updateTotalReadonly();
     });
@@ -273,7 +272,7 @@ export class DebtModal extends Modal {
   private handleSave(): void {
     const amount = parseAmount(this.amountInput.value);
     this.debt.originalAmount = amount;
-    this.debt.amount = this.calculateTotalAmount(amount, this.debt.interestRate);
+    this.debt.amount = amount;
     if (!amount || amount <= 0) {
       new Notice(this.tr.invalidAmount);
       this.amountInput.focus();

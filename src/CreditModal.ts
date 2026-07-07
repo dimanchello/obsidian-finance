@@ -1,7 +1,7 @@
 import { App, Modal, Notice } from 'obsidian';
 import { getLocaleFromApp, t, Translations } from './i18n';
-import { CreditRecord, CreditType } from './types';
-import { fmtAmount, parseAmount } from './utils';
+import { CreditRecord, CreditType, ACCRUAL_STEP_MONTHLY } from './types';
+import { fmtAmount, parseAmount, getTodayStr } from './utils';
 import { CreditInfoModal } from './CreditInfoModal';
 
 export interface CreditModalOptions {
@@ -25,7 +25,7 @@ export class CreditModal extends Modal {
     super(app);
     this.tr = t(getLocaleFromApp(app));
     this.o = opts;
-    const nowStr = new Date().toISOString().split('T')[0];
+    const nowStr = getTodayStr();
     this.credit = opts.credit
       ? { ...opts.credit, payments: [...opts.credit.payments] }
       : {
@@ -284,7 +284,7 @@ export class CreditModal extends Modal {
     const rate = parseFloat(this.rateInput.value.replace(',', '.')) || 0;
     const term = parseInt(this.termInput.value) || 0;
     if (amount <= 0 || term <= 0) return;
-    const monthlyRate = rate / 100 / 12;
+    const monthlyRate = rate / 100 / ACCRUAL_STEP_MONTHLY;
     let payment: number;
     if (monthlyRate > 0) {
       const factor = Math.pow(1 + monthlyRate, term);
@@ -315,7 +315,7 @@ export class CreditModal extends Modal {
     this.credit.name = this.credit.name.trim();
 
     if (this.credit.termMonths > 0 && this.credit.monthlyPayment > 0) {
-      const today = new Date().toISOString().split('T')[0];
+      const today = getTodayStr();
       const startDate = new Date(this.credit.startDate);
 
       const kept = this.credit.payments.filter(p => p.status === 'paid');
@@ -324,7 +324,7 @@ export class CreditModal extends Modal {
 
       for (let i = kept.length + 1; i <= this.credit.termMonths; i++) {
         const dueDate = new Date(startDate);
-        dueDate.setMonth(dueDate.getMonth() + i);
+        dueDate.setUTCMonth(dueDate.getUTCMonth() + i);
         const dueDateStr = dueDate.toISOString().split('T')[0];
         const isPast = dueDateStr <= today;
         this.credit.payments.push({
@@ -338,7 +338,8 @@ export class CreditModal extends Modal {
     }
 
     const paidSum = this.credit.payments.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0);
-    this.credit.currentAmount = Math.max(0, this.credit.originalAmount - paidSum);
+    const totalToPay = this.credit.monthlyPayment * this.credit.termMonths;
+    this.credit.currentAmount = Math.max(0, totalToPay - paidSum);
 
     this.o.onSave(this.credit);
     this.close();

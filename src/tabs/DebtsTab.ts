@@ -40,9 +40,7 @@ export class DebtsTab {
     const s = this.ctx.state.debtSort ?? { field: 'createdAt' as DebtSortField, dir: 'desc' };
     const q = f.search.toLowerCase();
 
-    const repaid = (d: DebtRecord) =>
-      d.movements.filter(m => m.type === 'repay').reduce((ss, m) => ss + m.amount, 0);
-    const isPaidOff = (d: DebtRecord) => repaid(d) >= d.amount;
+    const isPaidOff = (d: DebtRecord) => this.getDebtRemaining(d) <= 0;
 
     let rows = this.ctx.data.debts.filter(d => {
       const dir = (d.direction as string) || 'borrowed';
@@ -83,11 +81,10 @@ export class DebtsTab {
   }
 
   private isDebtPaidOff(debt: DebtRecord): boolean {
-    return this.getDebtRepaid(debt) >= debt.amount;
+    return this.getDebtRemaining(debt) <= 0;
   }
 
   private getDebtOriginal(debt: DebtRecord): number {
-    if (debt.originalAmount > 0) return debt.originalAmount;
     return debt.movements
       .filter(m => m.type === 'borrow')
       .reduce((s, m) => s + m.amount, 0);
@@ -457,6 +454,7 @@ export class DebtsTab {
         new ColumnVisibilityModal(this.ctx.app, {
           columns: debtColVisCols,
           visibility: { ...this.ctx.state.debtsColumns! },
+          accentColor: this.ctx.data?.accentColor,
           onSave: (updated) => {
             this.ctx.state.debtsColumns = updated;
             this.ctx.saveState();

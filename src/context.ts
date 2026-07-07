@@ -3,6 +3,7 @@ import { FinanceStorage } from './storage';
 import {
   AccountData, PluginSettings, ViewState,
   DEFAULT_FILTER, DEFAULT_SORT, DEFAULT_DEBT_FILTER, DEFAULT_CREDIT_FILTER, DEFAULT_DEPOSIT_FILTER,
+  MOBILE_BREAKPOINT,
 } from './types';
 import { fmt, fmtDate } from './utils';
 import { getLocaleFromApp, t, type Translations, type Locale } from './i18n';
@@ -40,7 +41,7 @@ export class ViewContext {
     this.container = container;
     this.locale = getLocaleFromApp(app);
     this.tr = t(this.locale);
-    this.isMobile = (app as any).isMobile ?? window.innerWidth <= 480;
+    this.isMobile = (app as any).isMobile ?? window.innerWidth <= MOBILE_BREAKPOINT;
     this._state = this.loadState(this.settings.defaultPageSize);
   }
 
@@ -67,6 +68,16 @@ export class ViewContext {
   saveState(): void {
     try {
       localStorage.setItem(LS(this.pluginId) + this.notePath, JSON.stringify({ ...this._state, page: 0 }));
+    } catch { /* ignore */ }
+    this.storage.saveViewState(this.notePath, { ...this._state, page: 0 }).catch(() => {});
+  }
+
+  async loadStateFromFile(): Promise<void> {
+    try {
+      const fileState = await this.storage.loadViewState(this.notePath);
+      if (fileState) {
+        this._state = { ...this._state, ...fileState } as ViewState;
+      }
     } catch { /* ignore */ }
   }
 
