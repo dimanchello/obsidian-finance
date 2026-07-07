@@ -1,7 +1,7 @@
 import { App, Modal, Notice, normalizePath } from 'obsidian';
 import { getLocaleFromApp, t, Translations } from './i18n';
 import { FinanceRecord, RecordType, PluginSettings } from './types';
-import { fmtAmount, parseAmount } from './utils';
+import { fmtAmount, parseAmount, getTodayStr } from './utils';
 import { CalculatorModal } from './CalculatorModal';
 
 export interface RecordModalOptions {
@@ -39,7 +39,7 @@ export class RecordModal extends Modal {
     this.tr = t(getLocaleFromApp(app));
     this.o   = opts;
     this.rec = {
-      date: new Date().toISOString().split('T')[0],
+      date: getTodayStr(),
       time: new Date().toTimeString().slice(0, 5),
       type: 'expense', amount: 0,
       category: '', tag: '', payer: '', note: '', attachmentPath: '',
@@ -485,7 +485,7 @@ export class RecordModal extends Modal {
     const record: FinanceRecord = {
       id:             this.rec.id             ?? crypto.randomUUID(),
       createdAt:      this.rec.createdAt      ?? Date.now(),
-      date:           this.rec.date           ?? new Date().toISOString().split('T')[0],
+      date:           this.rec.date           ?? getTodayStr(),
       time:           this.rec.time           ?? '',
       type:           this.rec.type           ?? 'expense',
       amount,

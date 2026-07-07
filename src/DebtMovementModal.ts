@@ -1,7 +1,7 @@
 import { App, Modal, Notice } from 'obsidian';
 import { getLocaleFromApp, t, Translations } from './i18n';
 import { DebtMovement, DebtMovementType } from './types';
-import { fmtAmount, parseAmount } from './utils';
+import { fmtAmount, parseAmount, getTodayStr } from './utils';
 
 export interface DebtMovementOptions {
   title:           string;
@@ -26,7 +26,7 @@ export class DebtMovementModal extends Modal {
     if (opts.movement) {
       this.mov = { ...opts.movement };
     } else {
-      const nowStr = new Date().toISOString().split('T')[0];
+      const nowStr = getTodayStr();
       const timeStr = new Date().toTimeString().slice(0, 5);
       this.mov = {
         id: crypto.randomUUID(),

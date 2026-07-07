@@ -1,6 +1,7 @@
 import { App, Modal, Notice } from 'obsidian';
 import { getLocaleFromApp, t, Translations } from './i18n';
 import { FinanceRecord, RecordType } from './types';
+import { getTodayStr } from './utils';
 
 type FileFormat = 'csv' | 'json';
 
@@ -131,37 +132,30 @@ export class ImportExportModal extends Modal {
     step1.createEl('div', { text: this.tr.importStep1, cls: 'finance-step-title' });
 
     const pickWrap = step1.createDiv('finance-attach-wrapper');
+    const fi       = pickWrap.createEl('input', { type: 'file', cls: 'finance-file-input' });
+    fi.accept      = '.csv,.json';
+    const uid      = `ft-import-${Date.now()}`;
+    fi.id          = uid;
+
     const nameEl   = pickWrap.createEl('span', { text: this.tr.importNoFile, cls: 'finance-attach-name' });
 
-    // Button — opens native Electron dialog (bypasses all browser file-API restrictions)
-    const openBtn = pickWrap.createEl('label', { cls: 'finance-attach-label' });
+    const openBtn  = pickWrap.createEl('label', { cls: 'finance-attach-label' });
+    openBtn.setAttribute('for', uid);
     openBtn.innerHTML = `<span>📂</span><span>${this.tr.importOpenFile}</span>`;
 
     // Steps 2+ appear here after file load
     const stepsContainer = b.createDiv('finance-import-steps');
 
-    openBtn.addEventListener('click', async (e) => {
-      e.preventDefault();
-      try {
-        const electron = (window as any).require('electron');
-        const fs       = (window as any).require('fs');
+    fi.addEventListener('change', () => {
+      const file = fi.files?.[0];
+      if (!file) return;
 
-        const result = await electron.remote.dialog.showOpenDialog({
-          properties: ['openFile'],
-          filters: [
-            { name: this.tr.importFileFilterData, extensions: ['csv', 'json'] },
-            { name: this.tr.importFileFilterAll,  extensions: ['*'] },
-          ],
-        });
+      const fileName = file.name;
+      nameEl.textContent = fileName;
 
-        if (result.canceled || !result.filePaths.length) return;
-
-        const filePath = result.filePaths[0];
-        const fileName = filePath.split(/[\\/]/).pop() ?? filePath;
-        nameEl.textContent = fileName;
-
-        const text = fs.readFileSync(filePath, 'utf8') as string;
-
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const text = e.target?.result as string;
         const fmt = fileName.endsWith('.csv') ? 'csv' : 'json';
 
         this.rawData   = [];
@@ -176,17 +170,18 @@ export class ImportExportModal extends Modal {
           if (fmt !== 'json') {
             this.renderMappingStep(stepsContainer);
           }
-        } catch (e) {
-          const errMsg = e instanceof Error ? e.message : String(e);
+        } catch (err) {
+          const errMsg = err instanceof Error ? err.message : String(err);
           stepsContainer.createEl('p', {
             text: this.tpl(this.tr.importParseError, { error: errMsg }),
             cls: 'finance-error',
           });
         }
-
-      } catch (err) {
-        new Notice(`${this.tr.importError}: ${String(err)}`);
-      }
+      };
+      reader.onerror = () => {
+        new Notice(this.tr.importError);
+      };
+      reader.readAsText(file, 'utf-8');
     });
   }
 
@@ -450,7 +445,7 @@ export class ImportExportModal extends Modal {
 
 // ── date normalizer ───────────────────────────────────────────────────────────
 function normalizeDate(s: string): string {
-  if (!s) return new Date().toISOString().split('T')[0];
+  if (!s) return getTodayStr();
   // already YYYY-MM-DD
   if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
   // DD.MM.YYYY or DD/MM/YYYY
@@ -461,6 +456,12 @@ function normalizeDate(s: string): string {
   if (m2) return `${m2[3]}-${m2[1].padStart(2,'0')}-${m2[2].padStart(2,'0')}`;
   // Try native Date parse
   const d = new Date(s);
-  if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
-  return new Date().toISOString().split('T')[0];
+  if (!isNaN(d.getTime())) {
+    // If YYYY-MM-DD parsed, it's UTC, otherwise it might be local
+    // To prevent shift, format using getUTCDate/getUTCMonth if s was just YYYY-MM-DD
+    // But since s wasn't matched by YYYY-MM-DD, it might be something else.
+    // Let's format using local time to get what the user expects locally
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+  return getTodayStr();
 }

@@ -1,6 +1,6 @@
 import { App, normalizePath } from 'obsidian';
 import { AccountData, AccountMeta, CreditRecord, DebtMovement, DebtRecord, DepositRecord, DepositTopUp, DepositWithdrawal, FinanceRecord, DAYS_IN_YEAR } from './types';
-import { getDaysBetween } from './utils';
+import { getDaysBetween, getTodayStr } from './utils';
 
 const DATA_VERSION = 4;
 
@@ -729,7 +729,7 @@ export class FinanceStorage {
   }
 
   private recalculateFutureAccruals(deposit: DepositRecord): void {
-    const today = new Date().toISOString().split('T')[0];
+    const today = getTodayStr();
     const futureAccruals = deposit.accruals
       .filter(a => a.dueDate > today && a.status === 'pending')
       .sort((a, b) => a.dueDate.localeCompare(b.dueDate));

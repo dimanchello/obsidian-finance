@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getDaysBetween } from '../utils';
+import { getDaysBetween, getTodayStr, fmtAmount, parseAmount } from '../utils';
 import { DAYS_IN_YEAR, ACCRUAL_STEP_MONTHLY } from '../types';
 
 describe('getDaysBetween', () => {
@@ -84,5 +84,28 @@ describe('Constants', () => {
 
   it('ACCRUAL_STEP_MONTHLY equals 12', () => {
     expect(ACCRUAL_STEP_MONTHLY).toBe(12);
+  });
+});
+
+describe('getTodayStr', () => {
+  it('returns YYYY-MM-DD format of current date', () => {
+    const today = getTodayStr();
+    expect(today).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    const d = new Date();
+    const expected = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    expect(today).toBe(expected);
+  });
+});
+
+describe('fmtAmount and parseAmount', () => {
+  it('parses formatted amount strings', () => {
+    expect(parseAmount('1 000,50')).toBe(1000.5);
+    expect(parseAmount('123')).toBe(123);
+    expect(parseAmount('0')).toBe(0);
+  });
+
+  it('formats numeric strings', () => {
+    expect(fmtAmount('1000.5')).toBe('1\u00a0000,5');
+    expect(fmtAmount('1234567')).toBe('1\u00a0234\u00a0567');
   });
 });

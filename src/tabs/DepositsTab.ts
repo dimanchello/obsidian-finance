@@ -10,7 +10,7 @@ import { ColumnVisibilityModal } from '../ColumnVisibilityModal';
 import { DepositTopUpModal } from '../DepositTopUpModal';
 import { DepositWithdrawalModal } from '../DepositWithdrawalModal';
 import { ConfirmModal } from '../ConfirmModal';
-
+import { getTodayStr } from '../utils';
 export class DepositsTab {
   private ctx: ViewContext;
   private el: HTMLElement;
@@ -61,7 +61,7 @@ export class DepositsTab {
     const startDate = new Date(deposit.startDate);
     if (isNaN(startDate.getTime())) return '';
     const term = deposit.termMonths || 0;
-    startDate.setMonth(startDate.getMonth() + term);
+    startDate.setUTCMonth(startDate.getUTCMonth() + term);
     return startDate.toISOString().split('T')[0];
   }
 
@@ -473,7 +473,7 @@ export class DepositsTab {
   private renderDepositAccrualsPanel(parent: HTMLElement, deposit: DepositRecord): void {
     const wrapper = parent.createDiv();
     wrapper.style.padding = '12px';
-    const today = new Date().toISOString().split('T')[0];
+    const today = getTodayStr();
 
     const startDate = deposit.startDate ? new Date(deposit.startDate) : null;
     const endDate = this.calculateDepositEndDate(deposit);
@@ -970,7 +970,7 @@ export class DepositsTab {
       const refundRec: FinanceRecord = {
         id: crypto.randomUUID(),
         createdAt: Date.now(),
-        date: new Date().toISOString().split('T')[0],
+        date: getTodayStr(),
         time: nowTime,
         type: 'income',
         amount: deposit.amount,
@@ -999,7 +999,7 @@ export class DepositsTab {
       const otherRecords = this.ctx.data!.records.filter(r => r.linkedId !== deposit.id);
 
       if (deposit.status === 'active') {
-        const nowDate = new Date().toISOString().split('T')[0];
+        const nowDate = getTodayStr();
         const nowTime = new Date().toTimeString().slice(0, 5);
         const refundRec: FinanceRecord = {
           id: crypto.randomUUID(),

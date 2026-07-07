@@ -3,6 +3,7 @@ import { FinanceStorage } from './storage';
 import {
   AccountData, PluginSettings, ViewState,
   DEFAULT_FILTER, DEFAULT_SORT, DEFAULT_DEBT_FILTER, DEFAULT_CREDIT_FILTER, DEFAULT_DEPOSIT_FILTER,
+  MOBILE_BREAKPOINT,
 } from './types';
 import { fmt, fmtDate } from './utils';
 import { getLocaleFromApp, t, type Translations, type Locale } from './i18n';
@@ -40,7 +41,7 @@ export class ViewContext {
     this.container = container;
     this.locale = getLocaleFromApp(app);
     this.tr = t(this.locale);
-    this.isMobile = (app as any).isMobile ?? window.innerWidth <= 480;
+    this.isMobile = (app as any).isMobile ?? window.innerWidth <= MOBILE_BREAKPOINT;
     this._state = this.loadState(this.settings.defaultPageSize);
   }
 

@@ -131,18 +131,23 @@ export class RecordsTab {
     const recs = this.ctx.data.records;
     const inc = recs.filter(r => r.type === 'income' && !r.isInternal).reduce((s, r) => s + r.amount, 0);
     const exp = recs.filter(r => r.type === 'expense' && !r.isInternal).reduce((s, r) => s + r.amount, 0);
-    const lent = this.ctx.data.debts.filter(d => d.direction === 'lent').reduce((s, d) => s + d.amount, 0);
     const borrowed = this.ctx.data.debts.filter(d => d.direction === 'borrowed').reduce((s, d) => s + d.amount, 0);
-    const bal = inc - exp - lent + borrowed;
+    const bal = inc - exp;
 
-    [
+    const cards = [
       { label: this.tr.incomeStat, value: this.ctx.fmt(inc), mod: 'income', icon: '↑' },
       { label: this.tr.expenseStat, value: this.ctx.fmt(exp), mod: 'expense', icon: '↓' },
       {
         label: this.tr.balance, value: (bal >= 0 ? '+' : '') + this.ctx.fmt(bal),
         mod: bal >= 0 ? 'positive' : 'negative', icon: '＝',
       },
-    ].forEach(item => {
+    ];
+
+    if (borrowed > 0) {
+      cards.push({ label: this.tr.borrowed, value: this.ctx.fmt(borrowed), mod: 'expense', icon: '👈' });
+    }
+
+    cards.forEach(item => {
       const card = this.statsEl!.createDiv(`finance-stat-card finance-stat-${item.mod}`);
       card.createEl('div', { text: item.icon, cls: 'finance-stat-icon' });
       const info = card.createDiv('finance-stat-info');

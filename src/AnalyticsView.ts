@@ -1,4 +1,4 @@
-import { FinanceRecord } from './types';
+import { FinanceRecord, MOBILE_BREAKPOINT, ONE_WEEK_MS } from './types';
 import { Translations } from './i18n';
 
 type ChartType = 'bar' | 'pie';
@@ -27,7 +27,7 @@ function getWeekNumber(dateStr: string): number {
   const date = new Date(y, m - 1, d);
   const start = new Date(date.getFullYear(), 0, 1);
   const diff = date.getTime() - start.getTime();
-  const oneWeek = 604800000;
+  const oneWeek = ONE_WEEK_MS;
   return Math.ceil((diff + (start.getDay() + 6) * 86400000) / oneWeek);
 }
 
@@ -85,7 +85,7 @@ export class AnalyticsView {
     this.el.empty();
     this.el.addClass('finance-analytics');
 
-    const isMobile = window.innerWidth <= 480;
+    const isMobile = window.innerWidth <= MOBILE_BREAKPOINT;
 
     // ── controls ──────────────────────────────────────────────────────────
     const ctrl = this.el.createDiv('finance-analytics-controls');
@@ -273,7 +273,7 @@ export class AnalyticsView {
       ];
     }
 
-    const isMobile = window.innerWidth <= 480;
+    const isMobile = window.innerWidth <= MOBILE_BREAKPOINT;
     const containerW = this.chartEl.clientWidth || 600;
     const MIN_GROUP = data.length > 12 ? 35 : data.length > 6 ? 50 : data.length > 3 ? 55 : 60;
     const PL = 45, PR = 12;
@@ -394,7 +394,7 @@ export class AnalyticsView {
   // ── Pie / donut chart (SVG) ───────────────────────────────────────────────
 
   private renderPie(rawData: Item[]): void {
-    const isMobile = window.innerWidth <= 480;
+    const isMobile = window.innerWidth <= MOBILE_BREAKPOINT;
     const MAX = 14;
     let items = rawData
       .map(d => ({

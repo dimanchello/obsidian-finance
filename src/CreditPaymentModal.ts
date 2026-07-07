@@ -1,7 +1,7 @@
 import { App, Modal, Notice } from 'obsidian';
 import { getLocaleFromApp, t, Translations } from './i18n';
 import { CreditPayment, CreditRecord } from './types';
-import { fmtAmount, parseAmount } from './utils';
+import { fmtAmount, parseAmount, getTodayStr } from './utils';
 
 export interface CreditPaymentOptions {
   title: string;
@@ -34,7 +34,7 @@ export class CreditPaymentModal extends Modal {
     const dateG = form.createDiv('finance-field-group');
     dateG.createEl('label', { text: this.tr.paymentDateLabel, cls: 'finance-field-label' });
     const dateIn = dateG.createEl('input', { type: 'date', cls: 'finance-input' });
-    const today = new Date().toISOString().split('T')[0];
+    const today = getTodayStr();
     dateIn.value = today;
 
     const amtG = form.createDiv('finance-field-group finance-amount-group');

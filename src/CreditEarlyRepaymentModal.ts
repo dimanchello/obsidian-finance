@@ -1,7 +1,7 @@
 import { App, Modal, Notice } from 'obsidian';
 import { getLocaleFromApp, t, Translations } from './i18n';
 import { CreditRecord, CreditPayment } from './types';
-import { fmtAmount, parseAmount } from './utils';
+import { fmtAmount, parseAmount, getTodayStr } from './utils';
 
 export interface EarlyRepaymentOptions {
   title: string;
@@ -27,7 +27,8 @@ export class CreditEarlyRepaymentModal extends Modal {
 
     this.pendingPayments = this.credit.payments.filter(p => p.status === 'pending');
     const paidAmount = this.credit.payments.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0);
-    this.actualRemaining = Math.max(0, this.credit.originalAmount - paidAmount);
+    const totalToPay = this.credit.monthlyPayment * this.credit.termMonths;
+    this.actualRemaining = Math.max(0, totalToPay - paidAmount);
   }
 
   onOpen(): void {
@@ -49,7 +50,7 @@ export class CreditEarlyRepaymentModal extends Modal {
     const dateG = form.createDiv('finance-field-group');
     dateG.createEl('label', { text: this.tr.repaymentDate, cls: 'finance-field-label' });
     const dateIn = dateG.createEl('input', { type: 'date', cls: 'finance-input' });
-    const today = new Date().toISOString().split('T')[0];
+    const today = getTodayStr();
     dateIn.value = today;
 
     const optRow = form.createDiv('finance-early-options');
@@ -162,7 +163,7 @@ export class CreditEarlyRepaymentModal extends Modal {
       .addEventListener('click', () => this.close());
     btnRow.createEl('button', { text: this.tr.repay, cls: 'finance-btn-save' })
       .addEventListener('click', () => {
-        const todayStr = new Date().toISOString().split('T')[0];
+        const todayStr = getTodayStr();
         const repaymentDate = dateIn.value || todayStr;
 
         if (this.selectedOption === 'amount') {
@@ -178,14 +179,21 @@ export class CreditEarlyRepaymentModal extends Modal {
           for (const payment of this.pendingPayments) {
             if (remainingAmount <= 0) break;
             const payAmount = Math.min(payment.amount, remainingAmount);
-            payment.status = 'paid';
-            payment.paidDate = repaymentDate;
-            if (noteIn.value) payment.note = noteIn.value;
+            if (remainingAmount >= payment.amount) {
+              payment.status = 'paid';
+              payment.paidDate = repaymentDate;
+              if (noteIn.value) payment.note = noteIn.value;
+            } else {
+              payment.amount = Math.round((payment.amount - remainingAmount) * 100) / 100;
+              if (noteIn.value) {
+                payment.note = payment.note ? `${payment.note}; ${noteIn.value}` : noteIn.value;
+              }
+            }
             remainingAmount -= payAmount;
           }
 
-          this.credit.currentAmount = Math.max(0, this.actualRemaining - amount);
           const stillPending = this.credit.payments.filter(p => p.status === 'pending');
+          this.credit.currentAmount = Math.round(stillPending.reduce((s, p) => s + p.amount, 0) * 100) / 100;
           if (this.credit.currentAmount <= 0 || stillPending.length === 0) {
             this.credit.status = 'paid';
           }

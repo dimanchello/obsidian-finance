@@ -4,7 +4,7 @@ import {
   AccountData, FinanceRecord, PluginSettings,
   MOBILE_BREAKPOINT, DAYS_IN_YEAR,
 } from './types';
-import { noteFilename, getDaysBetween } from './utils';
+import { noteFilename, getDaysBetween, getTodayStr } from './utils';
 import { RecordModal } from './RecordModal';
 import { ViewContext } from './context';
 import { RecordsTab } from './tabs/RecordsTab';
@@ -305,7 +305,7 @@ export class AccountView {
 
   private async checkAutoTransactions(): Promise<void> {
     if (!this.data) return;
-    const today = new Date().toISOString().split('T')[0];
+    const today = getTodayStr();
     const nowTime = new Date().toTimeString().slice(0, 5);
     let depositsChanged = false;
     let creditsChanged = false;
@@ -322,7 +322,7 @@ export class AccountView {
           let prevDate = deposit.startDate;
           for (let i = 1; i <= deposit.termMonths; i++) {
             const dueDate = new Date(startDate);
-            dueDate.setMonth(dueDate.getMonth() + i);
+            dueDate.setUTCMonth(dueDate.getUTCMonth() + i);
             const dueDateStr = dueDate.toISOString().split('T')[0];
             const days = getDaysBetween(prevDate, dueDateStr);
             const interest = currentAmount * (deposit.interestRate / 100) * days / DAYS_IN_YEAR;
@@ -348,7 +348,7 @@ export class AccountView {
           let prevDate = deposit.startDate;
           for (let i = 1; i <= deposit.termMonths; i++) {
             const dueDate = new Date(startDate);
-            dueDate.setMonth(dueDate.getMonth() + i);
+            dueDate.setUTCMonth(dueDate.getUTCMonth() + i);
             const dueDateStr = dueDate.toISOString().split('T')[0];
             const days = getDaysBetween(prevDate, dueDateStr);
             const interest = Math.round(baseAmount * (deposit.interestRate / 100) * days / DAYS_IN_YEAR * 100) / 100;
@@ -447,7 +447,7 @@ export class AccountView {
         const termMonths = credit.termMonths;
         for (let i = 1; i <= termMonths; i++) {
           const dueDate = new Date(startDate);
-          dueDate.setMonth(dueDate.getMonth() + i);
+          dueDate.setUTCMonth(dueDate.getUTCMonth() + i);
           const dueDateStr = dueDate.toISOString().split('T')[0];
           const isPast = dueDateStr <= today;
           credit.payments.push({
@@ -458,22 +458,27 @@ export class AccountView {
             paidDate: isPast ? dueDateStr : undefined,
           });
           if (isPast) {
-            const rec: FinanceRecord = {
-              id: crypto.randomUUID(),
-              createdAt: Date.now(),
-              date: dueDateStr,
-              time: nowTime,
-              type: 'expense',
-              amount: credit.monthlyPayment,
-              category: 'Кредит',
-              tag: '',
-              payer: credit.bankName,
-              note: `Платёж по кредиту "${credit.name}"`,
-              attachmentPath: '',
-              linkedId: credit.id,
-            };
-            this.data.records.push(rec);
-            recordsChanged = true;
+            const alreadyExists = this.data.records.some(r =>
+              r.linkedId === credit.id && r.date === dueDateStr && r.type === 'expense'
+            );
+            if (!alreadyExists) {
+              const rec: FinanceRecord = {
+                id: crypto.randomUUID(),
+                createdAt: Date.now(),
+                date: dueDateStr,
+                time: nowTime,
+                type: 'expense',
+                amount: credit.monthlyPayment,
+                category: 'Кредит',
+                tag: '',
+                payer: credit.bankName,
+                note: `Платёж по кредиту "${credit.name}"`,
+                attachmentPath: '',
+                linkedId: credit.id,
+              };
+              this.data.records.push(rec);
+              recordsChanged = true;
+            }
           }
         }
         creditsChanged = true;
@@ -485,27 +490,33 @@ export class AccountView {
           payment.paidDate = payment.dueDate;
 
           if (this.data) {
-            this.data.records.push({
-              id: crypto.randomUUID(),
-              createdAt: Date.now(),
-              date: payment.dueDate,
-              time: nowTime,
-              type: 'expense',
-              amount: payment.amount,
-              category: 'Кредит',
-              tag: '',
-              payer: credit.bankName,
-              note: `Платёж по кредиту "${credit.name}"`,
-              attachmentPath: '',
-              linkedId: credit.id,
-            });
-            recordsChanged = true;
+            const alreadyExists = this.data.records.some(r =>
+              r.linkedId === credit.id && r.date === payment.dueDate && r.type === 'expense'
+            );
+            if (!alreadyExists) {
+              this.data.records.push({
+                id: crypto.randomUUID(),
+                createdAt: Date.now(),
+                date: payment.dueDate,
+                time: nowTime,
+                type: 'expense',
+                amount: payment.amount,
+                category: 'Кредит',
+                tag: '',
+                payer: credit.bankName,
+                note: `Платёж по кредиту "${credit.name}"`,
+                attachmentPath: '',
+                linkedId: credit.id,
+              });
+              recordsChanged = true;
+            }
           }
         }
       }
 
       const paidAmount = credit.payments.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0);
-      if (paidAmount >= credit.originalAmount) {
+      const totalToPay = credit.monthlyPayment * credit.termMonths;
+      if (paidAmount >= totalToPay) {
         credit.status = 'paid';
         creditsChanged = true;
       }

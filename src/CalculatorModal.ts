@@ -33,6 +33,8 @@ export class CalculatorModal extends Modal {
     this.displayEl = contentEl.createDiv('finance-calc-display');
     this.updateDisplay();
 
+    document.addEventListener('keydown', this.keydownHandler);
+
     const grid = contentEl.createDiv('finance-calc-grid');
 
     this.addBtn(grid, '7');
@@ -143,7 +145,45 @@ export class CalculatorModal extends Modal {
     this.displayEl.textContent = this.display;
   }
 
+  private keydownHandler = (e: KeyboardEvent) => {
+    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+    const key = e.key;
+    if ('0123456789'.includes(key)) {
+      e.preventDefault();
+      this.handleInput(key);
+    } else if (key === ',' || key === '.') {
+      e.preventDefault();
+      this.handleInput('.');
+    } else if (key === '+' || key === '-' || key === '*' || key === '/') {
+      e.preventDefault();
+      const opMap: Record<string, string> = { '*': '×', '/': '÷', '+': '+', '-': '-' };
+      this.handleInput(opMap[key]);
+    } else if (key === 'Enter') {
+      e.preventDefault();
+      if (this.justEvaluated) {
+        this.handleOk();
+      } else {
+        this.handleEquals();
+      }
+    } else if (key === '=') {
+      e.preventDefault();
+      this.handleEquals();
+    } else if (key === 'Backspace') {
+      e.preventDefault();
+      if (this.display.length > 1) {
+        this.display = this.display.slice(0, -1);
+      } else {
+        this.display = '0';
+      }
+      this.updateDisplay();
+    } else if (key.toLowerCase() === 'c') {
+      e.preventDefault();
+      this.handleInput('C');
+    }
+  };
+
   onClose(): void {
+    document.removeEventListener('keydown', this.keydownHandler);
     this.contentEl.empty();
   }
 }
