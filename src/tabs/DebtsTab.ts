@@ -901,8 +901,8 @@ export class DebtsTab {
 
         const recType: RecordType = debt.direction === 'lent' ? 'expense' : 'income';
         const recNote = debt.direction === 'lent'
-          ? `Дано в долг: ${debt.person}`
-          : `Взято в долг: ${debt.person}`;
+          ? `${this.tr.debtLentNote}: ${debt.person}`
+          : `${this.tr.debtBorrowedNote}: ${debt.person}`;
         const rec: FinanceRecord = {
           id: crypto.randomUUID(),
           createdAt: Date.now(),
@@ -910,7 +910,7 @@ export class DebtsTab {
           time: debt.time || nowTime,
           type: recType,
           amount: debt.amount,
-          category: 'Долг',
+          category: this.tr.debtDefaultCat,
           tag: '',
           payer: debt.person,
           note: recNote,
@@ -956,8 +956,8 @@ export class DebtsTab {
 
         const recType: RecordType = debt.direction === 'lent' ? 'income' : 'expense';
         const recNote = debt.direction === 'lent'
-          ? `Возврат долга: ${debt.person}`
-          : `Погашение долга: ${debt.person}`;
+          ? `${this.tr.debtRepayNote}: ${debt.person}`
+          : `${this.tr.debtRepayNote}: ${debt.person}`;
         const rec: FinanceRecord = {
           id: crypto.randomUUID(),
           createdAt: Date.now(),
@@ -965,7 +965,7 @@ export class DebtsTab {
           time: mov.time || nowTime,
           type: recType,
           amount: mov.amount,
-          category: 'Долг',
+          category: this.tr.debtDefaultCat,
           tag: '',
           payer: debt.person,
           note: recNote,
@@ -991,8 +991,8 @@ export class DebtsTab {
 
         const recType: RecordType = debt.direction === 'lent' ? 'expense' : 'income';
         const recNote = debt.direction === 'lent'
-          ? `Дополнительно дано в долг: ${debt.person}`
-          : `Дополнительно взято в долг: ${debt.person}`;
+          ? `${this.tr.debtBorrowMoreNote}: ${debt.person}`
+          : `${this.tr.debtBorrowMoreNote}: ${debt.person}`;
         const rec: FinanceRecord = {
           id: crypto.randomUUID(),
           createdAt: Date.now(),
@@ -1000,7 +1000,7 @@ export class DebtsTab {
           time: mov.time || nowTime,
           type: recType,
           amount: mov.amount,
-          category: 'Долг',
+          category: this.tr.debtDefaultCat,
           tag: '',
           payer: debt.person,
           note: recNote,

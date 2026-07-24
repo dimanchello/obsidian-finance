@@ -330,6 +330,24 @@ export interface Translations {
   lentGiven: string;
   borrowedTaken: string;
   creditDefaultCat: string;
+  creditPaymentCat: string;
+  creditReceiptNote: string;
+  creditPaymentNote: string;
+  depositDefaultCat: string;
+  depositInterestCat: string;
+  depositRefundCat: string;
+  depositOpenNote: string;
+  depositInterestNote: string;
+  depositRefundNote: string;
+  depositTopUpNote: string;
+  depositWithdrawNote: string;
+  debtDefaultCat: string;
+  debtLentCat: string;
+  debtRepaidCat: string;
+  debtBorrowedNote: string;
+  debtLentNote: string;
+  debtRepayNote: string;
+  debtBorrowMoreNote: string;
   remainingCreditLabel: string;
   monthlyPaymentLabel: string;
   remainingPaymentsLabel: string;
@@ -692,6 +710,24 @@ const ru: Translations = {
   lentGiven: 'Дано в долг',
   borrowedTaken: 'Взято в долг',
   creditDefaultCat: 'Кредит',
+  creditPaymentCat: 'Платёж по кредиту',
+  creditReceiptNote: 'Получение кредита',
+  creditPaymentNote: 'Платёж по кредиту',
+  depositDefaultCat: 'Вклад',
+  depositInterestCat: 'Проценты по вкладу',
+  depositRefundCat: 'Возврат вклада',
+  depositOpenNote: 'Открытие вклада',
+  depositInterestNote: 'Начисление процентов по вкладу',
+  depositRefundNote: 'Возврат вклада',
+  depositTopUpNote: 'Пополнение вклада',
+  depositWithdrawNote: 'Снятие с вклада',
+  debtDefaultCat: 'Долг',
+  debtLentCat: 'Дано в долг',
+  debtRepaidCat: 'Возврат долга',
+  debtBorrowedNote: 'Взято в долг',
+  debtLentNote: 'Дано в долг',
+  debtRepayNote: 'Возврат долга',
+  debtBorrowMoreNote: 'Дополнительно взято',
   remainingCreditLabel: 'Остаток кредита',
   monthlyPaymentLabel: 'Ежемесячный платёж',
   remainingPaymentsLabel: 'Осталось платежей',
@@ -1096,6 +1132,24 @@ const en: Translations = {
   lentGiven: 'Given as debt',
   borrowedTaken: 'Taken as debt',
   creditDefaultCat: 'Credit',
+  creditPaymentCat: 'Credit payment',
+  creditReceiptNote: 'Credit receipt',
+  creditPaymentNote: 'Credit payment',
+  depositDefaultCat: 'Deposit',
+  depositInterestCat: 'Deposit interest',
+  depositRefundCat: 'Deposit refund',
+  depositOpenNote: 'Deposit opening',
+  depositInterestNote: 'Deposit interest accrual',
+  depositRefundNote: 'Deposit refund',
+  depositTopUpNote: 'Deposit top-up',
+  depositWithdrawNote: 'Deposit withdrawal',
+  debtDefaultCat: 'Debt',
+  debtLentCat: 'Lent',
+  debtRepaidCat: 'Debt repayment',
+  debtBorrowedNote: 'Borrowed',
+  debtLentNote: 'Lent',
+  debtRepayNote: 'Debt repayment',
+  debtBorrowMoreNote: 'Additional borrowing',
   remainingCreditLabel: 'Remaining credit',
   monthlyPaymentLabel: 'Monthly payment',
   remainingPaymentsLabel: 'Remaining payments',

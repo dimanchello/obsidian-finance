@@ -322,7 +322,7 @@ export class AccountView {
           let prevDate = deposit.startDate;
           for (let i = 1; i <= deposit.termMonths; i++) {
             const dueDate = new Date(startDate);
-            dueDate.setUTCMonth(dueDate.getUTCMonth() + i);
+            dueDate.setMonth(dueDate.getMonth() + i);
             const dueDateStr = dueDate.toISOString().split('T')[0];
             const days = getDaysBetween(prevDate, dueDateStr);
             const interest = currentAmount * (deposit.interestRate / 100) * days / DAYS_IN_YEAR;
@@ -348,7 +348,7 @@ export class AccountView {
           let prevDate = deposit.startDate;
           for (let i = 1; i <= deposit.termMonths; i++) {
             const dueDate = new Date(startDate);
-            dueDate.setUTCMonth(dueDate.getUTCMonth() + i);
+            dueDate.setMonth(dueDate.getMonth() + i);
             const dueDateStr = dueDate.toISOString().split('T')[0];
             const days = getDaysBetween(prevDate, dueDateStr);
             const interest = Math.round(baseAmount * (deposit.interestRate / 100) * days / DAYS_IN_YEAR * 100) / 100;
@@ -368,10 +368,10 @@ export class AccountView {
                 time: nowTime,
                 type: 'income',
                 amount: interest,
-                category: 'Проценты по вкладу',
+                category: this.ctx.tr.depositInterestCat,
                 tag: '',
                 payer: deposit.bankName,
-                note: `Начисление процентов по вкладу "${deposit.name}"`,
+                note: `${this.ctx.tr.depositInterestNote} "${deposit.name}"`,
                 attachmentPath: '',
                 linkedId: deposit.id,
               });
@@ -402,10 +402,10 @@ export class AccountView {
               time: nowTime,
               type: 'income',
               amount: accrual.amount,
-              category: 'Проценты по вкладу',
+              category: this.ctx.tr.depositInterestCat,
               tag: '',
               payer: deposit.bankName,
-              note: `Начисление процентов по вкладу "${deposit.name}"`,
+              note: `${this.ctx.tr.depositInterestNote} "${deposit.name}"`,
               attachmentPath: '',
               linkedId: deposit.id,
             };
@@ -427,10 +427,10 @@ export class AccountView {
           time: nowTime,
           type: 'income',
           amount: deposit.amount,
-          category: 'Возврат вклада',
+          category: this.ctx.tr.depositRefundCat,
           tag: '',
           payer: deposit.bankName,
-          note: `Возврат вклада "${deposit.name}"`,
+          note: `${this.ctx.tr.depositRefundNote} "${deposit.name}"`,
           attachmentPath: '',
           linkedId: deposit.id,
         };
@@ -447,7 +447,7 @@ export class AccountView {
         const termMonths = credit.termMonths;
         for (let i = 1; i <= termMonths; i++) {
           const dueDate = new Date(startDate);
-          dueDate.setUTCMonth(dueDate.getUTCMonth() + i);
+          dueDate.setMonth(dueDate.getMonth() + i);
           const dueDateStr = dueDate.toISOString().split('T')[0];
           const isPast = dueDateStr <= today;
           credit.payments.push({
@@ -469,10 +469,10 @@ export class AccountView {
                 time: nowTime,
                 type: 'expense',
                 amount: credit.monthlyPayment,
-                category: 'Кредит',
+                category: this.ctx.tr.creditDefaultCat,
                 tag: '',
                 payer: credit.bankName,
-                note: `Платёж по кредиту "${credit.name}"`,
+                note: `${this.ctx.tr.creditPaymentNote} "${credit.name}"`,
                 attachmentPath: '',
                 linkedId: credit.id,
               };
@@ -501,10 +501,10 @@ export class AccountView {
                 time: nowTime,
                 type: 'expense',
                 amount: payment.amount,
-                category: 'Кредит',
+                category: this.ctx.tr.creditDefaultCat,
                 tag: '',
                 payer: credit.bankName,
-                note: `Платёж по кредиту "${credit.name}"`,
+                note: `${this.ctx.tr.creditPaymentNote} "${credit.name}"`,
                 attachmentPath: '',
                 linkedId: credit.id,
               });

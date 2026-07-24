@@ -310,11 +310,9 @@ export class FinanceStorage {
   private async loadRecords(notePath: string): Promise<AccountRecordsFile> {
     if (this.recordsCache.has(notePath)) return this.recordsCache.get(notePath)!;
     const fp = this.fp(notePath, 'records');
-    console.log('[FT-storage] loadRecords:', fp);
     if (await this.app.vault.adapter.exists(fp)) {
       try {
         const data = JSON.parse(await this.app.vault.adapter.read(fp)) as AccountRecordsFile;
-        console.log('[FT-storage] loadRecords loaded:', data.records.length, 'records');
         data.records.forEach(r => {
           r.date = normalizeDateStr(r.date);
           r.time = normalizeTimeStr(r.time || '');
@@ -323,7 +321,7 @@ export class FinanceStorage {
         });
         this.recordsCache.set(notePath, data);
         return data;
-      } catch (e) { 
+      } catch (e) {
         console.error('[FT-storage] loadRecords parse error:', e);
       }
     }
@@ -384,7 +382,7 @@ export class FinanceStorage {
         });
         this.creditsCache.set(notePath, data);
         return data;
-      } catch (e) { 
+      } catch (e) {
         console.error('[FT-storage] loadCredits parse error:', e);
       }
     }

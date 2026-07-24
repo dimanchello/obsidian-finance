@@ -85,7 +85,7 @@ export class ImportExportModal extends Modal {
     let ext     = fmt;
 
     if (fmt === 'csv') {
-      const headers = ['id','createdAt','date','time','type','amount','category','tag','payer','note','exchangeRate','attachmentPath'];
+      const headers = ['id','createdAt','date','time','type','amount','category','tag','payer','note','exchangeRate','attachmentPath','isInternal','linkedId'];
       const escape  = (v: unknown) => { const s = v == null ? '' : typeof v === 'string' ? v : typeof v === 'number' || typeof v === 'boolean' ? String(v) : ''; return `"${s.replace(/"/g, '""')}"`; };
       content = [headers.join(','), ...recs.map(r => headers.map(h => escape(r[h as keyof FinanceRecord])).join(','))].join('\n');
       mime    = 'text/csv;charset=utf-8;';

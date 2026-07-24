@@ -627,7 +627,7 @@ export class CreditsTab {
     const startDate = parseDate(credit.startDate);
     if (!startDate || isNaN(startDate.getTime())) return '';
     const term = credit.termMonths || 0;
-    startDate.setUTCMonth(startDate.getUTCMonth() + term);
+    startDate.setMonth(startDate.getMonth() + term);
     return startDate.toISOString().split('T')[0];
   }
 
@@ -998,10 +998,10 @@ export class CreditsTab {
           time: nowTime,
           type: 'income',
           amount: credit.originalAmount,
-          category: 'Кредит',
+          category: this.tr.creditDefaultCat,
           tag: '',
           payer: credit.bankName,
-          note: `Получение кредита "${credit.name}"`,
+          note: `${this.tr.creditReceiptNote} "${credit.name}"`,
           attachmentPath: '',
           linkedId: credit.id,
         };
@@ -1015,10 +1015,10 @@ export class CreditsTab {
               time: nowTime,
               type: 'expense',
               amount: payment.amount,
-              category: 'Кредит',
+              category: this.tr.creditDefaultCat,
               tag: '',
               payer: credit.bankName,
-              note: `Платёж по кредиту "${credit.name}"`,
+              note: `${this.tr.creditPaymentNote} "${credit.name}"`,
               attachmentPath: '',
               linkedId: credit.id,
             });
@@ -1069,10 +1069,10 @@ export class CreditsTab {
                 time: nowTime,
                 type: 'expense',
                 amount: payment.amount,
-                category: 'Кредит',
+                category: this.tr.creditDefaultCat,
                 tag: '',
                 payer: updated.bankName,
-                note: `Платёж по кредиту "${updated.name}"`,
+                note: `${this.tr.creditPaymentNote} "${updated.name}"`,
                 attachmentPath: '',
                 linkedId: updated.id,
               });
@@ -1100,6 +1100,25 @@ export class CreditsTab {
           credit.status = 'paid';
         }
         await this.ctx.storage.updateCredit(this.ctx.notePath, credit);
+
+        const rec: FinanceRecord = {
+          id: Date.now().toString(),
+          createdAt: Date.now(),
+          date: payment.dueDate,
+          time: '',
+          type: 'expense',
+          amount: payment.amount,
+          category: this.tr.creditDefaultCat,
+          tag: '',
+          payer: credit.bankName,
+          note: `${this.tr.creditPaymentNote || 'Платёж по кредиту'} "${credit.name}"`,
+          exchangeRate: 1,
+          attachmentPath: '',
+          isInternal: false,
+          linkedId: credit.id,
+        };
+        await this.ctx.storage.addRecord(this.ctx.notePath, rec);
+
         this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
         this.render();
         new Notice(this.tr.creditPaymentRecorded);
@@ -1125,7 +1144,7 @@ export class CreditsTab {
     const label = `${credit.name} · ${this.ctx.fmt(credit.currentAmount)}`;
     new ConfirmModal(this.ctx.app, `${this.tr.confirmDeleteCredit}\n${label}`, async () => {
       await this.ctx.storage.deleteCredit(this.ctx.notePath, credit.id);
-      let recs = this.ctx.data!.records.filter(r => !(r.category === this.tr.creditDefaultCat && r.payer === credit.bankName && r.note.includes(credit.name)));
+      let recs = this.ctx.data!.records.filter(r => r.linkedId !== credit.id);
       if (credit.downPaymentRecordId) {
         recs = recs.filter(r => r.id !== credit.downPaymentRecordId);
       }
@@ -1147,7 +1166,7 @@ export class CreditsTab {
 
       let recs = this.ctx.data!.records;
       for (const credit of creditsToDelete) {
-        recs = recs.filter(r => !(r.category === this.tr.creditDefaultCat && r.payer === credit.bankName && r.note.includes(credit.name)));
+        recs = recs.filter(r => r.linkedId !== credit.id);
         if (credit.downPaymentRecordId) {
           recs = recs.filter(r => r.id !== credit.downPaymentRecordId);
         }

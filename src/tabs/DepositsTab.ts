@@ -67,7 +67,7 @@ export class DepositsTab {
     const startDate = parseDate(deposit.startDate);
     if (!startDate || isNaN(startDate.getTime())) return '';
     const term = deposit.termMonths || 0;
-    startDate.setUTCMonth(startDate.getUTCMonth() + term);
+    startDate.setMonth(startDate.getMonth() + term);
     return startDate.toISOString().split('T')[0];
   }
 
@@ -1027,10 +1027,10 @@ export class DepositsTab {
           time: nowTime,
           type: 'expense',
           amount: deposit.amount,
-          category: 'Вклад',
+          category: this.tr.depositDefaultCat,
           tag: '',
           payer: deposit.bankName,
-          note: `Открытие вклада "${deposit.name}"`,
+          note: `${this.tr.depositOpenNote} "${deposit.name}"`,
           attachmentPath: '',
           linkedId: deposit.id,
         };
@@ -1068,10 +1068,10 @@ export class DepositsTab {
             time: nowTime,
             type: 'expense',
             amount: updated.amount,
-            category: 'Вклад',
+            category: this.tr.depositDefaultCat,
             tag: '',
             payer: updated.bankName,
-            note: `Открытие вклада "${updated.name}"`,
+            note: `${this.tr.depositOpenNote} "${updated.name}"`,
             attachmentPath: '',
             linkedId: updated.id,
           };
