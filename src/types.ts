@@ -35,7 +35,7 @@ export type DebtDirection = 'lent' | 'borrowed';  // lent = мне должны,
 export interface DebtRecord {
   id:           string;
   person:       string;
-  amount:       number;   // current total (sum borrow - sum repay) with interest
+  amount:       number;   // current total (sum borrow - sum repay) WITHOUT interest
   originalAmount: number; // original amount without interest
   interestRate: number;   // percentage (e.g., 10 = 10%)
   direction:    DebtDirection;
