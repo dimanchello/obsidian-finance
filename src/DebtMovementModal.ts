@@ -1,7 +1,7 @@
 import { App, Modal, Notice } from 'obsidian';
 import { getLocaleFromApp, t, Translations } from './i18n';
 import { DebtMovement, DebtMovementType } from './types';
-import { fmtAmount, parseAmount, getTodayStr } from './utils';
+import { fmtAmount, parseAmount, getTodayStr, normalizeDateStr, normalizeTimeStr } from './utils';
 
 export interface DebtMovementOptions {
   title:           string;
@@ -113,14 +113,16 @@ export class DebtMovementModal extends Modal {
     const dtG = form.createDiv('finance-field-group');
     dtG.createEl('label', { text: this.tr.dateTime, cls: 'finance-field-label' });
     const dtIn = dtG.createEl('input', { type: 'datetime-local', cls: 'finance-input' });
-    dtIn.value = this.mov.date
-      ? `${this.mov.date}${this.mov.time ? 'T' + this.mov.time : 'T00:00'}`
+    const normDate = this.mov.date ? normalizeDateStr(this.mov.date) : '';
+    const normTime = this.mov.time ? normalizeTimeStr(this.mov.time) : '';
+    dtIn.value = normDate
+      ? `${normDate}T${normTime || '00:00'}`
       : new Date().toISOString().slice(0, 16);
     dtIn.addEventListener('change', () => {
       if (dtIn.value) {
-        const [d, t] = dtIn.value.split('T');
-        this.mov.date = d;
-        this.mov.time = t || '';
+        const [d, t] = dtIn.value.slice(0, 16).split('T');
+        this.mov.date = normalizeDateStr(d);
+        this.mov.time = normalizeTimeStr(t);
       }
     });
 

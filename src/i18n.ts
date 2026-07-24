@@ -26,6 +26,11 @@ export interface Translations {
   deleted: string;
   fileNotFound: string;
   confirmDelete: string;
+  bulkSelect: string;
+  confirmDeleteSelectedRecords: string;
+  confirmDeleteSelectedDebts: string;
+  confirmDeleteSelectedCredits: string;
+  confirmDeleteSelectedDeposits: string;
   enterYes: string;
   allDataDeleted: string;
   debtAdded: string;
@@ -345,6 +350,13 @@ export interface Translations {
   confirmCloseDeposit: string;
   closeDepositRefund: string;
   confirmDeleteRecord: string;
+  purchasePriceLabel: string;
+  downPaymentLabel: string;
+  downPaymentDateLabel: string;
+  downPaymentDateRequired: string;
+  downPaymentAmountRequired: string;
+  finalAmountLabel: string;
+  downPaymentNotePrefix: string;
   fileNotFoundWithPath: string;
   creditFieldDescriptionsSub: string;
   debtFieldDescriptionsSub: string;
@@ -418,6 +430,11 @@ const ru: Translations = {
   deleted: '🗑️ Удалено',
   fileNotFound: '⚠️ Файл не найден',
   confirmDelete: 'Удалить запись?',
+  bulkSelect: 'Выбор',
+  confirmDeleteSelectedRecords: 'Удалить выбранные записи ({count})?',
+  confirmDeleteSelectedDebts: 'Удалить выбранные долги ({count})?',
+  confirmDeleteSelectedCredits: 'Удалить выбранные кредиты ({count})?',
+  confirmDeleteSelectedDeposits: 'Удалить выбранные вклады ({count})?',
   enterYes: '⚠️ Введите "Yes" для подтверждения',
   allDataDeleted: '🗑️ Все данные удалены',
   debtAdded: '✅ Долг добавлен',
@@ -695,6 +712,13 @@ const ru: Translations = {
   confirmCloseDeposit: 'Закрыть вклад?',
   closeDepositRefund: 'Сумма {amount} будет возвращена на счёт.',
   confirmDeleteRecord: 'Удалить запись?',
+  purchasePriceLabel: 'Стоимость покупки *',
+  downPaymentLabel: 'Первоначальный взнос',
+  downPaymentDateLabel: 'Дата взноса',
+  downPaymentDateRequired: '⚠️ Необходимо указать дату первоначального взноса',
+  downPaymentAmountRequired: '⚠️ Сумма первоначального взноса должна быть больше нуля',
+  finalAmountLabel: 'Итого сумма кредита',
+  downPaymentNotePrefix: 'Первоначальный взнос — ',
   fileNotFoundWithPath: '⚠️ Файл не найден: {path}',
   chartView: 'Вид:',
   barChart: '▮▮ Столбцы',
@@ -810,6 +834,11 @@ const en: Translations = {
   deleted: '🗑️ Deleted',
   fileNotFound: '⚠️ File not found',
   confirmDelete: 'Delete record?',
+  bulkSelect: 'Select',
+  confirmDeleteSelectedRecords: 'Delete selected records ({count})?',
+  confirmDeleteSelectedDebts: 'Delete selected debts ({count})?',
+  confirmDeleteSelectedCredits: 'Delete selected credits ({count})?',
+  confirmDeleteSelectedDeposits: 'Delete selected deposits ({count})?',
   enterYes: '⚠️ Enter "Yes" to confirm',
   allDataDeleted: '🗑️ All data deleted',
   debtAdded: '✅ Debt added',
@@ -1087,6 +1116,13 @@ const en: Translations = {
   confirmCloseDeposit: 'Close deposit?',
   closeDepositRefund: 'Amount {amount} will be refunded to account.',
   confirmDeleteRecord: 'Delete record?',
+  purchasePriceLabel: 'Purchase price *',
+  downPaymentLabel: 'Down payment',
+  downPaymentDateLabel: 'Payment date',
+  downPaymentDateRequired: '⚠️ Please specify the down payment date',
+  downPaymentAmountRequired: '⚠️ Down payment amount must be greater than zero',
+  finalAmountLabel: 'Final credit amount',
+  downPaymentNotePrefix: 'Down payment — ',
   fileNotFoundWithPath: '⚠️ File not found: {path}',
   chartView: 'View:',
   barChart: '▮▮ Bars',

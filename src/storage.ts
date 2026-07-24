@@ -1,6 +1,6 @@
 import { App, normalizePath } from 'obsidian';
 import { AccountData, AccountMeta, CreditRecord, DebtMovement, DebtRecord, DepositRecord, DepositTopUp, DepositWithdrawal, FinanceRecord, DAYS_IN_YEAR } from './types';
-import { getDaysBetween, getTodayStr } from './utils';
+import { getDaysBetween, getTodayStr, normalizeDateStr, normalizeTimeStr } from './utils';
 
 const DATA_VERSION = 4;
 
@@ -316,7 +316,8 @@ export class FinanceStorage {
         const data = JSON.parse(await this.app.vault.adapter.read(fp)) as AccountRecordsFile;
         console.log('[FT-storage] loadRecords loaded:', data.records.length, 'records');
         data.records.forEach(r => {
-          r.time ??= '';
+          r.date = normalizeDateStr(r.date);
+          r.time = normalizeTimeStr(r.time || '');
           r.isInternal ??= false;
           r.linkedId ??= '';
         });
@@ -338,9 +339,18 @@ export class FinanceStorage {
       try {
         const data = JSON.parse(await this.app.vault.adapter.read(fp)) as DebtRecord[];
         data.forEach(d => {
+          d.date = normalizeDateStr(d.date);
+          d.time = normalizeTimeStr(d.time || '');
           if (!d.direction) d.direction = 'borrowed';
-          d.dueDate ??= '';
-          d.time ??= '';
+          d.dueDate = d.dueDate ? normalizeDateStr(d.dueDate) : '';
+          if (d.movements) {
+            d.movements.forEach(m => {
+              m.date = normalizeDateStr(m.date);
+              m.time = normalizeTimeStr(m.time || '');
+            });
+          } else {
+            d.movements = [];
+          }
         });
         this.debtsCache.set(notePath, data);
         return data;
@@ -358,9 +368,19 @@ export class FinanceStorage {
       try {
         const data = JSON.parse(await this.app.vault.adapter.read(fp)) as CreditRecord[];
         data.forEach(c => {
+          c.startDate = normalizeDateStr(c.startDate);
           if (!c.status) c.status = 'active';
           if (!c.payments) c.payments = [];
+          c.payments.forEach(p => {
+            p.dueDate = normalizeDateStr(p.dueDate);
+            if (p.paidDate) p.paidDate = normalizeDateStr(p.paidDate);
+          });
           if (c.earlyRepaymentOption === undefined) c.earlyRepaymentOption = null;
+          c.purchasePrice ??= c.originalAmount;
+          c.downPayment ??= 0;
+          c.downPaymentType ??= 'amount';
+          c.downPaymentValue ??= 0;
+          c.downPaymentDate = c.downPaymentDate ? normalizeDateStr(c.downPaymentDate) : '';
         });
         this.creditsCache.set(notePath, data);
         return data;
@@ -380,13 +400,26 @@ export class FinanceStorage {
       try {
         const data = JSON.parse(await this.app.vault.adapter.read(fp)) as DepositRecord[];
         data.forEach(d => {
+          d.startDate = normalizeDateStr(d.startDate);
           if (!d.termMonths) d.termMonths = 12;
           if (!d.accrualType) d.accrualType = 'to_account';
           if (!d.type) d.type = 'term';
           d.status ??= 'active';
           if (!d.accruals) d.accruals = [];
+          d.accruals.forEach(a => {
+            a.dueDate = normalizeDateStr(a.dueDate);
+            if (a.paidDate) a.paidDate = normalizeDateStr(a.paidDate);
+          });
           if (!d.topUps) d.topUps = [];
+          d.topUps.forEach(t => {
+            t.date = normalizeDateStr(t.date);
+            t.time = normalizeTimeStr(t.time || '');
+          });
           if (!d.withdrawals) d.withdrawals = [];
+          d.withdrawals.forEach(w => {
+            w.date = normalizeDateStr(w.date);
+            w.time = normalizeTimeStr(w.time || '');
+          });
         });
         this.depositsCache.set(notePath, data);
         return data;
@@ -543,6 +576,13 @@ export class FinanceStorage {
     this.scheduleRecords(notePath);
   }
 
+  async deleteRecordsBatch(notePath: string, ids: string[]): Promise<void> {
+    const idSet = new Set(ids);
+    const d   = await this.loadRecords(notePath);
+    d.records = d.records.filter(r => !idSet.has(r.id));
+    this.scheduleRecords(notePath);
+  }
+
   async importRecords(notePath: string, recs: FinanceRecord[]): Promise<void> {
     const d = await this.loadRecords(notePath);
     for (const r of recs) {
@@ -587,6 +627,14 @@ export class FinanceStorage {
   async deleteDebt(notePath: string, id: string): Promise<void> {
     const d = await this.loadDebts(notePath);
     const filtered = d.filter(x => x.id !== id);
+    this.debtsCache.set(notePath, filtered);
+    this.scheduleDebts(notePath);
+  }
+
+  async deleteDebtsBatch(notePath: string, ids: string[]): Promise<void> {
+    const idSet = new Set(ids);
+    const d = await this.loadDebts(notePath);
+    const filtered = d.filter(x => !idSet.has(x.id));
     this.debtsCache.set(notePath, filtered);
     this.scheduleDebts(notePath);
   }
@@ -646,6 +694,14 @@ export class FinanceStorage {
     this.scheduleCredits(notePath);
   }
 
+  async deleteCreditsBatch(notePath: string, ids: string[]): Promise<void> {
+    const idSet = new Set(ids);
+    const d = await this.loadCredits(notePath);
+    const filtered = d.filter(x => !idSet.has(x.id));
+    this.creditsCache.set(notePath, filtered);
+    this.scheduleCredits(notePath);
+  }
+
   // ── Deposit CRUD ──────────────────────────────────────────────────────────────
 
   async addDeposit(notePath: string, deposit: DepositRecord): Promise<void> {
@@ -665,6 +721,14 @@ export class FinanceStorage {
   async deleteDeposit(notePath: string, id: string): Promise<void> {
     const d = await this.loadDeposits(notePath);
     const filtered = d.filter(x => x.id !== id);
+    this.depositsCache.set(notePath, filtered);
+    this.scheduleDeposits(notePath);
+  }
+
+  async deleteDepositsBatch(notePath: string, ids: string[]): Promise<void> {
+    const idSet = new Set(ids);
+    const d = await this.loadDeposits(notePath);
+    const filtered = d.filter(x => !idSet.has(x.id));
     this.depositsCache.set(notePath, filtered);
     this.scheduleDeposits(notePath);
   }

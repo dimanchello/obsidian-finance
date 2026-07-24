@@ -1,7 +1,7 @@
 import { App, Modal, Notice } from 'obsidian';
 import { getLocaleFromApp, t, Translations } from './i18n';
 import { DepositTopUp, DepositRecord } from './types';
-import { fmtAmount, parseAmount, getTodayStr } from './utils';
+import { fmtAmount, parseAmount, getTodayStr, normalizeDateStr, normalizeTimeStr } from './utils';
 
 export interface DepositTopUpOptions {
   title: string;
@@ -93,8 +93,8 @@ export class DepositTopUpModal extends Modal {
         const topUp: DepositTopUp = {
           id: crypto.randomUUID(),
           amount,
-          date: dateIn.value,
-          time: timeIn.value,
+          date: normalizeDateStr(dateIn.value),
+          time: normalizeTimeStr(timeIn.value),
           createdAt: Date.now(),
           note: noteIn.value.trim(),
         };

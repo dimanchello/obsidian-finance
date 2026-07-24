@@ -4,7 +4,7 @@ import {
   AccountData, FinanceRecord, PluginSettings,
   MOBILE_BREAKPOINT, DAYS_IN_YEAR,
 } from './types';
-import { noteFilename, getDaysBetween, getTodayStr } from './utils';
+import { noteFilename, getDaysBetween, getTodayStr, parseDate } from './utils';
 import { RecordModal } from './RecordModal';
 import { ViewContext } from './context';
 import { RecordsTab } from './tabs/RecordsTab';
@@ -315,7 +315,7 @@ export class AccountView {
       if (!deposit.accruals) deposit.accruals = [];
 
       if (!deposit.accruals.length && deposit.termMonths > 0 && deposit.amount > 0 && deposit.startDate) {
-        const startDate = new Date(deposit.startDate);
+        const startDate = parseDate(deposit.startDate) ?? new Date();
 
         if (deposit.accrualType === 'capitalization') {
           let currentAmount = deposit.amount;
@@ -443,7 +443,7 @@ export class AccountView {
       if (credit.status !== 'active') continue;
       if (!credit.payments) credit.payments = [];
       if (!credit.payments.length && credit.monthlyPayment > 0 && credit.startDate) {
-        const startDate = new Date(credit.startDate);
+        const startDate = parseDate(credit.startDate) ?? new Date();
         const termMonths = credit.termMonths;
         for (let i = 1; i <= termMonths; i++) {
           const dueDate = new Date(startDate);

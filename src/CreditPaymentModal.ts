@@ -1,7 +1,7 @@
 import { App, Modal, Notice } from 'obsidian';
 import { getLocaleFromApp, t, Translations } from './i18n';
 import { CreditPayment, CreditRecord } from './types';
-import { fmtAmount, parseAmount, getTodayStr } from './utils';
+import { fmtAmount, parseAmount, getTodayStr, normalizeDateStr } from './utils';
 
 export interface CreditPaymentOptions {
   title: string;
@@ -88,9 +88,9 @@ export class CreditPaymentModal extends Modal {
         const payment: CreditPayment = {
           id: crypto.randomUUID(),
           amount,
-          dueDate: dateIn.value,
+          dueDate: normalizeDateStr(dateIn.value),
           status: 'paid',
-          paidDate: dateIn.value,
+          paidDate: normalizeDateStr(dateIn.value),
           note: noteIn.value,
         };
         this.o.onSave(payment);

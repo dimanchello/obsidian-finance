@@ -10,7 +10,7 @@ import { ColumnVisibilityModal } from '../ColumnVisibilityModal';
 import { DepositTopUpModal } from '../DepositTopUpModal';
 import { DepositWithdrawalModal } from '../DepositWithdrawalModal';
 import { ConfirmModal } from '../ConfirmModal';
-import { getTodayStr } from '../utils';
+import { getTodayStr, parseDate } from '../utils';
 export class DepositsTab {
   private ctx: ViewContext;
   private el: HTMLElement;
@@ -18,6 +18,8 @@ export class DepositsTab {
   private filterDebounce: ReturnType<typeof setTimeout> | null = null;
   private filtersOpen = false;
   onUpdate: (() => void) | null = null;
+  private bulkMode = false;
+  private selectedIds = new Set<string>();
 
   private get tr() { return this.ctx.tr; }
 
@@ -27,6 +29,10 @@ export class DepositsTab {
   }
 
   render(): void {
+    if (this.ctx.state.depositSort?.field === 'createdAt' as DepositSortField) {
+      this.ctx.state.depositSort = { field: 'date', dir: 'desc' };
+      this.ctx.saveState();
+    }
     this.el.empty();
     this.renderDepositsView(this.el);
   }
@@ -58,8 +64,8 @@ export class DepositsTab {
 
   private calculateDepositEndDate(deposit: DepositRecord): string {
     if (!deposit.startDate) return '';
-    const startDate = new Date(deposit.startDate);
-    if (isNaN(startDate.getTime())) return '';
+    const startDate = parseDate(deposit.startDate);
+    if (!startDate || isNaN(startDate.getTime())) return '';
     const term = deposit.termMonths || 0;
     startDate.setUTCMonth(startDate.getUTCMonth() + term);
     return startDate.toISOString().split('T')[0];
@@ -84,7 +90,7 @@ export class DepositsTab {
   private getFilteredDeposits(): DepositRecord[] {
     if (!this.ctx.data) return [];
     const f = this.ctx.state.depositFilter ?? DEFAULT_DEPOSIT_FILTER;
-    const s = this.ctx.state.depositSort ?? { field: 'createdAt' as DepositSortField, dir: 'desc' };
+    const s = this.ctx.state.depositSort ?? { field: 'date' as DepositSortField, dir: 'desc' };
     let result = [...this.ctx.data.deposits];
     if (f.search) {
       const q = f.search.toLowerCase();
@@ -100,7 +106,7 @@ export class DepositsTab {
       if (s.field === 'date') cmp = a.startDate.localeCompare(b.startDate);
       else if (s.field === 'amount') cmp = a.amount - b.amount;
       else if (s.field === 'bankName') cmp = a.bankName.localeCompare(b.bankName);
-      else cmp = a.createdAt - b.createdAt;
+      else cmp = a.startDate.localeCompare(b.startDate);
       return s.dir === 'asc' ? cmp : -cmp;
     });
     return result;
@@ -292,12 +298,11 @@ export class DepositsTab {
     sortRow.createEl('span', { text: this.tr.sortBy, cls: 'finance-sort-label' });
 
     const sortFields: { field: DepositSortField; label: string }[] = [
-      { field: 'createdAt', label: this.tr.sortAdded },
       { field: 'date', label: this.tr.startDate },
       { field: 'amount', label: this.tr.sum },
       { field: 'bankName', label: this.tr.bankName },
     ];
-    const s = this.ctx.state.depositSort ?? { field: 'createdAt' as DepositSortField, dir: 'desc' };
+    const s = this.ctx.state.depositSort ?? { field: 'date' as DepositSortField, dir: 'desc' };
     sortFields.forEach(({ field, label }) => {
       const active = s.field === field;
       const btn = sortRow.createEl('button', {
@@ -373,6 +378,19 @@ export class DepositsTab {
       this.render();
     });
 
+    if (this.ctx.isMobile) {
+      const bulkToggleBtn = toolbar.createEl('button', {
+        cls: `finance-analytics-toggle-btn${this.bulkMode ? ' active' : ''}`,
+        text: `☑️ ${this.tr.bulkSelect}`,
+      });
+      bulkToggleBtn.addEventListener('click', () => {
+        this.bulkMode = !this.bulkMode;
+        if (!this.bulkMode) this.selectedIds.clear();
+        bulkToggleBtn.classList.toggle('active', this.bulkMode);
+        this.render();
+      });
+    }
+
     const container = body.createDiv('finance-filters-container');
     container.style.display = this.filtersOpen ? 'block' : 'none';
     if (this.filtersOpen) {
@@ -439,13 +457,37 @@ export class DepositsTab {
       { key: '_act',      label: '' },
     ];
 
+    if (this.bulkMode) {
+      allDepositCols.unshift({ key: '_select', label: '' });
+    }
+
     this.ctx.state.depositsColumns ??= {};
 
-    const visDepositCols = allDepositCols.filter(c => c.key === '_act' || this.ctx.state.depositsColumns![c.key] !== false);
+    const visDepositCols = allDepositCols.filter(c => c.key === '_act' || c.key === '_select' || this.ctx.state.depositsColumns![c.key] !== false);
 
     if (!this.ctx.isMobile) {
-      const depositColVisCols = allDepositCols.filter(c => c.key !== '_act');
-      const gearBtn = infoBar.createEl('button', { cls: 'finance-colvis-btn', text: '⚙️' });
+      const depositColVisCols = allDepositCols.filter(c => c.key !== '_act' && c.key !== '_select');
+      const btnsContainer = infoBar.createDiv({ cls: 'finance-table-info-btns', attr: { style: 'display: flex; gap: 8px; align-items: center;' } });
+      
+      const bulkToggle = btnsContainer.createEl('button', {
+        cls: `finance-bulk-toggle-btn${this.bulkMode ? ' active' : ''}`,
+        text: '☑️',
+      });
+      bulkToggle.addEventListener('click', () => {
+        this.bulkMode = !this.bulkMode;
+        if (!this.bulkMode) this.selectedIds.clear();
+        this.render();
+      });
+
+      if (this.bulkMode && this.selectedIds.size > 0) {
+        const bulkDeleteBtn = btnsContainer.createEl('button', {
+          cls: 'finance-bulk-delete-btn',
+          text: `${this.tr.delete} (${this.selectedIds.size})`,
+        });
+        bulkDeleteBtn.addEventListener('click', () => this.confirmBulkDelete());
+      }
+
+      const gearBtn = btnsContainer.createEl('button', { cls: 'finance-colvis-btn', text: '⚙️' });
       gearBtn.title = this.tr.columnSettings;
       gearBtn.addEventListener('click', () => {
         new ColumnVisibilityModal(this.ctx.app, {
@@ -459,6 +501,15 @@ export class DepositsTab {
           },
         }).open();
       });
+    }
+
+    if (this.ctx.isMobile && this.bulkMode && this.selectedIds.size > 0) {
+      const mobileBar = container.createDiv('finance-mobile-bulk-bar');
+      const deleteBtn = mobileBar.createEl('button', {
+        cls: 'finance-bulk-delete-btn',
+        text: `${this.tr.delete} (${this.selectedIds.size})`,
+      });
+      deleteBtn.addEventListener('click', () => this.confirmBulkDelete());
     }
 
     if (this.ctx.isMobile) {
@@ -475,9 +526,9 @@ export class DepositsTab {
     wrapper.style.padding = '12px';
     const today = getTodayStr();
 
-    const startDate = deposit.startDate ? new Date(deposit.startDate) : null;
+    const startDate = deposit.startDate ? parseDate(deposit.startDate) : null;
     const endDate = this.calculateDepositEndDate(deposit);
-    const endDateObj = endDate ? new Date(endDate) : null;
+    const endDateObj = endDate ? parseDate(endDate) : null;
 
     if (startDate && endDateObj && startDate.getTime() < endDateObj.getTime()) {
       const totalDuration = endDateObj.getTime() - startDate.getTime();
@@ -667,6 +718,19 @@ export class DepositsTab {
       }
 
       const header = block.createDiv('finance-record-header');
+      if (this.bulkMode) {
+        const cb = header.createEl('input', { type: 'checkbox', cls: 'finance-block-checkbox' }) as HTMLInputElement;
+        cb.checked = this.selectedIds.has(deposit.id);
+        cb.addEventListener('change', (e) => {
+          e.stopPropagation();
+          if (cb.checked) {
+            this.selectedIds.add(deposit.id);
+          } else {
+            this.selectedIds.delete(deposit.id);
+          }
+          this.render();
+        });
+      }
       const amountText = '+' + this.ctx.fmt(deposit.amount);
       header.createEl('span', {
         text: amountText,
@@ -716,6 +780,22 @@ export class DepositsTab {
       this.mkActionBtn(actions, '✏️', this.tr.edit, () => this.openEditDepositModal(deposit));
       this.mkActionBtn(actions, '🗑️', this.tr.delete, () => this.confirmDeleteDeposit(deposit), 'finance-delete-btn');
 
+      if (this.bulkMode) {
+        block.style.cursor = 'pointer';
+        block.addEventListener('click', (e) => {
+          if ((e.target as HTMLElement).tagName === 'INPUT' || (e.target as HTMLElement).closest('.finance-action-btn') || (e.target as HTMLElement).closest('.finance-debt-history-toggle')) {
+            return;
+          }
+          const isSelected = this.selectedIds.has(deposit.id);
+          if (isSelected) {
+            this.selectedIds.delete(deposit.id);
+          } else {
+            this.selectedIds.add(deposit.id);
+          }
+          this.render();
+        });
+      }
+
       frag.appendChild(block);
     });
 
@@ -727,16 +807,52 @@ export class DepositsTab {
     const table = scroll.createEl('table', { cls: 'finance-table' });
 
     const hRow = table.createEl('thead').createEl('tr');
-    cols.forEach(c => hRow.createEl('th', { text: c.label, cls: 'finance-th' }));
+    cols.forEach(c => {
+      const th = hRow.createEl('th', { cls: 'finance-th' });
+      if (c.key === '_select') {
+        th.classList.add('finance-select-td');
+        const cb = th.createEl('input', { type: 'checkbox' }) as HTMLInputElement;
+        const allSelected = pageDeposits.length > 0 && pageDeposits.every(r => this.selectedIds.has(r.id));
+        cb.checked = allSelected;
+        cb.addEventListener('change', () => {
+          if (cb.checked) {
+            pageDeposits.forEach(r => this.selectedIds.add(r.id));
+          } else {
+            pageDeposits.forEach(r => this.selectedIds.delete(r.id));
+          }
+          this.render();
+        });
+      } else {
+        th.setText(c.label);
+      }
+    });
 
     const tbody = table.createEl('tbody');
     const frag = document.createDocumentFragment();
 
-    const dataCols = cols.filter(c => c.key !== '_act');
+    const dataCols = cols.filter(c => c.key !== '_act' && c.key !== '_select');
 
     pageDeposits.forEach(deposit => {
       const tr = document.createElement('tr');
       tr.classList.add('finance-tr');
+
+      if (cols.find(c => c.key === '_select')) {
+        const std = document.createElement('td');
+        std.classList.add('finance-td', 'finance-select-td');
+        const cb = std.createEl('input', { type: 'checkbox' }) as HTMLInputElement;
+        cb.checked = this.selectedIds.has(deposit.id);
+        cb.addEventListener('change', (e) => {
+          e.stopPropagation();
+          if (cb.checked) {
+            this.selectedIds.add(deposit.id);
+          } else {
+            this.selectedIds.delete(deposit.id);
+          }
+          this.render();
+        });
+        tr.appendChild(std);
+      }
+
       if (deposit.status === 'active') {
         tr.classList.add('finance-row-income');
       } else {
@@ -829,6 +945,22 @@ export class DepositsTab {
         tr.classList.toggle('finance-debt-row-expanded', open);
         expandRow.classList.toggle('finance-debt-expand-open', open);
       });
+
+      if (this.bulkMode) {
+        tr.style.cursor = 'pointer';
+        tr.addEventListener('click', (e) => {
+          if ((e.target as HTMLElement).tagName === 'INPUT' || (e.target as HTMLElement).closest('.finance-action-btn')) {
+            return;
+          }
+          const isSelected = this.selectedIds.has(deposit.id);
+          if (isSelected) {
+            this.selectedIds.delete(deposit.id);
+          } else {
+            this.selectedIds.add(deposit.id);
+          }
+          this.render();
+        });
+      }
 
       frag.appendChild(tr);
       frag.appendChild(expandRow);
@@ -1021,6 +1153,48 @@ export class DepositsTab {
       this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
       this.onUpdate?.();
       new Notice(this.tr.depositDeleted);
+    }).open();
+  }
+
+  private confirmBulkDelete(): void {
+    const count = this.selectedIds.size;
+    if (count === 0) return;
+    const msg = this.tr.confirmDeleteSelectedDeposits.replace('{count}', String(count));
+    new ConfirmModal(this.ctx.app, msg, async () => {
+      const ids = Array.from(this.selectedIds);
+      const depositsToDelete = (this.ctx.data?.deposits ?? []).filter(d => this.selectedIds.has(d.id));
+      await this.ctx.storage.deleteDepositsBatch(this.ctx.notePath, ids);
+
+      let otherRecords = this.ctx.data!.records.filter(r => !r.linkedId || !this.selectedIds.has(r.linkedId));
+
+      const nowDate = getTodayStr();
+      const nowTime = new Date().toTimeString().slice(0, 5);
+
+      depositsToDelete.forEach(deposit => {
+        if (deposit.status === 'active') {
+          const refundRec: FinanceRecord = {
+            id: crypto.randomUUID(),
+            createdAt: Date.now(),
+            date: nowDate,
+            time: nowTime,
+            type: 'income',
+            amount: deposit.amount,
+            category: 'Возврат вклада',
+            tag: '',
+            payer: deposit.bankName,
+            note: `Возврат тела вклада "${deposit.name}"`,
+            attachmentPath: '',
+          };
+          otherRecords.push(refundRec);
+        }
+      });
+
+      await this.ctx.storage.saveAllRecords(this.ctx.notePath, otherRecords);
+      this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
+      this.selectedIds.clear();
+      this.bulkMode = false;
+      this.onUpdate?.();
+      new Notice(this.tr.deleted);
     }).open();
   }
 

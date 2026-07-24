@@ -1,7 +1,7 @@
 import { App, Modal, Notice } from 'obsidian';
 import { getLocaleFromApp, t, Translations } from './i18n';
 import { CreditRecord, CreditPayment } from './types';
-import { fmtAmount, parseAmount, getTodayStr } from './utils';
+import { fmtAmount, parseAmount, getTodayStr, normalizeDateStr } from './utils';
 
 export interface EarlyRepaymentOptions {
   title: string;
@@ -164,7 +164,7 @@ export class CreditEarlyRepaymentModal extends Modal {
     btnRow.createEl('button', { text: this.tr.repay, cls: 'finance-btn-save' })
       .addEventListener('click', () => {
         const todayStr = getTodayStr();
-        const repaymentDate = dateIn.value || todayStr;
+        const repaymentDate = normalizeDateStr(dateIn.value || todayStr);
 
         if (this.selectedOption === 'amount') {
           const amount = parseAmount(this.amountInput.value);

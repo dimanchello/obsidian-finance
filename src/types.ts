@@ -1,5 +1,5 @@
 export type RecordType = 'income' | 'expense';
-export type SortField  = 'date' | 'amount' | 'category' | 'type' | 'payer' | 'tag' | 'createdAt';
+export type SortField  = 'date' | 'amount' | 'category' | 'type' | 'payer' | 'tag';
 export type SortDir    = 'asc'  | 'desc';
 export type DebtMovementType = 'borrow' | 'repay';
 
@@ -73,7 +73,7 @@ export interface FilterState {
 
 export interface SortState { field: SortField; dir: SortDir; }
 
-export type DebtSortField = 'date' | 'amount' | 'person' | 'createdAt';
+export type DebtSortField = 'date' | 'amount' | 'person';
 export interface DebtFilterState {
   search: string;
   status: 'all' | 'paid' | 'unpaid';
@@ -117,13 +117,13 @@ export const DEFAULT_FILTER: FilterState = {
   showInternal: 'all',
 };
 
-export const DEFAULT_SORT: SortState = { field: 'createdAt', dir: 'desc' };
+export const DEFAULT_SORT: SortState = { field: 'date', dir: 'desc' };
 
 export const DEFAULT_DEBT_FILTER: DebtFilterState = {
   search: '', status: 'all', direction: 'all', dateFrom: '', dateTo: '', person: '',
 };
 
-export type CreditSortField = 'date' | 'amount' | 'bankName' | 'createdAt';
+export type CreditSortField = 'date' | 'amount' | 'bankName';
 export interface CreditFilterState {
   search: string;
   status: 'all' | 'active' | 'paid';
@@ -133,7 +133,7 @@ export interface CreditFilterState {
   dateTo: string;
 }
 
-export type DepositSortField = 'date' | 'amount' | 'bankName' | 'createdAt';
+export type DepositSortField = 'date' | 'amount' | 'bankName';
 export interface DepositFilterState {
   search: string;
   status: 'all' | 'active' | 'closed';
@@ -167,6 +167,7 @@ export const PLURAL_THRESHOLD = 5;
 export const DAYS_IN_YEAR = 365;
 export const ACCRUAL_STEP_MONTHLY = 12;
 export const ONE_WEEK_MS = 604_800_000;
+export const PERCENT_100 = 100;
 
 export type CreditType = 'consumer' | 'auto' | 'mortgage';
 export type CreditStatus = 'active' | 'paid';
@@ -197,6 +198,12 @@ export interface CreditRecord {
   status: CreditStatus;
   earlyRepaymentOption: 'term' | 'amount' | null;
   payments: CreditPayment[];
+  purchasePrice?: number;
+  downPayment?: number;
+  downPaymentType?: 'percent' | 'amount';
+  downPaymentValue?: number;
+  downPaymentDate?: string;
+  downPaymentRecordId?: string;
 }
 
 export type DepositType = 'term' | 'demand' | 'savings';

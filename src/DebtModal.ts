@@ -1,7 +1,7 @@
 import { App, Modal, Notice } from 'obsidian';
 import { getLocaleFromApp, t, Translations } from './i18n';
 import { DebtRecord } from './types';
-import { fmtAmount, parseAmount, getTodayStr } from './utils';
+import { fmtAmount, parseAmount, getTodayStr, normalizeDateStr, normalizeTimeStr } from './utils';
 import { DebtInfoModal } from './DebtInfoModal';
 
 export interface DebtModalOptions {
@@ -25,7 +25,18 @@ export class DebtModal extends Modal {
     this.o = opts;
     const nowStr = getTodayStr();
     this.debt = opts.debt
-      ? { ...opts.debt, direction: (opts.debt.direction || 'borrowed'), movements: [...opts.debt.movements] }
+      ? {
+          ...opts.debt,
+          direction: (opts.debt.direction || 'borrowed'),
+          date: normalizeDateStr(opts.debt.date),
+          time: normalizeTimeStr(opts.debt.time || ''),
+          dueDate: opts.debt.dueDate ? normalizeDateStr(opts.debt.dueDate) : '',
+          movements: opts.debt.movements.map(m => ({
+            ...m,
+            date: normalizeDateStr(m.date),
+            time: normalizeTimeStr(m.time || ''),
+          }))
+        }
       : {
           id: crypto.randomUUID(),
           person: '',
@@ -34,7 +45,7 @@ export class DebtModal extends Modal {
           interestRate: 0,
           direction: 'borrowed',
           date: nowStr,
-          time: '',
+          time: new Date().toTimeString().slice(0, 5),
           dueDate: '',
           createdAt: Date.now(),
           note: '',
@@ -201,14 +212,14 @@ export class DebtModal extends Modal {
     const dateG = row2.createDiv('finance-field-group');
     dateG.createEl('label', { text: this.tr.dateCreated, cls: 'finance-field-label' });
     const dateIn = dateG.createEl('input', { type: 'date', cls: 'finance-input' });
-    dateIn.value = this.debt.date;
-    dateIn.addEventListener('change', () => { this.debt.date = dateIn.value; });
+    dateIn.value = normalizeDateStr(this.debt.date);
+    dateIn.addEventListener('change', () => { this.debt.date = normalizeDateStr(dateIn.value); });
 
     const dueDateG = row2.createDiv('finance-field-group');
     dueDateG.createEl('label', { text: this.tr.dueDate, cls: 'finance-field-label' });
     const dueDateIn = dueDateG.createEl('input', { type: 'date', cls: 'finance-input' });
-    dueDateIn.value = this.debt.dueDate || '';
-    dueDateIn.addEventListener('change', () => { this.debt.dueDate = dueDateIn.value; });
+    dueDateIn.value = this.debt.dueDate ? normalizeDateStr(this.debt.dueDate) : '';
+    dueDateIn.addEventListener('change', () => { this.debt.dueDate = dueDateIn.value ? normalizeDateStr(dueDateIn.value) : ''; });
 
     // === РЯД 3: Процент (%) | Итого к возврату ===
     const row3 = form.createDiv('finance-form-row finance-full-width');

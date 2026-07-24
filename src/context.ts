@@ -88,13 +88,13 @@ export class ViewContext {
         const v = JSON.parse(raw) as ViewState;
         v.page = 0;
         v.debtFilter ??= { ...DEFAULT_DEBT_FILTER };
-        v.debtSort ??= { field: 'createdAt', dir: 'desc' };
+        v.debtSort ??= { field: 'date', dir: 'desc' };
         if (typeof v.debtPage !== 'number') v.debtPage = 0;
         v.creditFilter ??= { ...DEFAULT_CREDIT_FILTER };
-        v.creditSort ??= { field: 'createdAt', dir: 'desc' };
+        v.creditSort ??= { field: 'date', dir: 'desc' };
         if (typeof v.creditPage !== 'number') v.creditPage = 0;
         v.depositFilter ??= { ...DEFAULT_DEPOSIT_FILTER };
-        v.depositSort ??= { field: 'createdAt', dir: 'desc' };
+        v.depositSort ??= { field: 'date', dir: 'desc' };
         if (typeof v.depositPage !== 'number') v.depositPage = 0;
         if (v.filter.showInternal === undefined || typeof v.filter.showInternal === 'boolean') {
           v.filter.showInternal = v.filter.showInternal === true ? 'only' : 'all';
@@ -105,11 +105,11 @@ export class ViewContext {
     return {
       sort: { ...DEFAULT_SORT },
       filter: { ...DEFAULT_FILTER },
-      debtSort: { field: 'createdAt', dir: 'desc' },
+      debtSort: { field: 'date', dir: 'desc' },
       debtFilter: { ...DEFAULT_DEBT_FILTER },
-      creditSort: { field: 'createdAt', dir: 'desc' },
+      creditSort: { field: 'date', dir: 'desc' },
       creditFilter: { ...DEFAULT_CREDIT_FILTER },
-      depositSort: { field: 'createdAt', dir: 'desc' },
+      depositSort: { field: 'date', dir: 'desc' },
       depositFilter: { ...DEFAULT_DEPOSIT_FILTER },
       page: 0,
       debtPage: 0,
@@ -134,7 +134,9 @@ export class ViewContext {
     const exp = recs.filter(r => r.type === 'expense' && !r.isInternal).reduce((s, r) => s + r.amount, 0);
     const lent = this._data.debts.filter(d => d.direction === 'lent').reduce((s, d) => s + d.amount, 0);
     const borrowed = this._data.debts.filter(d => d.direction === 'borrowed').reduce((s, d) => s + d.amount, 0);
-    const bal = inc - exp - lent + borrowed;
+    const totalInc = recs.filter(r => r.type === 'income').reduce((s, r) => s + r.amount, 0);
+    const totalExp = recs.filter(r => r.type === 'expense').reduce((s, r) => s + r.amount, 0);
+    const bal = totalInc - totalExp - lent + borrowed;
 
     const el = container.createDiv('finance-stats-container');
     const items = [

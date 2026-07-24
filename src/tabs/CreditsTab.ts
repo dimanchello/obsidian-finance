@@ -10,7 +10,7 @@ import { ColumnVisibilityModal } from '../ColumnVisibilityModal';
 import { CreditPaymentModal } from '../CreditPaymentModal';
 import { CreditEarlyRepaymentModal } from '../CreditEarlyRepaymentModal';
 import { ConfirmModal } from '../ConfirmModal';
-import { getTodayStr } from '../utils';
+import { getTodayStr, parseDate } from '../utils';
 export class CreditsTab {
   private ctx: ViewContext;
   private el: HTMLElement;
@@ -19,6 +19,8 @@ export class CreditsTab {
   private filtersOpen = false;
   private expandedCreditId: string | null = null;
   private creditPaymentPages = new Map<string, number>();
+  private bulkMode = false;
+  private selectedIds = new Set<string>();
 
   private get tr() { return this.ctx.tr; }
 
@@ -28,6 +30,10 @@ export class CreditsTab {
   }
 
   render(): void {
+    if (this.ctx.state.creditSort?.field === 'createdAt' as CreditSortField) {
+      this.ctx.state.creditSort = { field: 'date', dir: 'desc' };
+      this.ctx.saveState();
+    }
     this.el.empty();
     this.renderCreditsView(this.el);
   }
@@ -261,12 +267,11 @@ export class CreditsTab {
     sortRow.createEl('span', { text: this.tr.sortBy, cls: 'finance-sort-label' });
 
     const sortFields: { field: CreditSortField; label: string }[] = [
-      { field: 'createdAt', label: this.tr.sortAdded },
       { field: 'date', label: this.tr.startDate },
       { field: 'amount', label: this.tr.sum },
       { field: 'bankName', label: this.tr.bankName },
     ];
-    const s = this.ctx.state.creditSort ?? { field: 'createdAt' as CreditSortField, dir: 'desc' };
+    const s = this.ctx.state.creditSort ?? { field: 'date' as CreditSortField, dir: 'desc' };
     sortFields.forEach(({ field, label }) => {
       const active = s.field === field;
       const btn = sortRow.createEl('button', {
@@ -336,6 +341,19 @@ export class CreditsTab {
       this.render();
     });
 
+    if (this.ctx.isMobile) {
+      const bulkToggleBtn = toolbar.createEl('button', {
+        cls: `finance-analytics-toggle-btn${this.bulkMode ? ' active' : ''}`,
+        text: `☑️ ${this.tr.bulkSelect}`,
+      });
+      bulkToggleBtn.addEventListener('click', () => {
+        this.bulkMode = !this.bulkMode;
+        if (!this.bulkMode) this.selectedIds.clear();
+        bulkToggleBtn.classList.toggle('active', this.bulkMode);
+        this.render();
+      });
+    }
+
     const container = body.createDiv('finance-filters-container');
     container.style.display = this.filtersOpen ? 'block' : 'none';
     if (this.filtersOpen) {
@@ -382,7 +400,7 @@ export class CreditsTab {
       if (sf === 'date') cmp = a.startDate.localeCompare(b.startDate);
       else if (sf === 'amount') cmp = a.currentAmount - b.currentAmount;
       else if (sf === 'bankName') cmp = a.bankName.localeCompare(b.bankName);
-      else cmp = a.createdAt - b.createdAt;
+      else cmp = a.startDate.localeCompare(b.startDate);
       return sd === 'asc' ? cmp : -cmp;
     });
     return result;
@@ -428,13 +446,37 @@ export class CreditsTab {
       { key: '_act',      label: '' },
     ];
 
+    if (this.bulkMode) {
+      allCreditCols.unshift({ key: '_select', label: '' });
+    }
+
     this.ctx.state.creditsColumns ??= {};
 
-    const visCreditCols = allCreditCols.filter(c => c.key === '_act' || this.ctx.state.creditsColumns![c.key] !== false);
+    const visCreditCols = allCreditCols.filter(c => c.key === '_act' || c.key === '_select' || this.ctx.state.creditsColumns![c.key] !== false);
 
     if (!this.ctx.isMobile) {
-      const creditColVisCols = allCreditCols.filter(c => c.key !== '_act');
-      const gearBtn = infoBar.createEl('button', { cls: 'finance-colvis-btn', text: '⚙️' });
+      const creditColVisCols = allCreditCols.filter(c => c.key !== '_act' && c.key !== '_select');
+      const btnsContainer = infoBar.createDiv({ cls: 'finance-table-info-btns', attr: { style: 'display: flex; gap: 8px; align-items: center;' } });
+      
+      const bulkToggle = btnsContainer.createEl('button', {
+        cls: `finance-bulk-toggle-btn${this.bulkMode ? ' active' : ''}`,
+        text: '☑️',
+      });
+      bulkToggle.addEventListener('click', () => {
+        this.bulkMode = !this.bulkMode;
+        if (!this.bulkMode) this.selectedIds.clear();
+        this.render();
+      });
+
+      if (this.bulkMode && this.selectedIds.size > 0) {
+        const bulkDeleteBtn = btnsContainer.createEl('button', {
+          cls: 'finance-bulk-delete-btn',
+          text: `${this.tr.delete} (${this.selectedIds.size})`,
+        });
+        bulkDeleteBtn.addEventListener('click', () => this.confirmBulkDelete());
+      }
+
+      const gearBtn = btnsContainer.createEl('button', { cls: 'finance-colvis-btn', text: '⚙️' });
       gearBtn.title = this.tr.columnSettings;
       gearBtn.addEventListener('click', () => {
         new ColumnVisibilityModal(this.ctx.app, {
@@ -448,6 +490,15 @@ export class CreditsTab {
           },
         }).open();
       });
+    }
+
+    if (this.ctx.isMobile && this.bulkMode && this.selectedIds.size > 0) {
+      const mobileBar = container.createDiv('finance-mobile-bulk-bar');
+      const deleteBtn = mobileBar.createEl('button', {
+        cls: 'finance-bulk-delete-btn',
+        text: `${this.tr.delete} (${this.selectedIds.size})`,
+      });
+      deleteBtn.addEventListener('click', () => this.confirmBulkDelete());
     }
 
     if (this.ctx.isMobile) {
@@ -473,6 +524,19 @@ export class CreditsTab {
       }
 
       const header = block.createDiv('finance-record-header');
+      if (this.bulkMode) {
+        const cb = header.createEl('input', { type: 'checkbox', cls: 'finance-block-checkbox' }) as HTMLInputElement;
+        cb.checked = this.selectedIds.has(credit.id);
+        cb.addEventListener('change', (e) => {
+          e.stopPropagation();
+          if (cb.checked) {
+            this.selectedIds.add(credit.id);
+          } else {
+            this.selectedIds.delete(credit.id);
+          }
+          this.render();
+        });
+      }
       const amount = '−' + this.ctx.fmt(credit.currentAmount);
       header.createEl('span', {
         text: amount,
@@ -536,6 +600,22 @@ export class CreditsTab {
       this.mkActionBtn(actions, '✏️', this.tr.edit, () => this.openEditCreditModal(credit));
       this.mkActionBtn(actions, '🗑️', this.tr.delete, () => this.confirmDeleteCredit(credit), 'finance-delete-btn');
 
+      if (this.bulkMode) {
+        block.style.cursor = 'pointer';
+        block.addEventListener('click', (e) => {
+          if ((e.target as HTMLElement).tagName === 'INPUT' || (e.target as HTMLElement).closest('.finance-action-btn') || (e.target as HTMLElement).closest('.finance-debt-history-toggle')) {
+            return;
+          }
+          const isSelected = this.selectedIds.has(credit.id);
+          if (isSelected) {
+            this.selectedIds.delete(credit.id);
+          } else {
+            this.selectedIds.add(credit.id);
+          }
+          this.render();
+        });
+      }
+
       frag.appendChild(block);
     });
 
@@ -544,8 +624,8 @@ export class CreditsTab {
 
   private calculateCreditEndDate(credit: CreditRecord): string {
     if (!credit.startDate) return '';
-    const startDate = new Date(credit.startDate);
-    if (isNaN(startDate.getTime())) return '';
+    const startDate = parseDate(credit.startDate);
+    if (!startDate || isNaN(startDate.getTime())) return '';
     const term = credit.termMonths || 0;
     startDate.setUTCMonth(startDate.getUTCMonth() + term);
     return startDate.toISOString().split('T')[0];
@@ -556,16 +636,52 @@ export class CreditsTab {
     const table = scroll.createEl('table', { cls: 'finance-table' });
 
     const hRow = table.createEl('thead').createEl('tr');
-    cols.forEach(c => hRow.createEl('th', { text: c.label, cls: 'finance-th' }));
+    cols.forEach(c => {
+      const th = hRow.createEl('th', { cls: 'finance-th' });
+      if (c.key === '_select') {
+        th.classList.add('finance-select-td');
+        const cb = th.createEl('input', { type: 'checkbox' }) as HTMLInputElement;
+        const allSelected = pageCredits.length > 0 && pageCredits.every(r => this.selectedIds.has(r.id));
+        cb.checked = allSelected;
+        cb.addEventListener('change', () => {
+          if (cb.checked) {
+            pageCredits.forEach(r => this.selectedIds.add(r.id));
+          } else {
+            pageCredits.forEach(r => this.selectedIds.delete(r.id));
+          }
+          this.render();
+        });
+      } else {
+        th.setText(c.label);
+      }
+    });
 
     const tbody = table.createEl('tbody');
     const frag = document.createDocumentFragment();
 
-    const dataCols = cols.filter(c => c.key !== '_act');
+    const dataCols = cols.filter(c => c.key !== '_act' && c.key !== '_select');
 
     pageCredits.forEach(credit => {
       const tr = document.createElement('tr');
       tr.classList.add('finance-tr');
+
+      if (cols.find(c => c.key === '_select')) {
+        const std = document.createElement('td');
+        std.classList.add('finance-td', 'finance-select-td');
+        const cb = std.createEl('input', { type: 'checkbox' }) as HTMLInputElement;
+        cb.checked = this.selectedIds.has(credit.id);
+        cb.addEventListener('change', (e) => {
+          e.stopPropagation();
+          if (cb.checked) {
+            this.selectedIds.add(credit.id);
+          } else {
+            this.selectedIds.delete(credit.id);
+          }
+          this.render();
+        });
+        tr.appendChild(std);
+      }
+
       if (credit.status === 'active') {
         tr.classList.add('finance-row-income');
       } else {
@@ -663,6 +779,22 @@ export class CreditsTab {
         expandRow.classList.toggle('finance-debt-expand-open', open);
       });
 
+      if (this.bulkMode) {
+        tr.style.cursor = 'pointer';
+        tr.addEventListener('click', (e) => {
+          if ((e.target as HTMLElement).tagName === 'INPUT' || (e.target as HTMLElement).closest('.finance-action-btn')) {
+            return;
+          }
+          const isSelected = this.selectedIds.has(credit.id);
+          if (isSelected) {
+            this.selectedIds.delete(credit.id);
+          } else {
+            this.selectedIds.add(credit.id);
+          }
+          this.render();
+        });
+      }
+
       frag.appendChild(tr);
       frag.appendChild(expandRow);
     });
@@ -703,9 +835,9 @@ export class CreditsTab {
     wrapper.style.padding = '12px';
     const today = getTodayStr();
 
-    const startDate = credit.startDate ? new Date(credit.startDate) : null;
+    const startDate = credit.startDate ? parseDate(credit.startDate) : null;
     const endDate = this.calculateCreditEndDate(credit);
-    const endDateObj = endDate ? new Date(endDate) : null;
+    const endDateObj = endDate ? parseDate(endDate) : null;
 
     if (startDate && endDateObj && startDate.getTime() < endDateObj.getTime()) {
       const totalDuration = endDateObj.getTime() - startDate.getTime();
@@ -855,7 +987,8 @@ export class CreditsTab {
     new CreditModal(this.ctx.app, {
       title: this.tr.newCredit,
       banks: allBanks,
-      onSave: async credit => {
+      records: [...this.ctx.data.records],
+      onSave: async (credit, updatedRecords) => {
         await this.ctx.storage.addCredit(this.ctx.notePath, credit);
         const nowTime = new Date().toTimeString().slice(0, 5);
         const rec: FinanceRecord = {
@@ -872,10 +1005,10 @@ export class CreditsTab {
           attachmentPath: '',
           linkedId: credit.id,
         };
-        await this.ctx.storage.addRecord(this.ctx.notePath, rec);
+        updatedRecords.push(rec);
         for (const payment of credit.payments) {
           if (payment.status === 'paid') {
-            await this.ctx.storage.addRecord(this.ctx.notePath, {
+            updatedRecords.push({
               id: crypto.randomUUID(),
               createdAt: Date.now(),
               date: payment.dueDate,
@@ -891,6 +1024,7 @@ export class CreditsTab {
             });
           }
         }
+        await this.ctx.storage.saveAllRecords(this.ctx.notePath, updatedRecords);
         this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
         this.render();
         new Notice(this.tr.creditAdded);
@@ -905,13 +1039,22 @@ export class CreditsTab {
       title: this.tr.editRecord,
       credit,
       banks: allBanks,
-      onSave: async updated => {
+      records: [...this.ctx.data.records],
+      onSave: async (updated, updatedRecords) => {
         await this.ctx.storage.updateCredit(this.ctx.notePath, updated);
         const nowTime = new Date().toTimeString().slice(0, 5);
-        const existingRecs = this.ctx.data!.records;
+        
+        const receiptRec = updatedRecords.find(r => r.linkedId === updated.id && r.type === 'income');
+        if (receiptRec) {
+          receiptRec.amount = updated.originalAmount;
+          receiptRec.date = updated.startDate;
+          receiptRec.payer = updated.bankName;
+          receiptRec.note = `Получение кредита "${updated.name}"`;
+        }
+
         for (const payment of updated.payments) {
           if (payment.status === 'paid') {
-            const existingRec = existingRecs.find(r =>
+            const existingRec = updatedRecords.find(r =>
               r.linkedId === updated.id && r.date === payment.dueDate && r.type === 'expense'
             );
             if (existingRec) {
@@ -919,7 +1062,7 @@ export class CreditsTab {
                 existingRec.amount = payment.amount;
               }
             } else {
-              existingRecs.push({
+              updatedRecords.push({
                 id: crypto.randomUUID(),
                 createdAt: Date.now(),
                 date: payment.dueDate,
@@ -936,7 +1079,7 @@ export class CreditsTab {
             }
           }
         }
-        await this.ctx.storage.saveAllRecords(this.ctx.notePath, existingRecs);
+        await this.ctx.storage.saveAllRecords(this.ctx.notePath, updatedRecords);
         this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
         this.render();
         new Notice(this.tr.creditUpdated);
@@ -982,11 +1125,40 @@ export class CreditsTab {
     const label = `${credit.name} · ${this.ctx.fmt(credit.currentAmount)}`;
     new ConfirmModal(this.ctx.app, `${this.tr.confirmDeleteCredit}\n${label}`, async () => {
       await this.ctx.storage.deleteCredit(this.ctx.notePath, credit.id);
-      const recs = this.ctx.data!.records.filter(r => !(r.category === this.tr.creditDefaultCat && r.payer === credit.bankName && r.note.includes(credit.name)));
+      let recs = this.ctx.data!.records.filter(r => !(r.category === this.tr.creditDefaultCat && r.payer === credit.bankName && r.note.includes(credit.name)));
+      if (credit.downPaymentRecordId) {
+        recs = recs.filter(r => r.id !== credit.downPaymentRecordId);
+      }
       await this.ctx.storage.saveAllRecords(this.ctx.notePath, recs);
       this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
       this.render();
       new Notice(this.tr.creditDeleted);
+    }).open();
+  }
+
+  private confirmBulkDelete(): void {
+    const count = this.selectedIds.size;
+    if (count === 0) return;
+    const msg = this.tr.confirmDeleteSelectedCredits.replace('{count}', String(count));
+    new ConfirmModal(this.ctx.app, msg, async () => {
+      const ids = Array.from(this.selectedIds);
+      const creditsToDelete = (this.ctx.data?.credits ?? []).filter(c => this.selectedIds.has(c.id));
+      await this.ctx.storage.deleteCreditsBatch(this.ctx.notePath, ids);
+
+      let recs = this.ctx.data!.records;
+      for (const credit of creditsToDelete) {
+        recs = recs.filter(r => !(r.category === this.tr.creditDefaultCat && r.payer === credit.bankName && r.note.includes(credit.name)));
+        if (credit.downPaymentRecordId) {
+          recs = recs.filter(r => r.id !== credit.downPaymentRecordId);
+        }
+      }
+      await this.ctx.storage.saveAllRecords(this.ctx.notePath, recs);
+
+      this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
+      this.selectedIds.clear();
+      this.bulkMode = false;
+      this.render();
+      new Notice(this.tr.deleted);
     }).open();
   }
 }

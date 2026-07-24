@@ -33,6 +33,9 @@ export class RecordsTab {
   private filtBtn?: HTMLButtonElement;
   private setBtn?: HTMLButtonElement;
 
+  private bulkMode = false;
+  private selectedIds = new Set<string>();
+
   private get tr() { return this.ctx.tr; }
 
   constructor(ctx: ViewContext, el: HTMLElement) {
@@ -41,6 +44,11 @@ export class RecordsTab {
   }
 
   render(): void {
+    if (this.ctx.state.sort.field === 'createdAt' as SortField) {
+      this.ctx.state.sort = { field: 'date', dir: 'desc' };
+      this.ctx.saveState();
+    }
+
     this.el.empty();
 
     this.statsEl = this.el.createDiv('finance-stats-container');
@@ -60,6 +68,19 @@ export class RecordsTab {
       cls: 'finance-analytics-toggle-btn',
       text: this.tr.settings + ' ▼',
     });
+
+    if (this.ctx.isMobile) {
+      const bulkToggleBtn = toggleRow.createEl('button', {
+        cls: `finance-analytics-toggle-btn${this.bulkMode ? ' active' : ''}`,
+        text: `☑️ ${this.tr.bulkSelect}`,
+      });
+      bulkToggleBtn.addEventListener('click', () => {
+        this.bulkMode = !this.bulkMode;
+        if (!this.bulkMode) this.selectedIds.clear();
+        bulkToggleBtn.classList.toggle('active', this.bulkMode);
+        this.renderTable();
+      });
+    }
 
     this.analyticsEl = this.el.createDiv('finance-analytics-panel');
     this.analyticsEl.style.display = 'none';
@@ -132,7 +153,9 @@ export class RecordsTab {
     const inc = recs.filter(r => r.type === 'income' && !r.isInternal).reduce((s, r) => s + r.amount, 0);
     const exp = recs.filter(r => r.type === 'expense' && !r.isInternal).reduce((s, r) => s + r.amount, 0);
     const borrowed = this.ctx.data.debts.filter(d => d.direction === 'borrowed').reduce((s, d) => s + d.amount, 0);
-    const bal = inc - exp;
+    const totalInc = recs.filter(r => r.type === 'income').reduce((s, r) => s + r.amount, 0);
+    const totalExp = recs.filter(r => r.type === 'expense').reduce((s, r) => s + r.amount, 0);
+    const bal = totalInc - totalExp;
 
     const cards = [
       { label: this.tr.incomeStat, value: this.ctx.fmt(inc), mod: 'income', icon: '↑' },
@@ -256,7 +279,6 @@ export class RecordsTab {
     sortRow.createEl('span', { text: this.tr.sortBy, cls: 'finance-sort-label' });
 
     const sortFields: { field: SortField; label: string }[] = [
-      { field: 'createdAt', label: this.tr.sortAdded },
       { field: 'date', label: this.tr.sortDate },
       { field: 'amount', label: this.tr.sum },
       { field: 'category', label: this.tr.category },
@@ -466,8 +488,8 @@ export class RecordsTab {
       cls: 'finance-count-text',
     });
 
-    const fi = filtered.filter(r => r.type === 'income').reduce((s, r) => s + r.amount, 0);
-    const fe = filtered.filter(r => r.type === 'expense').reduce((s, r) => s + r.amount, 0);
+    const fi = filtered.filter(r => r.type === 'income' && !r.isInternal).reduce((s, r) => s + r.amount, 0);
+    const fe = filtered.filter(r => r.type === 'expense' && !r.isInternal).reduce((s, r) => s + r.amount, 0);
     const sums = infoBar.createDiv('finance-table-sums');
     sums.createEl('span', { text: `↑\u00a0${this.ctx.fmt(fi)}`, cls: 'finance-sum-income' });
     sums.createEl('span', { text: '·', cls: 'finance-sum-sep' });
@@ -484,13 +506,37 @@ export class RecordsTab {
       { key: '_act', label: '' },
     ];
 
+    if (this.bulkMode) {
+      allCols.unshift({ key: '_select', label: '' });
+    }
+
     this.ctx.state.recordsColumns ??= {};
 
-    const visCols = allCols.filter(c => c.key === '_act' || this.ctx.state.recordsColumns![c.key] !== false);
+    const visCols = allCols.filter(c => c.key === '_act' || c.key === '_select' || this.ctx.state.recordsColumns![c.key] !== false);
 
     if (!this.ctx.isMobile) {
-      const colVisCols = allCols.filter(c => c.key !== '_act');
-      const gearBtn = infoBar.createEl('button', { cls: 'finance-colvis-btn', text: '⚙️' });
+      const colVisCols = allCols.filter(c => c.key !== '_act' && c.key !== '_select');
+      const btnsContainer = infoBar.createDiv({ cls: 'finance-table-info-btns', attr: { style: 'display: flex; gap: 8px; align-items: center;' } });
+      
+      const bulkToggle = btnsContainer.createEl('button', {
+        cls: `finance-bulk-toggle-btn${this.bulkMode ? ' active' : ''}`,
+        text: '☑️',
+      });
+      bulkToggle.addEventListener('click', () => {
+        this.bulkMode = !this.bulkMode;
+        if (!this.bulkMode) this.selectedIds.clear();
+        this.renderTable();
+      });
+
+      if (this.bulkMode && this.selectedIds.size > 0) {
+        const bulkDeleteBtn = btnsContainer.createEl('button', {
+          cls: 'finance-bulk-delete-btn',
+          text: `${this.tr.delete} (${this.selectedIds.size})`,
+        });
+        bulkDeleteBtn.addEventListener('click', () => this.confirmBulkDelete());
+      }
+
+      const gearBtn = btnsContainer.createEl('button', { cls: 'finance-colvis-btn', text: '⚙️' });
       gearBtn.title = this.tr.columnSettings;
       gearBtn.addEventListener('click', () => {
         new ColumnVisibilityModal(this.ctx.app, {
@@ -504,6 +550,15 @@ export class RecordsTab {
           },
         }).open();
       });
+    }
+
+    if (this.ctx.isMobile && this.bulkMode && this.selectedIds.size > 0) {
+      const mobileBar = this.tableEl.createDiv('finance-mobile-bulk-bar');
+      const deleteBtn = mobileBar.createEl('button', {
+        cls: 'finance-bulk-delete-btn',
+        text: `${this.tr.delete} (${this.selectedIds.size})`,
+      });
+      deleteBtn.addEventListener('click', () => this.confirmBulkDelete());
     }
 
     if (this.ctx.isMobile) {
@@ -525,6 +580,20 @@ export class RecordsTab {
       if (rec.isInternal) block.classList.add('finance-tr-internal');
 
       const header = block.createDiv('finance-record-header');
+      if (this.bulkMode) {
+        const cb = header.createEl('input', { type: 'checkbox', cls: 'finance-block-checkbox' }) as HTMLInputElement;
+        cb.checked = this.selectedIds.has(rec.id);
+        cb.addEventListener('change', (e) => {
+          e.stopPropagation();
+          if (cb.checked) {
+            this.selectedIds.add(rec.id);
+          } else {
+            this.selectedIds.delete(rec.id);
+          }
+          this.renderTable();
+        });
+      }
+
       const amount = (rec.type === 'income' ? '+' : '−') + this.ctx.fmt(rec.amount);
       header.createEl('span', {
         text: amount,
@@ -558,6 +627,22 @@ export class RecordsTab {
       this.mkActionBtn(actions, '✏️', this.tr.edit, () => this.openEditModal(rec));
       this.mkActionBtn(actions, '🗑️', this.tr.delete, () => this.confirmDelete(rec), 'finance-delete-btn');
 
+      if (this.bulkMode) {
+        block.style.cursor = 'pointer';
+        block.addEventListener('click', (e) => {
+          if ((e.target as HTMLElement).tagName === 'INPUT' || (e.target as HTMLElement).closest('.finance-action-btn')) {
+            return;
+          }
+          const isSelected = this.selectedIds.has(rec.id);
+          if (isSelected) {
+            this.selectedIds.delete(rec.id);
+          } else {
+            this.selectedIds.add(rec.id);
+          }
+          this.renderTable();
+        });
+      }
+
       frag.appendChild(block);
     });
 
@@ -570,17 +655,52 @@ export class RecordsTab {
     const table = scroll.createEl('table', { cls: 'finance-table' });
 
     const hRow = table.createEl('thead').createEl('tr');
-    cols.forEach(c => hRow.createEl('th', { text: c.label, cls: 'finance-th' }));
+    cols.forEach(c => {
+      const th = hRow.createEl('th', { cls: 'finance-th' });
+      if (c.key === '_select') {
+        th.classList.add('finance-select-td');
+        const cb = th.createEl('input', { type: 'checkbox' }) as HTMLInputElement;
+        const allSelected = pageRows.length > 0 && pageRows.every(r => this.selectedIds.has(r.id));
+        cb.checked = allSelected;
+        cb.addEventListener('change', () => {
+          if (cb.checked) {
+            pageRows.forEach(r => this.selectedIds.add(r.id));
+          } else {
+            pageRows.forEach(r => this.selectedIds.delete(r.id));
+          }
+          this.renderTable();
+        });
+      } else {
+        th.setText(c.label);
+      }
+    });
 
     const tbody = table.createEl('tbody');
     const frag = document.createDocumentFragment();
 
-    const dataCols = cols.filter(c => c.key !== '_act');
+    const dataCols = cols.filter(c => c.key !== '_act' && c.key !== '_select');
 
     pageRows.forEach(rec => {
       const tr = document.createElement('tr');
       tr.classList.add('finance-tr', rec.type === 'income' ? 'finance-row-income' : 'finance-row-expense');
       if (rec.isInternal) tr.classList.add('finance-tr-internal');
+
+      if (cols.find(c => c.key === '_select')) {
+        const std = document.createElement('td');
+        std.classList.add('finance-td', 'finance-select-td');
+        const cb = std.createEl('input', { type: 'checkbox' }) as HTMLInputElement;
+        cb.checked = this.selectedIds.has(rec.id);
+        cb.addEventListener('change', (e) => {
+          e.stopPropagation();
+          if (cb.checked) {
+            this.selectedIds.add(rec.id);
+          } else {
+            this.selectedIds.delete(rec.id);
+          }
+          this.renderTable();
+        });
+        tr.appendChild(std);
+      }
 
       dataCols.forEach(c => {
         let text = '';
@@ -634,6 +754,22 @@ export class RecordsTab {
         this.mkActionBtn(atd, '🗑️', this.tr.delete, () => this.confirmDelete(rec), 'finance-delete-btn');
 
         tr.appendChild(atd);
+      }
+
+      if (this.bulkMode) {
+        tr.style.cursor = 'pointer';
+        tr.addEventListener('click', (e) => {
+          if ((e.target as HTMLElement).tagName === 'INPUT' || (e.target as HTMLElement).closest('.finance-action-btn')) {
+            return;
+          }
+          const isSelected = this.selectedIds.has(rec.id);
+          if (isSelected) {
+            this.selectedIds.delete(rec.id);
+          } else {
+            this.selectedIds.add(rec.id);
+          }
+          this.renderTable();
+        });
       }
 
       frag.appendChild(tr);
@@ -730,6 +866,22 @@ export class RecordsTab {
     new ConfirmModal(this.ctx.app, `${this.tr.confirmDeleteRecord}\n${label}`, async () => {
       await this.ctx.storage.deleteRecord(this.ctx.notePath, rec.id);
       this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
+      this.renderStats();
+      this.renderTable();
+      new Notice(this.tr.deleted);
+    }).open();
+  }
+
+  private confirmBulkDelete(): void {
+    const count = this.selectedIds.size;
+    if (count === 0) return;
+    const msg = this.tr.confirmDeleteSelectedRecords.replace('{count}', String(count));
+    new ConfirmModal(this.ctx.app, msg, async () => {
+      const ids = Array.from(this.selectedIds);
+      await this.ctx.storage.deleteRecordsBatch(this.ctx.notePath, ids);
+      this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
+      this.selectedIds.clear();
+      this.bulkMode = false;
       this.renderStats();
       this.renderTable();
       new Notice(this.tr.deleted);

@@ -184,6 +184,8 @@ export class AnalyticsView {
     const map = new Map<string, { income: number; expense: number }>();
 
     this.records.forEach(r => {
+      if (r.isInternal) return;
+
       // Filter by analytics date range
       if (this.dateFrom && r.date < this.dateFrom) return;
       if (this.dateTo && r.date > this.dateTo) return;

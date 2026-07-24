@@ -1,7 +1,7 @@
 import { App, Modal, Notice, normalizePath } from 'obsidian';
 import { getLocaleFromApp, t, Translations } from './i18n';
 import { FinanceRecord, RecordType, PluginSettings } from './types';
-import { fmtAmount, parseAmount, getTodayStr } from './utils';
+import { fmtAmount, parseAmount, getTodayStr, normalizeDateStr, normalizeTimeStr } from './utils';
 import { CalculatorModal } from './CalculatorModal';
 
 export interface RecordModalOptions {
@@ -187,14 +187,16 @@ export class RecordModal extends Modal {
     dtG.createEl('label', { text: this.tr.dateTime, cls: 'finance-field-label' });
     const dtIn = dtG.createEl('input', { type: 'datetime-local', cls: 'finance-input' });
     const nowStr = new Date().toISOString().slice(0, 16);
-    dtIn.value = this.rec.date
-      ? `${this.rec.date}${this.rec.time ? 'T' + this.rec.time : 'T00:00'}`
+    const normDate = this.rec.date ? normalizeDateStr(this.rec.date) : '';
+    const normTime = this.rec.time ? normalizeTimeStr(this.rec.time) : '';
+    dtIn.value = normDate
+      ? `${normDate}T${normTime || '00:00'}`
       : nowStr;
     dtIn.addEventListener('change', () => {
       if (dtIn.value) {
-        const [d, t] = dtIn.value.split('T');
-        this.rec.date = d;
-        this.rec.time = t || '';
+        const [d, t] = dtIn.value.slice(0, 16).split('T');
+        this.rec.date = normalizeDateStr(d);
+        this.rec.time = normalizeTimeStr(t);
       }
     });
 

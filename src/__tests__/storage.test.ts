@@ -105,6 +105,19 @@ describe('FinanceStorage', () => {
       expect(data.records).toHaveLength(0);
     });
 
+    it('should delete records in batch', async () => {
+      const notePath = 'test/note.md';
+      const r1 = { id: 'rec-1', createdAt: 1, date: '2024-01-01', time: '', type: 'expense' as const, amount: 100, category: 'Test', tag: '', payer: '', note: '', attachmentPath: '' };
+      const r2 = { id: 'rec-2', createdAt: 2, date: '2024-01-02', time: '', type: 'expense' as const, amount: 200, category: 'Test', tag: '', payer: '', note: '', attachmentPath: '' };
+      await storage.addRecord(notePath, r1);
+      await storage.addRecord(notePath, r2);
+
+      await storage.deleteRecordsBatch(notePath, ['rec-1', 'rec-2']);
+
+      const data = await storage.load(notePath);
+      expect(data.records).toHaveLength(0);
+    });
+
     it('should calculate debt amount from movements', async () => {
       const notePath = 'test/note.md';
 
@@ -333,6 +346,46 @@ describe('FinanceStorage', () => {
       let data = await storage.load('test.md');
       expect(data.credits).toHaveLength(1);
       expect(data.credits[0].name).toBe('Ипотека');
+    });
+
+    it('migrates older credits correctly', async () => {
+      mockAdapter.exists.mockImplementation(async (path: string) => {
+        if (path.endsWith('meta.json')) return true;
+        if (path.endsWith('credits.json')) return true;
+        return false;
+      });
+      mockAdapter.read.mockImplementation(async (path: string) => {
+        if (path.endsWith('credits.json')) {
+          return JSON.stringify([{
+            id: 'credit-1',
+            name: 'Ипотека',
+            bankName: 'Сбер',
+            originalAmount: 10000,
+            currentAmount: 10000,
+            interestRate: 10,
+            termMonths: 12,
+            monthlyPayment: 1000,
+            startDate: '2024-01-01',
+            status: 'active',
+            payments: [],
+            type: 'consumer',
+            createdAt: 1700000000000,
+            note: '',
+            earlyRepaymentOption: 'term',
+          }]);
+        }
+        if (path.endsWith('meta.json')) return JSON.stringify({ version: 4, name: 'Test', currency: '₽' });
+        return '[]';
+      });
+
+      const data = await storage.load('test-migrate.md');
+      expect(data.credits).toHaveLength(1);
+      const c = data.credits[0];
+      expect(c.purchasePrice).toBe(10000);
+      expect(c.downPayment).toBe(0);
+      expect(c.downPaymentType).toBe('amount');
+      expect(c.downPaymentValue).toBe(0);
+      expect(c.downPaymentDate).toBe('');
     });
   });
 

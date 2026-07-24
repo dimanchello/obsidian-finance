@@ -1,7 +1,7 @@
 import { App, Modal, Notice } from 'obsidian';
 import { getLocaleFromApp, t, Translations } from './i18n';
 import { DepositRecord, DepositType, DepositAccrualType, FinanceRecord } from './types';
-import { fmtAmount, parseAmount, getTodayStr } from './utils';
+import { fmtAmount, parseAmount, getTodayStr, normalizeDateStr, normalizeTimeStr, parseDate } from './utils';
 import { InfoModal } from './InfoModal';
 
 export interface DepositModalOptions {
@@ -24,7 +24,25 @@ export class DepositModal extends Modal {
     this.o = opts;
     const nowStr = getTodayStr();
     this.deposit = opts.deposit
-        ? { ...opts.deposit, accruals: [...opts.deposit.accruals], topUps: [...(opts.deposit.topUps || [])], withdrawals: [...(opts.deposit.withdrawals || [])] }
+        ? {
+            ...opts.deposit,
+            startDate: normalizeDateStr(opts.deposit.startDate),
+            accruals: opts.deposit.accruals.map(a => ({
+              ...a,
+              dueDate: normalizeDateStr(a.dueDate),
+              paidDate: a.paidDate ? normalizeDateStr(a.paidDate) : undefined,
+            })),
+            topUps: (opts.deposit.topUps || []).map(t => ({
+              ...t,
+              date: normalizeDateStr(t.date),
+              time: normalizeTimeStr(t.time || ''),
+            })),
+            withdrawals: (opts.deposit.withdrawals || []).map(w => ({
+              ...w,
+              date: normalizeDateStr(w.date),
+              time: normalizeTimeStr(w.time || ''),
+            })),
+          }
         : {
           id: crypto.randomUUID(),
           name: 'Вклад',
@@ -164,8 +182,8 @@ export class DepositModal extends Modal {
     const dateG = row3.createDiv('finance-field-group');
     dateG.createEl('label', { text: this.tr.startDate, cls: 'finance-field-label' });
     const dateIn = dateG.createEl('input', { type: 'date', cls: 'finance-input' });
-    dateIn.value = this.deposit.startDate;
-    dateIn.addEventListener('change', () => { this.deposit.startDate = dateIn.value; });
+    dateIn.value = normalizeDateStr(this.deposit.startDate);
+    dateIn.addEventListener('change', () => { this.deposit.startDate = normalizeDateStr(dateIn.value); });
 
     const termG = row3.createDiv('finance-field-group');
     termG.createEl('label', { text: this.tr.termLabel, cls: 'finance-field-label' });
@@ -243,7 +261,7 @@ export class DepositModal extends Modal {
     }
     this.deposit.name = this.deposit.name.trim();
 
-    if (!this.deposit.startDate || isNaN(new Date(this.deposit.startDate).getTime())) {
+    if (!this.deposit.startDate || !parseDate(this.deposit.startDate)) {
       new Notice(this.tr.specifyValidDate);
       return;
     }

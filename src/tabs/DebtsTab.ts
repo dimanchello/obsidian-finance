@@ -17,6 +17,8 @@ export class DebtsTab {
   private filterDebounce: ReturnType<typeof setTimeout> | null = null;
   private filtersOpen = false;
   onUpdate: (() => void) | null = null;
+  private bulkMode = false;
+  private selectedIds = new Set<string>();
 
   private get tr() { return this.ctx.tr; }
 
@@ -26,6 +28,10 @@ export class DebtsTab {
   }
 
   render(): void {
+    if (this.ctx.state.debtSort?.field === 'createdAt' as DebtSortField) {
+      this.ctx.state.debtSort = { field: 'date', dir: 'desc' };
+      this.ctx.saveState();
+    }
     this.el.empty();
     this.renderDebtsView(this.el);
   }
@@ -37,7 +43,7 @@ export class DebtsTab {
   private getFilteredDebts(): DebtRecord[] {
     if (!this.ctx.data) return [];
     const f = this.ctx.state.debtFilter ?? DEFAULT_DEBT_FILTER;
-    const s = this.ctx.state.debtSort ?? { field: 'createdAt' as DebtSortField, dir: 'desc' };
+    const s = this.ctx.state.debtSort ?? { field: 'date' as DebtSortField, dir: 'desc' };
     const q = f.search.toLowerCase();
 
     const isPaidOff = (d: DebtRecord) => this.getDebtRemaining(d) <= 0;
@@ -63,7 +69,7 @@ export class DebtsTab {
         case 'date': av = a.date; bv = b.date; break;
         case 'amount': av = a.amount; bv = b.amount; break;
         case 'person': av = a.person; bv = b.person; break;
-        default: av = a.createdAt; bv = b.createdAt;
+        default: av = a.date; bv = b.date;
       }
       const cmp = typeof av === 'number' && typeof bv === 'number'
         ? av - bv
@@ -207,12 +213,11 @@ export class DebtsTab {
     sortRow.createEl('span', { text: this.tr.sortBy, cls: 'finance-sort-label' });
 
     const sortFields: { field: DebtSortField; label: string }[] = [
-      { field: 'createdAt', label: this.tr.sortAdded },
       { field: 'date', label: this.tr.sortDate },
       { field: 'amount', label: this.tr.sum },
       { field: 'person', label: this.tr.sortPerson },
     ];
-    const s = this.ctx.state.debtSort ?? { field: 'createdAt' as DebtSortField, dir: 'desc' };
+    const s = this.ctx.state.debtSort ?? { field: 'date' as DebtSortField, dir: 'desc' };
     sortFields.forEach(({ field, label }) => {
       const active = s.field === field;
       const btn = sortRow.createEl('button', {
@@ -385,6 +390,19 @@ export class DebtsTab {
       this.render();
     });
 
+    if (this.ctx.isMobile) {
+      const bulkToggleBtn = toolbar.createEl('button', {
+        cls: `finance-analytics-toggle-btn${this.bulkMode ? ' active' : ''}`,
+        text: `☑️ ${this.tr.bulkSelect}`,
+      });
+      bulkToggleBtn.addEventListener('click', () => {
+        this.bulkMode = !this.bulkMode;
+        if (!this.bulkMode) this.selectedIds.clear();
+        bulkToggleBtn.classList.toggle('active', this.bulkMode);
+        this.render();
+      });
+    }
+
     const container = body.createDiv('finance-filters-container');
     container.style.display = this.filtersOpen ? 'block' : 'none';
     if (this.filtersOpen) {
@@ -442,13 +460,37 @@ export class DebtsTab {
       { key: '_act',      label: '' },
     ];
 
+    if (this.bulkMode) {
+      allDebtCols.unshift({ key: '_select', label: '' });
+    }
+
     this.ctx.state.debtsColumns ??= {};
 
-    const visDebtCols = allDebtCols.filter(c => c.key === '_act' || this.ctx.state.debtsColumns![c.key] !== false);
+    const visDebtCols = allDebtCols.filter(c => c.key === '_act' || c.key === '_select' || this.ctx.state.debtsColumns![c.key] !== false);
 
     if (!this.ctx.isMobile) {
-      const debtColVisCols = allDebtCols.filter(c => c.key !== '_act');
-      const gearBtn = infoBar.createEl('button', { cls: 'finance-colvis-btn', text: '⚙️' });
+      const debtColVisCols = allDebtCols.filter(c => c.key !== '_act' && c.key !== '_select');
+      const btnsContainer = infoBar.createDiv({ cls: 'finance-table-info-btns', attr: { style: 'display: flex; gap: 8px; align-items: center;' } });
+      
+      const bulkToggle = btnsContainer.createEl('button', {
+        cls: `finance-bulk-toggle-btn${this.bulkMode ? ' active' : ''}`,
+        text: '☑️',
+      });
+      bulkToggle.addEventListener('click', () => {
+        this.bulkMode = !this.bulkMode;
+        if (!this.bulkMode) this.selectedIds.clear();
+        this.render();
+      });
+
+      if (this.bulkMode && this.selectedIds.size > 0) {
+        const bulkDeleteBtn = btnsContainer.createEl('button', {
+          cls: 'finance-bulk-delete-btn',
+          text: `${this.tr.delete} (${this.selectedIds.size})`,
+        });
+        bulkDeleteBtn.addEventListener('click', () => this.confirmBulkDelete());
+      }
+
+      const gearBtn = btnsContainer.createEl('button', { cls: 'finance-colvis-btn', text: '⚙️' });
       gearBtn.title = this.tr.columnSettings;
       gearBtn.addEventListener('click', () => {
         new ColumnVisibilityModal(this.ctx.app, {
@@ -462,6 +504,15 @@ export class DebtsTab {
           },
         }).open();
       });
+    }
+
+    if (this.ctx.isMobile && this.bulkMode && this.selectedIds.size > 0) {
+      const mobileBar = wrapper.createDiv('finance-mobile-bulk-bar');
+      const deleteBtn = mobileBar.createEl('button', {
+        cls: 'finance-bulk-delete-btn',
+        text: `${this.tr.delete} (${this.selectedIds.size})`,
+      });
+      deleteBtn.addEventListener('click', () => this.confirmBulkDelete());
     }
 
     if (this.ctx.isMobile) {
@@ -522,6 +573,20 @@ export class DebtsTab {
       }
 
       const header = block.createDiv('finance-debt-header');
+      if (this.bulkMode) {
+        const cb = header.createEl('input', { type: 'checkbox', cls: 'finance-block-checkbox' }) as HTMLInputElement;
+        cb.checked = this.selectedIds.has(debt.id);
+        cb.addEventListener('change', (e) => {
+          e.stopPropagation();
+          if (cb.checked) {
+            this.selectedIds.add(debt.id);
+          } else {
+            this.selectedIds.delete(debt.id);
+          }
+          this.render();
+        });
+      }
+
       header.createEl('span', { text: debt.person || '—', cls: 'finance-debt-person' });
       header.createEl('span', {
         text: dir === 'lent' ? this.tr.lent : this.tr.borrowed,
@@ -585,6 +650,22 @@ export class DebtsTab {
       this.mkActionBtn(actions, '✏️', this.tr.edit, () => this.openEditDebtModal(debt));
       this.mkActionBtn(actions, '🗑️', this.tr.delete, () => this.confirmDeleteDebt(debt), 'finance-delete-btn');
 
+      if (this.bulkMode) {
+        block.style.cursor = 'pointer';
+        block.addEventListener('click', (e) => {
+          if ((e.target as HTMLElement).tagName === 'INPUT' || (e.target as HTMLElement).closest('.finance-action-btn') || (e.target as HTMLElement).closest('.finance-debt-history-toggle')) {
+            return;
+          }
+          const isSelected = this.selectedIds.has(debt.id);
+          if (isSelected) {
+            this.selectedIds.delete(debt.id);
+          } else {
+            this.selectedIds.add(debt.id);
+          }
+          this.render();
+        });
+      }
+
       frag.appendChild(block);
     });
 
@@ -596,16 +677,52 @@ export class DebtsTab {
     const table = scroll.createEl('table', { cls: 'finance-debt-table' });
 
     const hRow = table.createEl('thead').createEl('tr');
-    cols.forEach(c => hRow.createEl('th', { text: c.label, cls: 'finance-th' }));
+    cols.forEach(c => {
+      const th = hRow.createEl('th', { cls: 'finance-th' });
+      if (c.key === '_select') {
+        th.classList.add('finance-select-td');
+        const cb = th.createEl('input', { type: 'checkbox' }) as HTMLInputElement;
+        const allSelected = pageDebts.length > 0 && pageDebts.every(r => this.selectedIds.has(r.id));
+        cb.checked = allSelected;
+        cb.addEventListener('change', () => {
+          if (cb.checked) {
+            pageDebts.forEach(r => this.selectedIds.add(r.id));
+          } else {
+            pageDebts.forEach(r => this.selectedIds.delete(r.id));
+          }
+          this.render();
+        });
+      } else {
+        th.setText(c.label);
+      }
+    });
 
     const tbody = table.createEl('tbody');
     const frag = document.createDocumentFragment();
 
-    const dataCols = cols.filter(c => c.key !== '_act');
+    const dataCols = cols.filter(c => c.key !== '_act' && c.key !== '_select');
 
     pageDebts.forEach(debt => {
       const tr = document.createElement('tr');
       tr.classList.add('finance-tr', 'finance-debt-row');
+
+      if (cols.find(c => c.key === '_select')) {
+        const std = document.createElement('td');
+        std.classList.add('finance-td', 'finance-select-td');
+        const cb = std.createEl('input', { type: 'checkbox' }) as HTMLInputElement;
+        cb.checked = this.selectedIds.has(debt.id);
+        cb.addEventListener('change', (e) => {
+          e.stopPropagation();
+          if (cb.checked) {
+            this.selectedIds.add(debt.id);
+          } else {
+            this.selectedIds.delete(debt.id);
+          }
+          this.render();
+        });
+        tr.appendChild(std);
+      }
+
       const dir = (debt.direction as string) || 'borrowed';
       if (dir === 'lent') {
         tr.classList.add('finance-debt-lent');
@@ -697,6 +814,22 @@ export class DebtsTab {
         tr.classList.toggle('finance-debt-row-expanded', open);
         expandRow.classList.toggle('finance-debt-expand-open', open);
       });
+
+      if (this.bulkMode) {
+        tr.style.cursor = 'pointer';
+        tr.addEventListener('click', (e) => {
+          if ((e.target as HTMLElement).tagName === 'INPUT' || (e.target as HTMLElement).closest('.finance-action-btn')) {
+            return;
+          }
+          const isSelected = this.selectedIds.has(debt.id);
+          if (isSelected) {
+            this.selectedIds.delete(debt.id);
+          } else {
+            this.selectedIds.add(debt.id);
+          }
+          this.render();
+        });
+      }
 
       frag.appendChild(tr);
       frag.appendChild(expandRow);
@@ -913,9 +1046,29 @@ export class DebtsTab {
     const label = `${debt.person} · ${this.ctx.fmt(debt.amount)} · ${this.ctx.fmtDate(debt.date, debt.time)}`;
     new ConfirmModal(this.ctx.app, `${this.tr.confirmDeleteDebt}\n${label}`, async () => {
       await this.ctx.storage.deleteDebt(this.ctx.notePath, debt.id);
+      const otherRecords = this.ctx.data!.records.filter(r => r.linkedId !== debt.id);
+      await this.ctx.storage.saveAllRecords(this.ctx.notePath, otherRecords);
       this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
       this.onUpdate?.();
       new Notice(this.tr.debtDeleted);
+    }).open();
+  }
+
+  private confirmBulkDelete(): void {
+    const count = this.selectedIds.size;
+    if (count === 0) return;
+    const msg = this.tr.confirmDeleteSelectedDebts.replace('{count}', String(count));
+    new ConfirmModal(this.ctx.app, msg, async () => {
+      const ids = Array.from(this.selectedIds);
+      const idSet = new Set(ids);
+      await this.ctx.storage.deleteDebtsBatch(this.ctx.notePath, ids);
+      const otherRecords = this.ctx.data!.records.filter(r => !r.linkedId || !idSet.has(r.linkedId));
+      await this.ctx.storage.saveAllRecords(this.ctx.notePath, otherRecords);
+      this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
+      this.selectedIds.clear();
+      this.bulkMode = false;
+      this.onUpdate?.();
+      new Notice(this.tr.deleted);
     }).open();
   }
 }

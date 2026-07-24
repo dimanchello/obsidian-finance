@@ -1,7 +1,7 @@
 import { App, Modal, Notice } from 'obsidian';
 import { getLocaleFromApp, t, Translations } from './i18n';
 import { FinanceRecord, RecordType } from './types';
-import { getTodayStr } from './utils';
+import { normalizeDateStr, normalizeTimeStr } from './utils';
 
 type FileFormat = 'csv' | 'json';
 
@@ -417,11 +417,15 @@ export class ImportExportModal extends Modal {
       const rawAmt = get('amount').replace(',', '.').replace(/[^\d.-]/g, '');
       const rawEr  = get('exchangeRate').replace(',', '.').replace(/[^\d.]/g, '');
       const er     = parseFloat(rawEr);
+
+      const isInternalVal = row['isInternal'] || get('isInternal');
+      const isInternal = isInternalVal === 'true' || isInternalVal === '1';
+
       return {
         id:             crypto.randomUUID(),
         createdAt:      now + i,
-        date:           normalizeDate(get('date')),
-        time:           get('time').slice(0, 5),
+        date:           normalizeDateStr(get('date')),
+        time:           normalizeTimeStr(get('time')),
         type,
         amount:         Math.abs(parseFloat(rawAmt) || 0),
         category:       get('category'),
@@ -431,6 +435,7 @@ export class ImportExportModal extends Modal {
         exchangeRate:   er > 0 && er !== 1 ? er : undefined,
         attachmentPath: '',
         linkedId:       '',
+        isInternal,
       };
     });
 
@@ -443,25 +448,4 @@ export class ImportExportModal extends Modal {
   onClose(): void { this.contentEl.empty(); }
 }
 
-// ── date normalizer ───────────────────────────────────────────────────────────
-function normalizeDate(s: string): string {
-  if (!s) return getTodayStr();
-  // already YYYY-MM-DD
-  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
-  // DD.MM.YYYY or DD/MM/YYYY
-  const m = /^(\d{1,2})[./](\d{1,2})[./](\d{4})/.exec(s);
-  if (m) return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
-  // MM/DD/YYYY
-  const m2 = /^(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(s);
-  if (m2) return `${m2[3]}-${m2[1].padStart(2,'0')}-${m2[2].padStart(2,'0')}`;
-  // Try native Date parse
-  const d = new Date(s);
-  if (!isNaN(d.getTime())) {
-    // If YYYY-MM-DD parsed, it's UTC, otherwise it might be local
-    // To prevent shift, format using getUTCDate/getUTCMonth if s was just YYYY-MM-DD
-    // But since s wasn't matched by YYYY-MM-DD, it might be something else.
-    // Let's format using local time to get what the user expects locally
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  }
-  return getTodayStr();
-}
+

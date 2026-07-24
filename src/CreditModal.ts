@@ -1,14 +1,15 @@
 import { App, Modal, Notice } from 'obsidian';
 import { getLocaleFromApp, t, Translations } from './i18n';
-import { CreditRecord, CreditType, ACCRUAL_STEP_MONTHLY } from './types';
-import { fmtAmount, parseAmount, getTodayStr } from './utils';
+import { CreditRecord, CreditType, ACCRUAL_STEP_MONTHLY, PERCENT_100 } from './types';
+import { fmtAmount, parseAmount, getTodayStr, normalizeDateStr, parseDate } from './utils';
 import { CreditInfoModal } from './CreditInfoModal';
 
 export interface CreditModalOptions {
   title:     string;
   credit?:   CreditRecord;
   banks:     string[];
-  onSave:    (credit: CreditRecord) => void;
+  records:   any[]; // FinanceRecord[]
+  onSave:    (credit: CreditRecord, updatedRecords: any[]) => void;
 }
 
 export class CreditModal extends Modal {
@@ -19,6 +20,9 @@ export class CreditModal extends Modal {
   private paymentInput!: HTMLInputElement;
   private rateInput!: HTMLInputElement;
   private termInput!: HTMLInputElement;
+  private downPaymentValueInput!: HTMLInputElement;
+  private downPaymentDateInput!: HTMLInputElement;
+  private finalAmountDisplay!: HTMLElement;
   private calcTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(app: App, opts: CreditModalOptions) {
@@ -27,7 +31,16 @@ export class CreditModal extends Modal {
     this.o = opts;
     const nowStr = getTodayStr();
     this.credit = opts.credit
-      ? { ...opts.credit, payments: [...opts.credit.payments] }
+      ? {
+          ...opts.credit,
+          startDate: normalizeDateStr(opts.credit.startDate),
+          downPaymentDate: opts.credit.downPaymentDate ? normalizeDateStr(opts.credit.downPaymentDate) : '',
+          payments: opts.credit.payments.map(p => ({
+            ...p,
+            dueDate: normalizeDateStr(p.dueDate),
+            paidDate: p.paidDate ? normalizeDateStr(p.paidDate) : undefined,
+          }))
+        }
       : {
           id: crypto.randomUUID(),
           name: 'Кредит',
@@ -44,6 +57,12 @@ export class CreditModal extends Modal {
           status: 'active',
           earlyRepaymentOption: null,
           payments: [],
+          purchasePrice: 0,
+          downPayment: 0,
+          downPaymentType: 'amount',
+          downPaymentValue: 0,
+          downPaymentDate: '',
+          downPaymentRecordId: undefined,
         };
   }
 
@@ -112,29 +131,29 @@ export class CreditModal extends Modal {
     bankIn.addEventListener('input', () => { this.credit.bankName = bankIn.value; openDropdown(bankIn.value); });
     bankIn.addEventListener('blur', () => setTimeout(closeDropdown, 150));
 
-    // === РЯД 2: Сумма | Процентная ставка ===
+    // === РЯД 2: Стоимость покупки | Процентная ставка ===
     const row2 = form.createDiv('finance-form-row finance-full-width');
 
     const amtG = row2.createDiv('finance-field-group finance-amount-group');
-    amtG.createEl('label', { text: this.tr.amountLabel, cls: 'finance-field-label' });
+    amtG.createEl('label', { text: this.tr.purchasePriceLabel, cls: 'finance-field-label' });
     this.amountInput = amtG.createEl('input', { type: 'text', cls: 'finance-input finance-amount-input' });
     this.amountInput.setAttribute('inputmode', 'decimal');
     this.amountInput.setAttribute('placeholder', '0');
     this.amountInput.setAttribute('autocomplete', 'off');
 
-    if (this.credit.originalAmount > 0) {
-      this.amountInput.value = fmtAmount(String(this.credit.originalAmount));
+    if ((this.credit.purchasePrice ?? 0) > 0) {
+      this.amountInput.value = fmtAmount(String(this.credit.purchasePrice));
     }
 
     this.amountInput.addEventListener('focus', () => {
-      if (this.credit.originalAmount > 0) {
-        this.amountInput.value = String(this.credit.originalAmount).replace('.', ',');
+      if ((this.credit.purchasePrice ?? 0) > 0) {
+        this.amountInput.value = String(this.credit.purchasePrice).replace('.', ',');
       }
     });
 
     this.amountInput.addEventListener('input', () => {
       const raw = this.amountInput.value;
-      this.credit.originalAmount = parseAmount(raw);
+      this.credit.purchasePrice = parseAmount(raw);
       const sel = this.amountInput.selectionStart ?? raw.length;
       const rawBefore = raw.slice(0, sel).replace(/[^\d.,]/g, '').length;
       const formatted = fmtAmount(raw);
@@ -152,8 +171,10 @@ export class CreditModal extends Modal {
 
     this.amountInput.addEventListener('blur', () => {
       const n = parseAmount(this.amountInput.value);
-      this.credit.originalAmount = n;
+      this.credit.purchasePrice = n;
       this.amountInput.value = n > 0 ? fmtAmount(String(n)) : '';
+      this.updateCalculatedValues();
+      this.scheduleCalc();
     });
 
     const rateG = row2.createDiv('finance-field-group');
@@ -177,7 +198,111 @@ export class CreditModal extends Modal {
       const rate = parseFloat(this.rateInput.value.replace(',', '.')) || 0;
       this.credit.interestRate = rate;
       this.rateInput.value = rate > 0 ? String(rate) : '';
+      this.updateCalculatedValues();
+      this.scheduleCalc();
     });
+
+    // === РЯД 2.5: Первоначальный взнос (значение, тип, дата) ===
+    const rowDp = form.createDiv('finance-form-row finance-full-width');
+
+    const dpValG = rowDp.createDiv('finance-field-group');
+    dpValG.createEl('label', { text: this.tr.downPaymentLabel, cls: 'finance-field-label' });
+    
+    const dpInputWrap = dpValG.createDiv('finance-input-with-select');
+    dpInputWrap.style.display = 'flex';
+    dpInputWrap.style.gap = '8px';
+
+    this.downPaymentValueInput = dpInputWrap.createEl('input', { type: 'text', cls: 'finance-input' });
+    this.downPaymentValueInput.style.flex = '1';
+    this.downPaymentValueInput.setAttribute('inputmode', 'decimal');
+    this.downPaymentValueInput.setAttribute('placeholder', '0');
+    this.downPaymentValueInput.setAttribute('autocomplete', 'off');
+    if ((this.credit.downPaymentValue ?? 0) > 0) {
+      this.downPaymentValueInput.value = this.credit.downPaymentType === 'amount' 
+        ? fmtAmount(String(this.credit.downPaymentValue))
+        : String(this.credit.downPaymentValue);
+    }
+
+    const btnGroup = dpInputWrap.createDiv('finance-btn-group');
+    btnGroup.style.display = 'flex';
+    btnGroup.style.gap = '4px';
+
+    const amtBtn = btnGroup.createEl('button', {
+      text: '💵',
+      cls: `finance-type-toggle${this.credit.downPaymentType === 'amount' ? ' active' : ''}`,
+    });
+    amtBtn.setAttribute('type', 'button');
+    amtBtn.style.padding = '0 10px';
+    amtBtn.style.minHeight = '32px';
+    amtBtn.style.fontSize = '1.1em';
+    amtBtn.style.cursor = 'pointer';
+
+    const pctBtn = btnGroup.createEl('button', {
+      text: '%',
+      cls: `finance-type-toggle${this.credit.downPaymentType === 'percent' ? ' active' : ''}`,
+    });
+    pctBtn.setAttribute('type', 'button');
+    pctBtn.style.padding = '0 12px';
+    pctBtn.style.minHeight = '32px';
+    pctBtn.style.fontSize = '1.1em';
+    pctBtn.style.fontWeight = 'bold';
+    pctBtn.style.cursor = 'pointer';
+
+    const dpDateG = rowDp.createDiv('finance-field-group');
+    dpDateG.createEl('label', { text: this.tr.downPaymentDateLabel, cls: 'finance-field-label' });
+    this.downPaymentDateInput = dpDateG.createEl('input', { type: 'date', cls: 'finance-input' });
+    this.downPaymentDateInput.value = this.credit.downPaymentDate ? normalizeDateStr(this.credit.downPaymentDate) : '';
+
+    this.downPaymentValueInput.addEventListener('focus', () => {
+      if ((this.credit.downPaymentValue ?? 0) > 0) {
+        this.downPaymentValueInput.value = String(this.credit.downPaymentValue).replace('.', ',');
+      }
+    });
+
+    const onDpBlurOrChange = () => {
+      const type = this.credit.downPaymentType;
+      let rawVal = parseAmount(this.downPaymentValueInput.value);
+      
+      if (type === 'percent' && rawVal > PERCENT_100) {
+        rawVal = PERCENT_100;
+      }
+      
+      this.credit.downPaymentValue = rawVal;
+      
+      if (rawVal > 0) {
+        this.downPaymentValueInput.value = type === 'amount' ? fmtAmount(String(rawVal)) : String(rawVal);
+      } else {
+        this.downPaymentValueInput.value = '';
+      }
+      this.updateCalculatedValues();
+      this.scheduleCalc();
+    };
+
+    const setDpType = (type: 'amount' | 'percent') => {
+      this.credit.downPaymentType = type;
+      amtBtn.classList.toggle('active', type === 'amount');
+      pctBtn.classList.toggle('active', type === 'percent');
+      onDpBlurOrChange();
+    };
+
+    amtBtn.addEventListener('click', (e) => { e.preventDefault(); setDpType('amount'); });
+    pctBtn.addEventListener('click', (e) => { e.preventDefault(); setDpType('percent'); });
+
+    this.downPaymentValueInput.addEventListener('blur', onDpBlurOrChange);
+    this.downPaymentDateInput.addEventListener('change', () => {
+      this.credit.downPaymentDate = this.downPaymentDateInput.value ? normalizeDateStr(this.downPaymentDateInput.value) : '';
+    });
+
+    // === РЯД 2.6: Инфо-блок Итого сумма кредита ===
+    const rowInfo = form.createDiv('finance-form-row finance-full-width');
+    rowInfo.style.marginTop = '-4px';
+    rowInfo.style.marginBottom = '4px';
+    this.finalAmountDisplay = rowInfo.createDiv('finance-final-amount-info');
+    this.finalAmountDisplay.style.fontSize = '13px';
+    this.finalAmountDisplay.style.fontWeight = 'bold';
+    this.finalAmountDisplay.style.color = 'var(--text-muted)';
+
+    this.updateCalculatedValues();
 
     // === РЯД 3: Ежемесячный платёж | Срок ===
     const row3 = form.createDiv('finance-form-row finance-full-width');
@@ -237,8 +362,8 @@ export class CreditModal extends Modal {
     const dateG = row4.createDiv('finance-field-group');
     dateG.createEl('label', { text: this.tr.startDate, cls: 'finance-field-label' });
     const dateIn = dateG.createEl('input', { type: 'date', cls: 'finance-input' });
-    dateIn.value = this.credit.startDate;
-    dateIn.addEventListener('change', () => { this.credit.startDate = dateIn.value; });
+    dateIn.value = normalizeDateStr(this.credit.startDate);
+    dateIn.addEventListener('change', () => { this.credit.startDate = normalizeDateStr(dateIn.value); });
 
     const typeG = row4.createDiv('finance-field-group');
     typeG.createEl('label', { text: this.tr.creditTypeLabel, cls: 'finance-field-label' });
@@ -279,8 +404,28 @@ export class CreditModal extends Modal {
     this.calcTimer = setTimeout(() => this.calcMonthlyPayment(), 500);
   }
 
+  private updateCalculatedValues(): void {
+    const purchase = parseAmount(this.amountInput.value);
+    this.credit.purchasePrice = purchase;
+
+    const dpVal = this.credit.downPaymentValue ?? 0;
+    const dpType = this.credit.downPaymentType ?? 'amount';
+
+    let dpAmount = 0;
+    if (dpType === 'percent') {
+      dpAmount = Math.round(purchase * (dpVal / PERCENT_100) * 100) / 100;
+    } else {
+      dpAmount = dpVal;
+    }
+
+    this.credit.downPayment = dpAmount;
+    this.credit.originalAmount = Math.max(0, purchase - dpAmount);
+
+    this.finalAmountDisplay.textContent = `${this.tr.finalAmountLabel}: ${fmtAmount(String(this.credit.originalAmount))}`;
+  }
+
   private calcMonthlyPayment(): void {
-    const amount = parseAmount(this.amountInput.value);
+    const amount = this.credit.originalAmount;
     const rate = parseFloat(this.rateInput.value.replace(',', '.')) || 0;
     const term = parseInt(this.termInput.value) || 0;
     if (amount <= 0 || term <= 0) return;
@@ -298,8 +443,24 @@ export class CreditModal extends Modal {
 
   private handleSave(): void {
     const amount = parseAmount(this.amountInput.value);
-    this.credit.originalAmount = amount;
-    if (!amount || amount <= 0) {
+    this.credit.purchasePrice = amount;
+
+    // Validate Down Payment
+    const dpVal = this.credit.downPayment ?? 0;
+    const dpDate = this.credit.downPaymentDate;
+    if (dpVal > 0 && !dpDate) {
+      new Notice(this.tr.downPaymentDateRequired);
+      this.downPaymentDateInput.focus();
+      return;
+    }
+    if (dpDate && dpVal <= 0) {
+      new Notice(this.tr.downPaymentAmountRequired);
+      this.downPaymentValueInput.focus();
+      return;
+    }
+
+    const loanPrincipal = this.credit.originalAmount;
+    if (!loanPrincipal || loanPrincipal <= 0) {
       new Notice(this.tr.invalidAmount);
       this.amountInput.focus();
       return;
@@ -316,7 +477,7 @@ export class CreditModal extends Modal {
 
     if (this.credit.termMonths > 0 && this.credit.monthlyPayment > 0) {
       const today = getTodayStr();
-      const startDate = new Date(this.credit.startDate);
+      const startDate = parseDate(this.credit.startDate) ?? new Date();
 
       const kept = this.credit.payments.filter(p => p.status === 'paid');
       for (const p of kept) p.amount = this.credit.monthlyPayment;
@@ -341,7 +502,56 @@ export class CreditModal extends Modal {
     const totalToPay = this.credit.monthlyPayment * this.credit.termMonths;
     this.credit.currentAmount = Math.max(0, totalToPay - paidSum);
 
-    this.o.onSave(this.credit);
+    // Manage Down Payment Transaction
+    let updatedRecords = [...this.o.records];
+    if (dpVal > 0 && dpDate) {
+      if (this.credit.downPaymentRecordId) {
+        const existingDpRec = updatedRecords.find(r => r.id === this.credit.downPaymentRecordId);
+        if (existingDpRec) {
+          existingDpRec.date = dpDate;
+          existingDpRec.amount = dpVal;
+          existingDpRec.payer = this.credit.bankName;
+          existingDpRec.note = this.tr.downPaymentNotePrefix + this.credit.name;
+        } else {
+          updatedRecords.push({
+            id: this.credit.downPaymentRecordId,
+            createdAt: Date.now(),
+            date: dpDate,
+            time: '',
+            type: 'expense',
+            amount: dpVal,
+            category: 'Кредит',
+            tag: '',
+            payer: this.credit.bankName,
+            note: this.tr.downPaymentNotePrefix + this.credit.name,
+            attachmentPath: '',
+          });
+        }
+      } else {
+        const newDpId = crypto.randomUUID();
+        this.credit.downPaymentRecordId = newDpId;
+        updatedRecords.push({
+          id: newDpId,
+          createdAt: Date.now(),
+          date: dpDate,
+          time: '',
+          type: 'expense',
+          amount: dpVal,
+          category: 'Кредит',
+          tag: '',
+          payer: this.credit.bankName,
+          note: this.tr.downPaymentNotePrefix + this.credit.name,
+          attachmentPath: '',
+        });
+      }
+    } else {
+      if (this.credit.downPaymentRecordId) {
+        updatedRecords = updatedRecords.filter(r => r.id !== this.credit.downPaymentRecordId);
+        this.credit.downPaymentRecordId = undefined;
+      }
+    }
+
+    this.o.onSave(this.credit, updatedRecords);
     this.close();
   }
 
