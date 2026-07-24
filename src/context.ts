@@ -132,11 +132,9 @@ export class ViewContext {
     const recs = this._data.records;
     const inc = recs.filter(r => r.type === 'income' && !r.isInternal).reduce((s, r) => s + r.amount, 0);
     const exp = recs.filter(r => r.type === 'expense' && !r.isInternal).reduce((s, r) => s + r.amount, 0);
-    const lent = this._data.debts.filter(d => d.direction === 'lent').reduce((s, d) => s + d.amount, 0);
-    const borrowed = this._data.debts.filter(d => d.direction === 'borrowed').reduce((s, d) => s + d.amount, 0);
     const totalInc = recs.filter(r => r.type === 'income').reduce((s, r) => s + r.amount, 0);
     const totalExp = recs.filter(r => r.type === 'expense').reduce((s, r) => s + r.amount, 0);
-    const bal = totalInc - totalExp - lent + borrowed;
+    const bal = totalInc - totalExp;
 
     const el = container.createDiv('finance-stats-container');
     const items = [

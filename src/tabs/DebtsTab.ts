@@ -1024,7 +1024,22 @@ export class DebtsTab {
       movement: mov,
       currency: cur,
       onSave: async updated => {
+        const oldDate = mov.date;
+        const oldAmount = mov.amount;
+
         await this.ctx.storage.updateDebtMovement(this.ctx.notePath, debt.id, updated);
+
+        if (!this.ctx.data) return;
+        const linkedRec = this.ctx.data.records.find(r =>
+          r.linkedId === debt.id && r.date === oldDate && r.amount === oldAmount
+        );
+        if (linkedRec) {
+          linkedRec.date = updated.date;
+          linkedRec.amount = updated.amount;
+          linkedRec.time = updated.time || '';
+          await this.ctx.storage.updateRecord(this.ctx.notePath, linkedRec);
+        }
+
         this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
         this.onUpdate?.();
         new Notice(this.tr.debtUpdated);
@@ -1036,6 +1051,16 @@ export class DebtsTab {
     const label = `${mov.type === 'borrow' ? '−' : '+'}${this.ctx.fmt(mov.amount)}  ·  ${this.ctx.fmtDate(mov.date, mov.time)}`;
     new ConfirmModal(this.ctx.app, `${this.tr.confirmDeleteMovement}\n${label}`, async () => {
       await this.ctx.storage.deleteDebtMovement(this.ctx.notePath, debt.id, mov.id);
+
+      if (!this.ctx.data) return;
+      const linkedRec = this.ctx.data.records.find(r =>
+        r.linkedId === debt.id && r.date === mov.date && r.amount === mov.amount
+      );
+      if (linkedRec) {
+        const updatedRecords = this.ctx.data.records.filter(r => r.id !== linkedRec.id);
+        await this.ctx.storage.saveAllRecords(this.ctx.notePath, updatedRecords);
+      }
+
       this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
       this.onUpdate?.();
       new Notice(this.tr.debtDeleted);

@@ -24,6 +24,7 @@ export class AccountView {
   private data:     AccountData | null = null;
   private mode:     'records' | 'debts' | 'credits' | 'deposits' = 'records';
   private isMobile = false;
+  private isCheckingAutoTransactions = false;
 
   private recordsTab!:  RecordsTab;
   private debtsTab!:    DebtsTab;
@@ -304,12 +305,15 @@ export class AccountView {
   }
 
   private async checkAutoTransactions(): Promise<void> {
-    if (!this.data) return;
-    const today = getTodayStr();
-    const nowTime = new Date().toTimeString().slice(0, 5);
-    let depositsChanged = false;
-    let creditsChanged = false;
-    let recordsChanged = false;
+    if (!this.data || this.isCheckingAutoTransactions) return;
+    this.isCheckingAutoTransactions = true;
+
+    try {
+      const today = getTodayStr();
+      const nowTime = new Date().toTimeString().slice(0, 5);
+      let depositsChanged = false;
+      let creditsChanged = false;
+      let recordsChanged = false;
 
     for (const deposit of this.data.deposits) {
       if (!deposit.accruals) deposit.accruals = [];
@@ -514,9 +518,9 @@ export class AccountView {
         }
       }
 
-      const paidAmount = credit.payments.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0);
-      const totalToPay = credit.monthlyPayment * credit.termMonths;
-      if (paidAmount >= totalToPay) {
+      const pendingPayments = credit.payments.filter(p => p.status === 'pending');
+      const remainingAmount = pendingPayments.reduce((s, p) => s + p.amount, 0);
+      if (remainingAmount === 0 && credit.payments.length > 0) {
         credit.status = 'paid';
         creditsChanged = true;
       }
@@ -526,6 +530,9 @@ export class AccountView {
       await this.storage.saveAllRecords(this.notePath, this.data.records);
       if (depositsChanged) await this.storage.saveAllDeposits(this.notePath, this.data.deposits);
       if (creditsChanged) await this.storage.saveAllCredits(this.notePath, this.data.credits);
+    }
+    } finally {
+      this.isCheckingAutoTransactions = false;
     }
   }
 }

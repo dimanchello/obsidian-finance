@@ -1215,6 +1215,16 @@ export class DepositsTab {
     const label = `${deposit.name} · ${this.ctx.fmt(topUp.amount)} · ${this.ctx.fmtDate(topUp.date, topUp.time)}`;
     new ConfirmModal(this.ctx.app, `${this.tr.confirmDeleteTopUp}\n${label}`, async () => {
       await this.ctx.storage.deleteDepositTopUp(this.ctx.notePath, deposit.id, topUp.id);
+
+      if (!this.ctx.data) return;
+      const linkedRec = this.ctx.data.records.find(r =>
+        r.linkedId === deposit.id && r.date === topUp.date && r.amount === topUp.amount && r.type === 'expense'
+      );
+      if (linkedRec) {
+        const updatedRecords = this.ctx.data.records.filter(r => r.id !== linkedRec.id);
+        await this.ctx.storage.saveAllRecords(this.ctx.notePath, updatedRecords);
+      }
+
       this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
       this.onUpdate?.();
       new Notice(this.tr.deleted);
@@ -1241,6 +1251,16 @@ export class DepositsTab {
     const label = `${deposit.name} · ${this.ctx.fmt(withdrawal.amount)} · ${this.ctx.fmtDate(withdrawal.date, withdrawal.time)}`;
     new ConfirmModal(this.ctx.app, `${this.tr.confirmDeleteWithdrawal}\n${label}`, async () => {
       await this.ctx.storage.deleteDepositWithdrawal(this.ctx.notePath, deposit.id, withdrawal.id);
+
+      if (!this.ctx.data) return;
+      const linkedRec = this.ctx.data.records.find(r =>
+        r.linkedId === deposit.id && r.date === withdrawal.date && r.amount === withdrawal.amount && r.type === 'income'
+      );
+      if (linkedRec) {
+        const updatedRecords = this.ctx.data.records.filter(r => r.id !== linkedRec.id);
+        await this.ctx.storage.saveAllRecords(this.ctx.notePath, updatedRecords);
+      }
+
       this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
       this.onUpdate?.();
       new Notice(this.tr.deleted);
