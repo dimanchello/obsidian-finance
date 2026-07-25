@@ -46,6 +46,17 @@ export default [
       '@typescript-eslint/no-empty-function': 'off',
       '@typescript-eslint/prefer-regexp-exec': 'off',
       '@typescript-eslint/dot-notation': 'off',
+
+      'no-restricted-syntax': ['error',
+        {
+          selector: "CallExpression > MemberExpression[property.name='toISOString']",
+          message: 'toISOString() конвертирует в UTC и сдвигает локальную дату на день назад. Используйте toDateStr/toDateTimeLocalStr из src/domain/dateMath.',
+        },
+        {
+          selector: "CallExpression > MemberExpression[property.name=/^set(UTC)?Month$/]",
+          message: 'setMonth переполняет месяц: 31 января + 1 = 3 марта. Используйте addMonthsClamped из src/domain/dateMath.',
+        },
+      ],
     },
   },
 ];

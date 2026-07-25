@@ -2,6 +2,7 @@ import { App, Modal, Notice } from 'obsidian';
 import { getLocaleFromApp, t, Translations } from './i18n';
 import { CreditRecord, CreditPayment } from './types';
 import { fmtAmount, parseAmount, getTodayStr, normalizeDateStr } from './utils';
+import { round2, sumMoney } from './domain/money';
 
 export interface EarlyRepaymentOptions {
   title: string;
@@ -184,7 +185,7 @@ export class CreditEarlyRepaymentModal extends Modal {
               payment.paidDate = repaymentDate;
               if (noteIn.value) payment.note = noteIn.value;
             } else {
-              payment.amount = Math.round((payment.amount - remainingAmount) * 100) / 100;
+              payment.amount = round2(payment.amount - remainingAmount);
               if (noteIn.value) {
                 payment.note = payment.note ? `${payment.note}; ${noteIn.value}` : noteIn.value;
               }
@@ -193,7 +194,7 @@ export class CreditEarlyRepaymentModal extends Modal {
           }
 
           const stillPending = this.credit.payments.filter(p => p.status === 'pending');
-          this.credit.currentAmount = Math.round(stillPending.reduce((s, p) => s + p.amount, 0) * 100) / 100;
+          this.credit.currentAmount = sumMoney(stillPending.map(p => p.amount));
           if (this.credit.currentAmount <= 0 || stillPending.length === 0) {
             this.credit.status = 'paid';
           }

@@ -1,6 +1,8 @@
 import { App, normalizePath } from 'obsidian';
-import { AccountData, AccountMeta, CreditRecord, DebtMovement, DebtRecord, DepositRecord, DepositTopUp, DepositWithdrawal, FinanceRecord, DAYS_IN_YEAR } from './types';
-import { getDaysBetween, getTodayStr, normalizeDateStr, normalizeTimeStr } from './utils';
+import { AccountData, AccountMeta, CreditRecord, DebtMovement, DebtRecord, DepositRecord, DepositTopUp, DepositWithdrawal, FinanceRecord } from './types';
+import { getTodayStr, normalizeDateStr, normalizeTimeStr } from './utils';
+import { recalcFutureAccruals } from './domain/schedule';
+import { round2, sumMoney } from './domain/money';
 
 const DATA_VERSION = 4;
 
@@ -643,7 +645,7 @@ export class FinanceStorage {
     if (idx === -1) return;
     const debt = d[idx];
     debt.movements.push(mov);
-    debt.amount = debt.movements.reduce((sum, m) => m.type === 'borrow' ? sum + m.amount : sum - m.amount, 0);
+    debt.amount = sumMoney(debt.movements.map(m => m.type === 'borrow' ? m.amount : -m.amount));
     this.scheduleDebts(notePath);
   }
 
@@ -655,7 +657,7 @@ export class FinanceStorage {
     const mIdx = debt.movements.findIndex(m => m.id === mov.id);
     if (mIdx === -1) return;
     debt.movements[mIdx] = mov;
-    debt.amount = debt.movements.reduce((sum, m) => m.type === 'borrow' ? sum + m.amount : sum - m.amount, 0);
+    debt.amount = sumMoney(debt.movements.map(m => m.type === 'borrow' ? m.amount : -m.amount));
     this.scheduleDebts(notePath);
   }
 
@@ -665,7 +667,7 @@ export class FinanceStorage {
     if (idx === -1) return;
     const debt = d[idx];
     debt.movements = debt.movements.filter(m => m.id !== movementId);
-    debt.amount = debt.movements.reduce((sum, m) => m.type === 'borrow' ? sum + m.amount : sum - m.amount, 0);
+    debt.amount = sumMoney(debt.movements.map(m => m.type === 'borrow' ? m.amount : -m.amount));
     this.scheduleDebts(notePath);
   }
 
@@ -743,7 +745,7 @@ export class FinanceStorage {
     const deposit = d[idx];
     if (!deposit.topUps) deposit.topUps = [];
     deposit.topUps.push(topUp);
-    deposit.amount += topUp.amount;
+    deposit.amount = round2(deposit.amount + topUp.amount);
     this.recalculateFutureAccruals(deposit);
     this.scheduleDeposits(notePath);
   }
@@ -756,7 +758,7 @@ export class FinanceStorage {
     if (!deposit.topUps) return;
     const topUp = deposit.topUps.find(t => t.id === topUpId);
     if (topUp) {
-      deposit.amount = Math.max(0, deposit.amount - topUp.amount);
+      deposit.amount = Math.max(0, round2(deposit.amount - topUp.amount));
       deposit.topUps = deposit.topUps.filter(t => t.id !== topUpId);
       this.recalculateFutureAccruals(deposit);
     }
@@ -770,7 +772,7 @@ export class FinanceStorage {
     const deposit = d[idx];
     if (!deposit.withdrawals) deposit.withdrawals = [];
     deposit.withdrawals.push(withdrawal);
-    deposit.amount = Math.max(0, deposit.amount - withdrawal.amount);
+    deposit.amount = Math.max(0, round2(deposit.amount - withdrawal.amount));
     this.recalculateFutureAccruals(deposit);
     this.scheduleDeposits(notePath);
   }
@@ -783,7 +785,7 @@ export class FinanceStorage {
     if (!deposit.withdrawals) return;
     const withdrawal = deposit.withdrawals.find(w => w.id === withdrawalId);
     if (withdrawal) {
-      deposit.amount += withdrawal.amount;
+      deposit.amount = round2(deposit.amount + withdrawal.amount);
       deposit.withdrawals = deposit.withdrawals.filter(w => w.id !== withdrawalId);
       this.recalculateFutureAccruals(deposit);
     }
@@ -791,40 +793,7 @@ export class FinanceStorage {
   }
 
   private recalculateFutureAccruals(deposit: DepositRecord): void {
-    const today = getTodayStr();
-    const futureAccruals = deposit.accruals
-      .filter(a => a.dueDate > today && a.status === 'pending')
-      .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
-    if (!futureAccruals.length) return;
-
-    if (deposit.accrualType === 'capitalization') {
-      let currentAmount = deposit.amount;
-      for (let i = 0; i < futureAccruals.length; i++) {
-        const accrual = futureAccruals[i];
-        const prevAccrual = i > 0 ? futureAccruals[i - 1] : null;
-        const lastPaid = deposit.accruals
-          .filter(a => a.status === 'paid')
-          .sort((a, b) => b.dueDate.localeCompare(a.dueDate))[0];
-        const prevDate = prevAccrual?.dueDate ?? lastPaid?.dueDate ?? deposit.startDate;
-        const days = getDaysBetween(prevDate, accrual.dueDate);
-        const interest = currentAmount * (deposit.interestRate / 100) * days / DAYS_IN_YEAR;
-        currentAmount += interest;
-        accrual.amount = Math.round(interest * 100) / 100;
-      }
-    } else {
-      const baseAmount = deposit.amount;
-      for (let i = 0; i < futureAccruals.length; i++) {
-        const accrual = futureAccruals[i];
-        const prevAccrual = i > 0 ? futureAccruals[i - 1] : null;
-        const lastPaid = deposit.accruals
-          .filter(a => a.status === 'paid')
-          .sort((a, b) => b.dueDate.localeCompare(a.dueDate))[0];
-        const prevDate = prevAccrual?.dueDate ?? lastPaid?.dueDate ?? deposit.startDate;
-        const days = getDaysBetween(prevDate, accrual.dueDate);
-        const interest = baseAmount * (deposit.interestRate / 100) * days / DAYS_IN_YEAR;
-        accrual.amount = Math.round(interest * 100) / 100;
-      }
-    }
+    deposit.accruals = recalcFutureAccruals(deposit, getTodayStr());
   }
 
   async saveAllCredits(notePath: string, credits: CreditRecord[]): Promise<void> {

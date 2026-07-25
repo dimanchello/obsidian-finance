@@ -2,6 +2,7 @@ import { App, Modal, Notice, normalizePath } from 'obsidian';
 import { getLocaleFromApp, t, Translations } from './i18n';
 import { FinanceRecord, RecordType, PluginSettings } from './types';
 import { fmtAmount, parseAmount, getTodayStr, normalizeDateStr, normalizeTimeStr } from './utils';
+import { toDateTimeLocalStr } from './domain/dateMath';
 import { CalculatorModal } from './CalculatorModal';
 
 export interface RecordModalOptions {
@@ -186,7 +187,7 @@ export class RecordModal extends Modal {
     const dtG = grid.createDiv('finance-field-group');
     dtG.createEl('label', { text: this.tr.dateTime, cls: 'finance-field-label' });
     const dtIn = dtG.createEl('input', { type: 'datetime-local', cls: 'finance-input' });
-    const nowStr = new Date().toISOString().slice(0, 16);
+    const nowStr = toDateTimeLocalStr(new Date());
     const normDate = this.rec.date ? normalizeDateStr(this.rec.date) : '';
     const normTime = this.rec.time ? normalizeTimeStr(this.rec.time) : '';
     dtIn.value = normDate

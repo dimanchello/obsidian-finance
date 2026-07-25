@@ -11,6 +11,7 @@ import { DepositTopUpModal } from '../DepositTopUpModal';
 import { DepositWithdrawalModal } from '../DepositWithdrawalModal';
 import { ConfirmModal } from '../ConfirmModal';
 import { getTodayStr, parseDate } from '../utils';
+import { addMonthsClamped } from '../domain/dateMath';
 export class DepositsTab {
   private ctx: ViewContext;
   private el: HTMLElement;
@@ -64,11 +65,12 @@ export class DepositsTab {
 
   private calculateDepositEndDate(deposit: DepositRecord): string {
     if (!deposit.startDate) return '';
-    const startDate = parseDate(deposit.startDate);
-    if (!startDate || isNaN(startDate.getTime())) return '';
     const term = deposit.termMonths || 0;
-    startDate.setMonth(startDate.getMonth() + term);
-    return startDate.toISOString().split('T')[0];
+    try {
+      return addMonthsClamped(deposit.startDate, term);
+    } catch {
+      return '';
+    }
   }
 
   private mkActionBtn(parent: HTMLElement, icon: string, title: string, onClick: () => void, extraCls = ''): void {

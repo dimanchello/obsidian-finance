@@ -167,6 +167,7 @@ export const PLURAL_THRESHOLD = 5;
 export const DAYS_IN_YEAR = 365;
 export const ACCRUAL_STEP_MONTHLY = 12;
 export const ONE_WEEK_MS = 604_800_000;
+export const AUTO_TX_INTERVAL_MS = 3_600_000;
 export const PERCENT_100 = 100;
 
 export type CreditType = 'consumer' | 'auto' | 'mortgage';

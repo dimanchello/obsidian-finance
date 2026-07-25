@@ -11,6 +11,7 @@ import { CreditPaymentModal } from '../CreditPaymentModal';
 import { CreditEarlyRepaymentModal } from '../CreditEarlyRepaymentModal';
 import { ConfirmModal } from '../ConfirmModal';
 import { getTodayStr, parseDate } from '../utils';
+import { addMonthsClamped } from '../domain/dateMath';
 export class CreditsTab {
   private ctx: ViewContext;
   private el: HTMLElement;
@@ -624,11 +625,12 @@ export class CreditsTab {
 
   private calculateCreditEndDate(credit: CreditRecord): string {
     if (!credit.startDate) return '';
-    const startDate = parseDate(credit.startDate);
-    if (!startDate || isNaN(startDate.getTime())) return '';
     const term = credit.termMonths || 0;
-    startDate.setMonth(startDate.getMonth() + term);
-    return startDate.toISOString().split('T')[0];
+    try {
+      return addMonthsClamped(credit.startDate, term);
+    } catch {
+      return '';
+    }
   }
 
   private renderCreditsAsTable(container: HTMLElement, pageCredits: CreditRecord[], cols: { key: string; label: string }[]): void {

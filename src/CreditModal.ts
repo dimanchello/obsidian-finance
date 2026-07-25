@@ -1,7 +1,9 @@
 import { App, Modal, Notice } from 'obsidian';
 import { getLocaleFromApp, t, Translations } from './i18n';
 import { CreditRecord, CreditType, ACCRUAL_STEP_MONTHLY, PERCENT_100 } from './types';
-import { fmtAmount, parseAmount, getTodayStr, normalizeDateStr, parseDate } from './utils';
+import { fmtAmount, parseAmount, getTodayStr, normalizeDateStr } from './utils';
+import { addMonthsClamped } from './domain/dateMath';
+import { round2, sumMoney } from './domain/money';
 import { CreditInfoModal } from './CreditInfoModal';
 
 export interface CreditModalOptions {
@@ -413,13 +415,13 @@ export class CreditModal extends Modal {
 
     let dpAmount = 0;
     if (dpType === 'percent') {
-      dpAmount = Math.round(purchase * (dpVal / PERCENT_100) * 100) / 100;
+      dpAmount = round2(purchase * (dpVal / PERCENT_100));
     } else {
       dpAmount = dpVal;
     }
 
     this.credit.downPayment = dpAmount;
-    this.credit.originalAmount = Math.max(0, purchase - dpAmount);
+    this.credit.originalAmount = Math.max(0, round2(purchase - dpAmount));
 
     this.finalAmountDisplay.textContent = `${this.tr.finalAmountLabel}: ${fmtAmount(String(this.credit.originalAmount))}`;
   }
@@ -437,7 +439,7 @@ export class CreditModal extends Modal {
     } else {
       payment = amount / term;
     }
-    this.credit.monthlyPayment = Math.round(payment * 100) / 100;
+    this.credit.monthlyPayment = round2(payment);
     this.paymentInput.value = fmtAmount(String(this.credit.monthlyPayment));
   }
 
@@ -477,16 +479,14 @@ export class CreditModal extends Modal {
 
     if (this.credit.termMonths > 0 && this.credit.monthlyPayment > 0) {
       const today = getTodayStr();
-      const startDate = parseDate(this.credit.startDate) ?? new Date();
+      const startDate = normalizeDateStr(this.credit.startDate);
 
       const kept = this.credit.payments.filter(p => p.status === 'paid');
       for (const p of kept) p.amount = this.credit.monthlyPayment;
       this.credit.payments = [...kept];
 
       for (let i = kept.length + 1; i <= this.credit.termMonths; i++) {
-        const dueDate = new Date(startDate);
-        dueDate.setUTCMonth(dueDate.getUTCMonth() + i);
-        const dueDateStr = dueDate.toISOString().split('T')[0];
+        const dueDateStr = addMonthsClamped(startDate, i);
         const isPast = dueDateStr <= today;
         this.credit.payments.push({
           id: crypto.randomUUID(),
@@ -498,9 +498,9 @@ export class CreditModal extends Modal {
       }
     }
 
-    const paidSum = this.credit.payments.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0);
-    const totalToPay = this.credit.monthlyPayment * this.credit.termMonths;
-    this.credit.currentAmount = Math.max(0, totalToPay - paidSum);
+    const paidSum = sumMoney(this.credit.payments.filter(p => p.status === 'paid').map(p => p.amount));
+    const totalToPay = round2(this.credit.monthlyPayment * this.credit.termMonths);
+    this.credit.currentAmount = Math.max(0, round2(totalToPay - paidSum));
 
     // Manage Down Payment Transaction
     let updatedRecords = [...this.o.records];

@@ -20,6 +20,7 @@ export default class FinanceTrackerPlugin extends Plugin {
       'finance-account',
       async (source, el, ctx) => {
         const view = new AccountView(this.app, el, ctx.sourcePath, this.storage, this.settings, this.manifest.id);
+        ctx.addChild(view);
         await view.render();
       },
     );

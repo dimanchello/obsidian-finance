@@ -2,6 +2,7 @@ import { App, Modal, Notice } from 'obsidian';
 import { getLocaleFromApp, t, Translations } from './i18n';
 import { DebtMovement, DebtMovementType } from './types';
 import { fmtAmount, parseAmount, getTodayStr, normalizeDateStr, normalizeTimeStr } from './utils';
+import { toDateTimeLocalStr } from './domain/dateMath';
 
 export interface DebtMovementOptions {
   title:           string;
@@ -117,7 +118,7 @@ export class DebtMovementModal extends Modal {
     const normTime = this.mov.time ? normalizeTimeStr(this.mov.time) : '';
     dtIn.value = normDate
       ? `${normDate}T${normTime || '00:00'}`
-      : new Date().toISOString().slice(0, 16);
+      : toDateTimeLocalStr(new Date());
     dtIn.addEventListener('change', () => {
       if (dtIn.value) {
         const [d, t] = dtIn.value.slice(0, 16).split('T');
