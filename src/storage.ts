@@ -1,10 +1,11 @@
 import { App, normalizePath } from 'obsidian';
 import { AccountData, AccountMeta, CreditRecord, DebtMovement, DebtRecord, DepositRecord, DepositTopUp, DepositWithdrawal, FinanceRecord } from './types';
-import { getTodayStr, normalizeDateStr, normalizeTimeStr } from './utils';
+import { getTodayStr } from './utils';
 import { recalcFutureAccruals } from './domain/schedule';
 import { round2, sumMoney } from './domain/money';
+import { parseCredits, parseDebts, parseDeposits, parseRecords, parseStringList } from './domain/validate';
 
-const DATA_VERSION = 4;
+const DATA_VERSION = 1;
 
 interface AccountMetaFile {
   version: number;
@@ -123,319 +124,81 @@ export class FinanceStorage {
     }
   }
 
-  // ── Legacy migration ──────────────────────────────────────────────────────
-
-  private oldFp(notePath: string, suffix: string): string {
-    const safe = notePath.replace(/\.md$/i, '').replace(/[\\/:"*?<>|]/g, '_');
-    return normalizePath(`${this.base}/${safe}${suffix}.json`);
-  }
-
-  private async migrateLegacy(notePath: string): Promise<void> {
-    const a = this.app.vault.adapter;
-
-    // Step 1: Check if new folder files already exist
-    const newMeta = this.fp(notePath, 'meta');
-    const newRecs = this.fp(notePath, 'records');
-    if (await a.exists(newMeta) || await a.exists(newRecs)) {
-      // New format exists, clean up any old flat files
-      await this.cleanupOldFlatFiles(notePath);
-      return;
-    }
-
-    // Step 2: Try migrating from old flat files (e.g., accounts/name.meta.json → accounts/name/meta.json)
-    const oldMeta = this.oldFp(notePath, '.meta');
-    const oldRecs = this.oldFp(notePath, '.records');
-    if (await a.exists(oldMeta) || await a.exists(oldRecs)) {
-      try {
-        await this.ensureNoteFolder(notePath);
-        const suffixes = ['.meta', '.records', '.debts', '.credits', '.deposits'];
-        for (const suffix of suffixes) {
-          const oldFile = this.oldFp(notePath, suffix);
-          const newSuffix = suffix.replace('.', '');
-          const newFile = this.fp(notePath, newSuffix);
-          if (await a.exists(oldFile)) {
-            await a.rename(oldFile, newFile);
-          }
-        }
-      } catch {
-        // Migration failed, try copy+delete fallback
-        try {
-          await this.ensureNoteFolder(notePath);
-          const suffixes = ['.meta', '.records', '.debts', '.credits', '.deposits'];
-          for (const suffix of suffixes) {
-            const oldFile = this.oldFp(notePath, suffix);
-            const newSuffix = suffix.replace('.', '');
-            const newFile = this.fp(notePath, newSuffix);
-            if (await a.exists(oldFile)) {
-              const content = await a.read(oldFile);
-              await a.write(newFile, content);
-              await a.remove(oldFile);
-            }
-          }
-        } catch { /* ignore */ }
-      }
-      return;
-    }
-
-    // Step 3: Try migrating from single legacy file (accounts/name.json)
-    const safe = notePath.replace(/[\\/:"*?<>|]/g, '_');
-    const legacyPath = normalizePath(`${this.base}/${safe}.json`);
-    if (!(await a.exists(legacyPath))) return;
-
-    try {
-      await this.ensureNoteFolder(notePath);
-
-      const raw = await a.read(legacyPath);
-      const legacy = JSON.parse(raw) as AccountData;
-
-      const meta: AccountMetaFile = {
-        version: DATA_VERSION,
-        name: legacy.name || '',
-        currency: legacy.currency || this.defaultCurrency,
-        accentColor: legacy.accentColor ?? '',
-      };
-      await a.write(this.fp(notePath, 'meta'), JSON.stringify(meta));
-
-      const recs: AccountRecordsFile = {
-        version: DATA_VERSION,
-        records: legacy.records || [],
-        categories: legacy.categories || [],
-        tags: legacy.tags || [],
-        payers: legacy.payers || [],
-      };
-      await a.write(this.fp(notePath, 'records'), JSON.stringify(recs));
-
-      if (legacy.debts && legacy.debts.length > 0) {
-        await a.write(this.fp(notePath, 'debts'), JSON.stringify(legacy.debts));
-      }
-      if (legacy.credits && legacy.credits.length > 0) {
-        await a.write(this.fp(notePath, 'credits'), JSON.stringify(legacy.credits));
-      }
-      if (legacy.deposits && legacy.deposits.length > 0) {
-        await a.write(this.fp(notePath, 'deposits'), JSON.stringify(legacy.deposits));
-      }
-
-      await a.remove(legacyPath);
-    } catch {
-      // Migration failed, leave legacy file as-is
-    }
-  }
-
-  private async cleanupOldFlatFiles(notePath: string): Promise<void> {
-    const a = this.app.vault.adapter;
-    const suffixes = ['.meta', '.records', '.debts', '.credits', '.deposits'];
-    for (const suffix of suffixes) {
-      const oldFile = this.oldFp(notePath, suffix);
-      if (await a.exists(oldFile)) {
-        try { await a.remove(oldFile); } catch { /* ignore */ }
-      }
-    }
-    // Also remove single legacy file if exists
-    const safe = notePath.replace(/[\\/:"*?<>|]/g, '_');
-    const legacyPath = normalizePath(`${this.base}/${safe}.json`);
-    if (await a.exists(legacyPath)) {
-      try { await a.remove(legacyPath); } catch { /* ignore */ }
-    }
-  }
-
-  private async migrateToShortFolder(notePath: string): Promise<void> {
-    const a = this.app.vault.adapter;
-    const newFolder = this.noteFolder(notePath);
-
-    const safe = notePath.replace(/\.md$/i, '').replace(/[\\/:"*?<>|]/g, '_');
-    const oldFolder = normalizePath(`${this.base}/${safe}`);
-
-    if (newFolder === oldFolder) return;
-    if (!(await a.exists(oldFolder))) return;
-
-    const suffixes = ['meta', 'records', 'debts', 'credits', 'deposits', 'state'];
-
-    if (await a.exists(newFolder)) {
-      const metaPath = normalizePath(`${newFolder}/meta.json`);
-      if (await a.exists(metaPath)) {
-        await this.removeFolderFiles(oldFolder, suffixes);
-      } else {
-        await this.copyFolderFiles(oldFolder, newFolder, suffixes);
-        await this.removeFolderFiles(oldFolder, suffixes);
-      }
-    } else {
-      try {
-        await a.rename(oldFolder, newFolder);
-      } catch {
-        await this.copyFolderFiles(oldFolder, newFolder, suffixes);
-        await this.removeFolderFiles(oldFolder, suffixes);
-      }
-    }
-  }
-
-  private async copyFolderFiles(src: string, dst: string, suffixes: string[]): Promise<void> {
-    const a = this.app.vault.adapter;
-    for (const suffix of suffixes) {
-      const srcFile = normalizePath(`${src}/${suffix}.json`);
-      if (await a.exists(srcFile)) {
-        const content = await a.read(srcFile);
-        await a.write(normalizePath(`${dst}/${suffix}.json`), content);
-      }
-    }
-  }
-
-  private async removeFolderFiles(folder: string, suffixes: string[]): Promise<void> {
-    const a = this.app.vault.adapter;
-    for (const suffix of suffixes) {
-      const fp = normalizePath(`${folder}/${suffix}.json`);
-      if (await a.exists(fp)) {
-        try { await a.remove(fp); } catch { /* ignore */ }
-      }
-    }
-    try { await a.remove(folder); } catch { /* ignore */ }
-  }
-
   // ── Load methods ──────────────────────────────────────────────────────────
 
-  private async loadMeta(notePath: string): Promise<AccountMetaFile> {
-    if (this.metaCache.has(notePath)) return this.metaCache.get(notePath)!;
-    const fp = this.fp(notePath, 'meta');
-    if (await this.app.vault.adapter.exists(fp)) {
-      try {
-        const data = JSON.parse(await this.app.vault.adapter.read(fp)) as AccountMetaFile;
-        data.sourcePath ??= '';
-        this.metaCache.set(notePath, data);
-        return data;
-      } catch { /* corrupt */ }
+  private async readJson(notePath: string, suffix: string): Promise<unknown> {
+    const fp = this.fp(notePath, suffix);
+    if (!(await this.app.vault.adapter.exists(fp))) return null;
+    try {
+      return JSON.parse(await this.app.vault.adapter.read(fp));
+    } catch (e) {
+      console.error(`[FT-storage] ${suffix}.json parse error:`, e);
+      return null;
     }
-    const empty = emptyMeta(this.defaultCurrency);
-    empty.sourcePath = notePath;
-    this.metaCache.set(notePath, empty);
-    return empty;
+  }
+
+  private async loadMeta(notePath: string): Promise<AccountMetaFile> {
+    const cached = this.metaCache.get(notePath);
+    if (cached) return cached;
+
+    const raw = await this.readJson(notePath, 'meta');
+    const meta = emptyMeta(this.defaultCurrency);
+    meta.sourcePath = notePath;
+    if (raw !== null && typeof raw === 'object' && !Array.isArray(raw)) {
+      const o = raw as Record<string, unknown>;
+      if (typeof o.name === 'string') meta.name = o.name;
+      if (typeof o.currency === 'string' && o.currency) meta.currency = o.currency;
+      if (typeof o.accentColor === 'string') meta.accentColor = o.accentColor;
+      if (typeof o.sourcePath === 'string') meta.sourcePath = o.sourcePath;
+    }
+    this.metaCache.set(notePath, meta);
+    return meta;
   }
 
   private async loadRecords(notePath: string): Promise<AccountRecordsFile> {
-    if (this.recordsCache.has(notePath)) return this.recordsCache.get(notePath)!;
-    const fp = this.fp(notePath, 'records');
-    if (await this.app.vault.adapter.exists(fp)) {
-      try {
-        const data = JSON.parse(await this.app.vault.adapter.read(fp)) as AccountRecordsFile;
-        data.records.forEach(r => {
-          r.date = normalizeDateStr(r.date);
-          r.time = normalizeTimeStr(r.time || '');
-          r.isInternal ??= false;
-          r.linkedId ??= '';
-        });
-        this.recordsCache.set(notePath, data);
-        return data;
-      } catch (e) {
-        console.error('[FT-storage] loadRecords parse error:', e);
-      }
+    const cached = this.recordsCache.get(notePath);
+    if (cached) return cached;
+
+    const raw = await this.readJson(notePath, 'records');
+    const file = emptyRecords();
+    if (raw !== null && typeof raw === 'object' && !Array.isArray(raw)) {
+      const o = raw as Record<string, unknown>;
+      file.records = parseRecords(o.records);
+      file.categories = parseStringList(o.categories);
+      file.tags = parseStringList(o.tags);
+      file.payers = parseStringList(o.payers);
     }
-    const empty = emptyRecords();
-    this.recordsCache.set(notePath, empty);
-    return empty;
+    this.recordsCache.set(notePath, file);
+    return file;
   }
 
   private async loadDebts(notePath: string): Promise<DebtRecord[]> {
-    if (this.debtsCache.has(notePath)) return this.debtsCache.get(notePath)!;
-    const fp = this.fp(notePath, 'debts');
-    if (await this.app.vault.adapter.exists(fp)) {
-      try {
-        const data = JSON.parse(await this.app.vault.adapter.read(fp)) as DebtRecord[];
-        data.forEach(d => {
-          d.date = normalizeDateStr(d.date);
-          d.time = normalizeTimeStr(d.time || '');
-          if (!d.direction) d.direction = 'borrowed';
-          d.dueDate = d.dueDate ? normalizeDateStr(d.dueDate) : '';
-          if (d.movements) {
-            d.movements.forEach(m => {
-              m.date = normalizeDateStr(m.date);
-              m.time = normalizeTimeStr(m.time || '');
-            });
-          } else {
-            d.movements = [];
-          }
-        });
-        this.debtsCache.set(notePath, data);
-        return data;
-      } catch { /* corrupt */ }
-    }
-    const empty: DebtRecord[] = [];
-    this.debtsCache.set(notePath, empty);
-    return empty;
+    const cached = this.debtsCache.get(notePath);
+    if (cached) return cached;
+    const debts = parseDebts(await this.readJson(notePath, 'debts'));
+    this.debtsCache.set(notePath, debts);
+    return debts;
   }
 
   private async loadCredits(notePath: string): Promise<CreditRecord[]> {
-    if (this.creditsCache.has(notePath)) return this.creditsCache.get(notePath)!;
-    const fp = this.fp(notePath, 'credits');
-    if (await this.app.vault.adapter.exists(fp)) {
-      try {
-        const data = JSON.parse(await this.app.vault.adapter.read(fp)) as CreditRecord[];
-        data.forEach(c => {
-          c.startDate = normalizeDateStr(c.startDate);
-          if (!c.status) c.status = 'active';
-          if (!c.payments) c.payments = [];
-          c.payments.forEach(p => {
-            p.dueDate = normalizeDateStr(p.dueDate);
-            if (p.paidDate) p.paidDate = normalizeDateStr(p.paidDate);
-          });
-          if (c.earlyRepaymentOption === undefined) c.earlyRepaymentOption = null;
-          c.purchasePrice ??= c.originalAmount;
-          c.downPayment ??= 0;
-          c.downPaymentType ??= 'amount';
-          c.downPaymentValue ??= 0;
-          c.downPaymentDate = c.downPaymentDate ? normalizeDateStr(c.downPaymentDate) : '';
-        });
-        this.creditsCache.set(notePath, data);
-        return data;
-      } catch (e) {
-        console.error('[FT-storage] loadCredits parse error:', e);
-      }
-    }
-    const empty: CreditRecord[] = [];
-    this.creditsCache.set(notePath, empty);
-    return empty;
+    const cached = this.creditsCache.get(notePath);
+    if (cached) return cached;
+    const credits = parseCredits(await this.readJson(notePath, 'credits'));
+    this.creditsCache.set(notePath, credits);
+    return credits;
   }
 
   private async loadDeposits(notePath: string): Promise<DepositRecord[]> {
-    if (this.depositsCache.has(notePath)) return this.depositsCache.get(notePath)!;
-    const fp = this.fp(notePath, 'deposits');
-    if (await this.app.vault.adapter.exists(fp)) {
-      try {
-        const data = JSON.parse(await this.app.vault.adapter.read(fp)) as DepositRecord[];
-        data.forEach(d => {
-          d.startDate = normalizeDateStr(d.startDate);
-          if (!d.termMonths) d.termMonths = 12;
-          if (!d.accrualType) d.accrualType = 'to_account';
-          if (!d.type) d.type = 'term';
-          d.status ??= 'active';
-          if (!d.accruals) d.accruals = [];
-          d.accruals.forEach(a => {
-            a.dueDate = normalizeDateStr(a.dueDate);
-            if (a.paidDate) a.paidDate = normalizeDateStr(a.paidDate);
-          });
-          if (!d.topUps) d.topUps = [];
-          d.topUps.forEach(t => {
-            t.date = normalizeDateStr(t.date);
-            t.time = normalizeTimeStr(t.time || '');
-          });
-          if (!d.withdrawals) d.withdrawals = [];
-          d.withdrawals.forEach(w => {
-            w.date = normalizeDateStr(w.date);
-            w.time = normalizeTimeStr(w.time || '');
-          });
-        });
-        this.depositsCache.set(notePath, data);
-        return data;
-      } catch { /* corrupt */ }
-    }
-    const empty: DepositRecord[] = [];
-    this.depositsCache.set(notePath, empty);
-    return empty;
+    const cached = this.depositsCache.get(notePath);
+    if (cached) return cached;
+    const deposits = parseDeposits(await this.readJson(notePath, 'deposits'));
+    this.depositsCache.set(notePath, deposits);
+    return deposits;
   }
 
   // ── Composite load (for AccountView) ──────────────────────────────────────
 
   async load(notePath: string): Promise<AccountData> {
-    await this.migrateLegacy(notePath);
-    await this.migrateToShortFolder(notePath);
-
     const meta = await this.loadMeta(notePath);
     const recs = await this.loadRecords(notePath);
     const debts = await this.loadDebts(notePath);

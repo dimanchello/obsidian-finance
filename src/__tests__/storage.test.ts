@@ -175,38 +175,48 @@ describe('FinanceStorage', () => {
     });
   });
 
-  describe('backward compatibility', () => {
-    it('adds missing fields for old data', async () => {
+  describe('boundary validation', () => {
+    it('не читает старый плоский файл — миграций больше нет', async () => {
       const legacyData = {
-        version: 1,
-        name: 'Test',
-        currency: '₽',
-        records: [{ id: '1', createdAt: 1, date: '2024-01-01', type: 'expense', amount: 100, category: '', tag: '', payer: '', note: '', attachmentPath: '', time: '' }],
-        categories: ['Test'],
-        tags: [],
-        payers: [],
-        debts: [],
-        credits: [],
-        deposits: [],
+        version: 1, name: 'Test', currency: '₽',
+        records: [{ id: '1', createdAt: 1, date: '2024-01-01', type: 'expense', amount: 100, category: 'Старое', tag: '', payer: '', note: '', attachmentPath: '', time: '' }],
+        categories: ['Старое'], tags: [], payers: [], debts: [], credits: [], deposits: [],
       };
-
-      const filesOnDisk = new Map<string, string>();
-      mockAdapter.write.mockImplementation(async (path: string, content: string) => {
-        filesOnDisk.set(path, content);
-      });
-      mockAdapter.exists.mockImplementation(async (path: string) => {
-        if (path.endsWith('test_path.md.json')) return true;
-        return filesOnDisk.has(path);
-      });
-      mockAdapter.read.mockImplementation(async (path: string) => {
-        if (path.endsWith('test_path.md.json')) return JSON.stringify(legacyData);
-        return filesOnDisk.get(path) ?? '';
-      });
-      mockAdapter.remove.mockResolvedValue(undefined);
+      mockAdapter.exists.mockImplementation(async (path: string) => path.endsWith('test_path.md.json'));
+      mockAdapter.read.mockImplementation(async () => JSON.stringify(legacyData));
 
       const data = await storage.load('test/path.md');
+
+      expect(data.records).toHaveLength(0);
+      expect(data.version).toBe(1);
+    });
+
+    it('повреждённый JSON даёт пустой счёт, а не исключение', async () => {
+      mockAdapter.exists.mockResolvedValue(true);
+      mockAdapter.read.mockResolvedValue('{ не json');
+
+      const data = await storage.load('test/note.md');
+
+      expect(data.records).toEqual([]);
+      expect(data.debts).toEqual([]);
       expect(data.currency).toBe('₽');
-      expect(data.records[0].time).toBe('');
+    });
+
+    it('отбрасывает записи без id и оставляет годные', async () => {
+      mockAdapter.exists.mockImplementation(async (path: string) => path.endsWith('records.json'));
+      mockAdapter.read.mockResolvedValue(JSON.stringify({
+        version: 1,
+        records: [
+          { id: '', date: '2024-01-01', type: 'expense', amount: 1 },
+          { id: 'ok', createdAt: 1, date: '2024-01-01', time: '', type: 'expense', amount: 100, category: 'Т', tag: '', payer: '', note: '', attachmentPath: '' },
+        ],
+        categories: ['Т'], tags: [], payers: [],
+      }));
+
+      const data = await storage.load('test/note.md');
+
+      expect(data.records).toHaveLength(1);
+      expect(data.records[0].id).toBe('ok');
     });
   });
 
@@ -253,8 +263,8 @@ describe('FinanceStorage', () => {
       });
       mockAdapter.read.mockImplementation(async (path: string) => {
         if (path.endsWith('debts.json')) return filesOnDisk.get(path) ?? '[]';
-        if (path.endsWith('meta.json')) return JSON.stringify({ version: 4, name: 'Test', currency: '₽' });
-        if (path.endsWith('records.json')) return JSON.stringify({ version: 4, records: [], categories: [], tags: [], payers: [] });
+        if (path.endsWith('meta.json')) return JSON.stringify({ version: 1, name: 'Test', currency: '₽' });
+        if (path.endsWith('records.json')) return JSON.stringify({ version: 1, records: [], categories: [], tags: [], payers: [] });
         return '[]';
       });
 
@@ -318,8 +328,8 @@ describe('FinanceStorage', () => {
       });
       mockAdapter.read.mockImplementation(async (path: string) => {
         if (path.endsWith('credits.json')) return filesOnDisk.get(path) ?? '[]';
-        if (path.endsWith('meta.json')) return JSON.stringify({ version: 4, name: 'Test', currency: '₽' });
-        if (path.endsWith('records.json')) return JSON.stringify({ version: 4, records: [], categories: [], tags: [], payers: [] });
+        if (path.endsWith('meta.json')) return JSON.stringify({ version: 1, name: 'Test', currency: '₽' });
+        if (path.endsWith('records.json')) return JSON.stringify({ version: 1, records: [], categories: [], tags: [], payers: [] });
         return '[]';
       });
 
@@ -348,7 +358,7 @@ describe('FinanceStorage', () => {
       expect(data.credits[0].name).toBe('Ипотека');
     });
 
-    it('migrates older credits correctly', async () => {
+    it('поля предоплаты получают явные значения при разборе', async () => {
       mockAdapter.exists.mockImplementation(async (path: string) => {
         if (path.endsWith('meta.json')) return true;
         if (path.endsWith('credits.json')) return true;
@@ -374,14 +384,14 @@ describe('FinanceStorage', () => {
             earlyRepaymentOption: 'term',
           }]);
         }
-        if (path.endsWith('meta.json')) return JSON.stringify({ version: 4, name: 'Test', currency: '₽' });
+        if (path.endsWith('meta.json')) return JSON.stringify({ version: 1, name: 'Test', currency: '₽' });
         return '[]';
       });
 
-      const data = await storage.load('test-migrate.md');
+      const data = await storage.load('test-parse.md');
       expect(data.credits).toHaveLength(1);
       const c = data.credits[0];
-      expect(c.purchasePrice).toBe(10000);
+      expect(c.purchasePrice).toBe(0);
       expect(c.downPayment).toBe(0);
       expect(c.downPaymentType).toBe('amount');
       expect(c.downPaymentValue).toBe(0);
@@ -401,8 +411,8 @@ describe('FinanceStorage', () => {
       });
       mockAdapter.read.mockImplementation(async (path: string) => {
         if (path.endsWith('deposits.json')) return filesOnDisk.get(path) ?? '[]';
-        if (path.endsWith('meta.json')) return JSON.stringify({ version: 4, name: 'Test', currency: '₽' });
-        if (path.endsWith('records.json')) return JSON.stringify({ version: 4, records: [], categories: [], tags: [], payers: [] });
+        if (path.endsWith('meta.json')) return JSON.stringify({ version: 1, name: 'Test', currency: '₽' });
+        if (path.endsWith('records.json')) return JSON.stringify({ version: 1, records: [], categories: [], tags: [], payers: [] });
         return '[]';
       });
 
