@@ -16,6 +16,7 @@ import { DepositsTab } from './tabs/DepositsTab';
 export class AccountView extends MarkdownRenderChild {
   private app:      App;
   private root:     HTMLElement;
+  private accountId: string;
   private notePath: string;
   private storage:  FinanceStorage;
   private settings: PluginSettings;
@@ -27,11 +28,14 @@ export class AccountView extends MarkdownRenderChild {
   private isCheckingAutoTransactions = false;
   private autoTxTimer: ReturnType<typeof setInterval> | null = null;
 
-  constructor(app: App, root: HTMLElement, notePath: string, storage: FinanceStorage, settings: PluginSettings, pluginId: string) {
+  constructor(
+    app: App, root: HTMLElement, accountId: string, notePath: string,
+    storage: FinanceStorage, settings: PluginSettings, pluginId: string,
+  ) {
     super(root);
-    this.app = app; this.root = root; this.notePath = notePath;
+    this.app = app; this.root = root; this.accountId = accountId; this.notePath = notePath;
     this.storage = storage; this.settings = settings; this.pluginId = pluginId;
-    this.ctx = new ViewContext(app, storage, notePath, pluginId, settings, root);
+    this.ctx = new ViewContext(app, storage, accountId, pluginId, settings, root);
   }
 
   private get data(): AccountData | null {
@@ -46,7 +50,7 @@ export class AccountView extends MarkdownRenderChild {
     this.ctx.isMobile = this.isMobile;
     if (this.isMobile) this.root.addClass('finance-tracker--mobile');
 
-    this.ctx.data = await this.storage.load(this.notePath);
+    this.ctx.data = await this.storage.load(this.accountId);
 
     await this.ctx.loadStateFromFile();
 
@@ -193,7 +197,7 @@ export class AccountView extends MarkdownRenderChild {
   }
 
   private async refreshAndRender(): Promise<void> {
-    this.ctx.data = await this.storage.load(this.notePath);
+    this.ctx.data = await this.storage.load(this.accountId);
     await this.checkAutoTransactions();
     this.renderBodyContent();
   }
@@ -216,7 +220,7 @@ export class AccountView extends MarkdownRenderChild {
       const val = el.textContent?.trim() || current;
       if (val !== current && this.data) {
         this.data.name = val;
-        await this.storage.updateMeta(this.notePath, { name: val });
+        await this.storage.updateMeta(this.accountId, { name: val });
       }
       el.textContent = val;
     };
@@ -235,7 +239,7 @@ export class AccountView extends MarkdownRenderChild {
     const applyCurrency = async (newCur: string) => {
       if (newCur !== cur && this.data) {
         this.data.currency = newCur;
-        await this.storage.updateMeta(this.notePath, { currency: newCur });
+        await this.storage.updateMeta(this.accountId, { currency: newCur });
       }
       this.renderCurrencyBadge(wrap);
     };
@@ -284,8 +288,8 @@ export class AccountView extends MarkdownRenderChild {
       settings: this.settings,
       pluginId: this.pluginId,
       onSave: async rec => {
-        await this.storage.addRecord(this.notePath, rec);
-        this.ctx.data = await this.storage.load(this.notePath);
+        await this.storage.addRecord(this.accountId, rec);
+        this.ctx.data = await this.storage.load(this.accountId);
         this.renderBodyContent();
         new Notice(this.ctx.tr.recordAdded);
       },
@@ -319,9 +323,9 @@ export class AccountView extends MarkdownRenderChild {
 
       this.ctx.data = { ...data, records: result.records, deposits: result.deposits, credits: result.credits };
 
-      if (result.changed.records) await this.storage.saveAllRecords(this.notePath, result.records);
-      if (result.changed.deposits) await this.storage.saveAllDeposits(this.notePath, result.deposits);
-      if (result.changed.credits) await this.storage.saveAllCredits(this.notePath, result.credits);
+      if (result.changed.records) await this.storage.saveAllRecords(this.accountId, result.records);
+      if (result.changed.deposits) await this.storage.saveAllDeposits(this.accountId, result.deposits);
+      if (result.changed.credits) await this.storage.saveAllCredits(this.accountId, result.credits);
     } finally {
       this.isCheckingAutoTransactions = false;
     }

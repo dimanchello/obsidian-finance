@@ -8,6 +8,8 @@ interface MockAdapter {
   mkdir: ReturnType<typeof vi.fn>;
   remove: ReturnType<typeof vi.fn>;
   rename: ReturnType<typeof vi.fn>;
+  list: ReturnType<typeof vi.fn>;
+  rmdir: ReturnType<typeof vi.fn>;
 }
 
 interface MockApp {
@@ -29,6 +31,8 @@ describe('FinanceStorage', () => {
           mkdir: vi.fn().mockResolvedValue(undefined),
           remove: vi.fn().mockResolvedValue(undefined),
           rename: vi.fn().mockResolvedValue(undefined),
+          list: vi.fn().mockResolvedValue({ files: [], folders: [] }),
+          rmdir: vi.fn().mockResolvedValue(undefined),
         },
       },
     };
@@ -220,15 +224,42 @@ describe('FinanceStorage', () => {
     });
   });
 
-  describe('noteFolder', () => {
-    it('uses last 2 segments for nested paths', () => {
-      const result = (storage as any).noteFolder('Люди/Я/Финансы/Счета/Доллары.md');
-      expect(result).toContain('Счета_Доллары');
+  describe('accountFolder', () => {
+    it('папка называется по id и ни от чего внешнего не зависит', () => {
+      const result = (storage as any).accountFolder('a7f3c92b4e1d');
+      expect(result).toContain('accounts_a7f3c92b4e1d');
     });
 
-    it('uses single segment for root notes', () => {
-      const result = (storage as any).noteFolder('Доллары.md');
-      expect(result).toContain('accounts_Доллары');
+    it('один и тот же id всегда даёт одну и ту же папку', () => {
+      const a = (storage as any).accountFolder('a7f3c92b4e1d');
+      const b = (storage as any).accountFolder('a7f3c92b4e1d');
+      expect(a).toBe(b);
+    });
+
+    it('разные id не сталкиваются', () => {
+      const a = (storage as any).accountFolder('aaaaaaaaaaaa');
+      const b = (storage as any).accountFolder('bbbbbbbbbbbb');
+      expect(a).not.toBe(b);
+    });
+  });
+
+  describe('findOrphanedAccounts', () => {
+    it('возвращает папки, чей id не встречается ни в одном блоке', async () => {
+      mockAdapter.exists.mockResolvedValue(true);
+      mockAdapter.list.mockResolvedValue({
+        files: [],
+        folders: ['.obsidian/plugins/obsidian-finance/accounts/aaaaaaaaaaaa',
+                  '.obsidian/plugins/obsidian-finance/accounts/bbbbbbbbbbbb'],
+      });
+
+      const orphans = await storage.findOrphanedAccounts(new Set(['aaaaaaaaaaaa']));
+
+      expect(orphans).toEqual(['bbbbbbbbbbbb']);
+    });
+
+    it('пустой список, когда папки счетов ещё нет', async () => {
+      mockAdapter.exists.mockResolvedValue(false);
+      expect(await storage.findOrphanedAccounts(new Set())).toEqual([]);
     });
   });
 

@@ -1,13 +1,22 @@
-import { MarkdownView, Notice, Plugin, PluginSettingTab, App, Setting, TFile } from 'obsidian';
+import { MarkdownPostProcessorContext, Notice, Plugin, PluginSettingTab, App, Setting, TFile } from 'obsidian';
 import { FinanceStorage } from './src/storage';
 import { AccountView }    from './src/AccountView';
-import { PluginSettings, DEFAULT_SETTINGS } from './src/types';
+import { PluginSettings, DEFAULT_SETTINGS, MINT_GUARD_MS } from './src/types';
 import { getLocaleFromApp, t } from './src/i18n';
+import { collectAccountIds, insertAccountId, newAccountId, parseAccountId } from './src/domain/accountId';
+import { OrphanedAccountsModal } from './src/OrphanedAccountsModal';
+
+type ResolvedAccountId =
+  | { kind: 'ok'; id: string }
+  | { kind: 'invalid'; raw: string }
+  | { kind: 'unwritable' };
 
 export default class FinanceTrackerPlugin extends Plugin {
   settings: PluginSettings;
   storage:  FinanceStorage;
   private styleEl?: HTMLStyleElement;
+  /** Guards against the re-render our own note write triggers. */
+  private mintedBlocks = new Set<string>();
 
   async onload(): Promise<void> {
     await this.loadSettings();
@@ -19,11 +28,23 @@ export default class FinanceTrackerPlugin extends Plugin {
     this.registerMarkdownCodeBlockProcessor(
       'finance-account',
       async (source, el, ctx) => {
-        const view = new AccountView(this.app, el, ctx.sourcePath, this.storage, this.settings, this.manifest.id);
+        const resolved = await this.resolveAccountId(source, el, ctx);
+        if (resolved.kind !== 'ok') {
+          this.renderBlockError(el, resolved);
+          return;
+        }
+        const view = new AccountView(this.app, el, resolved.id, ctx.sourcePath, this.storage, this.settings, this.manifest.id);
         ctx.addChild(view);
         await view.render();
       },
     );
+
+    this.addCommand({
+      id: 'find-orphaned-accounts',
+      name: t(getLocaleFromApp(this.app)).commandFindOrphans,
+      icon: 'search',
+      callback: () => { void this.reportOrphanedAccounts(); },
+    });
 
     this.addCommand({
       id: 'insert-finance-account-template',
@@ -33,28 +54,10 @@ export default class FinanceTrackerPlugin extends Plugin {
         const template = '```finance-account\n\n```';
         editor.replaceSelection(template);
         const cursor = editor.getCursor();
-        editor.setCursor(cursor.line - 1, 0);
-        const tr = t(getLocaleFromApp(this.app));
+        editor.setCursor(cursor.line - 1, 0);        const tr = t(getLocaleFromApp(this.app));
         new Notice(tr.templateInserted);
       },
     });
-
-    this.registerEvent(
-      this.app.vault.on('rename', (file: TFile, oldPath: string) => {
-        if (file instanceof TFile && file.extension === 'md') {
-          this.storage.renameAccount(oldPath, file.path);
-          const oldKey = 'ft-view:' + this.manifest.id + ':' + oldPath;
-          const newKey = 'ft-view:' + this.manifest.id + ':' + file.path;
-          try {
-            const val = localStorage.getItem(oldKey);
-            if (val) {
-              localStorage.setItem(newKey, val);
-              localStorage.removeItem(oldKey);
-            }
-          } catch { /* ignore */ }
-        }
-      }),
-    );
 
     this.addSettingTab(new FinanceSettingTab(this.app, this));
   }
@@ -62,6 +65,82 @@ export default class FinanceTrackerPlugin extends Plugin {
   async onunload(): Promise<void> {
     await this.storage.flush();
     this.styleEl?.remove();
+  }
+
+  /**
+   * Resolves the account id from the block source, minting and writing one on first render.
+   * Writing into a user's note is the riskiest thing this plugin does, so it only happens
+   * when the id is absent, the section bounds are known, and the block has not been served yet.
+   */
+  private async resolveAccountId(
+    source: string, el: HTMLElement, ctx: MarkdownPostProcessorContext,
+  ): Promise<ResolvedAccountId> {
+    const parsed = parseAccountId(source);
+    if (parsed.kind === 'ok') {
+      void this.storage.touchSourcePath(parsed.id, ctx.sourcePath);
+      return parsed;
+    }
+    if (parsed.kind === 'invalid') return parsed;
+
+    const section = ctx.getSectionInfo(el);
+    const file = this.app.vault.getAbstractFileByPath(ctx.sourcePath);
+    // Embedded/exported views give no section info and no writable note. Creating an
+    // account here would leave an orphan folder, so refuse rather than guess.
+    if (!section || !(file instanceof TFile)) return { kind: 'unwritable' };
+
+    const blockKey = `${ctx.sourcePath}:${section.lineStart}`;
+    if (this.mintedBlocks.has(blockKey)) return { kind: 'unwritable' };
+    this.mintedBlocks.add(blockKey);
+    // Only guards the re-render our own write triggers; a later deliberate removal
+    // of the id line must be able to mint a fresh one.
+    window.setTimeout(() => this.mintedBlocks.delete(blockKey), MINT_GUARD_MS);
+
+    const id = newAccountId(crypto.randomUUID());
+    let written = false;
+    await this.app.vault.process(file, (data) => {
+      const next = insertAccountId(data, section.lineStart, section.lineEnd, id);
+      if (next === null) return data;
+      written = true;
+      return next;
+    });
+
+    if (!written) {
+      this.mintedBlocks.delete(blockKey);
+      return { kind: 'unwritable' };
+    }
+    void this.storage.touchSourcePath(id, ctx.sourcePath);
+    return { kind: 'ok', id };
+  }
+
+  private renderBlockError(el: HTMLElement, resolved: ResolvedAccountId): void {
+    const tr = t(getLocaleFromApp(this.app));
+    el.empty();
+    el.addClass('finance-tracker');
+    const box = el.createDiv('finance-block-error');
+    if (resolved.kind === 'invalid') {
+      box.createEl('strong', { text: tr.blockInvalidIdTitle });
+      box.createEl('p', { text: tr.blockInvalidIdDesc.replace('{id}', resolved.raw) });
+    } else {
+      box.createEl('strong', { text: tr.blockReadOnlyTitle });
+      box.createEl('p', { text: tr.blockReadOnlyDesc });
+    }
+  }
+
+  private async reportOrphanedAccounts(): Promise<void> {
+    const tr = t(getLocaleFromApp(this.app));
+    const liveIds = new Set<string>();
+    for (const file of this.app.vault.getMarkdownFiles()) {
+      for (const id of collectAccountIds(await this.app.vault.cachedRead(file))) {
+        liveIds.add(id);
+      }
+    }
+
+    const orphans = await this.storage.findOrphanedAccounts(liveIds);
+    if (!orphans.length) {
+      new Notice(tr.orphansNone);
+      return;
+    }
+    new OrphanedAccountsModal(this.app, orphans, this.storage).open();
   }
 
   async loadSettings(): Promise<void> {

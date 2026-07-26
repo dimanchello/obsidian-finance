@@ -991,7 +991,7 @@ export class CreditsTab {
       banks: allBanks,
       records: [...this.ctx.data.records],
       onSave: async (credit, updatedRecords) => {
-        await this.ctx.storage.addCredit(this.ctx.notePath, credit);
+        await this.ctx.storage.addCredit(this.ctx.accountId, credit);
         const nowTime = new Date().toTimeString().slice(0, 5);
         const rec: FinanceRecord = {
           id: crypto.randomUUID(),
@@ -1026,8 +1026,8 @@ export class CreditsTab {
             });
           }
         }
-        await this.ctx.storage.saveAllRecords(this.ctx.notePath, updatedRecords);
-        this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
+        await this.ctx.storage.saveAllRecords(this.ctx.accountId, updatedRecords);
+        this.ctx.data = await this.ctx.storage.load(this.ctx.accountId);
         this.render();
         new Notice(this.tr.creditAdded);
       },
@@ -1043,7 +1043,7 @@ export class CreditsTab {
       banks: allBanks,
       records: [...this.ctx.data.records],
       onSave: async (updated, updatedRecords) => {
-        await this.ctx.storage.updateCredit(this.ctx.notePath, updated);
+        await this.ctx.storage.updateCredit(this.ctx.accountId, updated);
         const nowTime = new Date().toTimeString().slice(0, 5);
         
         const receiptRec = updatedRecords.find(r => r.linkedId === updated.id && r.type === 'income');
@@ -1081,8 +1081,8 @@ export class CreditsTab {
             }
           }
         }
-        await this.ctx.storage.saveAllRecords(this.ctx.notePath, updatedRecords);
-        this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
+        await this.ctx.storage.saveAllRecords(this.ctx.accountId, updatedRecords);
+        this.ctx.data = await this.ctx.storage.load(this.ctx.accountId);
         this.render();
         new Notice(this.tr.creditUpdated);
       },
@@ -1101,7 +1101,7 @@ export class CreditsTab {
         if (paidAmount >= totalToPay) {
           credit.status = 'paid';
         }
-        await this.ctx.storage.updateCredit(this.ctx.notePath, credit);
+        await this.ctx.storage.updateCredit(this.ctx.accountId, credit);
 
         const rec: FinanceRecord = {
           id: Date.now().toString(),
@@ -1119,9 +1119,9 @@ export class CreditsTab {
           isInternal: false,
           linkedId: credit.id,
         };
-        await this.ctx.storage.addRecord(this.ctx.notePath, rec);
+        await this.ctx.storage.addRecord(this.ctx.accountId, rec);
 
-        this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
+        this.ctx.data = await this.ctx.storage.load(this.ctx.accountId);
         this.render();
         new Notice(this.tr.creditPaymentRecorded);
       },
@@ -1134,8 +1134,8 @@ export class CreditsTab {
       credit,
       currency: this.ctx.currency,
       onSave: async updated => {
-        await this.ctx.storage.updateCredit(this.ctx.notePath, updated);
-        this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
+        await this.ctx.storage.updateCredit(this.ctx.accountId, updated);
+        this.ctx.data = await this.ctx.storage.load(this.ctx.accountId);
         this.render();
         new Notice(this.tr.creditPaymentRecorded);
       },
@@ -1145,13 +1145,13 @@ export class CreditsTab {
   private confirmDeleteCredit(credit: CreditRecord): void {
     const label = `${credit.name} · ${this.ctx.fmt(credit.currentAmount)}`;
     new ConfirmModal(this.ctx.app, `${this.tr.confirmDeleteCredit}\n${label}`, async () => {
-      await this.ctx.storage.deleteCredit(this.ctx.notePath, credit.id);
+      await this.ctx.storage.deleteCredit(this.ctx.accountId, credit.id);
       let recs = this.ctx.data!.records.filter(r => r.linkedId !== credit.id);
       if (credit.downPaymentRecordId) {
         recs = recs.filter(r => r.id !== credit.downPaymentRecordId);
       }
-      await this.ctx.storage.saveAllRecords(this.ctx.notePath, recs);
-      this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
+      await this.ctx.storage.saveAllRecords(this.ctx.accountId, recs);
+      this.ctx.data = await this.ctx.storage.load(this.ctx.accountId);
       this.render();
       new Notice(this.tr.creditDeleted);
     }).open();
@@ -1164,7 +1164,7 @@ export class CreditsTab {
     new ConfirmModal(this.ctx.app, msg, async () => {
       const ids = Array.from(this.selectedIds);
       const creditsToDelete = (this.ctx.data?.credits ?? []).filter(c => this.selectedIds.has(c.id));
-      await this.ctx.storage.deleteCreditsBatch(this.ctx.notePath, ids);
+      await this.ctx.storage.deleteCreditsBatch(this.ctx.accountId, ids);
 
       let recs = this.ctx.data!.records;
       for (const credit of creditsToDelete) {
@@ -1173,9 +1173,9 @@ export class CreditsTab {
           recs = recs.filter(r => r.id !== credit.downPaymentRecordId);
         }
       }
-      await this.ctx.storage.saveAllRecords(this.ctx.notePath, recs);
+      await this.ctx.storage.saveAllRecords(this.ctx.accountId, recs);
 
-      this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
+      this.ctx.data = await this.ctx.storage.load(this.ctx.accountId);
       this.selectedIds.clear();
       this.bulkMode = false;
       this.render();

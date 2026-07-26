@@ -12,6 +12,7 @@ interface AccountMetaFile {
   name: string;
   currency: string;
   accentColor?: string;
+  /** Where the note was last seen. A display/diagnostics hint only — never identity. */
   sourcePath?: string;
 }
 
@@ -55,7 +56,6 @@ export class FinanceStorage {
   private depositsCache = new Map<string, DepositRecord[]>();
   private depositsDirty = new Set<string>();
 
-  private folderOverrides = new Map<string, string>();
 
   private timer: ReturnType<typeof setTimeout> | null = null;
   private defaultCurrency: string;
@@ -68,24 +68,13 @@ export class FinanceStorage {
 
   setDefaultCurrency(c: string) { this.defaultCurrency = c; }
 
-  private getFolderBaseName(notePath: string): string {
-    const withoutExt = notePath.replace(/\.md$/i, '');
-    const segments = withoutExt.split(/[\\/]/);
-    const folderName = segments.length >= 2
-      ? segments.slice(-2).join('_')
-      : segments[0];
-    return folderName.replace(/[\\/:"*?<>|]/g, '_');
+  /** The id is self-contained, so this folder never has to be renamed or disambiguated. */
+  private accountFolder(accountId: string): string {
+    return normalizePath(`${this.base}/${accountId}`);
   }
 
-  private noteFolder(notePath: string): string {
-    const override = this.folderOverrides.get(notePath);
-    if (override) return normalizePath(`${this.base}/${override}`);
-    const safe = this.getFolderBaseName(notePath);
-    return normalizePath(`${this.base}/${safe}`);
-  }
-
-  private fp(notePath: string, suffix: string): string {
-    return normalizePath(`${this.noteFolder(notePath)}/${suffix}.json`);
+  private fp(accountId: string, suffix: string): string {
+    return normalizePath(`${this.accountFolder(accountId)}/${suffix}.json`);
   }
 
   private async ensureBase(): Promise<void> {
@@ -93,41 +82,16 @@ export class FinanceStorage {
     if (!(await a.exists(this.base))) await a.mkdir(this.base);
   }
 
-  private async ensureNoteFolder(notePath: string): Promise<void> {
+  private async ensureAccountFolder(accountId: string): Promise<void> {
     const a = this.app.vault.adapter;
-    const folder = this.noteFolder(notePath);
-
-    if (!(await a.exists(folder))) {
-      await a.mkdir(folder);
-      return;
-    }
-
-    const metaPath = normalizePath(`${folder}/meta.json`);
-    if (await a.exists(metaPath)) {
-      try {
-        const meta = JSON.parse(await a.read(metaPath)) as AccountMetaFile;
-        if (meta.sourcePath && meta.sourcePath !== notePath) {
-          const base = this.getFolderBaseName(notePath);
-          let suffix = 1;
-          while (true) {
-            const newName = `${base}_${suffix}`;
-            const newFolder = normalizePath(`${this.base}/${newName}`);
-            if (!(await a.exists(newFolder))) {
-              await a.mkdir(newFolder);
-              this.folderOverrides.set(notePath, newName);
-              return;
-            }
-            suffix++;
-          }
-        }
-      } catch { /* ignore corrupt meta */ }
-    }
+    const folder = this.accountFolder(accountId);
+    if (!(await a.exists(folder))) await a.mkdir(folder);
   }
 
   // ── Load methods ──────────────────────────────────────────────────────────
 
-  private async readJson(notePath: string, suffix: string): Promise<unknown> {
-    const fp = this.fp(notePath, suffix);
+  private async readJson(accountId: string, suffix: string): Promise<unknown> {
+    const fp = this.fp(accountId, suffix);
     if (!(await this.app.vault.adapter.exists(fp))) return null;
     try {
       return JSON.parse(await this.app.vault.adapter.read(fp));
@@ -137,13 +101,12 @@ export class FinanceStorage {
     }
   }
 
-  private async loadMeta(notePath: string): Promise<AccountMetaFile> {
-    const cached = this.metaCache.get(notePath);
+  private async loadMeta(accountId: string): Promise<AccountMetaFile> {
+    const cached = this.metaCache.get(accountId);
     if (cached) return cached;
 
-    const raw = await this.readJson(notePath, 'meta');
+    const raw = await this.readJson(accountId, 'meta');
     const meta = emptyMeta(this.defaultCurrency);
-    meta.sourcePath = notePath;
     if (raw !== null && typeof raw === 'object' && !Array.isArray(raw)) {
       const o = raw as Record<string, unknown>;
       if (typeof o.name === 'string') meta.name = o.name;
@@ -151,15 +114,15 @@ export class FinanceStorage {
       if (typeof o.accentColor === 'string') meta.accentColor = o.accentColor;
       if (typeof o.sourcePath === 'string') meta.sourcePath = o.sourcePath;
     }
-    this.metaCache.set(notePath, meta);
+    this.metaCache.set(accountId, meta);
     return meta;
   }
 
-  private async loadRecords(notePath: string): Promise<AccountRecordsFile> {
-    const cached = this.recordsCache.get(notePath);
+  private async loadRecords(accountId: string): Promise<AccountRecordsFile> {
+    const cached = this.recordsCache.get(accountId);
     if (cached) return cached;
 
-    const raw = await this.readJson(notePath, 'records');
+    const raw = await this.readJson(accountId, 'records');
     const file = emptyRecords();
     if (raw !== null && typeof raw === 'object' && !Array.isArray(raw)) {
       const o = raw as Record<string, unknown>;
@@ -168,42 +131,42 @@ export class FinanceStorage {
       file.tags = parseStringList(o.tags);
       file.payers = parseStringList(o.payers);
     }
-    this.recordsCache.set(notePath, file);
+    this.recordsCache.set(accountId, file);
     return file;
   }
 
-  private async loadDebts(notePath: string): Promise<DebtRecord[]> {
-    const cached = this.debtsCache.get(notePath);
+  private async loadDebts(accountId: string): Promise<DebtRecord[]> {
+    const cached = this.debtsCache.get(accountId);
     if (cached) return cached;
-    const debts = parseDebts(await this.readJson(notePath, 'debts'));
-    this.debtsCache.set(notePath, debts);
+    const debts = parseDebts(await this.readJson(accountId, 'debts'));
+    this.debtsCache.set(accountId, debts);
     return debts;
   }
 
-  private async loadCredits(notePath: string): Promise<CreditRecord[]> {
-    const cached = this.creditsCache.get(notePath);
+  private async loadCredits(accountId: string): Promise<CreditRecord[]> {
+    const cached = this.creditsCache.get(accountId);
     if (cached) return cached;
-    const credits = parseCredits(await this.readJson(notePath, 'credits'));
-    this.creditsCache.set(notePath, credits);
+    const credits = parseCredits(await this.readJson(accountId, 'credits'));
+    this.creditsCache.set(accountId, credits);
     return credits;
   }
 
-  private async loadDeposits(notePath: string): Promise<DepositRecord[]> {
-    const cached = this.depositsCache.get(notePath);
+  private async loadDeposits(accountId: string): Promise<DepositRecord[]> {
+    const cached = this.depositsCache.get(accountId);
     if (cached) return cached;
-    const deposits = parseDeposits(await this.readJson(notePath, 'deposits'));
-    this.depositsCache.set(notePath, deposits);
+    const deposits = parseDeposits(await this.readJson(accountId, 'deposits'));
+    this.depositsCache.set(accountId, deposits);
     return deposits;
   }
 
   // ── Composite load (for AccountView) ──────────────────────────────────────
 
-  async load(notePath: string): Promise<AccountData> {
-    const meta = await this.loadMeta(notePath);
-    const recs = await this.loadRecords(notePath);
-    const debts = await this.loadDebts(notePath);
-    const credits = await this.loadCredits(notePath);
-    const deposits = await this.loadDeposits(notePath);
+  async load(accountId: string): Promise<AccountData> {
+    const meta = await this.loadMeta(accountId);
+    const recs = await this.loadRecords(accountId);
+    const debts = await this.loadDebts(accountId);
+    const credits = await this.loadCredits(accountId);
+    const deposits = await this.loadDeposits(accountId);
 
     return {
       version: DATA_VERSION,
@@ -222,11 +185,11 @@ export class FinanceStorage {
 
   // ── Schedule / Flush ──────────────────────────────────────────────────────
 
-  private scheduleMeta(notePath: string): void { this.metaDirty.add(notePath); this.startTimer(); }
-  private scheduleRecords(notePath: string): void { this.recordsDirty.add(notePath); this.startTimer(); }
-  private scheduleDebts(notePath: string): void { this.debtsDirty.add(notePath); this.startTimer(); }
-  private scheduleCredits(notePath: string): void { this.creditsDirty.add(notePath); this.startTimer(); }
-  private scheduleDeposits(notePath: string): void { this.depositsDirty.add(notePath); this.startTimer(); }
+  private scheduleMeta(accountId: string): void { this.metaDirty.add(accountId); this.startTimer(); }
+  private scheduleRecords(accountId: string): void { this.recordsDirty.add(accountId); this.startTimer(); }
+  private scheduleDebts(accountId: string): void { this.debtsDirty.add(accountId); this.startTimer(); }
+  private scheduleCredits(accountId: string): void { this.creditsDirty.add(accountId); this.startTimer(); }
+  private scheduleDeposits(accountId: string): void { this.depositsDirty.add(accountId); this.startTimer(); }
 
   private startTimer(): void {
     if (this.timer) clearTimeout(this.timer);
@@ -244,15 +207,12 @@ export class FinanceStorage {
       ...this.depositsDirty,
     ]);
     for (const np of allNotes) {
-      await this.ensureNoteFolder(np);
+      await this.ensureAccountFolder(np);
     }
 
     for (const np of this.metaDirty) {
       const d = this.metaCache.get(np);
-      if (d) {
-        d.sourcePath = np;
-        await this.app.vault.adapter.write(this.fp(np, 'meta'), JSON.stringify(d));
-      }
+      if (d) await this.app.vault.adapter.write(this.fp(np, 'meta'), JSON.stringify(d));
     }
     this.metaDirty.clear();
 
@@ -303,62 +263,62 @@ export class FinanceStorage {
 
   // ── Meta ──────────────────────────────────────────────────────────────────
 
-  async updateMeta(notePath: string, meta: Partial<AccountMeta>): Promise<void> {
-    const d = await this.loadMeta(notePath);
+  async updateMeta(accountId: string, meta: Partial<AccountMeta>): Promise<void> {
+    const d = await this.loadMeta(accountId);
     if (meta.name     !== undefined) d.name     = meta.name;
     if (meta.currency !== undefined) d.currency = meta.currency;
     if (meta.accentColor !== undefined) d.accentColor = meta.accentColor;
-    this.scheduleMeta(notePath);
+    this.scheduleMeta(accountId);
   }
 
   // ── Records CRUD ──────────────────────────────────────────────────────────
 
-  async addRecord(notePath: string, rec: FinanceRecord): Promise<void> {
-    const d = await this.loadRecords(notePath);
+  async addRecord(accountId: string, rec: FinanceRecord): Promise<void> {
+    const d = await this.loadRecords(accountId);
     d.records.push(rec);
     addToSet(d.categories, rec.category);
     addToSet(d.tags,       rec.tag);
     addToSet(d.payers,     rec.payer);
-    this.scheduleRecords(notePath);
+    this.scheduleRecords(accountId);
   }
 
-  async updateRecord(notePath: string, rec: FinanceRecord): Promise<void> {
-    const d   = await this.loadRecords(notePath);
+  async updateRecord(accountId: string, rec: FinanceRecord): Promise<void> {
+    const d   = await this.loadRecords(accountId);
     const idx = d.records.findIndex(r => r.id === rec.id);
     if (idx === -1) return;
     d.records[idx] = rec;
     addToSet(d.categories, rec.category);
     addToSet(d.tags,       rec.tag);
     addToSet(d.payers,     rec.payer);
-    this.scheduleRecords(notePath);
+    this.scheduleRecords(accountId);
   }
 
-  async deleteRecord(notePath: string, id: string): Promise<void> {
-    const d   = await this.loadRecords(notePath);
+  async deleteRecord(accountId: string, id: string): Promise<void> {
+    const d   = await this.loadRecords(accountId);
     d.records = d.records.filter(r => r.id !== id);
-    this.scheduleRecords(notePath);
+    this.scheduleRecords(accountId);
   }
 
-  async deleteRecordsBatch(notePath: string, ids: string[]): Promise<void> {
+  async deleteRecordsBatch(accountId: string, ids: string[]): Promise<void> {
     const idSet = new Set(ids);
-    const d   = await this.loadRecords(notePath);
+    const d   = await this.loadRecords(accountId);
     d.records = d.records.filter(r => !idSet.has(r.id));
-    this.scheduleRecords(notePath);
+    this.scheduleRecords(accountId);
   }
 
-  async importRecords(notePath: string, recs: FinanceRecord[]): Promise<void> {
-    const d = await this.loadRecords(notePath);
+  async importRecords(accountId: string, recs: FinanceRecord[]): Promise<void> {
+    const d = await this.loadRecords(accountId);
     for (const r of recs) {
       d.records.push(r);
       addToSet(d.categories, r.category);
       addToSet(d.tags,       r.tag);
       addToSet(d.payers,     r.payer);
     }
-    this.scheduleRecords(notePath);
+    this.scheduleRecords(accountId);
   }
 
-  async saveAllRecords(notePath: string, records: FinanceRecord[]): Promise<void> {
-    const d = await this.loadRecords(notePath);
+  async saveAllRecords(accountId: string, records: FinanceRecord[]): Promise<void> {
+    const d = await this.loadRecords(accountId);
     d.records = records;
     d.categories = [];
     d.tags = [];
@@ -368,52 +328,52 @@ export class FinanceStorage {
       addToSet(d.tags, r.tag);
       addToSet(d.payers, r.payer);
     });
-    this.scheduleRecords(notePath);
+    this.scheduleRecords(accountId);
   }
 
   // ── Debt CRUD ──────────────────────────────────────────────────────────────
 
-  async addDebt(notePath: string, debt: DebtRecord): Promise<void> {
-    const d = await this.loadDebts(notePath);
+  async addDebt(accountId: string, debt: DebtRecord): Promise<void> {
+    const d = await this.loadDebts(accountId);
     d.push(debt);
-    this.scheduleDebts(notePath);
+    this.scheduleDebts(accountId);
   }
 
-  async updateDebt(notePath: string, debt: DebtRecord): Promise<void> {
-    const d   = await this.loadDebts(notePath);
+  async updateDebt(accountId: string, debt: DebtRecord): Promise<void> {
+    const d   = await this.loadDebts(accountId);
     const idx = d.findIndex(x => x.id === debt.id);
     if (idx === -1) return;
     d[idx] = debt;
-    this.scheduleDebts(notePath);
+    this.scheduleDebts(accountId);
   }
 
-  async deleteDebt(notePath: string, id: string): Promise<void> {
-    const d = await this.loadDebts(notePath);
+  async deleteDebt(accountId: string, id: string): Promise<void> {
+    const d = await this.loadDebts(accountId);
     const filtered = d.filter(x => x.id !== id);
-    this.debtsCache.set(notePath, filtered);
-    this.scheduleDebts(notePath);
+    this.debtsCache.set(accountId, filtered);
+    this.scheduleDebts(accountId);
   }
 
-  async deleteDebtsBatch(notePath: string, ids: string[]): Promise<void> {
+  async deleteDebtsBatch(accountId: string, ids: string[]): Promise<void> {
     const idSet = new Set(ids);
-    const d = await this.loadDebts(notePath);
+    const d = await this.loadDebts(accountId);
     const filtered = d.filter(x => !idSet.has(x.id));
-    this.debtsCache.set(notePath, filtered);
-    this.scheduleDebts(notePath);
+    this.debtsCache.set(accountId, filtered);
+    this.scheduleDebts(accountId);
   }
 
-  async addDebtMovement(notePath: string, debtId: string, mov: DebtMovement): Promise<void> {
-    const d   = await this.loadDebts(notePath);
+  async addDebtMovement(accountId: string, debtId: string, mov: DebtMovement): Promise<void> {
+    const d   = await this.loadDebts(accountId);
     const idx = d.findIndex(x => x.id === debtId);
     if (idx === -1) return;
     const debt = d[idx];
     debt.movements.push(mov);
     debt.amount = sumMoney(debt.movements.map(m => m.type === 'borrow' ? m.amount : -m.amount));
-    this.scheduleDebts(notePath);
+    this.scheduleDebts(accountId);
   }
 
-  async updateDebtMovement(notePath: string, debtId: string, mov: DebtMovement): Promise<void> {
-    const d   = await this.loadDebts(notePath);
+  async updateDebtMovement(accountId: string, debtId: string, mov: DebtMovement): Promise<void> {
+    const d   = await this.loadDebts(accountId);
     const idx = d.findIndex(x => x.id === debtId);
     if (idx === -1) return;
     const debt = d[idx];
@@ -421,88 +381,88 @@ export class FinanceStorage {
     if (mIdx === -1) return;
     debt.movements[mIdx] = mov;
     debt.amount = sumMoney(debt.movements.map(m => m.type === 'borrow' ? m.amount : -m.amount));
-    this.scheduleDebts(notePath);
+    this.scheduleDebts(accountId);
   }
 
-  async deleteDebtMovement(notePath: string, debtId: string, movementId: string): Promise<void> {
-    const d   = await this.loadDebts(notePath);
+  async deleteDebtMovement(accountId: string, debtId: string, movementId: string): Promise<void> {
+    const d   = await this.loadDebts(accountId);
     const idx = d.findIndex(x => x.id === debtId);
     if (idx === -1) return;
     const debt = d[idx];
     debt.movements = debt.movements.filter(m => m.id !== movementId);
     debt.amount = sumMoney(debt.movements.map(m => m.type === 'borrow' ? m.amount : -m.amount));
-    this.scheduleDebts(notePath);
+    this.scheduleDebts(accountId);
   }
 
   // ── Credit CRUD ──────────────────────────────────────────────────────────────
 
-  async addCredit(notePath: string, credit: CreditRecord): Promise<void> {
-    const d = await this.loadCredits(notePath);
+  async addCredit(accountId: string, credit: CreditRecord): Promise<void> {
+    const d = await this.loadCredits(accountId);
     d.push(credit);
-    this.scheduleCredits(notePath);
+    this.scheduleCredits(accountId);
   }
 
-  async updateCredit(notePath: string, credit: CreditRecord): Promise<void> {
-    const d   = await this.loadCredits(notePath);
+  async updateCredit(accountId: string, credit: CreditRecord): Promise<void> {
+    const d   = await this.loadCredits(accountId);
     const idx = d.findIndex(x => x.id === credit.id);
     if (idx === -1) return;
     d[idx] = credit;
-    this.scheduleCredits(notePath);
+    this.scheduleCredits(accountId);
   }
 
-  async deleteCredit(notePath: string, id: string): Promise<void> {
-    const d = await this.loadCredits(notePath);
+  async deleteCredit(accountId: string, id: string): Promise<void> {
+    const d = await this.loadCredits(accountId);
     const filtered = d.filter(x => x.id !== id);
-    this.creditsCache.set(notePath, filtered);
-    this.scheduleCredits(notePath);
+    this.creditsCache.set(accountId, filtered);
+    this.scheduleCredits(accountId);
   }
 
-  async deleteCreditsBatch(notePath: string, ids: string[]): Promise<void> {
+  async deleteCreditsBatch(accountId: string, ids: string[]): Promise<void> {
     const idSet = new Set(ids);
-    const d = await this.loadCredits(notePath);
+    const d = await this.loadCredits(accountId);
     const filtered = d.filter(x => !idSet.has(x.id));
-    this.creditsCache.set(notePath, filtered);
-    this.scheduleCredits(notePath);
+    this.creditsCache.set(accountId, filtered);
+    this.scheduleCredits(accountId);
   }
 
   // ── Deposit CRUD ──────────────────────────────────────────────────────────────
 
-  async addDeposit(notePath: string, deposit: DepositRecord): Promise<void> {
-    const d = await this.loadDeposits(notePath);
+  async addDeposit(accountId: string, deposit: DepositRecord): Promise<void> {
+    const d = await this.loadDeposits(accountId);
     d.push(deposit);
-    this.scheduleDeposits(notePath);
+    this.scheduleDeposits(accountId);
   }
 
-  async updateDeposit(notePath: string, deposit: DepositRecord): Promise<void> {
-    const d   = await this.loadDeposits(notePath);
+  async updateDeposit(accountId: string, deposit: DepositRecord): Promise<void> {
+    const d   = await this.loadDeposits(accountId);
     const idx = d.findIndex(x => x.id === deposit.id);
     if (idx === -1) return;
     d[idx] = deposit;
-    this.scheduleDeposits(notePath);
+    this.scheduleDeposits(accountId);
   }
 
-  async deleteDeposit(notePath: string, id: string): Promise<void> {
-    const d = await this.loadDeposits(notePath);
+  async deleteDeposit(accountId: string, id: string): Promise<void> {
+    const d = await this.loadDeposits(accountId);
     const filtered = d.filter(x => x.id !== id);
-    this.depositsCache.set(notePath, filtered);
-    this.scheduleDeposits(notePath);
+    this.depositsCache.set(accountId, filtered);
+    this.scheduleDeposits(accountId);
   }
 
-  async deleteDepositsBatch(notePath: string, ids: string[]): Promise<void> {
+  async deleteDepositsBatch(accountId: string, ids: string[]): Promise<void> {
     const idSet = new Set(ids);
-    const d = await this.loadDeposits(notePath);
+    const d = await this.loadDeposits(accountId);
     const filtered = d.filter(x => !idSet.has(x.id));
-    this.depositsCache.set(notePath, filtered);
-    this.scheduleDeposits(notePath);
+    this.depositsCache.set(accountId, filtered);
+    this.scheduleDeposits(accountId);
   }
 
-  async saveAllDeposits(notePath: string, deposits: DepositRecord[]): Promise<void> {
-    this.depositsCache.set(notePath, deposits);
-    this.scheduleDeposits(notePath);
+  async saveAllDeposits(accountId: string, deposits: DepositRecord[]): Promise<void> {
+    this.depositsCache.set(accountId, deposits);
+    this.scheduleDeposits(accountId);
   }
 
-  async addDepositTopUp(notePath: string, depositId: string, topUp: DepositTopUp): Promise<void> {
-    const d = await this.loadDeposits(notePath);
+  async addDepositTopUp(accountId: string, depositId: string, topUp: DepositTopUp): Promise<void> {
+    const d = await this.loadDeposits(accountId);
     const idx = d.findIndex(x => x.id === depositId);
     if (idx === -1) return;
     const deposit = d[idx];
@@ -510,11 +470,11 @@ export class FinanceStorage {
     deposit.topUps.push(topUp);
     deposit.amount = round2(deposit.amount + topUp.amount);
     this.recalculateFutureAccruals(deposit);
-    this.scheduleDeposits(notePath);
+    this.scheduleDeposits(accountId);
   }
 
-  async deleteDepositTopUp(notePath: string, depositId: string, topUpId: string): Promise<void> {
-    const d = await this.loadDeposits(notePath);
+  async deleteDepositTopUp(accountId: string, depositId: string, topUpId: string): Promise<void> {
+    const d = await this.loadDeposits(accountId);
     const idx = d.findIndex(x => x.id === depositId);
     if (idx === -1) return;
     const deposit = d[idx];
@@ -525,11 +485,11 @@ export class FinanceStorage {
       deposit.topUps = deposit.topUps.filter(t => t.id !== topUpId);
       this.recalculateFutureAccruals(deposit);
     }
-    this.scheduleDeposits(notePath);
+    this.scheduleDeposits(accountId);
   }
 
-  async addDepositWithdrawal(notePath: string, depositId: string, withdrawal: DepositWithdrawal): Promise<void> {
-    const d = await this.loadDeposits(notePath);
+  async addDepositWithdrawal(accountId: string, depositId: string, withdrawal: DepositWithdrawal): Promise<void> {
+    const d = await this.loadDeposits(accountId);
     const idx = d.findIndex(x => x.id === depositId);
     if (idx === -1) return;
     const deposit = d[idx];
@@ -537,11 +497,11 @@ export class FinanceStorage {
     deposit.withdrawals.push(withdrawal);
     deposit.amount = Math.max(0, round2(deposit.amount - withdrawal.amount));
     this.recalculateFutureAccruals(deposit);
-    this.scheduleDeposits(notePath);
+    this.scheduleDeposits(accountId);
   }
 
-  async deleteDepositWithdrawal(notePath: string, depositId: string, withdrawalId: string): Promise<void> {
-    const d = await this.loadDeposits(notePath);
+  async deleteDepositWithdrawal(accountId: string, depositId: string, withdrawalId: string): Promise<void> {
+    const d = await this.loadDeposits(accountId);
     const idx = d.findIndex(x => x.id === depositId);
     if (idx === -1) return;
     const deposit = d[idx];
@@ -552,29 +512,29 @@ export class FinanceStorage {
       deposit.withdrawals = deposit.withdrawals.filter(w => w.id !== withdrawalId);
       this.recalculateFutureAccruals(deposit);
     }
-    this.scheduleDeposits(notePath);
+    this.scheduleDeposits(accountId);
   }
 
   private recalculateFutureAccruals(deposit: DepositRecord): void {
     deposit.accruals = recalcFutureAccruals(deposit, getTodayStr());
   }
 
-  async saveAllCredits(notePath: string, credits: CreditRecord[]): Promise<void> {
-    this.creditsCache.set(notePath, credits);
-    this.scheduleCredits(notePath);
+  async saveAllCredits(accountId: string, credits: CreditRecord[]): Promise<void> {
+    this.creditsCache.set(accountId, credits);
+    this.scheduleCredits(accountId);
   }
 
   // ── View State ──────────────────────────────────────────────────────────
 
-  async saveViewState(notePath: string, state: Record<string, unknown>): Promise<void> {
+  async saveViewState(accountId: string, state: Record<string, unknown>): Promise<void> {
     const a = this.app.vault.adapter;
-    await this.ensureNoteFolder(notePath);
-    const fp = this.fp(notePath, 'state');
+    await this.ensureAccountFolder(accountId);
+    const fp = this.fp(accountId, 'state');
     await a.write(fp, JSON.stringify(state));
   }
 
-  async loadViewState(notePath: string): Promise<Record<string, unknown> | null> {
-    const fp = this.fp(notePath, 'state');
+  async loadViewState(accountId: string): Promise<Record<string, unknown> | null> {
+    const fp = this.fp(accountId, 'state');
     if (await this.app.vault.adapter.exists(fp)) {
       try {
         return JSON.parse(await this.app.vault.adapter.read(fp));
@@ -585,87 +545,61 @@ export class FinanceStorage {
 
   // ── Utility ───────────────────────────────────────────────────────────────
 
-  invalidate(notePath: string): void {
-    this.folderOverrides.delete(notePath);
-    this.metaCache.delete(notePath);
-    this.recordsCache.delete(notePath);
-    this.debtsCache.delete(notePath);
-    this.creditsCache.delete(notePath);
-    this.depositsCache.delete(notePath);
+  invalidate(accountId: string): void {
+    this.metaCache.delete(accountId);
+    this.recordsCache.delete(accountId);
+    this.debtsCache.delete(accountId);
+    this.creditsCache.delete(accountId);
+    this.depositsCache.delete(accountId);
   }
 
-  async resetAllData(notePath: string): Promise<void> {
-    const recs = await this.loadRecords(notePath);
+  async resetAllData(accountId: string): Promise<void> {
+    const recs = await this.loadRecords(accountId);
     recs.records = [];
     recs.categories = [];
     recs.tags = [];
     recs.payers = [];
-    this.scheduleRecords(notePath);
+    this.scheduleRecords(accountId);
 
     const debts: DebtRecord[] = [];
-    this.debtsCache.set(notePath, debts);
-    this.scheduleDebts(notePath);
+    this.debtsCache.set(accountId, debts);
+    this.scheduleDebts(accountId);
 
     const credits: CreditRecord[] = [];
-    this.creditsCache.set(notePath, credits);
-    this.scheduleCredits(notePath);
+    this.creditsCache.set(accountId, credits);
+    this.scheduleCredits(accountId);
 
     const deposits: DepositRecord[] = [];
-    this.depositsCache.set(notePath, deposits);
-    this.scheduleDeposits(notePath);
+    this.depositsCache.set(accountId, deposits);
+    this.scheduleDeposits(accountId);
   }
 
-  // ── Rename ────────────────────────────────────────────────────────────────
+  /** Notes the path where this account's block was last rendered — for diagnostics only. */
+  async touchSourcePath(accountId: string, sourcePath: string): Promise<void> {
+    const meta = await this.loadMeta(accountId);
+    if (meta.sourcePath === sourcePath) return;
+    meta.sourcePath = sourcePath;
+    this.scheduleMeta(accountId);
+  }
 
-  async renameAccount(oldNotePath: string, newNotePath: string): Promise<void> {
-    await this.flushDirty();
-
+  /** Account folders whose id is not referenced by any block in the vault. */
+  async findOrphanedAccounts(liveIds: Set<string>): Promise<string[]> {
     const a = this.app.vault.adapter;
-    const oldFolder = this.noteFolder(oldNotePath);
-    const newFolder = this.noteFolder(newNotePath);
+    if (!(await a.exists(this.base))) return [];
+    const listing = await a.list(this.base);
+    return listing.folders
+      .map(f => f.split('/').pop() ?? '')
+      .filter(id => id && !liveIds.has(id));
+  }
 
-    if (await a.exists(oldFolder)) {
-      try {
-        await a.rename(oldFolder, newFolder);
-      } catch {
-        // If rename fails, copy all files and delete old folder
-        try {
-          await this.ensureNoteFolder(newNotePath);
-          const suffixes = ['meta', 'records', 'debts', 'credits', 'deposits'];
-          for (const suffix of suffixes) {
-            const oldFp = this.fp(oldNotePath, suffix);
-            const newFp = this.fp(newNotePath, suffix);
-            if (await a.exists(oldFp)) {
-              const content = await a.read(oldFp);
-              await a.write(newFp, content);
-              await a.remove(oldFp);
-            }
-          }
-          // Try to remove old folder if empty
-          try { await a.remove(oldFolder); } catch { /* ignore */ }
-        } catch { /* ignore */ }
-      }
+  async deleteAccount(accountId: string): Promise<void> {
+    const a = this.app.vault.adapter;
+    const folder = this.accountFolder(accountId);
+    for (const suffix of ['meta', 'records', 'debts', 'credits', 'deposits', 'state']) {
+      const fp = this.fp(accountId, suffix);
+      if (await a.exists(fp)) await a.remove(fp);
     }
-
-    // Update caches
-    const mvCache = <T>(cache: Map<string, T>, old: string, n: string) => {
-      const v = cache.get(old);
-      if (v !== undefined) { cache.set(n, v); cache.delete(old); }
-    };
-    mvCache(this.metaCache, oldNotePath, newNotePath);
-    mvCache(this.recordsCache, oldNotePath, newNotePath);
-    mvCache(this.debtsCache, oldNotePath, newNotePath);
-    mvCache(this.creditsCache, oldNotePath, newNotePath);
-    mvCache(this.depositsCache, oldNotePath, newNotePath);
-
-    // Update dirty sets
-    const mvSet = (set: Set<string>) => {
-      if (set.has(oldNotePath)) { set.delete(oldNotePath); set.add(newNotePath); }
-    };
-    mvSet(this.metaDirty);
-    mvSet(this.recordsDirty);
-    mvSet(this.debtsDirty);
-    mvSet(this.creditsDirty);
-    mvSet(this.depositsDirty);
+    if (await a.exists(folder)) await a.rmdir(folder, true);
+    this.invalidate(accountId);
   }
 }

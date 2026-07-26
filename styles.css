@@ -2536,3 +2536,50 @@
 .finance-bulk-delete-btn:active {
   transform: translateY(0); filter: brightness(.95);
 }
+
+/* ── Block errors and orphaned accounts ─────────────────────────────────── */
+.finance-block-error {
+  padding: 14px 16px;
+  border: 1px solid var(--text-error);
+  border-radius: var(--ft-radius);
+  background: var(--background-secondary);
+}
+.finance-block-error strong {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--text-error);
+}
+.finance-block-error p {
+  margin: 0;
+  font-size: .9em;
+  color: var(--text-muted);
+}
+.finance-orphan-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 12px;
+}
+.finance-orphan-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--ft-border);
+  border-radius: var(--ft-radius-sm);
+  background: var(--background-secondary);
+}
+.finance-orphan-id {
+  font-family: var(--font-monospace);
+  font-size: .9em;
+}
+.finance-orphan-delete {
+  padding: 4px 10px;
+  border: none;
+  border-radius: var(--ft-radius-sm);
+  cursor: pointer;
+  font-family: inherit;
+  background: #dc2626 !important;
+  color: #fff !important;
+}

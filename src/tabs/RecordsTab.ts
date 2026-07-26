@@ -834,8 +834,8 @@ export class RecordsTab {
       categories: this.ctx.data.categories, tags: this.ctx.data.tags, payers: this.ctx.data.payers,
       currency: cur, settings: this.ctx.settings, pluginId: this.ctx.pluginId,
       onSave: async rec => {
-        await this.ctx.storage.addRecord(this.ctx.notePath, rec);
-        this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
+        await this.ctx.storage.addRecord(this.ctx.accountId, rec);
+        this.ctx.data = await this.ctx.storage.load(this.ctx.accountId);
         this.renderStats();
         this.renderFilters();
         this.renderTable();
@@ -852,8 +852,8 @@ export class RecordsTab {
       categories: this.ctx.data.categories, tags: this.ctx.data.tags, payers: this.ctx.data.payers,
       currency: cur, settings: this.ctx.settings, pluginId: this.ctx.pluginId,
       onSave: async updated => {
-        await this.ctx.storage.updateRecord(this.ctx.notePath, updated);
-        this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
+        await this.ctx.storage.updateRecord(this.ctx.accountId, updated);
+        this.ctx.data = await this.ctx.storage.load(this.ctx.accountId);
         this.renderStats();
         this.renderTable();
         new Notice(this.tr.recordUpdated);
@@ -864,8 +864,8 @@ export class RecordsTab {
   private confirmDelete(rec: FinanceRecord): void {
     const label = `${rec.type === 'income' ? '+' : '−'}${this.ctx.fmt(rec.amount)}  ·  ${rec.category || '—'}  ·  ${this.ctx.fmtDate(rec.date, rec.time)}`;
     new ConfirmModal(this.ctx.app, `${this.tr.confirmDeleteRecord}\n${label}`, async () => {
-      await this.ctx.storage.deleteRecord(this.ctx.notePath, rec.id);
-      this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
+      await this.ctx.storage.deleteRecord(this.ctx.accountId, rec.id);
+      this.ctx.data = await this.ctx.storage.load(this.ctx.accountId);
       this.renderStats();
       this.renderTable();
       new Notice(this.tr.deleted);
@@ -878,8 +878,8 @@ export class RecordsTab {
     const msg = this.tr.confirmDeleteSelectedRecords.replace('{count}', String(count));
     new ConfirmModal(this.ctx.app, msg, async () => {
       const ids = Array.from(this.selectedIds);
-      await this.ctx.storage.deleteRecordsBatch(this.ctx.notePath, ids);
-      this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
+      await this.ctx.storage.deleteRecordsBatch(this.ctx.accountId, ids);
+      this.ctx.data = await this.ctx.storage.load(this.ctx.accountId);
       this.selectedIds.clear();
       this.bulkMode = false;
       this.renderStats();
@@ -897,12 +897,12 @@ export class RecordsTab {
   private openIEModal(mode: 'export' | 'import'): void {
     if (!this.ctx.data) { new Notice(this.ctx.tr.loading); return; }
     const modal = new ImportExportModal(this.ctx.app, {
-      noteName: this.ctx.data.name || noteFilename(this.ctx.notePath),
+      noteName: this.ctx.data.name || noteFilename(this.ctx.accountId),
       currency: this.ctx.currency,
       records: this.ctx.data.records,
       onImport: async recs => {
-        await this.ctx.storage.importRecords(this.ctx.notePath, recs);
-        this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
+        await this.ctx.storage.importRecords(this.ctx.accountId, recs);
+        this.ctx.data = await this.ctx.storage.load(this.ctx.accountId);
         this.renderStats();
         this.renderTable();
         if (this.filtersOpen) this.renderFilters();
@@ -1006,16 +1006,16 @@ export class RecordsTab {
     const hexLabel = acC.createEl('span', { text: acIn.value, cls: 'finance-settings-hex' });
     acIn.addEventListener('input', async () => {
       hexLabel.textContent = acIn.value;
-      await this.ctx.storage.updateMeta(this.ctx.notePath, { accentColor: acIn.value });
-      this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
+      await this.ctx.storage.updateMeta(this.ctx.accountId, { accentColor: acIn.value });
+      this.ctx.data = await this.ctx.storage.load(this.ctx.accountId);
       this.applyAccentColor(acIn.value);
     });
     const rstBtn = acC.createEl('button', { text: this.tr.resetColor, cls: 'finance-btn-cancel' });
     rstBtn.style.padding = '4px 12px';
     rstBtn.style.fontSize = '.8em';
     rstBtn.addEventListener('click', async () => {
-      await this.ctx.storage.updateMeta(this.ctx.notePath, { accentColor: '' });
-      this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
+      await this.ctx.storage.updateMeta(this.ctx.accountId, { accentColor: '' });
+      this.ctx.data = await this.ctx.storage.load(this.ctx.accountId);
       this.applyAccentColor('');
       acIn.value = '#7c3aed';
       hexLabel.textContent = '#7c3aed';
@@ -1051,8 +1051,8 @@ export class RecordsTab {
         new Notice(this.ctx.tr.enterYes);
         return;
       }
-      await this.ctx.storage.resetAllData(this.ctx.notePath);
-      this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
+      await this.ctx.storage.resetAllData(this.ctx.accountId);
+      this.ctx.data = await this.ctx.storage.load(this.ctx.accountId);
       this.renderStats();
       this.renderFilters();
       this.renderTable();

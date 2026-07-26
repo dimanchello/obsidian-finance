@@ -13,7 +13,7 @@ const LS = (pid: string) => `ft-view:${pid}:`;
 export class ViewContext {
   app: App;
   storage: FinanceStorage;
-  notePath: string;
+  accountId: string;
   pluginId: string;
   settings: PluginSettings;
   isMobile: boolean;
@@ -28,14 +28,14 @@ export class ViewContext {
   constructor(
     app: App,
     storage: FinanceStorage,
-    notePath: string,
+    accountId: string,
     pluginId: string,
     settings: PluginSettings,
     container: HTMLElement,
   ) {
     this.app = app;
     this.storage = storage;
-    this.notePath = notePath;
+    this.accountId = accountId;
     this.pluginId = pluginId;
     this.settings = settings;
     this.container = container;
@@ -67,14 +67,14 @@ export class ViewContext {
 
   saveState(): void {
     try {
-      localStorage.setItem(LS(this.pluginId) + this.notePath, JSON.stringify({ ...this._state, page: 0 }));
+      localStorage.setItem(LS(this.pluginId) + this.accountId, JSON.stringify({ ...this._state, page: 0 }));
     } catch { /* ignore */ }
-    this.storage.saveViewState(this.notePath, { ...this._state, page: 0 }).catch(() => {});
+    this.storage.saveViewState(this.accountId, { ...this._state, page: 0 }).catch(() => {});
   }
 
   async loadStateFromFile(): Promise<void> {
     try {
-      const fileState = await this.storage.loadViewState(this.notePath);
+      const fileState = await this.storage.loadViewState(this.accountId);
       if (fileState) {
         this._state = { ...this._state, ...fileState } as ViewState;
       }
@@ -83,7 +83,7 @@ export class ViewContext {
 
   loadState(pageSize: number): ViewState {
     try {
-      const raw = localStorage.getItem(LS(this.pluginId) + this.notePath);
+      const raw = localStorage.getItem(LS(this.pluginId) + this.accountId);
       if (raw) {
         const v = JSON.parse(raw) as ViewState;
         v.page = 0;

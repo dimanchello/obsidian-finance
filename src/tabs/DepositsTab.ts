@@ -1017,9 +1017,9 @@ export class DepositsTab {
       title: this.tr.newDeposit,
       banks: allBanks,
       onSave: async (deposit, interestRecords) => {
-        await this.ctx.storage.addDeposit(this.ctx.notePath, deposit);
+        await this.ctx.storage.addDeposit(this.ctx.accountId, deposit);
         for (const r of interestRecords) {
-          await this.ctx.storage.addRecord(this.ctx.notePath, r);
+          await this.ctx.storage.addRecord(this.ctx.accountId, r);
         }
         const nowTime = new Date().toTimeString().slice(0, 5);
         const rec: FinanceRecord = {
@@ -1036,8 +1036,8 @@ export class DepositsTab {
           attachmentPath: '',
           linkedId: deposit.id,
         };
-        await this.ctx.storage.addRecord(this.ctx.notePath, rec);
-        this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
+        await this.ctx.storage.addRecord(this.ctx.accountId, rec);
+        this.ctx.data = await this.ctx.storage.load(this.ctx.accountId);
         this.onUpdate?.();
         new Notice(this.tr.depositAdded);
       },
@@ -1081,13 +1081,13 @@ export class DepositsTab {
 
           updated.accruals = [];
 
-          await this.ctx.storage.saveAllRecords(this.ctx.notePath, otherRecords);
-          await this.ctx.storage.updateDeposit(this.ctx.notePath, updated);
+          await this.ctx.storage.saveAllRecords(this.ctx.accountId, otherRecords);
+          await this.ctx.storage.updateDeposit(this.ctx.accountId, updated);
         } else {
-          await this.ctx.storage.updateDeposit(this.ctx.notePath, updated);
+          await this.ctx.storage.updateDeposit(this.ctx.accountId, updated);
         }
 
-        this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
+        this.ctx.data = await this.ctx.storage.load(this.ctx.accountId);
         this.onUpdate?.();
         new Notice(this.tr.depositUpdated);
       },
@@ -1099,7 +1099,7 @@ export class DepositsTab {
     const nowTime = new Date().toTimeString().slice(0, 5);
     new ConfirmModal(this.ctx.app, `${this.tr.confirmCloseDeposit}\n${label}`, async () => {
       deposit.status = 'closed';
-      await this.ctx.storage.updateDeposit(this.ctx.notePath, deposit);
+      await this.ctx.storage.updateDeposit(this.ctx.accountId, deposit);
 
       const refundRec: FinanceRecord = {
         id: crypto.randomUUID(),
@@ -1115,9 +1115,9 @@ export class DepositsTab {
         attachmentPath: '',
         linkedId: deposit.id,
       };
-      await this.ctx.storage.addRecord(this.ctx.notePath, refundRec);
+      await this.ctx.storage.addRecord(this.ctx.accountId, refundRec);
 
-      this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
+      this.ctx.data = await this.ctx.storage.load(this.ctx.accountId);
       this.onUpdate?.();
       new Notice(this.tr.depositClosed);
     }).open();
@@ -1129,7 +1129,7 @@ export class DepositsTab {
       ? `\n\n${this.tr.closeDepositRefund.replace('{amount}', this.ctx.fmt(deposit.amount))}`
       : '';
     new ConfirmModal(this.ctx.app, `${this.tr.confirmDeleteDeposit}${refundNote}\n\n${label}`, async () => {
-      await this.ctx.storage.deleteDeposit(this.ctx.notePath, deposit.id);
+      await this.ctx.storage.deleteDeposit(this.ctx.accountId, deposit.id);
       const otherRecords = this.ctx.data!.records.filter(r => r.linkedId !== deposit.id);
 
       if (deposit.status === 'active') {
@@ -1151,8 +1151,8 @@ export class DepositsTab {
         otherRecords.push(refundRec);
       }
 
-      await this.ctx.storage.saveAllRecords(this.ctx.notePath, otherRecords);
-      this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
+      await this.ctx.storage.saveAllRecords(this.ctx.accountId, otherRecords);
+      this.ctx.data = await this.ctx.storage.load(this.ctx.accountId);
       this.onUpdate?.();
       new Notice(this.tr.depositDeleted);
     }).open();
@@ -1165,7 +1165,7 @@ export class DepositsTab {
     new ConfirmModal(this.ctx.app, msg, async () => {
       const ids = Array.from(this.selectedIds);
       const depositsToDelete = (this.ctx.data?.deposits ?? []).filter(d => this.selectedIds.has(d.id));
-      await this.ctx.storage.deleteDepositsBatch(this.ctx.notePath, ids);
+      await this.ctx.storage.deleteDepositsBatch(this.ctx.accountId, ids);
 
       let otherRecords = this.ctx.data!.records.filter(r => !r.linkedId || !this.selectedIds.has(r.linkedId));
 
@@ -1191,8 +1191,8 @@ export class DepositsTab {
         }
       });
 
-      await this.ctx.storage.saveAllRecords(this.ctx.notePath, otherRecords);
-      this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
+      await this.ctx.storage.saveAllRecords(this.ctx.accountId, otherRecords);
+      this.ctx.data = await this.ctx.storage.load(this.ctx.accountId);
       this.selectedIds.clear();
       this.bulkMode = false;
       this.onUpdate?.();
@@ -1205,8 +1205,8 @@ export class DepositsTab {
       title: `💰 ${this.tr.topUp} — ${deposit.name}`,
       deposit,
       onSave: async topUp => {
-        await this.ctx.storage.addDepositTopUp(this.ctx.notePath, deposit.id, topUp);
-        this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
+        await this.ctx.storage.addDepositTopUp(this.ctx.accountId, deposit.id, topUp);
+        this.ctx.data = await this.ctx.storage.load(this.ctx.accountId);
         this.onUpdate?.();
         new Notice(this.tr.depositUpdated);
       },
@@ -1216,7 +1216,7 @@ export class DepositsTab {
   private confirmDeleteDepositTopUp(deposit: DepositRecord, topUp: DepositTopUp): void {
     const label = `${deposit.name} · ${this.ctx.fmt(topUp.amount)} · ${this.ctx.fmtDate(topUp.date, topUp.time)}`;
     new ConfirmModal(this.ctx.app, `${this.tr.confirmDeleteTopUp}\n${label}`, async () => {
-      await this.ctx.storage.deleteDepositTopUp(this.ctx.notePath, deposit.id, topUp.id);
+      await this.ctx.storage.deleteDepositTopUp(this.ctx.accountId, deposit.id, topUp.id);
 
       if (!this.ctx.data) return;
       const linkedRec = this.ctx.data.records.find(r =>
@@ -1224,10 +1224,10 @@ export class DepositsTab {
       );
       if (linkedRec) {
         const updatedRecords = this.ctx.data.records.filter(r => r.id !== linkedRec.id);
-        await this.ctx.storage.saveAllRecords(this.ctx.notePath, updatedRecords);
+        await this.ctx.storage.saveAllRecords(this.ctx.accountId, updatedRecords);
       }
 
-      this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
+      this.ctx.data = await this.ctx.storage.load(this.ctx.accountId);
       this.onUpdate?.();
       new Notice(this.tr.deleted);
     }).open();
@@ -1241,8 +1241,8 @@ export class DepositsTab {
       maxAmount: deposit.amount,
       currency: cur,
       onSave: async withdrawal => {
-        await this.ctx.storage.addDepositWithdrawal(this.ctx.notePath, deposit.id, withdrawal);
-        this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
+        await this.ctx.storage.addDepositWithdrawal(this.ctx.accountId, deposit.id, withdrawal);
+        this.ctx.data = await this.ctx.storage.load(this.ctx.accountId);
         this.onUpdate?.();
         new Notice(this.tr.depositUpdated);
       },
@@ -1252,7 +1252,7 @@ export class DepositsTab {
   private confirmDeleteDepositWithdrawal(deposit: DepositRecord, withdrawal: DepositWithdrawal): void {
     const label = `${deposit.name} · ${this.ctx.fmt(withdrawal.amount)} · ${this.ctx.fmtDate(withdrawal.date, withdrawal.time)}`;
     new ConfirmModal(this.ctx.app, `${this.tr.confirmDeleteWithdrawal}\n${label}`, async () => {
-      await this.ctx.storage.deleteDepositWithdrawal(this.ctx.notePath, deposit.id, withdrawal.id);
+      await this.ctx.storage.deleteDepositWithdrawal(this.ctx.accountId, deposit.id, withdrawal.id);
 
       if (!this.ctx.data) return;
       const linkedRec = this.ctx.data.records.find(r =>
@@ -1260,10 +1260,10 @@ export class DepositsTab {
       );
       if (linkedRec) {
         const updatedRecords = this.ctx.data.records.filter(r => r.id !== linkedRec.id);
-        await this.ctx.storage.saveAllRecords(this.ctx.notePath, updatedRecords);
+        await this.ctx.storage.saveAllRecords(this.ctx.accountId, updatedRecords);
       }
 
-      this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
+      this.ctx.data = await this.ctx.storage.load(this.ctx.accountId);
       this.onUpdate?.();
       new Notice(this.tr.deleted);
     }).open();

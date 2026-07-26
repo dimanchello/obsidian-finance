@@ -897,7 +897,7 @@ export class DebtsTab {
           note,
         };
         debt.movements = [mov];
-        await this.ctx.storage.addDebt(this.ctx.notePath, debt);
+        await this.ctx.storage.addDebt(this.ctx.accountId, debt);
 
         const recType: RecordType = debt.direction === 'lent' ? 'expense' : 'income';
         const recNote = debt.direction === 'lent'
@@ -917,9 +917,9 @@ export class DebtsTab {
           attachmentPath: '',
           linkedId: debt.id,
         };
-        await this.ctx.storage.addRecord(this.ctx.notePath, rec);
+        await this.ctx.storage.addRecord(this.ctx.accountId, rec);
 
-        this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
+        this.ctx.data = await this.ctx.storage.load(this.ctx.accountId);
         this.onUpdate?.();
         new Notice(this.tr.debtAdded);
       },
@@ -935,8 +935,8 @@ export class DebtsTab {
       debt,
       allPersons: unique,
       onSave: async updated => {
-        await this.ctx.storage.updateDebt(this.ctx.notePath, updated);
-        this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
+        await this.ctx.storage.updateDebt(this.ctx.accountId, updated);
+        this.ctx.data = await this.ctx.storage.load(this.ctx.accountId);
         this.onUpdate?.();
         new Notice(this.tr.debtUpdated);
       },
@@ -952,7 +952,7 @@ export class DebtsTab {
       remainingAmount: this.getDebtRemaining(debt),
       currency: cur,
       onSave: async mov => {
-        await this.ctx.storage.addDebtMovement(this.ctx.notePath, debt.id, mov);
+        await this.ctx.storage.addDebtMovement(this.ctx.accountId, debt.id, mov);
 
         const recType: RecordType = debt.direction === 'lent' ? 'income' : 'expense';
         const recNote = debt.direction === 'lent'
@@ -972,9 +972,9 @@ export class DebtsTab {
           attachmentPath: '',
           linkedId: debt.id,
         };
-        await this.ctx.storage.addRecord(this.ctx.notePath, rec);
+        await this.ctx.storage.addRecord(this.ctx.accountId, rec);
 
-        this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
+        this.ctx.data = await this.ctx.storage.load(this.ctx.accountId);
         this.onUpdate?.();
         new Notice(this.tr.repaymentRecorded);
       },
@@ -987,7 +987,7 @@ export class DebtsTab {
       title: `${this.tr.borrowMore} — ${debt.person}`,
       type: 'borrow',
       onSave: async mov => {
-        await this.ctx.storage.addDebtMovement(this.ctx.notePath, debt.id, mov);
+        await this.ctx.storage.addDebtMovement(this.ctx.accountId, debt.id, mov);
 
         const recType: RecordType = debt.direction === 'lent' ? 'expense' : 'income';
         const recNote = debt.direction === 'lent'
@@ -1007,9 +1007,9 @@ export class DebtsTab {
           attachmentPath: '',
           linkedId: debt.id,
         };
-        await this.ctx.storage.addRecord(this.ctx.notePath, rec);
+        await this.ctx.storage.addRecord(this.ctx.accountId, rec);
 
-        this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
+        this.ctx.data = await this.ctx.storage.load(this.ctx.accountId);
         this.onUpdate?.();
         new Notice(this.tr.debtAmountIncreased);
       },
@@ -1027,7 +1027,7 @@ export class DebtsTab {
         const oldDate = mov.date;
         const oldAmount = mov.amount;
 
-        await this.ctx.storage.updateDebtMovement(this.ctx.notePath, debt.id, updated);
+        await this.ctx.storage.updateDebtMovement(this.ctx.accountId, debt.id, updated);
 
         if (!this.ctx.data) return;
         const linkedRec = this.ctx.data.records.find(r =>
@@ -1037,10 +1037,10 @@ export class DebtsTab {
           linkedRec.date = updated.date;
           linkedRec.amount = updated.amount;
           linkedRec.time = updated.time || '';
-          await this.ctx.storage.updateRecord(this.ctx.notePath, linkedRec);
+          await this.ctx.storage.updateRecord(this.ctx.accountId, linkedRec);
         }
 
-        this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
+        this.ctx.data = await this.ctx.storage.load(this.ctx.accountId);
         this.onUpdate?.();
         new Notice(this.tr.debtUpdated);
       },
@@ -1050,7 +1050,7 @@ export class DebtsTab {
   private confirmDeleteMovement(debt: DebtRecord, mov: DebtMovement): void {
     const label = `${mov.type === 'borrow' ? '−' : '+'}${this.ctx.fmt(mov.amount)}  ·  ${this.ctx.fmtDate(mov.date, mov.time)}`;
     new ConfirmModal(this.ctx.app, `${this.tr.confirmDeleteMovement}\n${label}`, async () => {
-      await this.ctx.storage.deleteDebtMovement(this.ctx.notePath, debt.id, mov.id);
+      await this.ctx.storage.deleteDebtMovement(this.ctx.accountId, debt.id, mov.id);
 
       if (!this.ctx.data) return;
       const linkedRec = this.ctx.data.records.find(r =>
@@ -1058,10 +1058,10 @@ export class DebtsTab {
       );
       if (linkedRec) {
         const updatedRecords = this.ctx.data.records.filter(r => r.id !== linkedRec.id);
-        await this.ctx.storage.saveAllRecords(this.ctx.notePath, updatedRecords);
+        await this.ctx.storage.saveAllRecords(this.ctx.accountId, updatedRecords);
       }
 
-      this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
+      this.ctx.data = await this.ctx.storage.load(this.ctx.accountId);
       this.onUpdate?.();
       new Notice(this.tr.debtDeleted);
     }).open();
@@ -1070,10 +1070,10 @@ export class DebtsTab {
   private confirmDeleteDebt(debt: DebtRecord): void {
     const label = `${debt.person} · ${this.ctx.fmt(debt.amount)} · ${this.ctx.fmtDate(debt.date, debt.time)}`;
     new ConfirmModal(this.ctx.app, `${this.tr.confirmDeleteDebt}\n${label}`, async () => {
-      await this.ctx.storage.deleteDebt(this.ctx.notePath, debt.id);
+      await this.ctx.storage.deleteDebt(this.ctx.accountId, debt.id);
       const otherRecords = this.ctx.data!.records.filter(r => r.linkedId !== debt.id);
-      await this.ctx.storage.saveAllRecords(this.ctx.notePath, otherRecords);
-      this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
+      await this.ctx.storage.saveAllRecords(this.ctx.accountId, otherRecords);
+      this.ctx.data = await this.ctx.storage.load(this.ctx.accountId);
       this.onUpdate?.();
       new Notice(this.tr.debtDeleted);
     }).open();
@@ -1086,10 +1086,10 @@ export class DebtsTab {
     new ConfirmModal(this.ctx.app, msg, async () => {
       const ids = Array.from(this.selectedIds);
       const idSet = new Set(ids);
-      await this.ctx.storage.deleteDebtsBatch(this.ctx.notePath, ids);
+      await this.ctx.storage.deleteDebtsBatch(this.ctx.accountId, ids);
       const otherRecords = this.ctx.data!.records.filter(r => !r.linkedId || !idSet.has(r.linkedId));
-      await this.ctx.storage.saveAllRecords(this.ctx.notePath, otherRecords);
-      this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
+      await this.ctx.storage.saveAllRecords(this.ctx.accountId, otherRecords);
+      this.ctx.data = await this.ctx.storage.load(this.ctx.accountId);
       this.selectedIds.clear();
       this.bulkMode = false;
       this.onUpdate?.();

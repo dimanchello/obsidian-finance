@@ -325,6 +325,15 @@ export interface Translations {
   currencyPlaceholder: string;
   templateInserted: string;
   commandInsertTemplate: string;
+  commandFindOrphans: string;
+  blockInvalidIdTitle: string;
+  blockInvalidIdDesc: string;
+  blockReadOnlyTitle: string;
+  blockReadOnlyDesc: string;
+  orphansTitle: string;
+  orphansDesc: string;
+  orphansNone: string;
+  orphanDeleted: string;
   uncategorized: string;
   notSpecified: string;
   lentGiven: string;
@@ -705,6 +714,15 @@ const ru: Translations = {
   currencyPlaceholder: 'напр. CNY, KRW, INR…',
   templateInserted: '✅ Шаблон счёта вставлен',
   commandInsertTemplate: 'Вставить шаблон счёта',
+  commandFindOrphans: 'Найти брошенные счета',
+  blockInvalidIdTitle: 'Некорректный идентификатор счёта',
+  blockInvalidIdDesc: 'Значение «{id}» не похоже на идентификатор счёта (12 шестнадцатеричных символов). Данные не потеряны: исправьте опечатку, чтобы вернуть счёт. Если удалить строку id, будет создан новый пустой счёт.',
+  blockReadOnlyTitle: 'Счёт доступен только для чтения',
+  blockReadOnlyDesc: 'В этом представлении заметка недоступна для записи, поэтому идентификатор счёта не может быть выдан. Откройте заметку обычным способом.',
+  orphansTitle: 'Брошенные счета',
+  orphansDesc: 'Папки с данными, чей идентификатор не встречается ни в одном блоке finance-account. Удаление необратимо.',
+  orphansNone: 'Брошенных счетов не найдено',
+  orphanDeleted: 'Счёт удалён',
   uncategorized: 'Без категории',
   notSpecified: 'Не указан',
   lentGiven: 'Дано в долг',
@@ -1127,6 +1145,15 @@ const en: Translations = {
   currencyPlaceholder: 'e.g. CNY, KRW, INR…',
   templateInserted: '✅ Account template inserted',
   commandInsertTemplate: 'Insert account template',
+  commandFindOrphans: 'Find orphaned accounts',
+  blockInvalidIdTitle: 'Invalid account id',
+  blockInvalidIdDesc: 'The value "{id}" is not an account id (12 hexadecimal characters). No data was lost: fix the typo to restore the account. Removing the id line creates a new empty account.',
+  blockReadOnlyTitle: 'Account is read-only',
+  blockReadOnlyDesc: 'This view cannot write to the note, so an account id cannot be assigned. Open the note normally.',
+  orphansTitle: 'Orphaned accounts',
+  orphansDesc: 'Data folders whose id appears in no finance-account block. Deletion cannot be undone.',
+  orphansNone: 'No orphaned accounts found',
+  orphanDeleted: 'Account deleted',
   uncategorized: 'Uncategorized',
   notSpecified: 'Not specified',
   lentGiven: 'Given as debt',
