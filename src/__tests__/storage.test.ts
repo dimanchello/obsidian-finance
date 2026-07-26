@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { FinanceStorage } from '../storage';
+import { AccountFiles } from '../storage/AccountFiles';
 
 interface MockAdapter {
   exists: ReturnType<typeof vi.fn>;
@@ -224,22 +225,20 @@ describe('FinanceStorage', () => {
     });
   });
 
-  describe('accountFolder', () => {
+  describe('AccountFiles', () => {
     it('папка называется по id и ни от чего внешнего не зависит', () => {
-      const result = (storage as any).accountFolder('a7f3c92b4e1d');
-      expect(result).toContain('accounts_a7f3c92b4e1d');
+      const files = new AccountFiles('obsidian-finance');
+      expect(files.folder('a7f3c92b4e1d')).toContain('accounts_a7f3c92b4e1d');
     });
 
     it('один и тот же id всегда даёт одну и ту же папку', () => {
-      const a = (storage as any).accountFolder('a7f3c92b4e1d');
-      const b = (storage as any).accountFolder('a7f3c92b4e1d');
-      expect(a).toBe(b);
+      const files = new AccountFiles('obsidian-finance');
+      expect(files.folder('a7f3c92b4e1d')).toBe(files.folder('a7f3c92b4e1d'));
     });
 
     it('разные id не сталкиваются', () => {
-      const a = (storage as any).accountFolder('aaaaaaaaaaaa');
-      const b = (storage as any).accountFolder('bbbbbbbbbbbb');
-      expect(a).not.toBe(b);
+      const files = new AccountFiles('obsidian-finance');
+      expect(files.folder('aaaaaaaaaaaa')).not.toBe(files.folder('bbbbbbbbbbbb'));
     });
   });
 
@@ -265,13 +264,15 @@ describe('FinanceStorage', () => {
 
   describe('saveViewState / loadViewState', () => {
     it('saves and loads view state', async () => {
-      mockAdapter.exists.mockResolvedValue(true);
       const state = { filter: { search: '' }, sort: { field: 'date' as const, dir: 'asc' as const }, page: 0, pageSize: 25 };
-      await storage.saveViewState('test/note.md', state as any);
-      expect(mockAdapter.write).toHaveBeenCalled();
+      await storage.saveViewState('a7f3c92b4e1d', state as any);
+      await storage.flush();
+      // atomicWrite: содержимое уходит во временный файл
+      const stateWrite = mockAdapter.write.mock.calls.find(([p]: [string]) => p.includes('state.json'));
+      expect(stateWrite).toBeDefined();
+      expect(JSON.parse(stateWrite![1] as string)).toEqual(state);
 
-      mockAdapter.read.mockResolvedValue(JSON.stringify(state));
-      const loaded = await storage.loadViewState('test/note.md');
+      const loaded = await storage.loadViewState('a7f3c92b4e1d');
       expect(loaded).toEqual(state);
     });
 
