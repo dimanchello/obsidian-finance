@@ -157,6 +157,8 @@ export const COMMON_CURRENCIES = [
 ];
 
 export const CREDIT_PAGE_SIZE = 20;
+export const CREDIT_PAYMENT_PAGE_SIZE = 15;
+export const DEPOSIT_ACCRUAL_PAGE_SIZE = 20;
 export const MOBILE_BREAKPOINT = 480;
 export const SEARCH_DEBOUNCE_MS = 280;
 export const PAGE_SIZE_OPTIONS = [10, 20, 25, 50, 100, 200, 500] as const;

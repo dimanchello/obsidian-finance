@@ -2617,3 +2617,53 @@
 .finance-mov-panel {
   padding: 10px 12px 12px;
 }
+
+/* ── Payments/accruals expandable panel ─────────────────────────────────── */
+.finance-payments-panel {
+  padding: 12px;
+}
+.finance-payments-panel .finance-section-title {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.finance-deposit-progress {
+  max-width: 400px;
+  margin: 0 auto 16px;
+}
+.finance-deposit-progress-label {
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+.finance-deposit-progress-bar {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--background-modifier-border);
+  overflow: hidden;
+}
+.finance-deposit-progress-fill {
+  height: 100%;
+  width: var(--ft-progress, 0%);
+  border-radius: 4px;
+  background: var(--ft-accent);
+  transition: width .3s ease;
+}
+.finance-deposit-progress-fill.is-complete {
+  background: #22c55e;
+}
+.finance-payment-paid td {
+  background: rgba(34, 197, 94, 0.08);
+  color: #16a34a;
+}
+.finance-payment-pending .finance-payment-status {
+  color: var(--text-muted);
+}
+.finance-panel-pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 4px;
+  margin-top: 12px;
+}
