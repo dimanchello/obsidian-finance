@@ -4,43 +4,111 @@ import {
   FinanceRecord,
   DEFAULT_FILTER,
   SortField,
-  SEARCH_DEBOUNCE_MS, PAGE_SIZE_OPTIONS, PAGE_RANGE_THRESHOLD, FOCUS_DELAY_MS,
+  PAGE_SIZE_OPTIONS,
 } from '../types';
 import { RecordModal } from '../RecordModal';
 import { ConfirmModal } from '../ConfirmModal';
 import { ImportExportModal } from '../ImportExportModal';
-import { ColumnVisibilityModal } from '../ColumnVisibilityModal';
 import { AnalyticsView, type BarClickAction } from '../AnalyticsView';
 import { noteFilename } from '../utils';
+import { DataTable, DataTableApi, FilterControl } from '../ui/DataTable';
+
+type Panel = 'analytics' | 'filters' | 'settings';
 
 export class RecordsTab {
   private ctx: ViewContext;
   private el: HTMLElement;
+  private table: DataTable<FinanceRecord>;
 
-  private statsEl?: HTMLElement;
-  private filtersEl?: HTMLElement;
-  private tableEl?: HTMLElement;
-  private paginationEl?: HTMLElement;
-  private analyticsEl?: HTMLElement;
+  private openPanel: Panel | null = null;
   private analyticsView: AnalyticsView | null = null;
-  private analyticsOpen = false;
-  private filtersOpen = false;
-  private settingsOpen = false;
-  private settingsEl?: HTMLElement;
-  private filterDebounce: ReturnType<typeof setTimeout> | null = null;
-
-  private analBtn?: HTMLButtonElement;
-  private filtBtn?: HTMLButtonElement;
-  private setBtn?: HTMLButtonElement;
-
-  private bulkMode = false;
-  private selectedIds = new Set<string>();
 
   private get tr() { return this.ctx.tr; }
 
   constructor(ctx: ViewContext, el: HTMLElement) {
     this.ctx = ctx;
     this.el = el;
+
+    this.table = new DataTable<FinanceRecord>({
+      ctx,
+      items: () => this.getFiltered(),
+      itemId: r => r.id,
+      hasAnyItems: () => (this.ctx.data?.records.length ?? 0) > 0,
+      columns: [
+        {
+          key: 'date', label: `${this.tr.date} / ${this.tr.time}`,
+          cell: r => ({ text: this.ctx.fmtDate(r.date, r.time), cls: 'finance-td-date' }),
+        },
+        {
+          key: 'type', label: this.tr.type,
+          cell: r => ({
+            text: r.type === 'income' ? this.tr.typeIncome : this.tr.typeExpense,
+            cls: r.type === 'income' ? 'finance-type-income' : 'finance-type-expense',
+          }),
+        },
+        {
+          key: 'amount', label: this.tr.sum,
+          cell: r => ({
+            text: (r.type === 'income' ? '+' : '−') + this.ctx.fmt(r.amount)
+              + (r.exchangeRate ? ` @ ${r.exchangeRate}` : ''),
+            cls: 'finance-amount-cell ' + (r.type === 'income' ? 'finance-amount-income' : 'finance-amount-expense'),
+          }),
+        },
+        { key: 'category', label: this.tr.category, cell: r => ({ text: r.category || '—' }) },
+        { key: 'tag', label: this.tr.tag, cell: r => ({ text: r.tag || '—', cls: 'finance-td-muted' }) },
+        { key: 'payer', label: this.tr.payer, cell: r => ({ text: r.payer || '—' }) },
+        { key: 'note', label: this.tr.note, cell: r => ({ text: r.note || '—', cls: 'finance-note-cell' }) },
+      ],
+      rowCls: r => {
+        const cls = [r.type === 'income' ? 'finance-row-income' : 'finance-row-expense'];
+        if (r.isInternal) cls.push('finance-tr-internal');
+        return cls;
+      },
+      rowActions: r => [
+        ...(r.attachmentPath ? [{ icon: '📎', title: this.tr.openAttachment, onClick: () => this.openAttachment(r) }] : []),
+        { icon: '✏️', title: this.tr.edit, onClick: () => this.openEditModal(r) },
+        { icon: '🗑️', title: this.tr.delete, onClick: () => this.confirmDelete(r), cls: 'finance-delete-btn' },
+      ],
+      renderCard: (block, r) => this.renderCard(block, r),
+      filterControls: () => this.filterControls(),
+      sortFields: [
+        { field: 'date', label: this.tr.sortDate },
+        { field: 'amount', label: this.tr.sum },
+        { field: 'category', label: this.tr.category },
+        { field: 'type', label: this.tr.type },
+        { field: 'payer', label: this.tr.payer },
+      ],
+      state: {
+        getPage: () => this.ctx.state.page,
+        setPage: p => { this.ctx.state.page = p; },
+        getSort: () => this.ctx.state.sort,
+        setSort: s => { this.ctx.state.sort = s as { field: SortField; dir: 'asc' | 'desc' }; },
+        resetFilter: () => { this.ctx.state.filter = { ...DEFAULT_FILTER }; },
+        getColumns: () => (this.ctx.state.recordsColumns ??= {}),
+        setColumns: c => { this.ctx.state.recordsColumns = c; },
+      },
+      renderStats: host => this.renderStats(host),
+      ownToolbar: (toolbar, api) => this.renderToolbar(toolbar, api),
+      renderPanels: host => this.renderPanels(host),
+      infoBarSums: (host, filtered) => {
+        const fi = filtered.filter(r => r.type === 'income' && !r.isInternal).reduce((s, r) => s + r.amount, 0);
+        const fe = filtered.filter(r => r.type === 'expense' && !r.isInternal).reduce((s, r) => s + r.amount, 0);
+        const sums = host.createDiv('finance-table-sums');
+        sums.createEl('span', { text: `↑ ${this.ctx.fmt(fi)}`, cls: 'finance-sum-income' });
+        sums.createEl('span', { text: '·', cls: 'finance-sum-sep' });
+        sums.createEl('span', { text: `↓ ${this.ctx.fmt(fe)}`, cls: 'finance-sum-expense' });
+      },
+      emptyState: { icon: '📊', title: this.tr.noRecords, subtitle: this.tr.noRecordsFilter },
+      emptyFiltered: { icon: '📊', title: this.tr.noRecords, subtitle: this.tr.tryChangeFilters },
+      onBulkDelete: async ids => {
+        await this.ctx.storage.deleteRecordsBatch(this.ctx.accountId, ids);
+        await this.reload();
+        new Notice(this.tr.deleted);
+      },
+      confirmBulkDeleteText: count => this.tr.confirmDeleteSelectedRecords.replace('{count}', String(count)),
+      onFilterChange: () => { this.analyticsView?.update(this.ctx.data?.records ?? [], this.ctx.currency); },
+      rerender: () => this.render(),
+    });
   }
 
   render(): void {
@@ -48,107 +116,77 @@ export class RecordsTab {
       this.ctx.state.sort = { field: 'date', dir: 'desc' };
       this.ctx.saveState();
     }
-
     this.el.empty();
-
-    this.statsEl = this.el.createDiv('finance-stats-container');
-    this.renderStats();
-
-    const toggleRow = this.el.createDiv('finance-analytics-toggle-row');
-
-    this.analBtn = toggleRow.createEl('button', {
-      cls: 'finance-analytics-toggle-btn',
-      text: `📈 ${this.tr.analytics} ▼`,
-    });
-    this.filtBtn = toggleRow.createEl('button', {
-      cls: 'finance-analytics-toggle-btn',
-      text: `🔍 ${this.tr.filters} ▼`,
-    });
-    this.setBtn = toggleRow.createEl('button', {
-      cls: 'finance-analytics-toggle-btn',
-      text: this.tr.settings + ' ▼',
-    });
-
-    if (this.ctx.isMobile) {
-      const bulkToggleBtn = toggleRow.createEl('button', {
-        cls: `finance-analytics-toggle-btn${this.bulkMode ? ' active' : ''}`,
-        text: `☑️ ${this.tr.bulkSelect}`,
-      });
-      bulkToggleBtn.addEventListener('click', () => {
-        this.bulkMode = !this.bulkMode;
-        if (!this.bulkMode) this.selectedIds.clear();
-        bulkToggleBtn.classList.toggle('active', this.bulkMode);
-        this.renderTable();
-      });
-    }
-
-    this.analyticsEl = this.el.createDiv('finance-analytics-panel');
-    this.analyticsEl.style.display = 'none';
-
-    this.filtersEl = this.el.createDiv('finance-filters-container');
-    this.filtersEl.style.display = 'none';
-
-    this.settingsEl = this.el.createDiv('finance-settings-panel');
-    this.settingsEl.style.display = 'none';
-
-    this.analBtn.addEventListener('click', () => this.togglePanel('analytics'));
-    this.filtBtn.addEventListener('click', () => this.togglePanel('filters'));
-    this.setBtn.addEventListener('click', () => this.togglePanel('settings'));
-
-    const tw = this.el.createDiv('finance-table-wrapper');
-    this.tableEl = tw.createDiv('finance-table-container');
-    this.paginationEl = tw.createDiv('finance-pagination');
-    this.renderTable();
-  }
-
-  private togglePanel(panel: 'analytics' | 'filters' | 'settings'): void {
-    const wasAnalytics = this.analyticsOpen;
-    const wasFilters = this.filtersOpen;
-    const wasSettings = this.settingsOpen;
-
-    const isOpening = (panel === 'analytics' && !wasAnalytics)
-      || (panel === 'filters' && !wasFilters)
-      || (panel === 'settings' && !wasSettings);
-
-    this.analyticsOpen = false;
-    this.filtersOpen = false;
-    this.settingsOpen = false;
-
-    if (isOpening) {
-      if (panel === 'analytics') {
-        this.analyticsOpen = true;
-        this.renderAnalytics();
-      } else if (panel === 'filters') {
-        this.filtersOpen = true;
-        this.renderFilters();
-      } else if (panel === 'settings') {
-        this.settingsOpen = true;
-        this.renderSettings();
-      }
-    }
-
-    this.analyticsEl!.style.display = this.analyticsOpen ? 'block' : 'none';
-    this.filtersEl!.style.display = this.filtersOpen ? 'block' : 'none';
-    this.settingsEl!.style.display = this.settingsOpen ? 'block' : 'none';
-
-    this.analBtn!.classList.toggle('active', this.analyticsOpen);
-    this.filtBtn!.classList.toggle('active', this.filtersOpen);
-    this.setBtn!.classList.toggle('active', this.settingsOpen);
-
-    this.analBtn!.textContent = `📈 ${this.tr.analytics} ${this.analyticsOpen ? '▲' : '▼'}`;
-    this.filtBtn!.textContent = `🔍 ${this.tr.filters} ${this.filtersOpen ? '▲' : '▼'}`;
-    this.setBtn!.textContent = `${this.tr.settings} ${this.settingsOpen ? '▲' : '▼'}`;
+    this.table.render(this.el);
   }
 
   update(): void {
-    this.renderStats();
-    if (this.filtersOpen) this.renderFilters();
-    this.renderTable();
+    this.render();
   }
 
-  private renderStats(): void {
-    if (!this.statsEl || !this.ctx.data) return;
-    this.statsEl.empty();
+  private async reload(): Promise<void> {
+    this.ctx.data = await this.ctx.storage.load(this.ctx.accountId);
+    this.render();
+  }
+
+  // ── Toolbar with three exclusive panels ─────────────────────────────────
+
+  private renderToolbar(toolbar: HTMLElement, api: DataTableApi): void {
+    const mkToggle = (label: string, panel: Panel, onClick: () => void) => {
+      const open = panel === 'filters' ? api.filtersOpen : this.openPanel === panel;
+      const btn = toolbar.createEl('button', {
+        cls: `finance-analytics-toggle-btn${open ? ' active' : ''}`,
+        text: `${label} ${open ? '▲' : '▼'}`,
+      });
+      btn.addEventListener('click', onClick);
+    };
+
+    mkToggle(`📈 ${this.tr.analytics}`, 'analytics', () => this.switchPanel('analytics', api));
+    mkToggle(`🔍 ${this.tr.filters}`, 'filters', () => this.switchPanel('filters', api));
+    mkToggle(this.tr.settings, 'settings', () => this.switchPanel('settings', api));
+
+    if (this.ctx.isMobile) {
+      const bulkBtn = toolbar.createEl('button', {
+        cls: `finance-analytics-toggle-btn${api.bulkMode ? ' active' : ''}`,
+        text: `☑️ ${this.tr.bulkSelect}`,
+      });
+      bulkBtn.addEventListener('click', () => api.toggleBulkMode());
+    }
+  }
+
+  private switchPanel(panel: Panel, api: DataTableApi): void {
+    if (panel === 'filters') {
+      if (this.openPanel !== null) this.openPanel = null;
+      api.toggleFilters();
+      return;
+    }
+    const opening = this.openPanel !== panel;
+    this.openPanel = opening ? panel : null;
+    if (opening && api.filtersOpen) { api.toggleFilters(); return; }
+    this.render();
+  }
+
+  private renderPanels(host: HTMLElement): void {
+    if (this.openPanel === 'analytics') {
+      const panel = host.createDiv('finance-analytics-panel');
+      this.analyticsView = new AnalyticsView(
+        panel, this.ctx.data?.records ?? [], this.ctx.currency, this.tr,
+        a => this.onAnalyticsBarClick(a),
+      );
+      this.analyticsView.render();
+    } else {
+      this.analyticsView = null;
+    }
+    if (this.openPanel === 'settings') {
+      this.renderSettings(host.createDiv('finance-settings-panel'));
+    }
+  }
+
+  // ── Stats ────────────────────────────────────────────────────────────────
+
+  private renderStats(host: HTMLElement): void {
+    if (!this.ctx.data) return;
+    const statsEl = host.createDiv('finance-stats-container');
     const recs = this.ctx.data.records;
     const inc = recs.filter(r => r.type === 'income' && !r.isInternal).reduce((s, r) => s + r.amount, 0);
     const exp = recs.filter(r => r.type === 'expense' && !r.isInternal).reduce((s, r) => s + r.amount, 0);
@@ -165,13 +203,12 @@ export class RecordsTab {
         mod: bal >= 0 ? 'positive' : 'negative', icon: '＝',
       },
     ];
-
     if (borrowed > 0) {
       cards.push({ label: this.tr.borrowed, value: this.ctx.fmt(borrowed), mod: 'expense', icon: '👈' });
     }
 
     cards.forEach(item => {
-      const card = this.statsEl!.createDiv(`finance-stat-card finance-stat-${item.mod}`);
+      const card = statsEl.createDiv(`finance-stat-card finance-stat-${item.mod}`);
       card.createEl('div', { text: item.icon, cls: 'finance-stat-icon' });
       const info = card.createDiv('finance-stat-info');
       info.createEl('div', { text: item.label, cls: 'finance-stat-label' });
@@ -179,244 +216,71 @@ export class RecordsTab {
     });
   }
 
-  private renderAnalytics(): void {
-    if (!this.analyticsEl || !this.ctx.data) return;
-    const allRecords = this.ctx.data.records;
-    const cur = this.ctx.currency;
+  // ── Filters ──────────────────────────────────────────────────────────────
 
-    if (this.analyticsView) {
-      this.analyticsView.update(allRecords, cur);
-    } else {
-      this.analyticsView = new AnalyticsView(this.analyticsEl, allRecords, cur, this.tr, (a) => this.onAnalyticsBarClick(a));
-      this.analyticsView.render();
-    }
-  }
-
-  private renderFilters(): void {
-    if (!this.filtersEl || !this.ctx.data) return;
-    this.filtersEl.empty();
+  private filterControls(): FilterControl[] {
     const f = this.ctx.state.filter;
-
-    const row1 = this.filtersEl.createDiv('finance-filters-row');
-
-    const sg = row1.createDiv('finance-filter-group finance-filter-search');
-    sg.createEl('label', { text: this.tr.search, cls: 'finance-filter-label' });
-    const si = sg.createEl('input', {
-      type: 'text', cls: 'finance-filter-input', placeholder: this.tr.searchAllFields,
-    });
-    si.value = f.search;
-    si.addEventListener('input', () => {
-      if (this.filterDebounce) clearTimeout(this.filterDebounce);
-      this.filterDebounce = setTimeout(() => {
-        this.ctx.state.filter.search = si.value;
-        this.resetPage();
-      }, SEARCH_DEBOUNCE_MS);
-    });
-
-    this.mkSelect(row1, this.tr.type,
-      [{ v: 'all', l: this.tr.allTypes }, { v: 'income', l: '↑ ' + this.tr.incomeStat }, { v: 'expense', l: '↓ ' + this.tr.expenseStat }],
-      f.type, v => { this.ctx.state.filter.type = v as any; this.resetPage(); });
-
-    this.mkSearchSelect(row1, this.tr.category,
-      [{ v: '', l: this.tr.all }, ...this.ctx.data.categories.map(c => ({ v: c, l: c }))],
-      f.category, v => { this.ctx.state.filter.category = v; this.resetPage(); });
-
-    const row2 = this.filtersEl.createDiv('finance-filters-row');
-
-    const dfG = row2.createDiv('finance-filter-group');
-    dfG.createEl('label', { text: this.tr.from, cls: 'finance-filter-label' });
-    const dfI = dfG.createEl('input', { type: 'date', cls: 'finance-filter-input' });
-    dfI.value = f.dateFrom;
-    dfI.addEventListener('change', () => { this.ctx.state.filter.dateFrom = dfI.value; this.resetPage(); });
-
-    const dtG = row2.createDiv('finance-filter-group');
-    dtG.createEl('label', { text: this.tr.to, cls: 'finance-filter-label' });
-    const dtI = dtG.createEl('input', { type: 'date', cls: 'finance-filter-input' });
-    dtI.value = f.dateTo;
-    dtI.addEventListener('change', () => { this.ctx.state.filter.dateTo = dtI.value; this.resetPage(); });
-
-    this.mkSearchSelect(row2, this.tr.payer,
-      [{ v: '', l: this.tr.all }, ...this.ctx.data.payers.map(p => ({ v: p, l: p }))],
-      f.payer, v => { this.ctx.state.filter.payer = v; this.resetPage(); });
-
-    this.mkSearchSelect(row2, this.tr.tag,
-      [{ v: '', l: this.tr.all }, ...this.ctx.data.tags.map(t => ({ v: t, l: t }))],
-      f.tag, v => { this.ctx.state.filter.tag = v; this.resetPage(); });
-
-    const intG = row2.createDiv('finance-filter-group finance-filter-internal');
-    const intLabel = intG.createEl('label', { cls: 'finance-filter-label' });
-    const intBtn = intG.createEl('button', {
-      type: 'button',
-      cls: 'finance-internal-btn',
-      attr: { title: this.tr.internalOnly },
-    });
-    intBtn.innerHTML = '🔄';
-    const applyInternalLabel = () => {
-      const only = f.showInternal === 'only';
-      intLabel.textContent = only ? this.tr.showInternal : this.tr.internal;
-      intBtn.style.opacity = only ? '1' : '.4';
-    };
-    applyInternalLabel();
-    intBtn.addEventListener('click', () => {
-      this.ctx.state.filter.showInternal = f.showInternal === 'only' ? 'all' : 'only';
-      applyInternalLabel();
-      this.resetPage();
-    });
-
-    const rG = row2.createDiv('finance-filter-group finance-filter-reset');
-    rG.createEl('label', { text: '\u00A0', cls: 'finance-filter-label' });
-    rG.createEl('button', { text: this.tr.reset, cls: 'finance-reset-btn' })
-      .addEventListener('click', () => {
-        this.ctx.state.filter = { ...DEFAULT_FILTER };
-        this.ctx.state.page = 0;
-        this.ctx.saveState();
-        this.renderFilters();
-        this.renderTable();
-        if (this.analyticsOpen) this.renderAnalytics();
-      });
-
-    const sortRow = this.filtersEl.createDiv('finance-sort-row');
-    sortRow.createEl('span', { text: this.tr.sortBy, cls: 'finance-sort-label' });
-
-    const sortFields: { field: SortField; label: string }[] = [
-      { field: 'date', label: this.tr.sortDate },
-      { field: 'amount', label: this.tr.sum },
-      { field: 'category', label: this.tr.category },
-      { field: 'type', label: this.tr.type },
-      { field: 'payer', label: this.tr.payer },
-    ];
-    sortFields.forEach(({ field, label }) => {
-      const active = this.ctx.state.sort.field === field;
-      const btn = sortRow.createEl('button', {
-        cls: `finance-sort-btn${active ? ' active' : ''}`,
-        text: label + (active ? (this.ctx.state.sort.dir === 'asc' ? ' ↑' : ' ↓') : ''),
-      });
-      btn.addEventListener('click', () => {
-        this.ctx.state.sort = this.ctx.state.sort.field === field
-          ? { field, dir: this.ctx.state.sort.dir === 'asc' ? 'desc' : 'asc' }
-          : { field, dir: 'desc' };
-        this.ctx.state.page = 0;
-        this.ctx.saveState();
-        this.renderFilters();
-        this.renderTable();
-        if (this.analyticsOpen) this.renderAnalytics();
-      });
-    });
-  }
-
-  private mkSelect(
-    row: HTMLElement, label: string,
-    opts: { v: string; l: string }[],
-    cur: string, onChange: (v: string) => void,
-  ): void {
-    const g = row.createDiv('finance-filter-group');
-    g.createEl('label', { text: label, cls: 'finance-filter-label' });
-    const sel = g.createEl('select', { cls: 'finance-filter-select' });
-    opts.forEach(({ v, l }) => { const o = sel.createEl('option', { text: l }); o.value = v; o.selected = v === cur; });
-    sel.addEventListener('change', () => onChange(sel.value));
-  }
-
-  private mkSearchSelect(
-    row: HTMLElement, label: string,
-    opts: { v: string; l: string }[],
-    cur: string, onChange: (v: string) => void,
-  ): void {
-    const g = row.createDiv('finance-filter-group');
-    g.createEl('label', { text: label, cls: 'finance-filter-label' });
-
-    const wrapper = g.createDiv('finance-custom-select');
-    let selectedValue = cur;
-
-    const trigger = wrapper.createDiv('finance-custom-select-trigger');
-    trigger.setAttribute('tabindex', '0');
-    const triggerText = trigger.createEl('span', { cls: 'finance-custom-select-text' });
-    triggerText.textContent = opts.find(o => o.v === cur)?.l ?? cur ?? opts[0]?.l ?? '—';
-
-    let dropdown: HTMLElement | null = null;
-    let isOpen = false;
-    let outsideHandler: ((e: MouseEvent) => void) | null = null;
-    let searchDebounce: ReturnType<typeof setTimeout> | null = null;
-
-    const closeDropdown = () => {
-      if (!isOpen) return;
-      isOpen = false;
-      dropdown?.remove();
-      dropdown = null;
-      if (outsideHandler) { document.removeEventListener('mousedown', outsideHandler); outsideHandler = null; }
-    };
-
-    const resetSelection = () => {
-      selectedValue = opts[0]?.v ?? '';
-      triggerText.textContent = opts[0]?.l ?? '—';
-      onChange(selectedValue);
-      closeDropdown();
-    };
-
-    const openDropdown = () => {
-      if (isOpen) { closeDropdown(); return; }
-      isOpen = true;
-
-      dropdown = wrapper.createDiv('finance-custom-select-dropdown');
-
-      const searchInput = dropdown.createEl('input', {
-        type: 'text',
-        cls: 'finance-custom-select-search',
-        placeholder: this.tr.searchPlaceholder,
-      });
-
-      const list = dropdown.createDiv('finance-custom-select-list');
-
-      const renderList = (q: string) => {
-        list.empty();
-        const lq = q.toLowerCase();
-        const filtered = opts.filter(o => !lq || o.l.toLowerCase().includes(lq) || o.v.toLowerCase().includes(lq));
-        if (!filtered.length) {
-          list.createDiv({ cls: 'finance-custom-select-empty', text: this.tr.noOptions });
-          return;
-        }
-        filtered.forEach(({ v, l }) => {
-          const item = list.createDiv({ cls: `finance-custom-select-item${v === selectedValue ? ' is-active' : ''}` });
-          item.textContent = l;
-          item.addEventListener('mousedown', (e) => {
-            e.preventDefault();
-            selectedValue = v;
-            triggerText.textContent = l;
-            onChange(v);
-            closeDropdown();
+    const data = this.ctx.data;
+    return [
+      {
+        kind: 'search', label: this.tr.search, placeholder: this.tr.searchAllFields,
+        get: () => f.search, set: v => { f.search = v; },
+      },
+      {
+        kind: 'select', label: this.tr.type,
+        options: [
+          { value: 'all', label: this.tr.allTypes },
+          { value: 'income', label: '↑ ' + this.tr.incomeStat },
+          { value: 'expense', label: '↓ ' + this.tr.expenseStat },
+        ],
+        get: () => f.type, set: v => { f.type = v as typeof f.type; },
+      },
+      {
+        kind: 'searchSelect', label: this.tr.category,
+        options: () => [{ value: '', label: this.tr.all }, ...(data?.categories ?? []).map(c => ({ value: c, label: c }))],
+        get: () => f.category, set: v => { f.category = v; },
+      },
+      {
+        kind: 'date', label: this.tr.from,
+        get: () => f.dateFrom, set: v => { f.dateFrom = v; },
+      },
+      {
+        kind: 'date', label: this.tr.to,
+        get: () => f.dateTo, set: v => { f.dateTo = v; },
+      },
+      {
+        kind: 'searchSelect', label: this.tr.payer,
+        options: () => [{ value: '', label: this.tr.all }, ...(data?.payers ?? []).map(p => ({ value: p, label: p }))],
+        get: () => f.payer, set: v => { f.payer = v; },
+      },
+      {
+        kind: 'searchSelect', label: this.tr.tag,
+        options: () => [{ value: '', label: this.tr.all }, ...(data?.tags ?? []).map(t => ({ value: t, label: t }))],
+        get: () => f.tag, set: v => { f.tag = v; },
+      },
+      {
+        kind: 'custom',
+        render: (row, onChange) => {
+          const g = row.createDiv('finance-filter-group finance-filter-internal');
+          const label = g.createEl('label', { cls: 'finance-filter-label' });
+          const btn = g.createEl('button', {
+            type: 'button', cls: 'finance-internal-btn', text: '🔄',
+            attr: { title: this.tr.internalOnly },
           });
-        });
-      };
-
-      renderList('');
-      searchInput.addEventListener('input', () => {
-        if (searchDebounce) clearTimeout(searchDebounce);
-        searchDebounce = setTimeout(() => renderList(searchInput.value), SEARCH_DEBOUNCE_MS);
-      });
-      searchInput.addEventListener('keydown', (e: KeyboardEvent) => {
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          const first = list.querySelector<HTMLElement>('.finance-custom-select-item');
-          if (first) first.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
-        }
-        if (e.key === 'ArrowDown') {
-          const first = list.querySelector<HTMLElement>('.finance-custom-select-item');
-          first?.focus();
-        }
-        if (e.key === 'Escape') { resetSelection(); }
-      });
-      setTimeout(() => searchInput.focus(), FOCUS_DELAY_MS);
-
-      outsideHandler = (e: MouseEvent) => {
-        if (!wrapper.contains(e.target as Node)) closeDropdown();
-      };
-      setTimeout(() => document.addEventListener('mousedown', outsideHandler!), 0);
-    };
-
-    trigger.addEventListener('click', openDropdown);
-    trigger.addEventListener('keydown', (e: KeyboardEvent) => {
-      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDropdown(); }
-      if (e.key === 'Escape') { e.preventDefault(); resetSelection(); }
-    });
+          const applyLabel = () => {
+            const only = f.showInternal === 'only';
+            label.textContent = only ? this.tr.showInternal : this.tr.internal;
+            btn.classList.toggle('is-dimmed', !only);
+          };
+          applyLabel();
+          btn.addEventListener('click', () => {
+            f.showInternal = f.showInternal === 'only' ? 'all' : 'only';
+            applyLabel();
+            onChange();
+          });
+        },
+      },
+    ];
   }
 
   private getFiltered(): FinanceRecord[] {
@@ -424,7 +288,7 @@ export class RecordsTab {
     const { filter, sort } = this.ctx.state;
     const q = filter.search.toLowerCase();
 
-    let rows = this.ctx.data.records.filter(r => {
+    const rows = this.ctx.data.records.filter(r => {
       if (filter.showInternal === 'only' && !r.isInternal) return false;
       if (filter.type !== 'all' && r.type !== filter.type) return false;
       if (filter.category && r.category !== filter.category) return false;
@@ -439,7 +303,7 @@ export class RecordsTab {
       return true;
     });
 
-    rows = rows.slice().sort((a, b) => {
+    return rows.sort((a, b) => {
       const av = a[sort.field as keyof FinanceRecord] ?? '';
       const bv = b[sort.field as keyof FinanceRecord] ?? '';
       const cmp = typeof av === 'number' && typeof bv === 'number'
@@ -447,415 +311,40 @@ export class RecordsTab {
         : String(av).localeCompare(String(bv), 'ru');
       return sort.dir === 'asc' ? cmp : -cmp;
     });
-
-    return rows;
   }
 
-  private renderTable(): void {
-    if (!this.tableEl || !this.paginationEl) return;
-    this.tableEl.empty();
-    this.paginationEl.empty();
+  // ── Mobile card ──────────────────────────────────────────────────────────
 
-    const filtered = this.getFiltered();
-    const { pageSize } = this.ctx.state;
-    const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-    const page = Math.max(0, Math.min(this.ctx.state.page, totalPages - 1));
-    this.ctx.state.page = page;
-    const start = page * pageSize;
-    const pageRows = filtered.slice(start, start + pageSize);
-    const cur = this.ctx.currency;
-
-    if (this.analyticsOpen && this.analyticsView && this.ctx.data) {
-      this.analyticsView.update(this.ctx.data.records, cur);
-    }
-
-    if (!filtered.length) {
-      const e = this.tableEl.createDiv('finance-empty-state');
-      e.createEl('div', { text: '📊', cls: 'finance-empty-icon' });
-      e.createEl('p', { text: this.tr.noRecords, cls: 'finance-empty-title' });
-      e.createEl('p', {
-        text: this.ctx.data?.records.length ? this.tr.tryChangeFilters : this.tr.noRecordsFilter,
-        cls: 'finance-empty-sub',
-      });
-      return;
-    }
-
-    const infoBar = this.tableEl.createDiv('finance-table-info-bar');
-
-    const metaLeft = infoBar.createDiv('finance-table-meta');
-    metaLeft.createEl('span', {
-      text: `${start + 1}–${Math.min(start + pageSize, filtered.length)} ${this.tr.fromLower} ${filtered.length}`,
-      cls: 'finance-count-text',
+  private renderCard(block: HTMLElement, rec: FinanceRecord): void {
+    const header = block.createDiv('finance-record-header');
+    const amount = (rec.type === 'income' ? '+' : '−') + this.ctx.fmt(rec.amount);
+    header.createEl('span', {
+      text: amount,
+      cls: 'finance-record-amount ' + (rec.type === 'income' ? 'finance-amount-income' : 'finance-amount-expense'),
     });
+    header.createEl('span', { text: this.ctx.fmtDate(rec.date, rec.time), cls: 'finance-record-date' });
 
-    const fi = filtered.filter(r => r.type === 'income' && !r.isInternal).reduce((s, r) => s + r.amount, 0);
-    const fe = filtered.filter(r => r.type === 'expense' && !r.isInternal).reduce((s, r) => s + r.amount, 0);
-    const sums = infoBar.createDiv('finance-table-sums');
-    sums.createEl('span', { text: `↑\u00a0${this.ctx.fmt(fi)}`, cls: 'finance-sum-income' });
-    sums.createEl('span', { text: '·', cls: 'finance-sum-sep' });
-    sums.createEl('span', { text: `↓\u00a0${this.ctx.fmt(fe)}`, cls: 'finance-sum-expense' });
+    if (rec.category) block.createEl('div', { text: rec.category, cls: 'finance-record-category' });
 
-    const allCols: { key: string; label: string }[] = [
-      { key: 'date', label: this.tr.date + ' / ' + this.tr.time },
-      { key: 'type', label: this.tr.type },
-      { key: 'amount', label: this.tr.sum },
-      { key: 'category', label: this.tr.category },
-      { key: 'tag', label: this.tr.tag },
-      { key: 'payer', label: this.tr.payer },
-      { key: 'note', label: this.tr.note },
-      { key: '_act', label: '' },
-    ];
+    const details = block.createDiv('finance-record-details');
+    if (rec.tag) details.createEl('span', { text: `🏷️ ${rec.tag}`, cls: 'finance-record-detail' });
+    if (rec.payer) details.createEl('span', { text: `👤 ${rec.payer}`, cls: 'finance-record-detail' });
+    if (rec.exchangeRate) details.createEl('span', { text: `💱 @ ${rec.exchangeRate}`, cls: 'finance-record-detail' });
 
-    if (this.bulkMode) {
-      allCols.unshift({ key: '_select', label: '' });
-    }
-
-    this.ctx.state.recordsColumns ??= {};
-
-    const visCols = allCols.filter(c => c.key === '_act' || c.key === '_select' || this.ctx.state.recordsColumns![c.key] !== false);
-
-    if (!this.ctx.isMobile) {
-      const colVisCols = allCols.filter(c => c.key !== '_act' && c.key !== '_select');
-      const btnsContainer = infoBar.createDiv({ cls: 'finance-table-info-btns', attr: { style: 'display: flex; gap: 8px; align-items: center;' } });
-      
-      const bulkToggle = btnsContainer.createEl('button', {
-        cls: `finance-bulk-toggle-btn${this.bulkMode ? ' active' : ''}`,
-        text: '☑️',
-      });
-      bulkToggle.addEventListener('click', () => {
-        this.bulkMode = !this.bulkMode;
-        if (!this.bulkMode) this.selectedIds.clear();
-        this.renderTable();
-      });
-
-      if (this.bulkMode && this.selectedIds.size > 0) {
-        const bulkDeleteBtn = btnsContainer.createEl('button', {
-          cls: 'finance-bulk-delete-btn',
-          text: `${this.tr.delete} (${this.selectedIds.size})`,
-        });
-        bulkDeleteBtn.addEventListener('click', () => this.confirmBulkDelete());
-      }
-
-      const gearBtn = btnsContainer.createEl('button', { cls: 'finance-colvis-btn', text: '⚙️' });
-      gearBtn.title = this.tr.columnSettings;
-      gearBtn.addEventListener('click', () => {
-        new ColumnVisibilityModal(this.ctx.app, {
-          columns: colVisCols,
-          visibility: { ...this.ctx.state.recordsColumns! },
-          accentColor: this.ctx.data?.accentColor,
-          onSave: (updated) => {
-            this.ctx.state.recordsColumns = updated;
-            this.ctx.saveState();
-            this.renderTable();
-          },
-        }).open();
-      });
-    }
-
-    if (this.ctx.isMobile && this.bulkMode && this.selectedIds.size > 0) {
-      const mobileBar = this.tableEl.createDiv('finance-mobile-bulk-bar');
-      const deleteBtn = mobileBar.createEl('button', {
-        cls: 'finance-bulk-delete-btn',
-        text: `${this.tr.delete} (${this.selectedIds.size})`,
-      });
-      deleteBtn.addEventListener('click', () => this.confirmBulkDelete());
-    }
-
-    if (this.ctx.isMobile) {
-      this.renderRecordsAsBlocks(pageRows);
-    } else {
-      this.renderRecordsAsTable(pageRows, visCols);
-    }
-    if (totalPages > 1) this.renderPagination(totalPages, page);
+    if (rec.note) block.createEl('div', { text: rec.note, cls: 'finance-record-note' });
   }
 
-  private renderRecordsAsBlocks(pageRows: FinanceRecord[]): void {
-    if (!this.tableEl) return;
-    const list = this.tableEl.createDiv('finance-records-list');
-    const frag = document.createDocumentFragment();
-
-    pageRows.forEach(rec => {
-      const block = document.createElement('div');
-      block.classList.add('finance-record-block', rec.type === 'income' ? 'finance-row-income' : 'finance-row-expense');
-      if (rec.isInternal) block.classList.add('finance-tr-internal');
-
-      const header = block.createDiv('finance-record-header');
-      if (this.bulkMode) {
-        const cb = header.createEl('input', { type: 'checkbox', cls: 'finance-block-checkbox' }) as HTMLInputElement;
-        cb.checked = this.selectedIds.has(rec.id);
-        cb.addEventListener('change', (e) => {
-          e.stopPropagation();
-          if (cb.checked) {
-            this.selectedIds.add(rec.id);
-          } else {
-            this.selectedIds.delete(rec.id);
-          }
-          this.renderTable();
-        });
-      }
-
-      const amount = (rec.type === 'income' ? '+' : '−') + this.ctx.fmt(rec.amount);
-      header.createEl('span', {
-        text: amount,
-        cls: 'finance-record-amount ' + (rec.type === 'income' ? 'finance-amount-income' : 'finance-amount-expense'),
-      });
-      header.createEl('span', { text: this.ctx.fmtDate(rec.date, rec.time), cls: 'finance-record-date' });
-
-      if (rec.category) {
-        block.createEl('div', { text: rec.category, cls: 'finance-record-category' });
-      }
-
-      const details = block.createDiv('finance-record-details');
-      if (rec.tag) {
-        details.createEl('span', { text: `🏷️ ${rec.tag}`, cls: 'finance-record-detail' });
-      }
-      if (rec.payer) {
-        details.createEl('span', { text: `👤 ${rec.payer}`, cls: 'finance-record-detail' });
-      }
-      if (rec.exchangeRate) {
-        details.createEl('span', { text: `💱 @ ${rec.exchangeRate}`, cls: 'finance-record-detail' });
-      }
-
-      if (rec.note) {
-        block.createEl('div', { text: rec.note, cls: 'finance-record-note' });
-      }
-
-      const actions = block.createDiv('finance-record-actions');
-      if (rec.attachmentPath) {
-        this.mkActionBtn(actions, '📎', this.tr.openAttachment, () => this.openAttachment(rec));
-      }
-      this.mkActionBtn(actions, '✏️', this.tr.edit, () => this.openEditModal(rec));
-      this.mkActionBtn(actions, '🗑️', this.tr.delete, () => this.confirmDelete(rec), 'finance-delete-btn');
-
-      if (this.bulkMode) {
-        block.style.cursor = 'pointer';
-        block.addEventListener('click', (e) => {
-          if ((e.target as HTMLElement).tagName === 'INPUT' || (e.target as HTMLElement).closest('.finance-action-btn')) {
-            return;
-          }
-          const isSelected = this.selectedIds.has(rec.id);
-          if (isSelected) {
-            this.selectedIds.delete(rec.id);
-          } else {
-            this.selectedIds.add(rec.id);
-          }
-          this.renderTable();
-        });
-      }
-
-      frag.appendChild(block);
-    });
-
-    list.appendChild(frag);
-  }
-
-  private renderRecordsAsTable(pageRows: FinanceRecord[], cols: { key: string; label: string }[]): void {
-    if (!this.tableEl) return;
-    const scroll = this.tableEl.createDiv('finance-table-scroll');
-    const table = scroll.createEl('table', { cls: 'finance-table' });
-
-    const hRow = table.createEl('thead').createEl('tr');
-    cols.forEach(c => {
-      const th = hRow.createEl('th', { cls: 'finance-th' });
-      if (c.key === '_select') {
-        th.classList.add('finance-select-td');
-        const cb = th.createEl('input', { type: 'checkbox' }) as HTMLInputElement;
-        const allSelected = pageRows.length > 0 && pageRows.every(r => this.selectedIds.has(r.id));
-        cb.checked = allSelected;
-        cb.addEventListener('change', () => {
-          if (cb.checked) {
-            pageRows.forEach(r => this.selectedIds.add(r.id));
-          } else {
-            pageRows.forEach(r => this.selectedIds.delete(r.id));
-          }
-          this.renderTable();
-        });
-      } else {
-        th.setText(c.label);
-      }
-    });
-
-    const tbody = table.createEl('tbody');
-    const frag = document.createDocumentFragment();
-
-    const dataCols = cols.filter(c => c.key !== '_act' && c.key !== '_select');
-
-    pageRows.forEach(rec => {
-      const tr = document.createElement('tr');
-      tr.classList.add('finance-tr', rec.type === 'income' ? 'finance-row-income' : 'finance-row-expense');
-      if (rec.isInternal) tr.classList.add('finance-tr-internal');
-
-      if (cols.find(c => c.key === '_select')) {
-        const std = document.createElement('td');
-        std.classList.add('finance-td', 'finance-select-td');
-        const cb = std.createEl('input', { type: 'checkbox' }) as HTMLInputElement;
-        cb.checked = this.selectedIds.has(rec.id);
-        cb.addEventListener('change', (e) => {
-          e.stopPropagation();
-          if (cb.checked) {
-            this.selectedIds.add(rec.id);
-          } else {
-            this.selectedIds.delete(rec.id);
-          }
-          this.renderTable();
-        });
-        tr.appendChild(std);
-      }
-
-      dataCols.forEach(c => {
-        let text = '';
-        let cls = '';
-        switch (c.key) {
-          case 'date':
-            text = this.ctx.fmtDate(rec.date, rec.time);
-            cls = 'finance-td-date';
-            break;
-          case 'type':
-            text = rec.type === 'income' ? this.tr.typeIncome : this.tr.typeExpense;
-            cls = rec.type === 'income' ? 'finance-type-income' : 'finance-type-expense';
-            break;
-          case 'amount':
-            text = (rec.type === 'income' ? '+' : '−') + this.ctx.fmt(rec.amount)
-              + (rec.exchangeRate ? ` @ ${rec.exchangeRate}` : '');
-            cls = 'finance-amount-cell ' + (rec.type === 'income' ? 'finance-amount-income' : 'finance-amount-expense');
-            break;
-          case 'category':
-            text = rec.category || '—';
-            break;
-          case 'tag':
-            text = rec.tag || '—';
-            cls = 'finance-td-muted';
-            break;
-          case 'payer':
-            text = rec.payer || '—';
-            break;
-          case 'note':
-            text = rec.note || '—';
-            cls = 'finance-note-cell';
-            break;
-        }
-        const td = document.createElement('td');
-        td.classList.add('finance-td');
-        if (cls) cls.split(' ').filter(Boolean).forEach(x => td.classList.add(x));
-        td.setAttribute('data-label', c.label);
-        td.textContent = text;
-        tr.appendChild(td);
-      });
-
-      if (cols.find(c => c.key === '_act')) {
-        const atd = document.createElement('td');
-        atd.classList.add('finance-td', 'finance-actions-td');
-        atd.setAttribute('data-label', '');
-
-        if (rec.attachmentPath) {
-          this.mkActionBtn(atd, '📎', this.tr.openAttachment, () => this.openAttachment(rec));
-        }
-        this.mkActionBtn(atd, '✏️', this.tr.edit, () => this.openEditModal(rec));
-        this.mkActionBtn(atd, '🗑️', this.tr.delete, () => this.confirmDelete(rec), 'finance-delete-btn');
-
-        tr.appendChild(atd);
-      }
-
-      if (this.bulkMode) {
-        tr.style.cursor = 'pointer';
-        tr.addEventListener('click', (e) => {
-          if ((e.target as HTMLElement).tagName === 'INPUT' || (e.target as HTMLElement).closest('.finance-action-btn')) {
-            return;
-          }
-          const isSelected = this.selectedIds.has(rec.id);
-          if (isSelected) {
-            this.selectedIds.delete(rec.id);
-          } else {
-            this.selectedIds.add(rec.id);
-          }
-          this.renderTable();
-        });
-      }
-
-      frag.appendChild(tr);
-    });
-
-    tbody.appendChild(frag);
-  }
-
-  private mkActionBtn(parent: HTMLElement, icon: string, title: string, onClick: () => void, extraCls = ''): void {
-    const btn = document.createElement('button');
-    btn.classList.add('finance-action-btn');
-    if (extraCls) btn.classList.add(extraCls);
-    btn.title = title;
-    btn.textContent = icon;
-    btn.addEventListener('click', onClick);
-    parent.appendChild(btn);
-  }
-
-  private renderPagination(totalPages: number, current: number): void {
-    if (!this.paginationEl) return;
-    const nav = this.paginationEl.createDiv('finance-pagination-nav');
-
-    const go = (page: number) => {
-      this.ctx.state.page = page;
-      this.renderTable();
-    };
-
-    const prev = nav.createEl('button', { cls: 'finance-page-btn', text: '←' });
-    prev.disabled = current === 0;
-    prev.addEventListener('click', () => go(current - 1));
-
-    this.pageRange(current, totalPages).forEach(p => {
-      if (p === -1) { nav.createEl('span', { text: '…', cls: 'finance-page-ellipsis' }); return; }
-      const btn = nav.createEl('button', {
-        text: String(p + 1),
-        cls: `finance-page-btn${p === current ? ' active' : ''}`,
-      });
-      btn.addEventListener('click', () => go(p));
-    });
-
-    const next = nav.createEl('button', { cls: 'finance-page-btn', text: '→' });
-    next.disabled = current >= totalPages - 1;
-    next.addEventListener('click', () => go(current + 1));
-  }
-
-  private pageRange(cur: number, total: number): number[] {
-    if (total <= PAGE_RANGE_THRESHOLD) return Array.from({ length: total }, (_, i) => i);
-    const radius = this.ctx.isMobile ? 1 : 3;
-    const p: number[] = [0];
-    if (cur > radius + 1) p.push(-1);
-    for (let i = Math.max(1, cur - radius); i <= Math.min(total - 2, cur + radius); i++) p.push(i);
-    if (cur < total - (radius + 2)) p.push(-1);
-    p.push(total - 1);
-    return p;
-  }
-
-  private openAddModal(type: 'income' | 'expense'): void {
-    if (!this.ctx.data) { new Notice(this.ctx.tr.loading); return; }
-    const cur = this.ctx.currency;
-    new RecordModal(this.ctx.app, {
-      initial: { type }, records: this.ctx.data.records,
-      categories: this.ctx.data.categories, tags: this.ctx.data.tags, payers: this.ctx.data.payers,
-      currency: cur, settings: this.ctx.settings, pluginId: this.ctx.pluginId,
-      onSave: async rec => {
-        await this.ctx.storage.addRecord(this.ctx.accountId, rec);
-        this.ctx.data = await this.ctx.storage.load(this.ctx.accountId);
-        this.renderStats();
-        this.renderFilters();
-        this.renderTable();
-        new Notice(this.tr.recordAdded);
-      },
-    }).open();
-  }
+  // ── Modals ──────────────────────────────────────────────────────────────
 
   private openEditModal(rec: FinanceRecord): void {
     if (!this.ctx.data) return;
-    const cur = this.ctx.currency;
     new RecordModal(this.ctx.app, {
       initial: { ...rec }, records: this.ctx.data.records.filter(r => r.id !== rec.id),
       categories: this.ctx.data.categories, tags: this.ctx.data.tags, payers: this.ctx.data.payers,
-      currency: cur, settings: this.ctx.settings, pluginId: this.ctx.pluginId,
+      currency: this.ctx.currency, settings: this.ctx.settings, pluginId: this.ctx.pluginId,
       onSave: async updated => {
         await this.ctx.storage.updateRecord(this.ctx.accountId, updated);
-        this.ctx.data = await this.ctx.storage.load(this.ctx.accountId);
-        this.renderStats();
-        this.renderTable();
+        await this.reload();
         new Notice(this.tr.recordUpdated);
       },
     }).open();
@@ -865,25 +354,7 @@ export class RecordsTab {
     const label = `${rec.type === 'income' ? '+' : '−'}${this.ctx.fmt(rec.amount)}  ·  ${rec.category || '—'}  ·  ${this.ctx.fmtDate(rec.date, rec.time)}`;
     new ConfirmModal(this.ctx.app, `${this.tr.confirmDeleteRecord}\n${label}`, async () => {
       await this.ctx.storage.deleteRecord(this.ctx.accountId, rec.id);
-      this.ctx.data = await this.ctx.storage.load(this.ctx.accountId);
-      this.renderStats();
-      this.renderTable();
-      new Notice(this.tr.deleted);
-    }).open();
-  }
-
-  private confirmBulkDelete(): void {
-    const count = this.selectedIds.size;
-    if (count === 0) return;
-    const msg = this.tr.confirmDeleteSelectedRecords.replace('{count}', String(count));
-    new ConfirmModal(this.ctx.app, msg, async () => {
-      const ids = Array.from(this.selectedIds);
-      await this.ctx.storage.deleteRecordsBatch(this.ctx.accountId, ids);
-      this.ctx.data = await this.ctx.storage.load(this.ctx.accountId);
-      this.selectedIds.clear();
-      this.bulkMode = false;
-      this.renderStats();
-      this.renderTable();
+      await this.reload();
       new Notice(this.tr.deleted);
     }).open();
   }
@@ -895,29 +366,20 @@ export class RecordsTab {
   }
 
   private openIEModal(mode: 'export' | 'import'): void {
-    if (!this.ctx.data) { new Notice(this.ctx.tr.loading); return; }
-    const modal = new ImportExportModal(this.ctx.app, {
+    if (!this.ctx.data) { new Notice(this.tr.loading); return; }
+    new ImportExportModal(this.ctx.app, {
       noteName: this.ctx.data.name || noteFilename(this.ctx.accountId),
       currency: this.ctx.currency,
       records: this.ctx.data.records,
       onImport: async recs => {
         await this.ctx.storage.importRecords(this.ctx.accountId, recs);
-        this.ctx.data = await this.ctx.storage.load(this.ctx.accountId);
-        this.renderStats();
-        this.renderTable();
-        if (this.filtersOpen) this.renderFilters();
+        await this.reload();
       },
       mode,
-    });
-    modal.open();
+    }).open();
   }
 
-  private resetPage(): void {
-    this.ctx.state.page = 0;
-    this.ctx.saveState();
-    this.renderTable();
-    if (this.analyticsOpen) this.renderAnalytics();
-  }
+  // ── Analytics drill-down ─────────────────────────────────────────────────
 
   private onAnalyticsBarClick(action: BarClickAction): void {
     const f = this.ctx.state.filter;
@@ -925,24 +387,18 @@ export class RecordsTab {
 
     if (groupBy === 'category') {
       f.category = rawKey === this.tr.uncategorized ? '' : rawKey;
-      f.payer = '';
-      f.dateFrom = '';
-      f.dateTo = '';
+      f.payer = ''; f.dateFrom = ''; f.dateTo = '';
     } else if (groupBy === 'payer') {
       f.payer = rawKey === this.tr.notSpecified ? '' : rawKey;
-      f.category = '';
-      f.dateFrom = '';
-      f.dateTo = '';
+      f.category = ''; f.dateFrom = ''; f.dateTo = '';
     } else if (groupBy === 'year') {
-      f.category = '';
-      f.payer = '';
+      f.category = ''; f.payer = '';
       f.dateFrom = `${rawKey}-01-01`;
       f.dateTo = `${rawKey}-12-31`;
     } else if (groupBy === 'month') {
       const [y, m] = rawKey.split('-');
       const lastDay = new Date(Number(y), Number(m), 0).getDate();
-      f.category = '';
-      f.payer = '';
+      f.category = ''; f.payer = '';
       f.dateFrom = `${y}-${m}-01`;
       f.dateTo = `${y}-${m}-${String(lastDay).padStart(2, '0')}`;
     } else if (groupBy === 'week') {
@@ -960,28 +416,24 @@ export class RecordsTab {
         const dd = String(d.getDate()).padStart(2, '0');
         return `${yy}-${mm}-${dd}`;
       };
-      f.category = '';
-      f.payer = '';
+      f.category = ''; f.payer = '';
       f.dateFrom = pad(monday);
       f.dateTo = pad(sunday);
     }
 
     f.search = '';
     this.ctx.state.page = 0;
+    this.openPanel = null;
     this.ctx.saveState();
-    this.togglePanel('filters');
-    this.renderTable();
+    this.render();
   }
 
-  private renderSettings(): void {
-    if (!this.settingsEl || !this.ctx.data) return;
-    const el = this.settingsEl;
-    el.empty();
-    el.addClass('finance-settings-panel');
+  // ── Settings panel ───────────────────────────────────────────────────────
 
+  private renderSettings(el: HTMLElement): void {
+    if (!this.ctx.data) return;
     const row = (): HTMLDivElement => el.createDiv('finance-settings-row');
 
-    // ── Page size ────────────────────────────────────────────────────────
     const psRow = row();
     psRow.createEl('label', { text: this.tr.pageSizeLabel, cls: 'finance-filter-label' });
     const psSel = psRow.createEl('select', { cls: 'finance-filter-select' });
@@ -994,10 +446,9 @@ export class RecordsTab {
       this.ctx.state.pageSize = parseInt(psSel.value);
       this.ctx.state.page = 0;
       this.ctx.saveState();
-      this.renderTable();
+      this.render();
     });
 
-    // ── Accent color ─────────────────────────────────────────────────────
     const acRow = row();
     acRow.createEl('label', { text: this.tr.accentColor, cls: 'finance-filter-label' });
     const acC = acRow.createDiv('finance-settings-controls');
@@ -1010,9 +461,7 @@ export class RecordsTab {
       this.ctx.data = await this.ctx.storage.load(this.ctx.accountId);
       this.applyAccentColor(acIn.value);
     });
-    const rstBtn = acC.createEl('button', { text: this.tr.resetColor, cls: 'finance-btn-cancel' });
-    rstBtn.style.padding = '4px 12px';
-    rstBtn.style.fontSize = '.8em';
+    const rstBtn = acC.createEl('button', { text: this.tr.resetColor, cls: 'finance-btn-cancel finance-btn-compact' });
     rstBtn.addEventListener('click', async () => {
       await this.ctx.storage.updateMeta(this.ctx.accountId, { accentColor: '' });
       this.ctx.data = await this.ctx.storage.load(this.ctx.accountId);
@@ -1021,50 +470,40 @@ export class RecordsTab {
       hexLabel.textContent = '#7c3aed';
     });
 
-    // ── Import / Export ────────────────────────────────────────────────────
     const ieRow = row();
     ieRow.classList.add('finance-settings-sep');
     ieRow.createEl('label', { text: this.tr.importExport, cls: 'finance-filter-label' });
     const ieC = ieRow.createDiv('finance-settings-controls');
-    const expBtn = ieC.createEl('button', { cls: 'finance-add-btn finance-ie-btn', text: this.tr.export });
-    const impBtn = ieC.createEl('button', { cls: 'finance-add-btn finance-ie-btn', text: this.tr.import });
-    expBtn.addEventListener('click', () => this.openIEModal('export'));
-    impBtn.addEventListener('click', () => this.openIEModal('import'));
+    ieC.createEl('button', { cls: 'finance-add-btn finance-ie-btn', text: this.tr.export })
+      .addEventListener('click', () => this.openIEModal('export'));
+    ieC.createEl('button', { cls: 'finance-add-btn finance-ie-btn', text: this.tr.import })
+      .addEventListener('click', () => this.openIEModal('import'));
 
-    // ── Danger zone ───────────────────────────────────────────────────────
     const dgRow = row();
     dgRow.classList.add('finance-settings-danger');
     dgRow.createEl('label', { text: this.tr.dangerZone, cls: 'finance-danger-label' });
 
-    const dangerDesc = el.createDiv('finance-danger-desc');
-    dangerDesc.textContent = this.ctx.tr.confirmDeleteAll;
+    el.createDiv('finance-danger-desc').textContent = this.tr.confirmDeleteAll;
 
     const cfRow = row();
     cfRow.classList.add('finance-settings-cf');
     const cfIn = cfRow.createEl('input', {
-      type: 'text', cls: 'finance-input', placeholder: this.ctx.tr.enterYes,
+      type: 'text', cls: 'finance-input finance-input-danger', placeholder: this.tr.enterYes,
     });
-    cfIn.style.borderColor = '#dc2626';
     const delBtn = cfRow.createEl('button', { text: this.tr.deleteAllData, cls: 'finance-btn-danger' });
     delBtn.addEventListener('click', async () => {
       if (cfIn.value.trim() !== 'Yes') {
-        new Notice(this.ctx.tr.enterYes);
+        new Notice(this.tr.enterYes);
         return;
       }
       await this.ctx.storage.resetAllData(this.ctx.accountId);
-      this.ctx.data = await this.ctx.storage.load(this.ctx.accountId);
-      this.renderStats();
-      this.renderFilters();
-      this.renderTable();
-      new Notice(this.ctx.tr.allDataDeleted);
+      await this.reload();
+      new Notice(this.tr.allDataDeleted);
     });
   }
 
   private applyAccentColor(color: string): void {
-    if (color) {
-      this.el.style.setProperty('--ft-accent', color);
-    } else {
-      this.el.style.removeProperty('--ft-accent');
-    }
+    if (color) this.el.style.setProperty('--ft-accent', color);
+    else this.el.style.removeProperty('--ft-accent');
   }
 }

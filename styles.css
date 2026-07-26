@@ -2583,3 +2583,30 @@
   background: #dc2626 !important;
   color: #fff !important;
 }
+
+/* ── DataTable shared classes (replaces inline styles) ──────────────────── */
+.finance-table-info-btns {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.finance-tr-selectable {
+  cursor: pointer;
+}
+.finance-internal-btn.is-dimmed {
+  opacity: .4;
+}
+.finance-btn-compact {
+  padding: 4px 12px;
+  font-size: .8em;
+}
+.finance-input-danger {
+  border-color: #dc2626;
+}
+.finance-custom-select-item.is-highlighted {
+  background: var(--background-modifier-hover);
+}
+.finance-custom-select-create {
+  font-style: italic;
+  color: var(--text-accent);
+}
