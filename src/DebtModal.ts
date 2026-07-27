@@ -3,6 +3,7 @@ import { getLocaleFromApp, t, Translations } from './i18n';
 import { DebtRecord } from './types';
 import { fmtAmount, parseAmount, getTodayStr, normalizeDateStr, normalizeTimeStr } from './utils';
 import { DebtInfoModal } from './DebtInfoModal';
+import { attachAutocomplete } from './ui/Combobox';
 
 export interface DebtModalOptions {
   title:   string;
@@ -109,57 +110,10 @@ export class DebtModal extends Modal {
     personIn.value = this.debt.person;
     personIn.setAttribute('autocomplete', 'off');
 
-    let dropdown: HTMLElement | null = null;
-    const opts = this.o.allPersons;
-    const closeDropdown = () => { dropdown?.remove(); dropdown = null; };
-    const openDropdown = (q: string) => {
-      closeDropdown();
-      const lq = q.toLowerCase();
-      const filtered = opts.filter(o => !lq || o.toLowerCase().includes(lq));
-      if (!filtered.length) {
-        if (q) {
-          dropdown = comboboxWrap.createDiv('finance-combobox-dropdown');
-          const addItem = dropdown.createDiv({ cls: 'finance-combobox-item' });
-          addItem.textContent = `➕ "${q}"`;
-          addItem.style.fontStyle = 'italic';
-          addItem.style.color = 'var(--text-muted)';
-          addItem.addEventListener('mousedown', e => {
-            e.preventDefault();
-            personIn.value = q;
-            this.debt.person = q;
-            closeDropdown();
-          });
-        }
-        return;
-      }
-      dropdown = comboboxWrap.createDiv('finance-combobox-dropdown');
-      filtered.forEach(opt => {
-        const item = dropdown!.createDiv({
-          cls: `finance-combobox-item${opt === personIn.value ? ' is-active' : ''}`,
-        });
-        item.textContent = opt;
-        item.addEventListener('mousedown', e => {
-          e.preventDefault();
-          personIn.value = opt;
-          this.debt.person = opt;
-          closeDropdown();
-        });
-      });
-    };
-
-    personIn.addEventListener('focus', () => openDropdown(personIn.value));
-    personIn.addEventListener('input', () => { this.debt.person = personIn.value; openDropdown(personIn.value); });
-    personIn.addEventListener('blur', () => setTimeout(closeDropdown, 150));
-    personIn.addEventListener('keydown', (e: KeyboardEvent) => {
-      if (e.key === 'Enter' && dropdown) {
-        const first = dropdown.querySelector<HTMLElement>('.finance-combobox-item');
-        if (first) { e.preventDefault(); first.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })); }
-      }
-      if (e.key === 'Escape') { personIn.value = ''; this.debt.person = ''; closeDropdown(); }
-      if (e.key === 'ArrowDown' && dropdown) {
-        const first = dropdown.querySelector<HTMLElement>('.finance-combobox-item');
-        first?.focus();
-      }
+    attachAutocomplete(personIn, {
+      options: () => this.o.allPersons,
+      onPick: v => { this.debt.person = v; },
+      createLabel: q => `➕ "${q}"`,
     });
 
     const amtG = row1.createDiv('finance-field-group finance-amount-group');

@@ -3,6 +3,7 @@ import { getLocaleFromApp, t, Translations } from './i18n';
 import { FinanceRecord, RecordType, PluginSettings } from './types';
 import { fmtAmount, parseAmount, getTodayStr, normalizeDateStr, normalizeTimeStr } from './utils';
 import { toDateTimeLocalStr } from './domain/dateMath';
+import { attachAutocomplete } from './ui/Combobox';
 import { CalculatorModal } from './CalculatorModal';
 
 export interface RecordModalOptions {
@@ -287,15 +288,14 @@ export class RecordModal extends Modal {
     input.value = value;
     input.setAttribute('autocomplete', 'off');
 
-    // ── Internal toggle button ───────────────────────────────────────────
     if (opts?.withInternalToggle) {
       let internalState = opts.isInternal ?? false;
       const intBtn = wrapper.createEl('button', {
         type: 'button',
+        text: '🔄',
         cls: `finance-internal-btn${internalState ? ' is-active' : ''}`,
         attr: { title: this.tr.internalOpDesc },
       });
-      intBtn.innerHTML = '🔄';
       intBtn.addEventListener('click', () => {
         internalState = !internalState;
         opts.onToggleInternal?.(internalState);
@@ -303,46 +303,7 @@ export class RecordModal extends Modal {
       });
     }
 
-    let dropdown: HTMLElement | null = null;
-
-    const closeDropdown = () => { dropdown?.remove(); dropdown = null; };
-
-    const openDropdown = (q: string) => {
-      closeDropdown();
-      const lq       = q.toLowerCase();
-      const filtered = options.filter(o => !lq || o.toLowerCase().includes(lq));
-      if (!filtered.length) return;
-
-      dropdown = wrapper.createDiv('finance-combobox-dropdown');
-      filtered.forEach(opt => {
-        const item = dropdown!.createDiv({
-          cls: `finance-combobox-item${opt === input.value ? ' is-active' : ''}`,
-        });
-        item.textContent = opt;
-        item.addEventListener('mousedown', e => {
-          e.preventDefault();               // keep focus on input
-          input.value = opt;
-          onChange(opt);
-          closeDropdown();
-        });
-      });
-    };
-
-    input.addEventListener('focus', () => openDropdown(input.value));
-    input.addEventListener('input', () => { onChange(input.value); openDropdown(input.value); });
-    input.addEventListener('blur',  () => setTimeout(closeDropdown, 150));
-    input.addEventListener('keydown', (e: KeyboardEvent) => {
-      if (e.key === 'Enter' && dropdown) {
-        const first = dropdown.querySelector<HTMLElement>('.finance-combobox-item');
-        if (first) { e.preventDefault(); first.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })); }
-      }
-      if (e.key === 'Escape') { input.value = ''; onChange(''); closeDropdown(); }
-      if (e.key === 'ArrowDown' && dropdown) {
-        const first = dropdown.querySelector<HTMLElement>('.finance-combobox-item');
-        first?.focus();
-      }
-    });
-
+    attachAutocomplete(input, { options: () => options, onPick: onChange });
     return input;
   }
 

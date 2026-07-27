@@ -5,6 +5,7 @@ import { fmtAmount, parseAmount, getTodayStr, normalizeDateStr } from './utils';
 import { addMonthsClamped } from './domain/dateMath';
 import { round2, sumMoney } from './domain/money';
 import { CreditInfoModal } from './CreditInfoModal';
+import { attachAutocomplete } from './ui/Combobox';
 
 export interface CreditModalOptions {
   title:     string;
@@ -93,45 +94,11 @@ export class CreditModal extends Modal {
     bankIn.value = this.credit.bankName;
     bankIn.setAttribute('autocomplete', 'off');
 
-    let dropdown: HTMLElement | null = null;
-    const bankOpts = this.o.banks;
-    const closeDropdown = () => { dropdown?.remove(); dropdown = null; };
-    const openDropdown = (q: string) => {
-      closeDropdown();
-      const lq = q.toLowerCase();
-      const filtered = bankOpts.filter(o => !lq || o.toLowerCase().includes(lq));
-      if (!filtered.length) {
-        if (q) {
-          dropdown = bankWrap.createDiv('finance-combobox-dropdown');
-          const addItem = dropdown.createDiv({ cls: 'finance-combobox-item' });
-          addItem.textContent = ` "${q}"`;
-          addItem.style.fontStyle = 'italic';
-          addItem.style.color = 'var(--text-muted)';
-          addItem.addEventListener('mousedown', e => {
-            e.preventDefault();
-            bankIn.value = q;
-            this.credit.bankName = q;
-            closeDropdown();
-          });
-        }
-        return;
-      }
-      dropdown = bankWrap.createDiv('finance-combobox-dropdown');
-      filtered.forEach(opt => {
-        const item = dropdown!.createDiv({ cls: `finance-combobox-item${opt === bankIn.value ? ' is-active' : ''}` });
-        item.textContent = opt;
-        item.addEventListener('mousedown', e => {
-          e.preventDefault();
-          bankIn.value = opt;
-          this.credit.bankName = opt;
-          closeDropdown();
-        });
-      });
-    };
-
-    bankIn.addEventListener('focus', () => openDropdown(bankIn.value));
-    bankIn.addEventListener('input', () => { this.credit.bankName = bankIn.value; openDropdown(bankIn.value); });
-    bankIn.addEventListener('blur', () => setTimeout(closeDropdown, 150));
+    attachAutocomplete(bankIn, {
+      options: () => this.o.banks,
+      onPick: v => { this.credit.bankName = v; },
+      createLabel: q => ` "${q}"`,
+    });
 
     // === РЯД 2: Стоимость покупки | Процентная ставка ===
     const row2 = form.createDiv('finance-form-row finance-full-width');

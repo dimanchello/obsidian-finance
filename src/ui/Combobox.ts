@@ -5,6 +5,77 @@ export interface ComboOption {
   label: string;
 }
 
+export interface AutocompleteOptions {
+  options: () => string[];
+  onPick: (value: string) => void;
+  /** Shows a "create «query»" item when the query matches nothing. */
+  createLabel?: (query: string) => string;
+}
+
+/**
+ * Free-text input with a suggestions dropdown — the modal flavour of the widget
+ * (RecordModal/DebtModal/CreditModal/DepositModal each had their own copy).
+ * Closing is focus-driven, not the old setTimeout(close, 150) race.
+ */
+export function attachAutocomplete(input: HTMLInputElement, opts: AutocompleteOptions): void {
+  const wrapper = input.parentElement;
+  if (!wrapper) return;
+  let dropdown: HTMLElement | null = null;
+
+  const close = () => { dropdown?.remove(); dropdown = null; };
+
+  const pick = (value: string) => {
+    input.value = value;
+    opts.onPick(value);
+    close();
+  };
+
+  const open = (q: string) => {
+    close();
+    const lq = q.toLowerCase();
+    const filtered = opts.options().filter(o => !lq || o.toLowerCase().includes(lq));
+
+    if (!filtered.length) {
+      if (!q || !opts.createLabel) return;
+      dropdown = wrapper.createDiv('finance-combobox-dropdown');
+      const addItem = dropdown.createDiv('finance-combobox-item finance-combobox-create');
+      addItem.textContent = opts.createLabel(q);
+      addItem.addEventListener('mousedown', e => { e.preventDefault(); pick(q); });
+      return;
+    }
+
+    dropdown = wrapper.createDiv('finance-combobox-dropdown');
+    filtered.forEach(opt => {
+      const item = dropdown!.createDiv({
+        cls: `finance-combobox-item${opt === input.value ? ' is-active' : ''}`,
+      });
+      item.textContent = opt;
+      item.addEventListener('mousedown', e => { e.preventDefault(); pick(opt); });
+    });
+  };
+
+  input.addEventListener('focus', () => open(input.value));
+  input.addEventListener('input', () => { opts.onPick(input.value); open(input.value); });
+  input.addEventListener('blur', (e: FocusEvent) => {
+    const next = e.relatedTarget as Node | null;
+    if (next && dropdown?.contains(next)) return;
+    close();
+  });
+  input.addEventListener('keydown', (e: KeyboardEvent) => {
+    if (e.key === 'Enter' && dropdown) {
+      const first = dropdown.querySelector<HTMLElement>('.finance-combobox-item');
+      if (first) {
+        e.preventDefault();
+        first.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+      }
+    }
+    if (e.key === 'Escape') { pick(''); }
+    if (e.key === 'ArrowDown' && dropdown) {
+      dropdown.querySelector<HTMLElement>('.finance-combobox-item')?.focus();
+    }
+  });
+}
+
 export interface ComboboxOptions {
   options: ComboOption[];
   value: string;

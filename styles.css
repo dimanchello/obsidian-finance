@@ -1176,6 +1176,10 @@
   max-height: 180px;
   overflow-y: auto;
 }
+.finance-combobox-create {
+  font-style: italic;
+  color: var(--text-muted);
+}
 .finance-combobox-item {
   padding: 7px 12px;
   font-size: .875em; color: var(--text-normal);
