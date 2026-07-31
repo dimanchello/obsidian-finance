@@ -2680,3 +2680,35 @@
   display: inline-block;
   margin-top: 4px;
 }
+
+/* ── Field reference modal ──────────────────────────────────────────────── */
+.finance-info-container {
+  max-width: 480px;
+  margin: 0 auto;
+}
+.finance-info-subtitle {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 20px;
+}
+.finance-info-card {
+  margin-bottom: 12px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+}
+.finance-info-card-label {
+  font-weight: 600;
+  font-size: 13px;
+  margin-bottom: 4px;
+  color: var(--text-normal);
+}
+.finance-info-card-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+.finance-info-btns {
+  margin-top: 8px;
+}

@@ -2,7 +2,7 @@ import { App, Modal, Notice } from 'obsidian';
 import { getLocaleFromApp, t, Translations } from './i18n';
 import { DepositRecord, DepositType, DepositAccrualType, FinanceRecord } from './types';
 import { parseAmount, getTodayStr, normalizeDateStr, normalizeTimeStr, parseDate } from './utils';
-import { InfoModal } from './InfoModal';
+import { FieldInfoModal, DEPOSIT_FIELDS } from './FieldInfoModal';
 import { attachAutocomplete } from './ui/Combobox';
 import { createAmountInput } from './ui/AmountInput';
 
@@ -182,7 +182,7 @@ export class DepositModal extends Modal {
     const btnRow = contentEl.createDiv('finance-modal-btns');
     const infoBtn = btnRow.createEl('button', { text: '❓', cls: 'finance-btn-cancel' });
     infoBtn.style.marginRight = 'auto';
-    infoBtn.addEventListener('click', () => new InfoModal(this.app).open());
+    infoBtn.addEventListener('click', () => new FieldInfoModal(this.app, DEPOSIT_FIELDS).open());
     btnRow.createEl('button', { text: this.tr.cancel, cls: 'finance-btn-cancel' })
         .addEventListener('click', () => this.close());
     btnRow.createEl('button', { text: this.tr.save, cls: 'finance-btn-save' })

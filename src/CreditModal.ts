@@ -4,7 +4,7 @@ import { CreditRecord, CreditType, ACCRUAL_STEP_MONTHLY, PERCENT_100 } from './t
 import { fmtAmount, parseAmount, getTodayStr, normalizeDateStr } from './utils';
 import { addMonthsClamped } from './domain/dateMath';
 import { round2, sumMoney } from './domain/money';
-import { CreditInfoModal } from './CreditInfoModal';
+import { FieldInfoModal, CREDIT_FIELDS } from './FieldInfoModal';
 import { attachAutocomplete } from './ui/Combobox';
 import { createAmountInput, type AmountInputHandle } from './ui/AmountInput';
 
@@ -296,7 +296,7 @@ export class CreditModal extends Modal {
     const btnRow = contentEl.createDiv('finance-modal-btns');
     const infoBtn = btnRow.createEl('button', { text: '❓', cls: 'finance-btn-cancel' });
     infoBtn.style.marginRight = 'auto';
-    infoBtn.addEventListener('click', () => new CreditInfoModal(this.app).open());
+    infoBtn.addEventListener('click', () => new FieldInfoModal(this.app, CREDIT_FIELDS).open());
     btnRow.createEl('button', { text: this.tr.cancel, cls: 'finance-btn-cancel' })
       .addEventListener('click', () => this.close());
     btnRow.createEl('button', { text: this.tr.save, cls: 'finance-btn-save' })
