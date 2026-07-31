@@ -1,7 +1,8 @@
 import { App, Modal, Notice } from 'obsidian';
 import { getLocaleFromApp, t, Translations } from './i18n';
 import { DepositTopUp, DepositRecord } from './types';
-import { fmtAmount, parseAmount, getTodayStr, normalizeDateStr, normalizeTimeStr } from './utils';
+import { parseAmount, getTodayStr, normalizeDateStr, normalizeTimeStr } from './utils';
+import { createAmountInput } from './ui/AmountInput';
 
 export interface DepositTopUpOptions {
   title: string;
@@ -34,31 +35,8 @@ export class DepositTopUpModal extends Modal {
 
     const amtG = row1.createDiv('finance-field-group finance-amount-group');
     amtG.createEl('label', { text: this.tr.topUpAmountLabel, cls: 'finance-field-label' });
-    this.amountInput = amtG.createEl('input', { type: 'text', cls: 'finance-input finance-amount-input' });
-    this.amountInput.setAttribute('inputmode', 'decimal');
-    this.amountInput.setAttribute('placeholder', '0');
-    this.amountInput.setAttribute('autocomplete', 'off');
+    this.amountInput = createAmountInput(amtG, { onChange: () => {} }).input;
     this.amountInput.focus();
-
-    this.amountInput.addEventListener('input', () => {
-      const raw = this.amountInput.value;
-      const sel = this.amountInput.selectionStart ?? raw.length;
-      const rawBefore = raw.slice(0, sel).replace(/[^\d.,]/g, '').length;
-      const formatted = fmtAmount(raw);
-      if (formatted !== raw) {
-        this.amountInput.value = formatted;
-        let newPos = 0, rawCount = 0;
-        for (let i = 0; i < formatted.length; i++) {
-          if (/[\d.,]/.test(formatted[i])) rawCount++;
-          if (rawCount >= rawBefore) { newPos = i + 1; break; }
-        }
-        this.amountInput.setSelectionRange(newPos, newPos);
-      }
-    });
-    this.amountInput.addEventListener('blur', () => {
-      const n = parseAmount(this.amountInput.value);
-      this.amountInput.value = n > 0 ? fmtAmount(String(n)) : '';
-    });
 
     const row2 = form.createDiv('finance-form-row finance-full-width');
 

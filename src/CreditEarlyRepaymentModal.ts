@@ -2,6 +2,7 @@ import { App, Modal, Notice } from 'obsidian';
 import { getLocaleFromApp, t, Translations } from './i18n';
 import { CreditRecord, CreditPayment } from './types';
 import { fmtAmount, parseAmount, getTodayStr, normalizeDateStr } from './utils';
+import { createAmountInput } from './ui/AmountInput';
 import { round2, sumMoney } from './domain/money';
 
 export interface EarlyRepaymentOptions {
@@ -95,36 +96,10 @@ export class CreditEarlyRepaymentModal extends Modal {
     const amountSection = form.createDiv('finance-early-amount-section');
     amountSection.createEl('label', { text: this.tr.earlyRepaymentAmount, cls: 'finance-field-label' });
 
-    this.amountInput = amountSection.createEl('input', {
-      type: 'text',
-      cls: 'finance-input finance-amount-input',
-    });
-    this.amountInput.setAttribute('inputmode', 'decimal');
-    this.amountInput.setAttribute('placeholder', '0');
-    this.amountInput.setAttribute('autocomplete', 'off');
-    this.amountInput.value = fmtAmount(String(this.actualRemaining));
-
-    this.amountInput.addEventListener('focus', () => {
-      if (this.actualRemaining > 0) {
-        this.amountInput.value = String(this.actualRemaining).replace('.', ',');
-      }
-    });
-
-    this.amountInput.addEventListener('input', () => {
-      const raw = this.amountInput.value;
-      const sel = this.amountInput.selectionStart ?? raw.length;
-      const rawBefore = raw.slice(0, sel).replace(/[^\d.,]/g, '').length;
-      const formatted = fmtAmount(raw);
-      if (formatted !== raw) {
-        this.amountInput.value = formatted;
-        let newPos = 0, rawCount = 0;
-        for (let i = 0; i < formatted.length; i++) {
-          if (/[\d.,]/.test(formatted[i])) rawCount++;
-          if (rawCount >= rawBefore) { newPos = i + 1; break; }
-        }
-        this.amountInput.setSelectionRange(newPos, newPos);
-      }
-    });
+    this.amountInput = createAmountInput(amountSection, {
+      value: this.actualRemaining,
+      onChange: () => {},
+    }).input;
 
     const termSection = form.createDiv('finance-early-term-section');
     termSection.style.display = 'none';

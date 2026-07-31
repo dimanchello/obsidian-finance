@@ -6,6 +6,7 @@ import { addMonthsClamped } from './domain/dateMath';
 import { round2, sumMoney } from './domain/money';
 import { CreditInfoModal } from './CreditInfoModal';
 import { attachAutocomplete } from './ui/Combobox';
+import { createAmountInput, type AmountInputHandle } from './ui/AmountInput';
 
 export interface CreditModalOptions {
   title:     string;
@@ -21,6 +22,7 @@ export class CreditModal extends Modal {
   private credit: CreditRecord;
   private amountInput!: HTMLInputElement;
   private paymentInput!: HTMLInputElement;
+  private paymentHandle!: AmountInputHandle;
   private rateInput!: HTMLInputElement;
   private termInput!: HTMLInputElement;
   private downPaymentValueInput!: HTMLInputElement;
@@ -105,46 +107,11 @@ export class CreditModal extends Modal {
 
     const amtG = row2.createDiv('finance-field-group finance-amount-group');
     amtG.createEl('label', { text: this.tr.purchasePriceLabel, cls: 'finance-field-label' });
-    this.amountInput = amtG.createEl('input', { type: 'text', cls: 'finance-input finance-amount-input' });
-    this.amountInput.setAttribute('inputmode', 'decimal');
-    this.amountInput.setAttribute('placeholder', '0');
-    this.amountInput.setAttribute('autocomplete', 'off');
-
-    if ((this.credit.purchasePrice ?? 0) > 0) {
-      this.amountInput.value = fmtAmount(String(this.credit.purchasePrice));
-    }
-
-    this.amountInput.addEventListener('focus', () => {
-      if ((this.credit.purchasePrice ?? 0) > 0) {
-        this.amountInput.value = String(this.credit.purchasePrice).replace('.', ',');
-      }
-    });
-
-    this.amountInput.addEventListener('input', () => {
-      const raw = this.amountInput.value;
-      this.credit.purchasePrice = parseAmount(raw);
-      const sel = this.amountInput.selectionStart ?? raw.length;
-      const rawBefore = raw.slice(0, sel).replace(/[^\d.,]/g, '').length;
-      const formatted = fmtAmount(raw);
-      if (formatted !== raw) {
-        this.amountInput.value = formatted;
-        let newPos = 0, rawCount = 0;
-        for (let i = 0; i < formatted.length; i++) {
-          if (/[\d.,]/.test(formatted[i])) rawCount++;
-          if (rawCount >= rawBefore) { newPos = i + 1; break; }
-        }
-        this.amountInput.setSelectionRange(newPos, newPos);
-      }
-      this.scheduleCalc();
-    });
-
-    this.amountInput.addEventListener('blur', () => {
-      const n = parseAmount(this.amountInput.value);
-      this.credit.purchasePrice = n;
-      this.amountInput.value = n > 0 ? fmtAmount(String(n)) : '';
-      this.updateCalculatedValues();
-      this.scheduleCalc();
-    });
+    this.amountInput = createAmountInput(amtG, {
+      value: this.credit.purchasePrice ?? 0,
+      onChange: v => { this.credit.purchasePrice = v; this.scheduleCalc(); },
+      onBlur: () => { this.updateCalculatedValues(); this.scheduleCalc(); },
+    }).input;
 
     const rateG = row2.createDiv('finance-field-group');
     rateG.createEl('label', { text: this.tr.interestRate + ' (%)', cls: 'finance-field-label' });
@@ -278,43 +245,11 @@ export class CreditModal extends Modal {
 
     const paymentG = row3.createDiv('finance-field-group finance-amount-group');
     paymentG.createEl('label', { text: this.tr.monthlyPayment, cls: 'finance-field-label' });
-    this.paymentInput = paymentG.createEl('input', { type: 'text', cls: 'finance-input finance-amount-input' });
-    this.paymentInput.setAttribute('inputmode', 'decimal');
-    this.paymentInput.setAttribute('placeholder', '0');
-    this.paymentInput.setAttribute('autocomplete', 'off');
-
-    if (this.credit.monthlyPayment > 0) {
-      this.paymentInput.value = fmtAmount(String(this.credit.monthlyPayment));
-    }
-
-    this.paymentInput.addEventListener('focus', () => {
-      if (this.credit.monthlyPayment > 0) {
-        this.paymentInput.value = String(this.credit.monthlyPayment).replace('.', ',');
-      }
+    this.paymentHandle = createAmountInput(paymentG, {
+      value: this.credit.monthlyPayment,
+      onChange: v => { this.credit.monthlyPayment = v; },
     });
-
-    this.paymentInput.addEventListener('input', () => {
-      const raw = this.paymentInput.value;
-      this.credit.monthlyPayment = parseAmount(raw);
-      const sel = this.paymentInput.selectionStart ?? raw.length;
-      const rawBefore = raw.slice(0, sel).replace(/[^\d.,]/g, '').length;
-      const formatted = fmtAmount(raw);
-      if (formatted !== raw) {
-        this.paymentInput.value = formatted;
-        let newPos = 0, rawCount = 0;
-        for (let i = 0; i < formatted.length; i++) {
-          if (/[\d.,]/.test(formatted[i])) rawCount++;
-          if (rawCount >= rawBefore) { newPos = i + 1; break; }
-        }
-        this.paymentInput.setSelectionRange(newPos, newPos);
-      }
-    });
-
-    this.paymentInput.addEventListener('blur', () => {
-      const n = parseAmount(this.paymentInput.value);
-      this.credit.monthlyPayment = n;
-      this.paymentInput.value = n > 0 ? fmtAmount(String(n)) : '';
-    });
+    this.paymentInput = this.paymentHandle.input;
 
     const termG = row3.createDiv('finance-field-group');
     termG.createEl('label', { text: this.tr.termLabel, cls: 'finance-field-label' });
@@ -406,8 +341,7 @@ export class CreditModal extends Modal {
     } else {
       payment = amount / term;
     }
-    this.credit.monthlyPayment = round2(payment);
-    this.paymentInput.value = fmtAmount(String(this.credit.monthlyPayment));
+    this.paymentHandle.set(round2(payment));
   }
 
   private handleSave(): void {

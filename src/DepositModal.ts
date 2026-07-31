@@ -1,9 +1,10 @@
 import { App, Modal, Notice } from 'obsidian';
 import { getLocaleFromApp, t, Translations } from './i18n';
 import { DepositRecord, DepositType, DepositAccrualType, FinanceRecord } from './types';
-import { fmtAmount, parseAmount, getTodayStr, normalizeDateStr, normalizeTimeStr, parseDate } from './utils';
+import { parseAmount, getTodayStr, normalizeDateStr, normalizeTimeStr, parseDate } from './utils';
 import { InfoModal } from './InfoModal';
 import { attachAutocomplete } from './ui/Combobox';
+import { createAmountInput } from './ui/AmountInput';
 
 export interface DepositModalOptions {
   title:     string;
@@ -97,34 +98,10 @@ export class DepositModal extends Modal {
 
     const amtG = row2.createDiv('finance-field-group finance-amount-group');
     amtG.createEl('label', { text: this.tr.sum, cls: 'finance-field-label' });
-    this.amountInput = amtG.createEl('input', { type: 'text', cls: 'finance-input finance-amount-input' });
-    this.amountInput.setAttribute('inputmode', 'decimal');
-    this.amountInput.setAttribute('placeholder', '0');
-    this.amountInput.setAttribute('autocomplete', 'off');
-    if (this.deposit.amount > 0) {
-      this.amountInput.value = fmtAmount(String(this.deposit.amount));
-    }
-    this.amountInput.addEventListener('input', () => {
-      const raw = this.amountInput.value;
-      this.deposit.amount = parseAmount(raw);
-      const sel = this.amountInput.selectionStart ?? raw.length;
-      const rawBefore = raw.slice(0, sel).replace(/[^\d.,]/g, '').length;
-      const formatted = fmtAmount(raw);
-      if (formatted !== raw) {
-        this.amountInput.value = formatted;
-        let newPos = 0, rawCount = 0;
-        for (let i = 0; i < formatted.length; i++) {
-          if (/[\d.,]/.test(formatted[i])) rawCount++;
-          if (rawCount >= rawBefore) { newPos = i + 1; break; }
-        }
-        this.amountInput.setSelectionRange(newPos, newPos);
-      }
-    });
-    this.amountInput.addEventListener('blur', () => {
-      const n = parseAmount(this.amountInput.value);
-      this.deposit.amount = n;
-      this.amountInput.value = n > 0 ? fmtAmount(String(n)) : '';
-    });
+    this.amountInput = createAmountInput(amtG, {
+      value: this.deposit.amount,
+      onChange: v => { this.deposit.amount = v; },
+    }).input;
 
     const rateG = row2.createDiv('finance-field-group');
     rateG.createEl('label', { text: this.tr.interestRate + ' (%)', cls: 'finance-field-label' });

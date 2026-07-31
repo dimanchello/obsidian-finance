@@ -2671,3 +2671,12 @@
   gap: 4px;
   margin-top: 12px;
 }
+
+.finance-fill-remaining-link {
+  cursor: pointer;
+  color: var(--ft-accent);
+  font-size: .85em;
+  text-decoration: underline;
+  display: inline-block;
+  margin-top: 4px;
+}

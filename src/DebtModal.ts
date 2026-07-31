@@ -4,6 +4,7 @@ import { DebtRecord } from './types';
 import { fmtAmount, parseAmount, getTodayStr, normalizeDateStr, normalizeTimeStr } from './utils';
 import { DebtInfoModal } from './DebtInfoModal';
 import { attachAutocomplete } from './ui/Combobox';
+import { createAmountInput } from './ui/AmountInput';
 
 export interface DebtModalOptions {
   title:   string;
@@ -118,47 +119,14 @@ export class DebtModal extends Modal {
 
     const amtG = row1.createDiv('finance-field-group finance-amount-group');
     amtG.createEl('label', { text: this.tr.amountLabel, cls: 'finance-field-label' });
-    this.amountInput = amtG.createEl('input', { type: 'text', cls: 'finance-input finance-amount-input' });
-    this.amountInput.setAttribute('inputmode', 'decimal');
-    this.amountInput.setAttribute('placeholder', '0');
-    this.amountInput.setAttribute('autocomplete', 'off');
-
-    if (this.debt.amount > 0) {
-      this.amountInput.value = fmtAmount(String(this.debt.amount));
-    }
-
-    this.amountInput.addEventListener('focus', () => {
-      if (this.debt.amount > 0) {
-        this.amountInput.value = String(this.debt.amount).replace('.', ',');
-      }
-    });
-
-    this.amountInput.addEventListener('input', () => {
-      const raw = this.amountInput.value;
-      this.debt.originalAmount = parseAmount(raw);
-      this.debt.amount = this.debt.originalAmount;
-      const sel = this.amountInput.selectionStart ?? raw.length;
-      const rawBefore = raw.slice(0, sel).replace(/[^\d.,]/g, '').length;
-      const formatted = fmtAmount(raw);
-      if (formatted !== raw) {
-        this.amountInput.value = formatted;
-        let newPos = 0, rawCount = 0;
-        for (let i = 0; i < formatted.length; i++) {
-          if (/[\d.,]/.test(formatted[i])) rawCount++;
-          if (rawCount >= rawBefore) { newPos = i + 1; break; }
-        }
-        this.amountInput.setSelectionRange(newPos, newPos);
-      }
-      this.updateTotalReadonly();
-    });
-
-    this.amountInput.addEventListener('blur', () => {
-      const n = parseAmount(this.amountInput.value);
-      this.debt.originalAmount = n;
-      this.debt.amount = n;
-      this.amountInput.value = n > 0 ? fmtAmount(String(n)) : '';
-      this.updateTotalReadonly();
-    });
+    this.amountInput = createAmountInput(amtG, {
+      value: this.debt.amount,
+      onChange: v => {
+        this.debt.originalAmount = v;
+        this.debt.amount = v;
+        this.updateTotalReadonly();
+      },
+    }).input;
 
     // === РЯД 2: Дата создания | Дата возврата ===
     const row2 = form.createDiv('finance-form-row finance-full-width');

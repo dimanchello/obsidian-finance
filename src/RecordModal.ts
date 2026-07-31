@@ -1,9 +1,10 @@
 import { App, Modal, Notice, normalizePath } from 'obsidian';
 import { getLocaleFromApp, t, Translations } from './i18n';
 import { FinanceRecord, RecordType, PluginSettings } from './types';
-import { fmtAmount, parseAmount, getTodayStr, normalizeDateStr, normalizeTimeStr } from './utils';
+import { parseAmount, getTodayStr, normalizeDateStr, normalizeTimeStr } from './utils';
 import { toDateTimeLocalStr } from './domain/dateMath';
 import { attachAutocomplete } from './ui/Combobox';
+import { createAmountInput, type AmountInputHandle } from './ui/AmountInput';
 import { CalculatorModal } from './CalculatorModal';
 
 export interface RecordModalOptions {
@@ -26,6 +27,7 @@ export class RecordModal extends Modal {
   private rec: Partial<FinanceRecord>;
 
   private amountInput!:      HTMLInputElement;
+  private amountHandle!:     AmountInputHandle;
   private incomeBtn!:         HTMLButtonElement;
   private expenseBtn!:        HTMLButtonElement;
   private categoryInput!:     HTMLInputElement;
@@ -76,54 +78,13 @@ export class RecordModal extends Modal {
 
     const amtRow = amtG.createDiv('finance-amount-row');
 
-    this.amountInput = amtRow.createEl('input', {
-      type: 'text',
-      cls: 'finance-input finance-amount-input',
+    const amountHandle = createAmountInput(amtRow, {
+      value: this.rec.amount,
+      onChange: v => { this.rec.amount = v; },
+      onBlur: () => this.updateAmountColor(),
     });
-    this.amountInput.setAttribute('inputmode', 'decimal');
-    this.amountInput.setAttribute('placeholder', '0');
-    this.amountInput.setAttribute('autocomplete', 'off');
-
-    // Display existing value formatted
-    if (this.rec.amount && this.rec.amount > 0) {
-      this.amountInput.value = fmtAmount(String(this.rec.amount));
-    }
-
-    this.amountInput.addEventListener('focus', () => {
-      // On focus show plain number for easy editing
-      if (this.rec.amount && this.rec.amount > 0) {
-        this.amountInput.value = String(this.rec.amount).replace('.', ',');
-      }
-    });
-
-    this.amountInput.addEventListener('input', () => {
-      const raw = this.amountInput.value;
-      this.rec.amount = parseAmount(raw);
-
-      // Real-time format: track cursor
-      const sel  = this.amountInput.selectionStart ?? raw.length;
-      const rawBefore = raw.slice(0, sel).replace(/[^\d.,]/g, '').length;
-
-      const formatted = fmtAmount(raw);
-      if (formatted !== raw) {
-        this.amountInput.value = formatted;
-        // Reposition cursor: count raw digit/separator chars up to old position
-        let newPos = 0, rawCount = 0;
-        for (let i = 0; i < formatted.length; i++) {
-          if (/[\d.,]/.test(formatted[i])) rawCount++;
-          if (rawCount >= rawBefore) { newPos = i + 1; break; }
-        }
-        this.amountInput.setSelectionRange(newPos, newPos);
-      }
-    });
-
-    this.amountInput.addEventListener('blur', () => {
-      // Format nicely on blur
-      const n = parseAmount(this.amountInput.value);
-      this.rec.amount = n;
-      this.amountInput.value = n > 0 ? fmtAmount(String(n)) : '';
-      this.updateAmountColor();
-    });
+    this.amountInput = amountHandle.input;
+    this.amountHandle = amountHandle;
 
     this.updateAmountColor();
 
@@ -135,8 +96,7 @@ export class RecordModal extends Modal {
     calcIconBtn.addEventListener('click', () => {
       const currentValue = this.amountInput.value.replace(/\u00a0/g, '').replace(',', '.');
       new CalculatorModal(this.app, (result) => {
-        this.rec.amount = result;
-        this.amountInput.value = result > 0 ? fmtAmount(String(result)) : '';
+        amountHandle.set(result);
         this.updateAmountColor();
       }, currentValue).open();
     });
@@ -326,8 +286,7 @@ export class RecordModal extends Modal {
     let filled = false;
 
     if ((!this.amountInput.value || parseAmount(this.amountInput.value) === 0) && match.amount > 0) {
-      this.amountInput.value = fmtAmount(String(match.amount));
-      this.rec.amount = match.amount;
+      this.amountHandle.set(match.amount);
       this.updateAmountColor();
       filled = true;
     }
