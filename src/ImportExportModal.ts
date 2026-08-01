@@ -1,6 +1,7 @@
 import { App, Modal, Notice } from 'obsidian';
 import { getLocaleFromApp, t, Translations } from './i18n';
-import { FinanceRecord, RecordType } from './types';
+import { FinanceRecord } from './types';
+import { csvToObjects, resolveRecordType, TypeMap, TypeMode } from './domain/csv';
 import { normalizeDateStr, normalizeTimeStr } from './utils';
 
 type FileFormat = 'csv' | 'json';
@@ -114,8 +115,8 @@ export class ImportExportModal extends Modal {
   private rawData:    Record<string, string>[] = [];
   private srcFields:  string[] = [];
   private mapping:    Record<string, string> = {};  // ourField → srcField
-  private typeMap:    { incomeVal: string; expenseVal: string } = { incomeVal: 'income', expenseVal: 'expense' };
-  private typeMode:   'field' | 'sign' | 'all_income' | 'all_expense' = 'field';
+  private typeMap:    TypeMap = { incomeVal: 'income', expenseVal: 'expense' };
+  private typeMode:   TypeMode = 'field';
   private typeField = '';
 
   private tpl(s: string, params: Record<string, string | number>): string {
@@ -189,32 +190,10 @@ export class ImportExportModal extends Modal {
   // ── parsers ───────────────────────────────────────────────────────────────
 
   private parseCSV(text: string): void {
-    const lines   = text.split(/\r?\n/).filter(l => l.trim());
-    if (!lines.length) throw new Error(this.tr.importEmptyFile);
-    const headers = this.csvRow(lines[0]);
-    this.srcFields= headers;
-    this.rawData  = lines.slice(1).map(l => {
-      const vals = this.csvRow(l);
-      const obj: Record<string, string> = {};
-      headers.forEach((h, i) => { obj[h] = vals[i] ?? ''; });
-      return obj;
-    });
-  }
-
-  private csvRow(line: string): string[] {
-    const result: string[] = [];
-    let cur = '', inQ = false;
-    for (let i = 0; i < line.length; i++) {
-      const ch = line[i];
-      if (ch === '"') {
-        if (inQ && line[i+1] === '"') { cur += '"'; i++; }
-        else inQ = !inQ;
-      } else if (ch === ',' && !inQ) {
-        result.push(cur); cur = '';
-      } else { cur += ch; }
-    }
-    result.push(cur);
-    return result;
+    const { headers, rows } = csvToObjects(text);
+    if (!headers.length) throw new Error(this.tr.importEmptyFile);
+    this.srcFields = headers;
+    this.rawData   = rows;
   }
 
   private parseJSON(text: string, container: HTMLElement): void {
@@ -400,35 +379,32 @@ export class ImportExportModal extends Modal {
   private doImport(): void {
     const m   = this.mapping;
     const now = Date.now();
+    let skipped = 0;
 
-    const records: FinanceRecord[] = this.rawData.map((row, i) => {
+    const records: FinanceRecord[] = [];
+    this.rawData.forEach((row, i) => {
       const get = (key: string) => (m[key] ? row[m[key]] ?? '' : '');
 
-      let type: RecordType = 'expense';
-      if      (this.typeMode === 'all_income')  type = 'income';
-      else if (this.typeMode === 'all_expense') type = 'expense';
-      else if (this.typeMode === 'sign') {
-        const v = parseFloat(get('amount'));
-        type    = v >= 0 ? 'income' : 'expense';
-      } else {
-        const tv = (this.typeField ? row[this.typeField] : get('type')) ?? '';
-        type     = tv.toLowerCase() === this.typeMap.incomeVal.toLowerCase() ? 'income' : 'expense';
-      }
-
       const rawAmt = get('amount').replace(',', '.').replace(/[^\d.-]/g, '');
+      const amount = parseFloat(rawAmt) || 0;
+
+      const typeValue = (this.typeField ? row[this.typeField] : get('type')) ?? '';
+      const type = resolveRecordType(this.typeMode, typeValue, amount, this.typeMap);
+      if (type === null) { skipped++; return; }
+
       const rawEr  = get('exchangeRate').replace(',', '.').replace(/[^\d.]/g, '');
       const er     = parseFloat(rawEr);
 
       const isInternalVal = row['isInternal'] || get('isInternal');
       const isInternal = isInternalVal === 'true' || isInternalVal === '1';
 
-      return {
+      records.push({
         id:             crypto.randomUUID(),
         createdAt:      now + i,
         date:           normalizeDateStr(get('date')),
         time:           normalizeTimeStr(get('time')),
         type,
-        amount:         Math.abs(parseFloat(rawAmt) || 0),
+        amount:         Math.abs(amount),
         category:       get('category'),
         tag:            get('tag'),
         payer:          get('payer'),
@@ -437,12 +413,15 @@ export class ImportExportModal extends Modal {
         attachmentPath: '',
         linkedId:       '',
         isInternal,
-      };
+      });
     });
 
     const valid = records.filter(r => r.amount > 0);
+    skipped += records.length - valid.length;
+
     this.o.onImport(valid);
-    new Notice(`${this.tr.importSuccess} — ${valid.length} ${this.tr.imported}`);
+    const skipNote = skipped ? ` — ${this.tpl(this.tr.importSkipped, { count: skipped })}` : '';
+    new Notice(`${this.tr.importSuccess} — ${valid.length} ${this.tr.imported}${skipNote}`);
     this.close();
   }
 

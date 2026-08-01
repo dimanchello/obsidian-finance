@@ -1,5 +1,6 @@
-import { FinanceRecord, MOBILE_BREAKPOINT, ONE_WEEK_MS } from './types';
+import { FinanceRecord, MOBILE_BREAKPOINT } from './types';
 import { Translations } from './i18n';
+import { isoWeek } from './domain/dateMath';
 
 type ChartType = 'bar' | 'pie';
 type GroupBy   = 'category' | 'payer' | 'month' | 'week' | 'year';
@@ -20,15 +21,6 @@ function shortMonth(m: number, locale: string): string {
   const d = new Date(2024, m, 1);
   const s = d.toLocaleString(locale, { month: 'short' });
   return s.charAt(0).toUpperCase() + s.slice(1);
-}
-
-function getWeekNumber(dateStr: string): number {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  const date = new Date(y, m - 1, d);
-  const start = new Date(date.getFullYear(), 0, 1);
-  const diff = date.getTime() - start.getTime();
-  const oneWeek = ONE_WEEK_MS;
-  return Math.ceil((diff + (start.getDay() + 6) * 86400000) / oneWeek);
 }
 
 // ── SVG helper ────────────────────────────────────────────────────────────────
@@ -223,9 +215,9 @@ export class AnalyticsView {
         if (!r.date) return;
         key = r.date.split('-')[0];
       } else if (this.groupBy === 'week') {
-        if (!r.date) return;
-        const w = getWeekNumber(r.date);
-        key = `${r.date.split('-')[0]}-W${String(w).padStart(2, '0')}`;
+        const iso = r.date ? isoWeek(r.date) : null;
+        if (!iso) return;
+        key = `${iso.year}-W${String(iso.week).padStart(2, '0')}`;
       } else {
         if (!r.date) return;
         const [y, m] = r.date.split('-');

@@ -45,6 +45,7 @@ export interface Translations {
   arrayNotFound: string;
   tagNotFound: string;
   importSuccess: string;
+  importSkipped: string;
   income: string;
   expense: string;
   debts: string;
@@ -476,6 +477,7 @@ const ru: Translations = {
   arrayNotFound: '⚠️ По указанному пути не найден массив',
   tagNotFound: '⚠️ Тег не найден',
   importSuccess: '✅ Импортировано',
+  importSkipped: 'пропущено строк: {count}',
   income: '↑ Доход',
   expense: '↓ Расход',
   debts: 'Долги',
@@ -907,6 +909,7 @@ const en: Translations = {
   arrayNotFound: '⚠️ Array not found at specified path',
   tagNotFound: '⚠️ Tag not found',
   importSuccess: '✅ Imported',
+  importSkipped: 'skipped rows: {count}',
   income: '↑ Income',
   expense: '↓ Expense',
   debts: 'Debts',

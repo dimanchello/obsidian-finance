@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   addMonthsClamped, toDateStr, toDateTimeLocalStr, parseDateStr,
-  daysBetweenStr, daysInMonth, isLeapYear,
+  daysBetweenStr, daysInMonth, isLeapYear, isoWeek, isoWeekRange,
 } from '../domain/dateMath';
 
 describe('isLeapYear', () => {
@@ -151,5 +151,72 @@ describe('daysBetweenStr', () => {
   it('возвращает 0 на некорректном входе', () => {
     expect(daysBetweenStr('', '2026-01-01')).toBe(0);
     expect(daysBetweenStr('2026-01-01', 'мусор')).toBe(0);
+  });
+});
+
+describe('isoWeek', () => {
+  it('1 января в четверг попадает в неделю 1 своего года', () => {
+    // 2026-01-01 — четверг
+    expect(isoWeek('2026-01-01')).toEqual({ year: 2026, week: 1 });
+  });
+
+  it('1 января в пятницу принадлежит последней неделе прошлого года', () => {
+    // 2027-01-01 — пятница, неделя 53 2026-го
+    expect(isoWeek('2027-01-01')).toEqual({ year: 2026, week: 53 });
+  });
+
+  it('1 января в субботу принадлежит последней неделе прошлого года', () => {
+    // 2022-01-01 — суббота, неделя 52 2021-го
+    expect(isoWeek('2022-01-01')).toEqual({ year: 2021, week: 52 });
+  });
+
+  it('1 января в воскресенье принадлежит последней неделе прошлого года', () => {
+    // 2023-01-01 — воскресенье, неделя 52 2022-го
+    expect(isoWeek('2023-01-01')).toEqual({ year: 2022, week: 52 });
+  });
+
+  it('1 января в понедельник — неделя 1', () => {
+    expect(isoWeek('2024-01-01')).toEqual({ year: 2024, week: 1 });
+  });
+
+  it('конец декабря может относиться к неделе 1 следующего года', () => {
+    // 2025-12-29 — понедельник недели 1 2026-го
+    expect(isoWeek('2025-12-29')).toEqual({ year: 2026, week: 1 });
+  });
+
+  it('год с 53 неделями', () => {
+    expect(isoWeek('2026-12-31')).toEqual({ year: 2026, week: 53 });
+  });
+
+  it('воскресенье закрывает неделю, а не открывает следующую', () => {
+    expect(isoWeek('2026-01-04')).toEqual({ year: 2026, week: 1 });
+    expect(isoWeek('2026-01-05')).toEqual({ year: 2026, week: 2 });
+  });
+
+  it('возвращает null на некорректной дате', () => {
+    expect(isoWeek('мусор')).toBeNull();
+    expect(isoWeek('')).toBeNull();
+  });
+});
+
+describe('isoWeekRange', () => {
+  it('неделя 1 2026 года — с понедельника по воскресенье', () => {
+    expect(isoWeekRange(2026, 1)).toEqual({ from: '2025-12-29', to: '2026-01-04' });
+  });
+
+  it('неделя 1 2024 года начинается 1 января', () => {
+    expect(isoWeekRange(2024, 1)).toEqual({ from: '2024-01-01', to: '2024-01-07' });
+  });
+
+  it('53-я неделя 2026 года', () => {
+    expect(isoWeekRange(2026, 53)).toEqual({ from: '2026-12-28', to: '2027-01-03' });
+  });
+
+  it('обратна isoWeek для любого дня недели', () => {
+    for (const d of ['2026-01-01', '2022-01-01', '2025-12-29', '2026-06-15', '2027-01-01']) {
+      const iso = isoWeek(d)!;
+      const { from, to } = isoWeekRange(iso.year, iso.week);
+      expect(from <= d && d <= to).toBe(true);
+    }
   });
 });

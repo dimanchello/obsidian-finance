@@ -65,3 +65,42 @@ export function daysBetweenStr(from: string, to: string): number {
   const utcB = Date.UTC(b.year, b.month - 1, b.day);
   return Math.round((utcB - utcA) / MS_PER_DAY);
 }
+
+const DAYS_IN_WEEK = 7;
+const THURSDAY = 4;
+
+/**
+ * ISO-8601 week: weeks start on Monday and week 1 is the one containing the first
+ * Thursday, so the last days of December can belong to week 1 of the next year —
+ * which is why the year is returned alongside and must be used for the bucket key.
+ */
+export function isoWeek(dateStr: string): { year: number; week: number } | null {
+  const p = parseDateStr(dateStr);
+  if (!p) return null;
+
+  const d = new Date(Date.UTC(p.year, p.month - 1, p.day));
+  const dayOfWeek = d.getUTCDay() || DAYS_IN_WEEK; // Sunday 0 → 7
+
+  // Step to the Thursday of this week: its calendar year is the ISO week-year.
+  d.setUTCDate(d.getUTCDate() + THURSDAY - dayOfWeek);
+  const year = d.getUTCFullYear();
+
+  const jan1 = Date.UTC(year, 0, 1);
+  const week = Math.floor((d.getTime() - jan1) / (DAYS_IN_WEEK * MS_PER_DAY)) + 1;
+
+  return { year, week };
+}
+
+/** Inverse of {@link isoWeek}: the Monday and Sunday bounding an ISO week. */
+export function isoWeekRange(year: number, week: number): { from: string; to: string } {
+  // Jan 4 is always in ISO week 1, so its Monday anchors the whole year.
+  const jan4 = new Date(Date.UTC(year, 0, 4));
+  const isoDow = jan4.getUTCDay() || DAYS_IN_WEEK;
+  const monday = new Date(Date.UTC(year, 0, 4 - (isoDow - 1) + (week - 1) * DAYS_IN_WEEK));
+  const sunday = new Date(monday.getTime() + (DAYS_IN_WEEK - 1) * MS_PER_DAY);
+
+  const fmt = (d: Date) => `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}`;
+  return { from: fmt(monday), to: fmt(sunday) };
+}
+
+

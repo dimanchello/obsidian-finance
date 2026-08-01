@@ -1,6 +1,7 @@
 import { ViewContext } from '../context';
-import { SortDir, PAGE_RANGE_THRESHOLD, SEARCH_DEBOUNCE_MS } from '../types';
+import { SortDir, SEARCH_DEBOUNCE_MS } from '../types';
 import { Combobox, ComboOption } from './Combobox';
+import { pageRange } from './pagination';
 import { ColumnVisibilityModal } from '../ColumnVisibilityModal';
 import { ConfirmModal } from '../ConfirmModal';
 
@@ -551,14 +552,7 @@ export class DataTable<T> {
   }
 
   private pageRange(cur: number, total: number): number[] {
-    if (total <= PAGE_RANGE_THRESHOLD) return Array.from({ length: total }, (_, i) => i);
-    const radius = this.ctx.isMobile ? 1 : 3;
-    const p: number[] = [0];
-    if (cur > radius + 1) p.push(-1);
-    for (let i = Math.max(1, cur - radius); i <= Math.min(total - 2, cur + radius); i++) p.push(i);
-    if (cur < total - (radius + 2)) p.push(-1);
-    p.push(total - 1);
-    return p;
+    return pageRange(cur, total, this.ctx.isMobile);
   }
 
   private confirmBulkDelete(): void {

@@ -7,7 +7,6 @@ import { createAmountInput } from './ui/AmountInput';
 export interface CreditPaymentOptions {
   title: string;
   credit: CreditRecord;
-  payment?: CreditPayment;
   onSave: (payment: CreditPayment) => void;
 }
 

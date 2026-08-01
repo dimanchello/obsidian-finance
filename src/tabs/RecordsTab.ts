@@ -11,6 +11,7 @@ import { ConfirmModal } from '../ConfirmModal';
 import { ImportExportModal } from '../ImportExportModal';
 import { AnalyticsView, type BarClickAction } from '../AnalyticsView';
 import { noteFilename } from '../utils';
+import { isoWeekRange } from '../domain/dateMath';
 import { DataTable, DataTableApi, FilterControl } from '../ui/DataTable';
 
 type Panel = 'analytics' | 'filters' | 'settings';
@@ -403,22 +404,10 @@ export class RecordsTab {
       f.dateTo = `${y}-${m}-${String(lastDay).padStart(2, '0')}`;
     } else if (groupBy === 'week') {
       const [yStr, wStr] = rawKey.split('-W');
-      const y = Number(yStr);
-      const w = Number(wStr);
-      const jan4 = new Date(y, 0, 4);
-      const daysOffset = (w - 1) * 7 + (1 - jan4.getDay()) - 3;
-      const monday = new Date(y, 0, 4 + daysOffset);
-      const sunday = new Date(monday);
-      sunday.setDate(monday.getDate() + 6);
-      const pad = (d: Date) => {
-        const yy = d.getFullYear();
-        const mm = String(d.getMonth() + 1).padStart(2, '0');
-        const dd = String(d.getDate()).padStart(2, '0');
-        return `${yy}-${mm}-${dd}`;
-      };
+      const { from, to } = isoWeekRange(Number(yStr), Number(wStr));
       f.category = ''; f.payer = '';
-      f.dateFrom = pad(monday);
-      f.dateTo = pad(sunday);
+      f.dateFrom = from;
+      f.dateTo = to;
     }
 
     f.search = '';
