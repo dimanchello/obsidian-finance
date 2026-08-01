@@ -141,7 +141,8 @@ export class ImportExportModal extends Modal {
 
     const openBtn  = pickWrap.createEl('label', { cls: 'finance-attach-label' });
     openBtn.setAttribute('for', uid);
-    openBtn.innerHTML = `<span>📂</span><span>${this.tr.importOpenFile}</span>`;
+    openBtn.createEl('span', { text: '📂' });
+    openBtn.createEl('span', { text: this.tr.importOpenFile });
 
     // Steps 2+ appear here after file load
     const stepsContainer = b.createDiv('finance-import-steps');

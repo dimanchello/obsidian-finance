@@ -103,22 +103,26 @@ export class AccountView extends MarkdownRenderChild {
 
     const right  = header.createDiv('finance-header-right');
 
-    const incBtn = right.createEl('button', { cls: 'finance-add-btn finance-income-btn' });
-    incBtn.innerHTML = `<span class="btn-icon">↑</span><span>${this.ctx.tr.typeIncome}</span>`;
+    const mkIconBtn = (cls: string, icon: string, label: string) => {
+      const btn = right.createEl('button', { cls: `finance-add-btn ${cls}` });
+      btn.createEl('span', { text: icon, cls: 'btn-icon' });
+      btn.createEl('span', { text: label });
+      return btn;
+    };
 
-    const expBtn = right.createEl('button', { cls: 'finance-add-btn finance-expense-btn' });
-    expBtn.innerHTML = `<span class="btn-icon">↓</span><span>${this.ctx.tr.typeExpense}</span>`;
+    const incBtn = mkIconBtn('finance-income-btn', '↑', this.ctx.tr.typeIncome);
+    const expBtn = mkIconBtn('finance-expense-btn', '↓', this.ctx.tr.typeExpense);
 
     const moreWrap = right.createDiv('finance-more-dropdown');
-    const moreBtn = moreWrap.createEl('button', { cls: 'finance-add-btn finance-more-btn' });
-    moreBtn.innerHTML = this.isMobile ? '•••' : '•••';
+    const moreBtn = moreWrap.createEl('button', { cls: 'finance-add-btn finance-more-btn', text: '•••' });
 
     const dropdown = moreWrap.createDiv('finance-dropdown-menu');
     dropdown.addClass('is-hidden');
 
     const mkDropdownItem = (icon: string, label: string, targetMode: string) => {
       const item = dropdown.createDiv(`finance-dropdown-item${this.mode === targetMode ? ' active' : ''}`);
-      item.innerHTML = `${icon} ${label}`;
+      item.createEl('span', { text: icon, cls: 'btn-icon' });
+      item.createEl('span', { text: label });
       if (this.mode !== targetMode) {
         item.addEventListener('click', () => {
           this.mode = targetMode as 'records' | 'debts' | 'credits' | 'deposits';
@@ -132,7 +136,7 @@ export class AccountView extends MarkdownRenderChild {
     moreBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       if (dropdown.hasClass('is-hidden')) {
-        dropdown.innerHTML = '';
+        dropdown.empty();
         mkDropdownItem('📄', this.ctx.tr.records, 'records');
         mkDropdownItem('💳', this.ctx.tr.debts, 'debts');
         mkDropdownItem('🏦', this.ctx.tr.credits, 'credits');

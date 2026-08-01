@@ -6,6 +6,7 @@ import { toDateTimeLocalStr } from './domain/dateMath';
 import { attachAutocomplete } from './ui/Combobox';
 import { createAmountInput, type AmountInputHandle } from './ui/AmountInput';
 import { CalculatorModal } from './CalculatorModal';
+import { buildCalculatorIcon } from './ui/icons';
 
 export interface RecordModalOptions {
   initial:    Partial<FinanceRecord>;
@@ -88,11 +89,9 @@ export class RecordModal extends Modal {
 
     this.updateAmountColor();
 
-    const calcIconBtn = document.createElement('button');
-    calcIconBtn.className = 'finance-calc-icon-btn';
+    const calcIconBtn = amtRow.createEl('button', { cls: 'finance-calc-icon-btn' });
     calcIconBtn.title = this.tr.calculatorTitle;
-    calcIconBtn.innerHTML = `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><rect x="3" y="2" width="14" height="16" rx="1.5"/><line x1="7" y1="6" x2="13" y2="6"/><circle cx="7" cy="10" r=".8" fill="currentColor"/><circle cx="13" cy="10" r=".8" fill="currentColor"/><circle cx="7" cy="14" r=".8" fill="currentColor"/><circle cx="13" cy="14" r=".8" fill="currentColor"/></svg>`;
-    amtRow.appendChild(calcIconBtn);
+    buildCalculatorIcon(calcIconBtn);
     calcIconBtn.addEventListener('click', () => {
       const currentValue = this.amountInput.value.replace(/\u00a0/g, '').replace(',', '.');
       new CalculatorModal(this.app, (result) => {
@@ -339,7 +338,8 @@ export class RecordModal extends Modal {
     fi.id        = uid;
     const lbl    = wrap.createEl('label', { cls: 'finance-attach-label' });
     lbl.setAttribute('for', uid);
-    lbl.innerHTML = `<span>📎</span><span>${this.tr.selectFile}</span>`;
+    lbl.createEl('span', { text: '📎' });
+    lbl.createEl('span', { text: this.tr.selectFile });
     const nameEl = wrap.createEl('span', {
       text: this.rec.attachmentPath
         ? (this.rec.attachmentPath.split('/').pop() ?? this.rec.attachmentPath)

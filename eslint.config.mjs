@@ -56,6 +56,14 @@ export default [
           selector: "CallExpression > MemberExpression[property.name=/^set(UTC)?Month$/]",
           message: 'setMonth переполняет месяц: 31 января + 1 = 3 марта. Используйте addMonthsClamped из src/domain/dateMath.',
         },
+        {
+          selector: "AssignmentExpression > MemberExpression[property.name=/^(inner|outer)HTML$/]",
+          message: 'innerHTML с интерполяцией — ожидающий своего часа XSS. Используйте createEl/createSpan или empty().',
+        },
+        {
+          selector: "AssignmentExpression > MemberExpression[property.name='cssText']",
+          message: 'Инлайн-стили не переопределяются темами Obsidian. Используйте класс в styles.css.',
+        },
       ],
     },
   },
