@@ -2712,3 +2712,122 @@
 .finance-info-btns {
   margin-top: 8px;
 }
+
+/* ── Early repayment modal ──────────────────────────────────────────────── */
+.is-hidden { display: none !important; }
+
+.finance-early-options {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.finance-early-opt-btn {
+  flex: 1;
+  padding: 10px 16px;
+  border-radius: 8px;
+  border: 2px solid var(--background-modifier-border);
+  font-size: 14px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background .2s ease, color .2s ease, border-color .2s ease;
+  background: var(--background-secondary);
+  color: var(--text-normal);
+}
+.finance-early-opt-btn.is-active {
+  background: var(--ft-accent);
+  color: #fff;
+  border-color: var(--ft-accent);
+}
+
+/* ── Analytics: classes replacing inline styles ─────────────────────────── */
+.finance-bar-tooltip {
+  display: none;
+  position: fixed;
+  left: var(--ft-tip-left, 0);
+  top: var(--ft-tip-top, 0);
+  z-index: 10000;
+  pointer-events: none;
+  padding: 5px 10px;
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 5px;
+  font-size: 13px;
+  color: var(--text-normal);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .15);
+  line-height: 1.4;
+  max-width: 320px;
+}
+.finance-bar-tooltip.is-visible { display: block; }
+
+.finance-analytics-btn-wrap {
+  display: flex;
+  gap: 6px;
+}
+.finance-analytics.is-mobile .finance-analytics-group,
+.finance-analytics.is-mobile .finance-analytics-group-row > .finance-analytics-group {
+  flex-direction: column;
+  align-items: flex-start;
+}
+.finance-analytics.is-mobile .finance-analytics-group-row {
+  flex-direction: column;
+  align-items: stretch;
+}
+.finance-analytics.is-mobile .finance-analytics-btn-wrap { width: 100%; }
+
+.finance-empty-chart { padding: 32px; }
+.finance-chart-clickable { cursor: pointer; }
+
+.finance-bar-chart-svg {
+  display: block;
+  width: var(--ft-chart-w);
+  height: var(--ft-chart-h);
+}
+.finance-pie-chart-svg {
+  flex-shrink: 0;
+  height: 100%;
+}
+.finance-analytics.is-mobile .finance-pie-chart-svg { height: 260px; }
+
+.finance-chart-legend-dot,
+.finance-pie-dot { background: var(--ft-dot-color); }
+
+/* ── Modal layout helpers (replacing inline styles) ─────────────────────── */
+.finance-input-with-select {
+  display: flex;
+  gap: 8px;
+}
+.finance-input-grow { flex: 1; }
+.finance-btn-group {
+  display: flex;
+  gap: 4px;
+}
+.finance-dp-toggle {
+  padding: 0 10px;
+  min-height: 32px;
+  font-size: 1.1em;
+  cursor: pointer;
+}
+.finance-dp-toggle-pct {
+  padding: 0 12px;
+  font-weight: bold;
+}
+.finance-row-info {
+  margin-top: -4px;
+  margin-bottom: 4px;
+}
+.finance-final-amount-info {
+  font-size: 13px;
+  font-weight: bold;
+  color: var(--text-muted);
+}
+.finance-info-btn-left { margin-right: auto; }
+.finance-btn-bottom { margin-top: auto; }
+.finance-modal-hint {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 0 0 12px;
+}
+
+.finance-more-btn { border: 2px solid transparent; }
+.finance-more-btn.is-active-mode { border-color: var(--ft-accent); }

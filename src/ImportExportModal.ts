@@ -237,9 +237,9 @@ export class ImportExportModal extends Modal {
 
     const row  = step.createDiv('finance-filters-row');
     const inp  = row.createEl('input', { type: 'text', cls: 'finance-input', placeholder: 'records' });
-    inp.style.flex = '1';
+    inp.addClass('finance-input-grow');
     const btn  = row.createEl('button', { text: this.tr.importNext, cls: 'finance-btn-save' });
-    btn.style.marginTop = 'auto';
+    btn.addClass('finance-btn-bottom');
 
     btn.addEventListener('click', () => {
       const path  = inp.value.trim();

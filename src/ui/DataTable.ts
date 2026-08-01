@@ -112,7 +112,7 @@ export class DataTable<T> {
     this.spec.renderPanels?.(host);
 
     const filtersEl = host.createDiv('finance-filters-container');
-    filtersEl.style.display = this.filtersOpen ? 'block' : 'none';
+    filtersEl.toggleClass('is-hidden', !this.filtersOpen);
     if (this.filtersOpen) this.renderFilters(filtersEl);
 
     if (!this.spec.hasAnyItems()) {

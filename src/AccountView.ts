@@ -114,7 +114,7 @@ export class AccountView extends MarkdownRenderChild {
     moreBtn.innerHTML = this.isMobile ? '•••' : '•••';
 
     const dropdown = moreWrap.createDiv('finance-dropdown-menu');
-    dropdown.style.display = 'none';
+    dropdown.addClass('is-hidden');
 
     const mkDropdownItem = (icon: string, label: string, targetMode: string) => {
       const item = dropdown.createDiv(`finance-dropdown-item${this.mode === targetMode ? ' active' : ''}`);
@@ -124,27 +124,27 @@ export class AccountView extends MarkdownRenderChild {
           this.mode = targetMode as 'records' | 'debts' | 'credits' | 'deposits';
           this.updateHeaderButtons();
           this.renderBodyContent();
-          dropdown.style.display = 'none';
+          dropdown.addClass('is-hidden');
         });
       }
     };
 
     moreBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-      if (dropdown.style.display === 'none') {
+      if (dropdown.hasClass('is-hidden')) {
         dropdown.innerHTML = '';
         mkDropdownItem('📄', this.ctx.tr.records, 'records');
         mkDropdownItem('💳', this.ctx.tr.debts, 'debts');
         mkDropdownItem('🏦', this.ctx.tr.credits, 'credits');
         mkDropdownItem('📈', this.ctx.tr.deposits, 'deposits');
         dropdown.createDiv('finance-dropdown-separator');
-        dropdown.style.display = 'block';
+        dropdown.removeClass('is-hidden');
       } else {
-        dropdown.style.display = 'none';
+        dropdown.addClass('is-hidden');
       }
     });
 
-    this.registerDomEvent(document, 'click', () => { dropdown.style.display = 'none'; });
+    this.registerDomEvent(document, 'click', () => { dropdown.addClass('is-hidden'); });
 
     incBtn.addEventListener('click', () => { this.mode = 'records'; this.renderBodyContent(); this.openAddModal('income'); });
     expBtn.addEventListener('click', () => { this.mode = 'records'; this.renderBodyContent(); this.openAddModal('expense'); });
@@ -154,9 +154,7 @@ export class AccountView extends MarkdownRenderChild {
     const moreBtn = this.root.querySelector<HTMLElement>('.finance-more-btn');
     if (moreBtn) {
       const isActive = this.mode === 'debts' || this.mode === 'credits' || this.mode === 'deposits';
-      moreBtn.style.border = isActive
-        ? '2px solid var(--ft-accent)'
-        : '2px solid transparent';
+      moreBtn.toggleClass('is-active-mode', isActive);
     }
   }
 
@@ -273,7 +271,9 @@ export class AccountView extends MarkdownRenderChild {
   }
 
   private applyAccentColor(color: string): void {
-    this.root.style.setProperty('--ft-accent', color);
+    // Empty string would set the property to "" rather than falling back to the theme
+    if (color) this.root.style.setProperty('--ft-accent', color);
+    else this.root.style.removeProperty('--ft-accent');
   }
 
   private openAddModal(type: 'income' | 'expense'): void {

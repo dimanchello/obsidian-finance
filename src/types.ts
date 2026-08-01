@@ -164,6 +164,7 @@ export const SEARCH_DEBOUNCE_MS = 280;
 export const PAGE_SIZE_OPTIONS = [10, 20, 25, 50, 100, 200, 500] as const;
 export const PAGE_RANGE_THRESHOLD = 7;
 export const FOCUS_DELAY_MS = 20;
+export const AUTOFILL_BADGE_MS = 6_000;
 export const SKELETON_CARD_COUNT = 3;
 export const PLURAL_THRESHOLD = 5;
 export const DAYS_IN_YEAR = 365;

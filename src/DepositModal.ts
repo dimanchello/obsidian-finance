@@ -181,7 +181,7 @@ export class DepositModal extends Modal {
 
     const btnRow = contentEl.createDiv('finance-modal-btns');
     const infoBtn = btnRow.createEl('button', { text: '❓', cls: 'finance-btn-cancel' });
-    infoBtn.style.marginRight = 'auto';
+    infoBtn.addClass('finance-info-btn-left');
     infoBtn.addEventListener('click', () => new FieldInfoModal(this.app, DEPOSIT_FIELDS).open());
     btnRow.createEl('button', { text: this.tr.cancel, cls: 'finance-btn-cancel' })
         .addEventListener('click', () => this.close());

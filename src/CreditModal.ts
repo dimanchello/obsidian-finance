@@ -145,11 +145,8 @@ export class CreditModal extends Modal {
     dpValG.createEl('label', { text: this.tr.downPaymentLabel, cls: 'finance-field-label' });
     
     const dpInputWrap = dpValG.createDiv('finance-input-with-select');
-    dpInputWrap.style.display = 'flex';
-    dpInputWrap.style.gap = '8px';
 
-    this.downPaymentValueInput = dpInputWrap.createEl('input', { type: 'text', cls: 'finance-input' });
-    this.downPaymentValueInput.style.flex = '1';
+    this.downPaymentValueInput = dpInputWrap.createEl('input', { type: 'text', cls: 'finance-input finance-input-grow' });
     this.downPaymentValueInput.setAttribute('inputmode', 'decimal');
     this.downPaymentValueInput.setAttribute('placeholder', '0');
     this.downPaymentValueInput.setAttribute('autocomplete', 'off');
@@ -160,29 +157,20 @@ export class CreditModal extends Modal {
     }
 
     const btnGroup = dpInputWrap.createDiv('finance-btn-group');
-    btnGroup.style.display = 'flex';
-    btnGroup.style.gap = '4px';
 
     const amtBtn = btnGroup.createEl('button', {
       text: '💵',
       cls: `finance-type-toggle${this.credit.downPaymentType === 'amount' ? ' active' : ''}`,
     });
     amtBtn.setAttribute('type', 'button');
-    amtBtn.style.padding = '0 10px';
-    amtBtn.style.minHeight = '32px';
-    amtBtn.style.fontSize = '1.1em';
-    amtBtn.style.cursor = 'pointer';
+    amtBtn.addClass('finance-dp-toggle');
 
     const pctBtn = btnGroup.createEl('button', {
       text: '%',
       cls: `finance-type-toggle${this.credit.downPaymentType === 'percent' ? ' active' : ''}`,
     });
     pctBtn.setAttribute('type', 'button');
-    pctBtn.style.padding = '0 12px';
-    pctBtn.style.minHeight = '32px';
-    pctBtn.style.fontSize = '1.1em';
-    pctBtn.style.fontWeight = 'bold';
-    pctBtn.style.cursor = 'pointer';
+    pctBtn.addClass('finance-dp-toggle', 'finance-dp-toggle-pct');
 
     const dpDateG = rowDp.createDiv('finance-field-group');
     dpDateG.createEl('label', { text: this.tr.downPaymentDateLabel, cls: 'finance-field-label' });
@@ -230,13 +218,10 @@ export class CreditModal extends Modal {
     });
 
     // === РЯД 2.6: Инфо-блок Итого сумма кредита ===
-    const rowInfo = form.createDiv('finance-form-row finance-full-width');
-    rowInfo.style.marginTop = '-4px';
-    rowInfo.style.marginBottom = '4px';
+    const rowInfo = form.createDiv('finance-form-row finance-full-width finance-row-info');
+
     this.finalAmountDisplay = rowInfo.createDiv('finance-final-amount-info');
-    this.finalAmountDisplay.style.fontSize = '13px';
-    this.finalAmountDisplay.style.fontWeight = 'bold';
-    this.finalAmountDisplay.style.color = 'var(--text-muted)';
+
 
     this.updateCalculatedValues();
 
@@ -295,7 +280,7 @@ export class CreditModal extends Modal {
 
     const btnRow = contentEl.createDiv('finance-modal-btns');
     const infoBtn = btnRow.createEl('button', { text: '❓', cls: 'finance-btn-cancel' });
-    infoBtn.style.marginRight = 'auto';
+    infoBtn.addClass('finance-info-btn-left');
     infoBtn.addEventListener('click', () => new FieldInfoModal(this.app, CREDIT_FIELDS).open());
     btnRow.createEl('button', { text: this.tr.cancel, cls: 'finance-btn-cancel' })
       .addEventListener('click', () => this.close());

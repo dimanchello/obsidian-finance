@@ -56,42 +56,15 @@ export class CreditEarlyRepaymentModal extends Modal {
     dateIn.value = today;
 
     const optRow = form.createDiv('finance-early-options');
-    optRow.style.display = 'flex';
-    optRow.style.gap = '8px';
-    optRow.style.marginBottom = '16px';
 
-    const baseBtnStyle = (btn: HTMLElement) => {
-      btn.style.flex = '1';
-      btn.style.padding = '10px 16px';
-      btn.style.borderRadius = '8px';
-      btn.style.border = '2px solid #e5e7eb';
-      btn.style.fontSize = '14px';
-      btn.style.fontWeight = '500';
-      btn.style.cursor = 'pointer';
-      btn.style.transition = 'all 0.2s ease';
-      btn.style.background = '#f9fafb';
-      btn.style.color = '#374151';
-    };
-
-    const activeBtnStyle = (btn: HTMLElement) => {
-      btn.style.background = '#7c3aed';
-      btn.style.color = '#fff';
-      btn.style.borderColor = '#7c3aed';
-    };
-
-    const inactiveBtnStyle = (btn: HTMLElement) => {
-      btn.style.background = '#f9fafb';
-      btn.style.color = '#374151';
-      btn.style.borderColor = '#e5e7eb';
-    };
-
-    const amountBtn = optRow.createEl('button', { text: this.tr.repayAmountShort });
-    baseBtnStyle(amountBtn);
-    activeBtnStyle(amountBtn);
-
-    const termBtn = optRow.createEl('button', { text: this.tr.repayTermShort });
-    baseBtnStyle(termBtn);
-    inactiveBtnStyle(termBtn);
+    const amountBtn = optRow.createEl('button', {
+      text: this.tr.repayAmountShort,
+      cls: 'finance-early-opt-btn is-active',
+    });
+    const termBtn = optRow.createEl('button', {
+      text: this.tr.repayTermShort,
+      cls: 'finance-early-opt-btn',
+    });
 
     const amountSection = form.createDiv('finance-early-amount-section');
     amountSection.createEl('label', { text: this.tr.earlyRepaymentAmount, cls: 'finance-field-label' });
@@ -101,8 +74,7 @@ export class CreditEarlyRepaymentModal extends Modal {
       onChange: () => {},
     }).input;
 
-    const termSection = form.createDiv('finance-early-term-section');
-    termSection.style.display = 'none';
+    const termSection = form.createDiv('finance-early-term-section is-hidden');
     termSection.createEl('label', { text: this.tr.reduceTermLabel, cls: 'finance-field-label' });
     const termInput = termSection.createEl('input', {
       type: 'number',
@@ -112,21 +84,17 @@ export class CreditEarlyRepaymentModal extends Modal {
     termInput.setAttribute('max', String(this.pendingPayments.length));
     termInput.value = '1';
 
-    amountBtn.addEventListener('click', () => {
-      this.selectedOption = 'amount';
-      activeBtnStyle(amountBtn);
-      inactiveBtnStyle(termBtn);
-      amountSection.style.display = 'block';
-      termSection.style.display = 'none';
-    });
+    const selectOption = (option: 'amount' | 'term') => {
+      this.selectedOption = option;
+      const byAmount = option === 'amount';
+      amountBtn.classList.toggle('is-active', byAmount);
+      termBtn.classList.toggle('is-active', !byAmount);
+      amountSection.classList.toggle('is-hidden', !byAmount);
+      termSection.classList.toggle('is-hidden', byAmount);
+    };
 
-    termBtn.addEventListener('click', () => {
-      this.selectedOption = 'term';
-      activeBtnStyle(termBtn);
-      inactiveBtnStyle(amountBtn);
-      amountSection.style.display = 'none';
-      termSection.style.display = 'block';
-    });
+    amountBtn.addEventListener('click', () => selectOption('amount'));
+    termBtn.addEventListener('click', () => selectOption('term'));
 
     const noteG = form.createDiv('finance-field-group');
     noteG.createEl('label', { text: this.tr.note, cls: 'finance-field-label' });

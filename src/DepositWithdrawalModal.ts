@@ -33,10 +33,8 @@ export class DepositWithdrawalModal extends Modal {
 
     contentEl.createEl('h2', { text: this.o.title, cls: 'finance-modal-title' });
 
-    const hint = contentEl.createEl('p', { text: `${this.tr.available}: ${fmtAmount(String(this.o.maxAmount))} ${this.o.currency}`, cls: 'finance-modal-hint' });
-    hint.style.fontSize = '13px';
-    hint.style.color = '#6b7280';
-    hint.style.margin = '0 0 12px';
+    contentEl.createEl('p', { text: `${this.tr.available}: ${fmtAmount(String(this.o.maxAmount))} ${this.o.currency}`, cls: 'finance-modal-hint' });
+
 
     const form = contentEl.createDiv('finance-form finance-form-grid finance-form-compact');
 

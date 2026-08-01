@@ -1,6 +1,6 @@
 import { App, Modal, Notice, normalizePath } from 'obsidian';
 import { getLocaleFromApp, t, Translations } from './i18n';
-import { FinanceRecord, RecordType, PluginSettings } from './types';
+import { FinanceRecord, RecordType, PluginSettings, FOCUS_DELAY_MS, AUTOFILL_BADGE_MS } from './types';
 import { parseAmount, getTodayStr, normalizeDateStr, normalizeTimeStr } from './utils';
 import { toDateTimeLocalStr } from './domain/dateMath';
 import { attachAutocomplete } from './ui/Combobox';
@@ -104,7 +104,7 @@ export class RecordModal extends Modal {
 
     // ── Exchange rate — collapsible ─────────────────────────────────────
     this.exchangeRateWrap = form.createDiv('finance-field-group finance-exrate-group');
-    this.exchangeRateWrap.style.display = 'none';
+    this.exchangeRateWrap.addClass('is-hidden');
 
     const erLabelRow = this.exchangeRateWrap.createDiv('finance-exrate-label-row');
     erLabelRow.createEl('label', { text: this.tr.exchangeRateQuestion.replace('{currency}', this.o.currency), cls: 'finance-field-label' });
@@ -120,7 +120,7 @@ export class RecordModal extends Modal {
 
     if (this.rec.exchangeRate && this.rec.exchangeRate > 0) {
       this.exchangeRateInput.value = String(this.rec.exchangeRate).replace('.', ',');
-      this.exchangeRateWrap.style.display = '';
+      this.exchangeRateWrap.removeClass('is-hidden');
     }
 
     this.exchangeRateInput.addEventListener('input', () => {
@@ -131,15 +131,16 @@ export class RecordModal extends Modal {
     const erToggle = form.createDiv('finance-exrate-toggle');
     erToggle.textContent = this.rec.exchangeRate ? this.tr.exchangeRateHide : this.tr.exchangeRateShow;
     erToggle.addEventListener('click', () => {
-      const shown = this.exchangeRateWrap!.style.display !== 'none';
-      this.exchangeRateWrap!.style.display = shown ? 'none' : '';
-      erToggle.textContent = shown ? this.tr.exchangeRateShow : this.tr.exchangeRateHide;
-      if (!shown) setTimeout(() => this.exchangeRateInput!.focus(), 50);
+      const wrap = this.exchangeRateWrap!;
+      const willShow = wrap.hasClass('is-hidden');
+      wrap.toggleClass('is-hidden', !willShow);
+      erToggle.textContent = willShow ? this.tr.exchangeRateHide : this.tr.exchangeRateShow;
+      if (willShow) setTimeout(() => this.exchangeRateInput!.focus(), FOCUS_DELAY_MS);
     });
 
     // ── Autofill badge ───────────────────────────────────────────────────
     this.autofillBadge = form.createDiv('finance-autofill-badge');
-    this.autofillBadge.style.display = 'none';
+    this.autofillBadge.addClass('is-hidden');
 
     // ── Grid: date+time / payer / category / tag ──────────────────────
     const grid = form.createDiv('finance-form-grid');
@@ -308,7 +309,7 @@ export class RecordModal extends Modal {
 
     if (match.exchangeRate && (!this.exchangeRateInput?.value)) {
       if (this.exchangeRateWrap && this.exchangeRateInput) {
-        this.exchangeRateWrap.style.display = '';
+        this.exchangeRateWrap.removeClass('is-hidden');
         this.exchangeRateInput.value = String(match.exchangeRate).replace('.', ',');
         this.rec.exchangeRate = match.exchangeRate;
         const toggle = this.exchangeRateWrap.parentElement?.querySelector('.finance-exrate-toggle');
@@ -318,10 +319,10 @@ export class RecordModal extends Modal {
     }
 
     if (filled) {
-      this.autofillBadge.style.display = 'flex';
+      this.autofillBadge.removeClass('is-hidden');
       const d = match.date.split('-');
       this.autofillBadge.textContent = this.tr.autofillFromDate.replace('{date}', `${d[2]}.${d[1]}.${d[0]}`);
-      setTimeout(() => { this.autofillBadge.style.display = 'none'; }, 6000);
+      setTimeout(() => { this.autofillBadge.addClass('is-hidden'); }, AUTOFILL_BADGE_MS);
     }
   }
 
@@ -353,7 +354,7 @@ export class RecordModal extends Modal {
       if (af) {
         const src = this.app.vault.getResourcePath(af as any);
         if (src) {
-          preview.style.display = 'block';
+          preview.removeClass('is-hidden');
           preview.createEl('img', { cls: 'finance-preview-img' }).src = src;
         }
       }
@@ -367,7 +368,7 @@ export class RecordModal extends Modal {
       if (file.type.startsWith('image/')) {
         const reader = new FileReader();
         reader.onload = e => {
-          preview.empty(); preview.style.display = 'block';
+          preview.empty(); preview.removeClass('is-hidden');
           preview.createEl('img', { cls: 'finance-preview-img' }).src = e.target?.result as string;
         };
         reader.readAsDataURL(file);
