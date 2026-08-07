@@ -14,7 +14,7 @@ export function parseCSV(text: string): string[][] {
   const endRow = () => { endField(); rows.push(row); row = []; };
 
   for (let i = 0; i < text.length; i++) {
-    const ch = text[i];
+    const ch = text[i]!;  // i < text.length guarantees defined
 
     if (inQuotes) {
       if (ch === '"') {
@@ -29,7 +29,7 @@ export function parseCSV(text: string): string[][] {
     if (ch === '"') inQuotes = true;
     else if (ch === ',') endField();
     else if (ch === '\n') endRow();
-    else if (ch === '\r') { if (text[i + 1] === '\n') i++; endRow(); }
+    else if (ch === '\r') { if (text[i + 1] === '\n') { i++; } endRow(); }
     else cur += ch;
   }
 

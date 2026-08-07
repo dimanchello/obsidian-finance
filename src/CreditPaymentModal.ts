@@ -13,7 +13,6 @@ export interface CreditPaymentOptions {
 export class CreditPaymentModal extends Modal {
   private tr: Translations;
   private o: CreditPaymentOptions;
-  private payment: Partial<CreditPayment>;
   private amountInput!: HTMLInputElement;
 
   constructor(app: App, opts: CreditPaymentOptions) {
@@ -22,7 +21,7 @@ export class CreditPaymentModal extends Modal {
     this.o = opts;
   }
 
-  onOpen(): void {
+  override onOpen(): void {
     const { contentEl } = this;
     contentEl.empty();
     contentEl.addClass('finance-modal');
@@ -75,5 +74,5 @@ export class CreditPaymentModal extends Modal {
       });
   }
 
-  onClose(): void { this.contentEl.empty(); }
+  override onClose(): void { this.contentEl.empty(); }
 }

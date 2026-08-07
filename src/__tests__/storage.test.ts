@@ -268,7 +268,7 @@ describe('FinanceStorage', () => {
       await storage.saveViewState('a7f3c92b4e1d', state as any);
       await storage.flush();
       // atomicWrite: содержимое уходит во временный файл
-      const stateWrite = mockAdapter.write.mock.calls.find(([p]: [string]) => p.includes('state.json'));
+      const stateWrite = mockAdapter.write.mock.calls.find((args: unknown[]) => (args[0] as string).includes('state.json'));
       expect(stateWrite).toBeDefined();
       expect(JSON.parse(stateWrite![1] as string)).toEqual(state);
 

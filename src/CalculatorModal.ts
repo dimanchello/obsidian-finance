@@ -25,7 +25,7 @@ export class CalculatorModal extends Modal {
     }
   }
 
-  onOpen(): void {
+  override onOpen(): void {
     const { contentEl } = this;
     contentEl.empty();
     this.modalEl.addClass('finance-calculator-modal');
@@ -157,7 +157,7 @@ export class CalculatorModal extends Modal {
     } else if (key === '+' || key === '-' || key === '*' || key === '/') {
       e.preventDefault();
       const opMap: Record<string, string> = { '*': '×', '/': '÷', '+': '+', '-': '-' };
-      this.handleInput(opMap[key]);
+      this.handleInput(opMap[key] ?? key);
     } else if (key === 'Enter') {
       e.preventDefault();
       if (this.justEvaluated) {
@@ -182,7 +182,7 @@ export class CalculatorModal extends Modal {
     }
   };
 
-  onClose(): void {
+  override onClose(): void {
     document.removeEventListener('keydown', this.keydownHandler);
     this.contentEl.empty();
   }

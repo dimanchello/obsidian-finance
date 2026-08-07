@@ -148,8 +148,8 @@ export class AnalyticsView {
     dfI.addEventListener('change', () => {
       if (dfI.value) {
         const [d, t] = dfI.value.split('T');
-        this.dateFrom = d;
-        this.timeFrom = t;
+        this.dateFrom = d ?? '';
+        this.timeFrom = t ?? '00:00';
       } else {
         this.dateFrom = '';
         this.timeFrom = '00:00';
@@ -164,8 +164,8 @@ export class AnalyticsView {
     dtI.addEventListener('change', () => {
       if (dtI.value) {
         const [d, t] = dtI.value.split('T');
-        this.dateTo = d;
-        this.timeTo = t;
+        this.dateTo = d ?? '';
+        this.timeTo = t ?? '23:59';
       } else {
         this.dateTo = '';
         this.timeTo = '23:59';
@@ -213,7 +213,7 @@ export class AnalyticsView {
       else if (this.groupBy === 'payer')    key = r.payer    || this.tr.notSpecified;
       else if (this.groupBy === 'year') {
         if (!r.date) return;
-        key = r.date.split('-')[0];
+        key = r.date.slice(0, 4);
       } else if (this.groupBy === 'week') {
         const iso = r.date ? isoWeek(r.date) : null;
         if (!iso) return;
@@ -235,7 +235,7 @@ export class AnalyticsView {
       items.sort((a, b) => a.label.localeCompare(b.label));
       items = items.map(d => {
         const [y, m] = d.label.split('-');
-        return { ...d, label: `${shortMonth((parseInt(m) - 1) % 12, this.locale)} ${y}` };
+        return { ...d, label: `${shortMonth((parseInt(m ?? '1') - 1) % 12, this.locale)} ${y}` };
       });
     } else if (this.groupBy === 'week') {
       items.sort((a, b) => a.label.localeCompare(b.label));
@@ -381,7 +381,11 @@ export class AnalyticsView {
 
     if (this.showType === 'both') {
       const legEl = this.chartEl.createDiv('finance-chart-legend');
-      [['#22c55e', this.tr.incomeStat], ['#ef4444', this.tr.expenseStat]].forEach(([c, lbl]) => {
+      const legendItems: [string, string][] = [
+        ['#22c55e', this.tr.incomeStat],
+        ['#ef4444', this.tr.expenseStat],
+      ];
+      legendItems.forEach(([c, lbl]) => {
         const row = legEl.createDiv('finance-chart-legend-row');
         const dot = row.createDiv('finance-chart-legend-dot');
         dot.style.setProperty('--ft-dot-color', c);
@@ -438,7 +442,7 @@ export class AnalyticsView {
 
       const path = svg('path', {
         d:   `M ${f(ix1)} ${f(iy1)} L ${f(x1)} ${f(y1)} A ${R} ${R} 0 ${large} 1 ${f(x2)} ${f(y2)} L ${f(ix2)} ${f(iy2)} A ${iR} ${iR} 0 ${large} 0 ${f(ix1)} ${f(iy1)} Z`,
-        fill: PALETTE[idx % PALETTE.length],
+        fill: PALETTE[idx % PALETTE.length]!,
         stroke: 'var(--background-primary)',
         'stroke-width': 2,
       });
@@ -468,7 +472,7 @@ export class AnalyticsView {
     items.forEach((d, idx) => {
       const row = legend.createDiv('finance-pie-legend-row');
       const dot = row.createDiv('finance-pie-dot');
-      dot.style.setProperty('--ft-dot-color', PALETTE[idx % PALETTE.length]);
+      dot.style.setProperty('--ft-dot-color', PALETTE[idx % PALETTE.length]!);
       row.createEl('span', { text: d.label,                      cls: 'finance-pie-label' });
       row.createEl('span', { text: `${this.fmtNum(d.value)} · ${pct(d.value, total)}`, cls: 'finance-pie-val' });
     });

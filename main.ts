@@ -12,13 +12,13 @@ type ResolvedAccountId =
   | { kind: 'unwritable' };
 
 export default class FinanceTrackerPlugin extends Plugin {
-  settings: PluginSettings;
-  storage:  FinanceStorage;
+  settings!: PluginSettings;
+  storage!:  FinanceStorage;
   private styleEl?: HTMLStyleElement;
   /** Guards against the re-render our own note write triggers. */
   private mintedBlocks = new Set<string>();
 
-  async onload(): Promise<void> {
+  override async onload(): Promise<void> {
     await this.loadSettings();
     this.storage = new FinanceStorage(this.app, this.manifest.id, this.settings.defaultCurrency);
 
@@ -62,7 +62,7 @@ export default class FinanceTrackerPlugin extends Plugin {
     this.addSettingTab(new FinanceSettingTab(this.app, this));
   }
 
-  async onunload(): Promise<void> {
+  override async onunload(): Promise<void> {
     await this.storage.flush();
     this.styleEl?.remove();
   }
@@ -260,6 +260,7 @@ class FinanceSettingTab extends PluginSettingTab {
           if (isNaN(fromIdx) || isNaN(toIdx) || fromIdx === toIdx) return;
           const currencies = this.plugin.settings.customCurrencies;
           const [moved] = currencies.splice(fromIdx, 1);
+          if (!moved) return;
           currencies.splice(toIdx, 0, moved);
           this.plugin.saveSettings();
           renderCurrencyList();

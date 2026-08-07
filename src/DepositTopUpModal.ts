@@ -13,7 +13,6 @@ export interface DepositTopUpOptions {
 export class DepositTopUpModal extends Modal {
   private tr: Translations;
   private o: DepositTopUpOptions;
-  private deposit: DepositRecord;
   private amountInput!: HTMLInputElement;
 
   constructor(app: App, opts: DepositTopUpOptions) {
@@ -22,7 +21,7 @@ export class DepositTopUpModal extends Modal {
     this.o = opts;
   }
 
-  onOpen(): void {
+  override onOpen(): void {
     const { contentEl } = this;
     contentEl.empty();
     contentEl.addClass('finance-modal');
@@ -81,5 +80,5 @@ export class DepositTopUpModal extends Modal {
       });
   }
 
-  onClose(): void { this.contentEl.empty(); }
+  override onClose(): void { this.contentEl.empty(); }
 }

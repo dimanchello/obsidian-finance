@@ -33,7 +33,7 @@ export class CreditEarlyRepaymentModal extends Modal {
     this.actualRemaining = Math.max(0, totalToPay - paidAmount);
   }
 
-  onOpen(): void {
+  override onOpen(): void {
     const { contentEl } = this;
     contentEl.empty();
     contentEl.addClass('finance-modal');
@@ -146,10 +146,10 @@ export class CreditEarlyRepaymentModal extends Modal {
           const monthsToRemove = parseInt(termInput.value) || 1;
           const toRemove = Math.min(monthsToRemove, this.pendingPayments.length);
 
-          for (let i = 0; i < toRemove; i++) {
-            this.pendingPayments[i].status = 'paid';
-            this.pendingPayments[i].paidDate = repaymentDate;
-            if (noteIn.value) this.pendingPayments[i].note = noteIn.value;
+          for (const p of this.pendingPayments.slice(0, toRemove)) {
+            p.status = 'paid';
+            p.paidDate = repaymentDate;
+            if (noteIn.value) p.note = noteIn.value;
           }
 
           const stillPending = this.credit.payments.filter(p => p.status === 'pending');
@@ -162,5 +162,5 @@ export class CreditEarlyRepaymentModal extends Modal {
       });
   }
 
-  onClose(): void { this.contentEl.empty(); }
+  override onClose(): void { this.contentEl.empty(); }
 }

@@ -11,7 +11,7 @@ export function parseAccountId(source: string): AccountIdSource {
   for (const line of source.split('\n')) {
     const m = ID_LINE_RE.exec(line);
     if (!m) continue;
-    const raw = m[1];
+    const raw = m[1] ?? '';
     return VALID_ID_RE.test(raw) ? { kind: 'ok', id: raw } : { kind: 'invalid', raw };
   }
   return { kind: 'missing' };
@@ -35,7 +35,7 @@ export function insertAccountId(
 ): string | null {
   const lines = fileContent.split('\n');
   if (lineStart < 0 || lineEnd >= lines.length || lineStart >= lineEnd) return null;
-  if (!lines[lineStart].trimStart().startsWith('```')) return null;
+  if (!lines[lineStart]!.trimStart().startsWith('```')) return null;
 
   const body = lines.slice(lineStart + 1, lineEnd);
   if (body.some(l => ID_LINE_RE.test(l))) return null;
@@ -58,7 +58,7 @@ export function collectAccountIds(fileContent: string): string[] {
     }
     if (trimmed.startsWith('```')) { inBlock = false; continue; }
     const m = ID_LINE_RE.exec(line);
-    if (m && VALID_ID_RE.test(m[1])) ids.push(m[1]);
+    if (m?.[1] && VALID_ID_RE.test(m[1])) ids.push(m[1]);
   }
 
   return ids;

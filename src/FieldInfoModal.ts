@@ -49,7 +49,7 @@ export class FieldInfoModal extends Modal {
     this.fields = fields;
   }
 
-  onOpen(): void {
+  override onOpen(): void {
     const { contentEl } = this;
     contentEl.empty();
     contentEl.addClass('finance-modal');
@@ -69,5 +69,5 @@ export class FieldInfoModal extends Modal {
       .addEventListener('click', () => this.close());
   }
 
-  onClose(): void { this.contentEl.empty(); }
+  override onClose(): void { this.contentEl.empty(); }
 }

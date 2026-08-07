@@ -14,7 +14,7 @@ export function isLeapYear(year: number): boolean {
 /** month is 1-based */
 export function daysInMonth(year: number, month: number): number {
   if (month === 2 && isLeapYear(year)) return 29;
-  return DAYS_PER_MONTH[month - 1];
+  return DAYS_PER_MONTH[month - 1]!;
 }
 
 /** Local-calendar date string. Never uses toISOString, which shifts the day in UTC+ zones. */

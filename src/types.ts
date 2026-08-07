@@ -17,7 +17,7 @@ export interface FinanceRecord {
   attachmentPath: string;
   isInternal?:    boolean;  // if true, excluded from income/expense stats
   linkedId?:      string;   // links to credit/deposit/debt record (hidden from UI)
-  exchangeRate?:  number;   // optional currency exchange rate (e.g., 95.5 for ₽→$)
+  exchangeRate?:  number | undefined;   // optional currency exchange rate (e.g., 95.5 for ₽→$)
 }
 
 export interface DebtMovement {
@@ -50,7 +50,7 @@ export interface DebtRecord {
 export interface AccountMeta {
   name:         string;   // custom display name; "" → use note filename
   currency:     string;   // "₽" | "$" | "BTC" etc.
-  accentColor?: string;   // custom accent color for this account
+  accentColor?: string | undefined;   // custom accent color for this account
 }
 
 export interface AccountData extends AccountMeta {
@@ -183,8 +183,8 @@ export interface CreditPayment {
   amount: number;
   dueDate: string;
   status: CreditPaymentStatus;
-  paidDate?: string;
-  note?: string;
+  paidDate?: string | undefined;
+  note?: string | undefined;
 }
 
 export interface CreditRecord {
@@ -208,7 +208,7 @@ export interface CreditRecord {
   downPaymentType?: 'percent' | 'amount';
   downPaymentValue?: number;
   downPaymentDate?: string;
-  downPaymentRecordId?: string;
+  downPaymentRecordId?: string | undefined;
 }
 
 export type DepositType = 'term' | 'demand' | 'savings';
@@ -221,8 +221,8 @@ export interface DepositAccrual {
   amount: number;
   dueDate: string;
   status: DepositAccrualStatus;
-  paidDate?: string;
-  note?: string;
+  paidDate?: string | undefined;
+  note?: string | undefined;
 }
 
 export interface DepositTopUp {

@@ -64,7 +64,7 @@ export class DepositModal extends Modal {
         };
   }
 
-  onOpen(): void {
+  override onOpen(): void {
     const { contentEl } = this;
     contentEl.empty();
     contentEl.addClass('finance-modal');
@@ -215,5 +215,5 @@ export class DepositModal extends Modal {
     this.close();
   }
 
-  onClose(): void { this.contentEl.empty(); }
+  override onClose(): void { this.contentEl.empty(); }
 }

@@ -55,7 +55,7 @@ export class DebtModal extends Modal {
         };
   }
 
-  onOpen(): void {
+  override onOpen(): void {
     const { contentEl } = this;
     contentEl.empty();
     contentEl.addClass('finance-modal');
@@ -232,5 +232,5 @@ export class DebtModal extends Modal {
     return original + (original * rate / 100);
   }
 
-  onClose(): void { this.contentEl.empty(); }
+  override onClose(): void { this.contentEl.empty(); }
 }

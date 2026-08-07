@@ -42,7 +42,7 @@ export class ImportExportModal extends Modal {
     ];
   }
 
-  onOpen(): void {
+  override onOpen(): void {
     const { contentEl } = this;
     contentEl.empty();
     contentEl.addClass('finance-modal');
@@ -253,7 +253,7 @@ export class ImportExportModal extends Modal {
       cls: 'finance-step-title',
     });
 
-    const sample = this.rawData[0];
+    const sample = this.rawData[0] ?? {};
     step.createEl('p', { text: this.tr.importFirstRecord, cls: 'finance-hint-text' });
     const sampleBox = step.createEl('pre', { cls: 'finance-sample-box' });
     sampleBox.textContent = JSON.stringify(sample, null, 2).slice(0, 600);
@@ -288,7 +288,7 @@ export class ImportExportModal extends Modal {
       const alts = aliases[ourKey] ?? [ourKey];
       for (const a of alts) {
         const idx = lc.indexOf(a);
-        if (idx !== -1) return this.srcFields[idx];
+        if (idx !== -1) return this.srcFields[idx] ?? '';
       }
       return '';
     };
@@ -337,7 +337,7 @@ export class ImportExportModal extends Modal {
         selG.createEl('label', { text: this.tr.importTypeField, cls: 'finance-filter-label-sm' });
         const sel  = selG.createEl('select', { cls: 'finance-filter-select' });
         this.srcFields.forEach(f => { const o = sel.createEl('option',{text:f}); o.value=f; });
-        sel.value      = this.mapping.type || this.srcFields[0] || '';
+        sel.value      = this.mapping.type ?? this.srcFields[0] ?? '';
         this.typeField = sel.value;
         sel.addEventListener('change', () => { this.typeField = sel.value; });
 
@@ -395,7 +395,7 @@ export class ImportExportModal extends Modal {
       const rawEr  = get('exchangeRate').replace(',', '.').replace(/[^\d.]/g, '');
       const er     = parseFloat(rawEr);
 
-      const isInternalVal = row['isInternal'] || get('isInternal');
+      const isInternalVal = row['isInternal'] ?? get('isInternal');
       const isInternal = isInternalVal === 'true' || isInternalVal === '1';
 
       records.push({
@@ -425,7 +425,7 @@ export class ImportExportModal extends Modal {
     this.close();
   }
 
-  onClose(): void { this.contentEl.empty(); }
+  override onClose(): void { this.contentEl.empty(); }
 }
 
 

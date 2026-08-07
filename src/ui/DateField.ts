@@ -23,7 +23,7 @@ export function createDateTimeField(parent: HTMLElement, opts: DateTimeFieldOpti
   input.addEventListener('change', () => {
     if (!input.value) return;
     const [d, t] = input.value.slice(0, 16).split('T');
-    opts.onChange(normalizeDateStr(d), normalizeTimeStr(t));
+    opts.onChange(normalizeDateStr(d ?? ''), normalizeTimeStr(t ?? ''));
   });
 
   return input;

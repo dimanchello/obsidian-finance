@@ -5,7 +5,7 @@ export interface ColumnVisibilityModalOptions {
   columns: { key: string; label: string }[];
   visibility: Record<string, boolean>;
   onSave: (visibility: Record<string, boolean>) => void;
-  accentColor?: string;
+  accentColor?: string | undefined;
 }
 
 export class ColumnVisibilityModal extends Modal {
@@ -20,7 +20,7 @@ export class ColumnVisibilityModal extends Modal {
     this.modalEl.addClass('finance-colvis-modal');
   }
 
-  onOpen(): void {
+  override onOpen(): void {
     const { contentEl } = this;
     contentEl.addClass('finance-modal');
     if (this.opts.accentColor) {
@@ -55,7 +55,7 @@ export class ColumnVisibilityModal extends Modal {
       });
   }
 
-  onClose(): void {
+  override onClose(): void {
     this.contentEl.empty();
   }
 }

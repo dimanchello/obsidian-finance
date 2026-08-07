@@ -52,7 +52,7 @@ export class RecordModal extends Modal {
     };
   }
 
-  onOpen(): void {
+  override onOpen(): void {
     const { contentEl } = this;
     contentEl.empty();
     contentEl.addClass('finance-modal');
@@ -157,8 +157,8 @@ export class RecordModal extends Modal {
     dtIn.addEventListener('change', () => {
       if (dtIn.value) {
         const [d, t] = dtIn.value.slice(0, 16).split('T');
-        this.rec.date = normalizeDateStr(d);
-        this.rec.time = normalizeTimeStr(t);
+        this.rec.date = normalizeDateStr(d ?? '');
+        this.rec.time = normalizeTimeStr(t ?? '');
       }
     });
 
@@ -426,5 +426,5 @@ export class RecordModal extends Modal {
     this.close();
   }
 
-  onClose(): void { this.contentEl.empty(); }
+  override onClose(): void { this.contentEl.empty(); }
 }

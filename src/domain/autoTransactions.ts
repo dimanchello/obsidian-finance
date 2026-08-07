@@ -76,7 +76,7 @@ class RecordMirror {
   }
 }
 
-function settleDue<T extends { dueDate: string; status: 'pending' | 'paid'; paidDate?: string }>(
+function settleDue<T extends { dueDate: string; status: 'pending' | 'paid'; paidDate?: string | undefined }>(
   items: T[], today: string,
 ): { items: T[]; settled: T[] } {
   const settled: T[] = [];
@@ -139,7 +139,7 @@ function processDeposit(
     status = 'closed';
     changed = true;
     // Dated at term end, not at "whenever the note was next opened".
-    const lastDueDate = accruals[accruals.length - 1].dueDate;
+    const lastDueDate = accruals[accruals.length - 1]!.dueDate;
     mirror.ensure({
       date: lastDueDate,
       type: 'income',

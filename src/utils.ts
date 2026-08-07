@@ -35,25 +35,16 @@ export function parseDate(d: string): Date | null {
   if (!d) return null;
   d = d.trim();
   if (/^\d{4}-\d{2}-\d{2}/.test(d)) {
-    const parts = d.slice(0, 10).split('-');
-    const year = parseInt(parts[0], 10);
-    const month = parseInt(parts[1], 10) - 1;
-    const day = parseInt(parts[2], 10);
-    return new Date(year, month, day);
+    const [year, month, day] = d.slice(0, 10).split('-').map(Number) as [number, number, number];
+    return new Date(year, month - 1, day);
   }
   const mDot = /^(\d{1,2})\.(\d{1,2})\.(\d{4})/.exec(d);
   if (mDot) {
-    const day = parseInt(mDot[1], 10);
-    const month = parseInt(mDot[2], 10) - 1;
-    const year = parseInt(mDot[3], 10);
-    return new Date(year, month, day);
+    return new Date(Number(mDot[3]), Number(mDot[2]) - 1, Number(mDot[1]));
   }
   const mSlash = /^(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(d);
   if (mSlash) {
-    const day = parseInt(mSlash[1], 10);
-    const month = parseInt(mSlash[2], 10) - 1;
-    const year = parseInt(mSlash[3], 10);
-    return new Date(year, month, day);
+    return new Date(Number(mSlash[3]), Number(mSlash[2]) - 1, Number(mSlash[1]));
   }
   const parsed = new Date(d);
   if (!isNaN(parsed.getTime())) {
@@ -76,7 +67,7 @@ export function normalizeTimeStr(t: string): string {
   t = t.trim();
   const m = /^(\d{1,2}):(\d{2})/.exec(t);
   if (m) {
-    return `${m[1].padStart(2, '0')}:${m[2]}`;
+    return `${m[1]!.padStart(2, '0')}:${m[2]}`;
   }
   return '';
 }
@@ -85,7 +76,7 @@ export function createDateObject(dateStr: string, timeStr = ''): Date {
   const d = parseDate(dateStr) ?? new Date();
   const t = normalizeTimeStr(timeStr);
   if (t) {
-    const [h, m] = t.split(':').map(Number);
+    const [h, m] = t.split(':').map(Number) as [number, number];
     d.setHours(h, m, 0, 0);
   } else {
     d.setHours(0, 0, 0, 0);

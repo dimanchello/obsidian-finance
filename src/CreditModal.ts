@@ -21,7 +21,6 @@ export class CreditModal extends Modal {
   private o: CreditModalOptions;
   private credit: CreditRecord;
   private amountInput!: HTMLInputElement;
-  private paymentInput!: HTMLInputElement;
   private paymentHandle!: AmountInputHandle;
   private rateInput!: HTMLInputElement;
   private termInput!: HTMLInputElement;
@@ -71,7 +70,7 @@ export class CreditModal extends Modal {
         };
   }
 
-  onOpen(): void {
+  override onOpen(): void {
     const { contentEl } = this;
     contentEl.empty();
     contentEl.addClass('finance-modal');
@@ -234,7 +233,6 @@ export class CreditModal extends Modal {
       value: this.credit.monthlyPayment,
       onChange: v => { this.credit.monthlyPayment = v; },
     });
-    this.paymentInput = this.paymentHandle.input;
 
     const termG = row3.createDiv('finance-field-group');
     termG.createEl('label', { text: this.tr.termLabel, cls: 'finance-field-label' });
@@ -441,5 +439,5 @@ export class CreditModal extends Modal {
     this.close();
   }
 
-  onClose(): void { this.contentEl.empty(); }
+  override onClose(): void { this.contentEl.empty(); }
 }

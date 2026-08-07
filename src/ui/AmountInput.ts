@@ -10,14 +10,14 @@ export function caretAfterFormat(raw: string, caret: number, formatted: string):
   if (significantBefore === 0) return 0;
   let count = 0;
   for (let i = 0; i < formatted.length; i++) {
-    if (/[\d.,]/.test(formatted[i])) count++;
+    if (/[\d.,]/.test(formatted[i]!)) count++;
     if (count >= significantBefore) return i + 1;
   }
   return formatted.length;
 }
 
 export interface AmountInputOptions {
-  value?: number;
+  value?: number | undefined;
   placeholder?: string;
   onChange: (value: number) => void;
   /** Called after blur re-formats the field (e.g. to update colouring). */

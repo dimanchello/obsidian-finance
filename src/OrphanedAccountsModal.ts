@@ -14,7 +14,7 @@ export class OrphanedAccountsModal extends Modal {
     this.storage = storage;
   }
 
-  onOpen(): void {
+  override onOpen(): void {
     const { contentEl } = this;
     contentEl.empty();
     contentEl.addClass('finance-modal');
@@ -42,7 +42,7 @@ export class OrphanedAccountsModal extends Modal {
     }
   }
 
-  onClose(): void {
+  override onClose(): void {
     this.contentEl.empty();
   }
 }

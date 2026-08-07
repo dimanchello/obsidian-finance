@@ -10,7 +10,7 @@ export default [
     languageOptions: {
       parser: tsparser,
       parserOptions: {
-        project: true,
+        project: ['./tsconfig.json', './src/__tests__/tsconfig.json'],
         tsconfigRootDir: import.meta.dirname,
       },
     },

@@ -92,7 +92,6 @@ export interface ComboboxOptions {
  * keyboard handling had quietly diverged.
  */
 export class Combobox {
-  private readonly host: HTMLElement;
   private readonly opts: ComboboxOptions;
   private readonly trigger: HTMLElement;
   private readonly triggerText: HTMLElement;
@@ -103,7 +102,6 @@ export class Combobox {
   private filtered: ComboOption[] = [];
 
   constructor(host: HTMLElement, opts: ComboboxOptions) {
-    this.host = host;
     this.opts = opts;
 
     const wrapper = host.createDiv('finance-custom-select');
@@ -121,7 +119,7 @@ export class Combobox {
 
   private labelFor(value: string): string {
     return this.opts.options.find(o => o.value === value)?.label
-      ?? (value || this.opts.options[0]?.label || '—');
+      ?? (value !== '' ? value : (this.opts.options[0]?.label ?? '—'));
   }
 
   private toggle(wrapper: HTMLElement): void {

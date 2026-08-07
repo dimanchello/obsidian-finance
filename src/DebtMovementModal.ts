@@ -19,7 +19,6 @@ export class DebtMovementModal extends Modal {
   private o: DebtMovementOptions;
   private mov: DebtMovement;
   private amountInput!: HTMLInputElement;
-  private typeInput!: HTMLSelectElement;
 
   constructor(app: App, opts: DebtMovementOptions) {
     super(app);
@@ -42,7 +41,7 @@ export class DebtMovementModal extends Modal {
     }
   }
 
-  onOpen(): void {
+  override onOpen(): void {
     const { contentEl } = this;
     contentEl.empty();
     contentEl.addClass('finance-modal');
@@ -119,5 +118,5 @@ export class DebtMovementModal extends Modal {
     this.close();
   }
 
-  onClose(): void { this.contentEl.empty(); }
+  override onClose(): void { this.contentEl.empty(); }
 }

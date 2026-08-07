@@ -69,7 +69,7 @@ export class AccountView extends MarkdownRenderChild {
     this.renderBodyContent();
   }
 
-  onunload(): void {
+  override onunload(): void {
     this.stopAutoTxTimer();
   }
 
