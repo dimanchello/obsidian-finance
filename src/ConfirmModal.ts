@@ -9,7 +9,7 @@ export class ConfirmModal extends Modal {
     private onConfirm: () => void,
   ) { super(app); this.tr = t(getLocaleFromApp(app)); }
 
-  onOpen(): void {
+  override onOpen(): void {
     const { contentEl } = this;
     contentEl.addClass('finance-confirm-modal');
     contentEl.createEl('p', { text: this.message, cls: 'finance-confirm-message' });
@@ -20,5 +20,5 @@ export class ConfirmModal extends Modal {
         .addEventListener('click', () => { this.onConfirm(); this.close(); });
   }
 
-  onClose(): void { this.contentEl.empty(); }
+  override onClose(): void { this.contentEl.empty(); }
 }

@@ -1,19 +1,18 @@
 import { App, Modal, Notice } from 'obsidian';
 import { getLocaleFromApp, t, Translations } from './i18n';
 import { CreditPayment, CreditRecord } from './types';
-import { fmtAmount, parseAmount, getTodayStr } from './utils';
+import { parseAmount, getTodayStr, normalizeDateStr } from './utils';
+import { createAmountInput } from './ui/AmountInput';
 
 export interface CreditPaymentOptions {
   title: string;
   credit: CreditRecord;
-  payment?: CreditPayment;
   onSave: (payment: CreditPayment) => void;
 }
 
 export class CreditPaymentModal extends Modal {
   private tr: Translations;
   private o: CreditPaymentOptions;
-  private payment: Partial<CreditPayment>;
   private amountInput!: HTMLInputElement;
 
   constructor(app: App, opts: CreditPaymentOptions) {
@@ -22,7 +21,7 @@ export class CreditPaymentModal extends Modal {
     this.o = opts;
   }
 
-  onOpen(): void {
+  override onOpen(): void {
     const { contentEl } = this;
     contentEl.empty();
     contentEl.addClass('finance-modal');
@@ -40,33 +39,10 @@ export class CreditPaymentModal extends Modal {
     const amtG = form.createDiv('finance-field-group finance-amount-group');
     amtG.createEl('label', { text: this.tr.sum, cls: 'finance-field-label' });
 
-    this.amountInput = amtG.createEl('input', { type: 'text', cls: 'finance-input finance-amount-input' });
-    this.amountInput.setAttribute('inputmode', 'decimal');
-    this.amountInput.setAttribute('placeholder', '0');
-    this.amountInput.setAttribute('autocomplete', 'off');
-    this.amountInput.value = fmtAmount(String(this.o.credit.monthlyPayment));
-
-    this.amountInput.addEventListener('focus', () => {
-      if (this.o.credit.monthlyPayment > 0) {
-        this.amountInput.value = String(this.o.credit.monthlyPayment).replace('.', ',');
-      }
-    });
-
-    this.amountInput.addEventListener('input', () => {
-      const raw = this.amountInput.value;
-      const sel = this.amountInput.selectionStart ?? raw.length;
-      const rawBefore = raw.slice(0, sel).replace(/[^\d.,]/g, '').length;
-      const formatted = fmtAmount(raw);
-      if (formatted !== raw) {
-        this.amountInput.value = formatted;
-        let newPos = 0, rawCount = 0;
-        for (let i = 0; i < formatted.length; i++) {
-          if (/[\d.,]/.test(formatted[i])) rawCount++;
-          if (rawCount >= rawBefore) { newPos = i + 1; break; }
-        }
-        this.amountInput.setSelectionRange(newPos, newPos);
-      }
-    });
+    this.amountInput = createAmountInput(amtG, {
+      value: this.o.credit.monthlyPayment,
+      onChange: () => {},
+    }).input;
 
     const noteG = form.createDiv('finance-field-group');
     noteG.createEl('label', { text: this.tr.note, cls: 'finance-field-label' });
@@ -88,9 +64,9 @@ export class CreditPaymentModal extends Modal {
         const payment: CreditPayment = {
           id: crypto.randomUUID(),
           amount,
-          dueDate: dateIn.value,
+          dueDate: normalizeDateStr(dateIn.value),
           status: 'paid',
-          paidDate: dateIn.value,
+          paidDate: normalizeDateStr(dateIn.value),
           note: noteIn.value,
         };
         this.o.onSave(payment);
@@ -98,5 +74,5 @@ export class CreditPaymentModal extends Modal {
       });
   }
 
-  onClose(): void { this.contentEl.empty(); }
+  override onClose(): void { this.contentEl.empty(); }
 }

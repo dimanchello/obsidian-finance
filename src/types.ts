@@ -1,5 +1,5 @@
 export type RecordType = 'income' | 'expense';
-export type SortField  = 'date' | 'amount' | 'category' | 'type' | 'payer' | 'tag' | 'createdAt';
+export type SortField  = 'date' | 'amount' | 'category' | 'type' | 'payer' | 'tag';
 export type SortDir    = 'asc'  | 'desc';
 export type DebtMovementType = 'borrow' | 'repay';
 
@@ -16,8 +16,9 @@ export interface FinanceRecord {
   note:           string;
   attachmentPath: string;
   isInternal?:    boolean;  // if true, excluded from income/expense stats
-  linkedId?:      string;   // links to credit/deposit/debt record (hidden from UI)
-  exchangeRate?:  number;   // optional currency exchange rate (e.g., 95.5 for ₽→$)
+  linkedId?:        string;   // links to credit/deposit/debt record (hidden from UI)
+  linkedMovementId?: string | undefined;   // links to the specific DebtMovement within a debt
+  exchangeRate?:  number | undefined;   // optional currency exchange rate (e.g., 95.5 for ₽→$)
 }
 
 export interface DebtMovement {
@@ -35,7 +36,7 @@ export type DebtDirection = 'lent' | 'borrowed';  // lent = мне должны,
 export interface DebtRecord {
   id:           string;
   person:       string;
-  amount:       number;   // current total (sum borrow - sum repay) with interest
+  amount:       number;   // current total (sum borrow - sum repay) WITHOUT interest
   originalAmount: number; // original amount without interest
   interestRate: number;   // percentage (e.g., 10 = 10%)
   direction:    DebtDirection;
@@ -50,7 +51,7 @@ export interface DebtRecord {
 export interface AccountMeta {
   name:         string;   // custom display name; "" → use note filename
   currency:     string;   // "₽" | "$" | "BTC" etc.
-  accentColor?: string;   // custom accent color for this account
+  accentColor?: string | undefined;   // custom accent color for this account
 }
 
 export interface AccountData extends AccountMeta {
@@ -73,7 +74,7 @@ export interface FilterState {
 
 export interface SortState { field: SortField; dir: SortDir; }
 
-export type DebtSortField = 'date' | 'amount' | 'person' | 'createdAt';
+export type DebtSortField = 'date' | 'amount' | 'person';
 export interface DebtFilterState {
   search: string;
   status: 'all' | 'paid' | 'unpaid';
@@ -117,13 +118,13 @@ export const DEFAULT_FILTER: FilterState = {
   showInternal: 'all',
 };
 
-export const DEFAULT_SORT: SortState = { field: 'createdAt', dir: 'desc' };
+export const DEFAULT_SORT: SortState = { field: 'date', dir: 'desc' };
 
 export const DEFAULT_DEBT_FILTER: DebtFilterState = {
   search: '', status: 'all', direction: 'all', dateFrom: '', dateTo: '', person: '',
 };
 
-export type CreditSortField = 'date' | 'amount' | 'bankName' | 'createdAt';
+export type CreditSortField = 'date' | 'amount' | 'bankName';
 export interface CreditFilterState {
   search: string;
   status: 'all' | 'active' | 'paid';
@@ -133,7 +134,7 @@ export interface CreditFilterState {
   dateTo: string;
 }
 
-export type DepositSortField = 'date' | 'amount' | 'bankName' | 'createdAt';
+export type DepositSortField = 'date' | 'amount' | 'bankName';
 export interface DepositFilterState {
   search: string;
   status: 'all' | 'active' | 'closed';
@@ -157,16 +158,22 @@ export const COMMON_CURRENCIES = [
 ];
 
 export const CREDIT_PAGE_SIZE = 20;
+export const CREDIT_PAYMENT_PAGE_SIZE = 15;
+export const DEPOSIT_ACCRUAL_PAGE_SIZE = 20;
 export const MOBILE_BREAKPOINT = 480;
 export const SEARCH_DEBOUNCE_MS = 280;
 export const PAGE_SIZE_OPTIONS = [10, 20, 25, 50, 100, 200, 500] as const;
 export const PAGE_RANGE_THRESHOLD = 7;
 export const FOCUS_DELAY_MS = 20;
+export const AUTOFILL_BADGE_MS = 6_000;
 export const SKELETON_CARD_COUNT = 3;
 export const PLURAL_THRESHOLD = 5;
 export const DAYS_IN_YEAR = 365;
 export const ACCRUAL_STEP_MONTHLY = 12;
 export const ONE_WEEK_MS = 604_800_000;
+export const AUTO_TX_INTERVAL_MS = 3_600_000;
+export const MINT_GUARD_MS = 3_000;
+export const PERCENT_100 = 100;
 
 export type CreditType = 'consumer' | 'auto' | 'mortgage';
 export type CreditStatus = 'active' | 'paid';
@@ -177,8 +184,8 @@ export interface CreditPayment {
   amount: number;
   dueDate: string;
   status: CreditPaymentStatus;
-  paidDate?: string;
-  note?: string;
+  paidDate?: string | undefined;
+  note?: string | undefined;
 }
 
 export interface CreditRecord {
@@ -197,6 +204,13 @@ export interface CreditRecord {
   status: CreditStatus;
   earlyRepaymentOption: 'term' | 'amount' | null;
   payments: CreditPayment[];
+  purchasePrice?: number;
+  downPayment?: number;
+  downPaymentType?: 'percent' | 'amount';
+  downPaymentValue?: number;
+  downPaymentDate?: string;
+  downPaymentRecordId?: string | undefined;
+  isEscrow?: boolean; // funds go to developer via escrow account, not added to balance
 }
 
 export type DepositType = 'term' | 'demand' | 'savings';
@@ -209,8 +223,8 @@ export interface DepositAccrual {
   amount: number;
   dueDate: string;
   status: DepositAccrualStatus;
-  paidDate?: string;
-  note?: string;
+  paidDate?: string | undefined;
+  note?: string | undefined;
 }
 
 export interface DepositTopUp {

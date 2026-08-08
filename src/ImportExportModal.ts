@@ -1,7 +1,8 @@
 import { App, Modal, Notice } from 'obsidian';
 import { getLocaleFromApp, t, Translations } from './i18n';
-import { FinanceRecord, RecordType } from './types';
-import { getTodayStr } from './utils';
+import { FinanceRecord } from './types';
+import { csvToObjects, resolveRecordType, TypeMap, TypeMode } from './domain/csv';
+import { normalizeDateStr, normalizeTimeStr } from './utils';
 
 type FileFormat = 'csv' | 'json';
 
@@ -41,7 +42,7 @@ export class ImportExportModal extends Modal {
     ];
   }
 
-  onOpen(): void {
+  override onOpen(): void {
     const { contentEl } = this;
     contentEl.empty();
     contentEl.addClass('finance-modal');
@@ -85,7 +86,7 @@ export class ImportExportModal extends Modal {
     let ext     = fmt;
 
     if (fmt === 'csv') {
-      const headers = ['id','createdAt','date','time','type','amount','category','tag','payer','note','exchangeRate','attachmentPath'];
+      const headers = ['id','createdAt','date','time','type','amount','category','tag','payer','note','exchangeRate','attachmentPath','isInternal','linkedId'];
       const escape  = (v: unknown) => { const s = v == null ? '' : typeof v === 'string' ? v : typeof v === 'number' || typeof v === 'boolean' ? String(v) : ''; return `"${s.replace(/"/g, '""')}"`; };
       content = [headers.join(','), ...recs.map(r => headers.map(h => escape(r[h as keyof FinanceRecord])).join(','))].join('\n');
       mime    = 'text/csv;charset=utf-8;';
@@ -114,8 +115,8 @@ export class ImportExportModal extends Modal {
   private rawData:    Record<string, string>[] = [];
   private srcFields:  string[] = [];
   private mapping:    Record<string, string> = {};  // ourField → srcField
-  private typeMap:    { incomeVal: string; expenseVal: string } = { incomeVal: 'income', expenseVal: 'expense' };
-  private typeMode:   'field' | 'sign' | 'all_income' | 'all_expense' = 'field';
+  private typeMap:    TypeMap = { incomeVal: 'income', expenseVal: 'expense' };
+  private typeMode:   TypeMode = 'field';
   private typeField = '';
 
   private tpl(s: string, params: Record<string, string | number>): string {
@@ -141,7 +142,8 @@ export class ImportExportModal extends Modal {
 
     const openBtn  = pickWrap.createEl('label', { cls: 'finance-attach-label' });
     openBtn.setAttribute('for', uid);
-    openBtn.innerHTML = `<span>📂</span><span>${this.tr.importOpenFile}</span>`;
+    openBtn.createEl('span', { text: '📂' });
+    openBtn.createEl('span', { text: this.tr.importOpenFile });
 
     // Steps 2+ appear here after file load
     const stepsContainer = b.createDiv('finance-import-steps');
@@ -188,32 +190,10 @@ export class ImportExportModal extends Modal {
   // ── parsers ───────────────────────────────────────────────────────────────
 
   private parseCSV(text: string): void {
-    const lines   = text.split(/\r?\n/).filter(l => l.trim());
-    if (!lines.length) throw new Error(this.tr.importEmptyFile);
-    const headers = this.csvRow(lines[0]);
-    this.srcFields= headers;
-    this.rawData  = lines.slice(1).map(l => {
-      const vals = this.csvRow(l);
-      const obj: Record<string, string> = {};
-      headers.forEach((h, i) => { obj[h] = vals[i] ?? ''; });
-      return obj;
-    });
-  }
-
-  private csvRow(line: string): string[] {
-    const result: string[] = [];
-    let cur = '', inQ = false;
-    for (let i = 0; i < line.length; i++) {
-      const ch = line[i];
-      if (ch === '"') {
-        if (inQ && line[i+1] === '"') { cur += '"'; i++; }
-        else inQ = !inQ;
-      } else if (ch === ',' && !inQ) {
-        result.push(cur); cur = '';
-      } else { cur += ch; }
-    }
-    result.push(cur);
-    return result;
+    const { headers, rows } = csvToObjects(text);
+    if (!headers.length) throw new Error(this.tr.importEmptyFile);
+    this.srcFields = headers;
+    this.rawData   = rows;
   }
 
   private parseJSON(text: string, container: HTMLElement): void {
@@ -237,9 +217,9 @@ export class ImportExportModal extends Modal {
 
     const row  = step.createDiv('finance-filters-row');
     const inp  = row.createEl('input', { type: 'text', cls: 'finance-input', placeholder: 'records' });
-    inp.style.flex = '1';
+    inp.addClass('finance-input-grow');
     const btn  = row.createEl('button', { text: this.tr.importNext, cls: 'finance-btn-save' });
-    btn.style.marginTop = 'auto';
+    btn.addClass('finance-btn-bottom');
 
     btn.addEventListener('click', () => {
       const path  = inp.value.trim();
@@ -248,8 +228,8 @@ export class ImportExportModal extends Modal {
       const arr = tryArr(node);
       if (!arr) { new Notice(this.tr.arrayNotFound); return; }
       this.setRawData(arr);
-      const next = container.createDiv();
-      this.renderMappingStep(next);
+      container.empty();
+      this.renderMappingStep(container);
     });
   }
 
@@ -273,7 +253,7 @@ export class ImportExportModal extends Modal {
       cls: 'finance-step-title',
     });
 
-    const sample = this.rawData[0];
+    const sample = this.rawData[0] ?? {};
     step.createEl('p', { text: this.tr.importFirstRecord, cls: 'finance-hint-text' });
     const sampleBox = step.createEl('pre', { cls: 'finance-sample-box' });
     sampleBox.textContent = JSON.stringify(sample, null, 2).slice(0, 600);
@@ -308,7 +288,7 @@ export class ImportExportModal extends Modal {
       const alts = aliases[ourKey] ?? [ourKey];
       for (const a of alts) {
         const idx = lc.indexOf(a);
-        if (idx !== -1) return this.srcFields[idx];
+        if (idx !== -1) return this.srcFields[idx] ?? '';
       }
       return '';
     };
@@ -357,7 +337,7 @@ export class ImportExportModal extends Modal {
         selG.createEl('label', { text: this.tr.importTypeField, cls: 'finance-filter-label-sm' });
         const sel  = selG.createEl('select', { cls: 'finance-filter-select' });
         this.srcFields.forEach(f => { const o = sel.createEl('option',{text:f}); o.value=f; });
-        sel.value      = this.mapping.type || this.srcFields[0] || '';
+        sel.value      = this.mapping.type ?? this.srcFields[0] ?? '';
         this.typeField = sel.value;
         sel.addEventListener('change', () => { this.typeField = sel.value; });
 
@@ -399,31 +379,32 @@ export class ImportExportModal extends Modal {
   private doImport(): void {
     const m   = this.mapping;
     const now = Date.now();
+    let skipped = 0;
 
-    const records: FinanceRecord[] = this.rawData.map((row, i) => {
+    const records: FinanceRecord[] = [];
+    this.rawData.forEach((row, i) => {
       const get = (key: string) => (m[key] ? row[m[key]] ?? '' : '');
 
-      let type: RecordType = 'expense';
-      if      (this.typeMode === 'all_income')  type = 'income';
-      else if (this.typeMode === 'all_expense') type = 'expense';
-      else if (this.typeMode === 'sign') {
-        const v = parseFloat(get('amount'));
-        type    = v >= 0 ? 'income' : 'expense';
-      } else {
-        const tv = (this.typeField ? row[this.typeField] : get('type')) ?? '';
-        type     = tv.toLowerCase() === this.typeMap.incomeVal.toLowerCase() ? 'income' : 'expense';
-      }
-
       const rawAmt = get('amount').replace(',', '.').replace(/[^\d.-]/g, '');
+      const amount = parseFloat(rawAmt) || 0;
+
+      const typeValue = (this.typeField ? row[this.typeField] : get('type')) ?? '';
+      const type = resolveRecordType(this.typeMode, typeValue, amount, this.typeMap);
+      if (type === null) { skipped++; return; }
+
       const rawEr  = get('exchangeRate').replace(',', '.').replace(/[^\d.]/g, '');
       const er     = parseFloat(rawEr);
-      return {
+
+      const isInternalVal = row['isInternal'] ?? get('isInternal');
+      const isInternal = isInternalVal === 'true' || isInternalVal === '1';
+
+      records.push({
         id:             crypto.randomUUID(),
         createdAt:      now + i,
-        date:           normalizeDate(get('date')),
-        time:           get('time').slice(0, 5),
+        date:           normalizeDateStr(get('date')),
+        time:           normalizeTimeStr(get('time')),
         type,
-        amount:         Math.abs(parseFloat(rawAmt) || 0),
+        amount:         Math.abs(amount),
         category:       get('category'),
         tag:            get('tag'),
         payer:          get('payer'),
@@ -431,37 +412,20 @@ export class ImportExportModal extends Modal {
         exchangeRate:   er > 0 && er !== 1 ? er : undefined,
         attachmentPath: '',
         linkedId:       '',
-      };
+        isInternal,
+      });
     });
 
     const valid = records.filter(r => r.amount > 0);
+    skipped += records.length - valid.length;
+
     this.o.onImport(valid);
-    new Notice(`${this.tr.importSuccess} — ${valid.length} ${this.tr.imported}`);
+    const skipNote = skipped ? ` — ${this.tpl(this.tr.importSkipped, { count: skipped })}` : '';
+    new Notice(`${this.tr.importSuccess} — ${valid.length} ${this.tr.imported}${skipNote}`);
     this.close();
   }
 
-  onClose(): void { this.contentEl.empty(); }
+  override onClose(): void { this.contentEl.empty(); }
 }
 
-// ── date normalizer ───────────────────────────────────────────────────────────
-function normalizeDate(s: string): string {
-  if (!s) return getTodayStr();
-  // already YYYY-MM-DD
-  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
-  // DD.MM.YYYY or DD/MM/YYYY
-  const m = /^(\d{1,2})[./](\d{1,2})[./](\d{4})/.exec(s);
-  if (m) return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
-  // MM/DD/YYYY
-  const m2 = /^(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(s);
-  if (m2) return `${m2[3]}-${m2[1].padStart(2,'0')}-${m2[2].padStart(2,'0')}`;
-  // Try native Date parse
-  const d = new Date(s);
-  if (!isNaN(d.getTime())) {
-    // If YYYY-MM-DD parsed, it's UTC, otherwise it might be local
-    // To prevent shift, format using getUTCDate/getUTCMonth if s was just YYYY-MM-DD
-    // But since s wasn't matched by YYYY-MM-DD, it might be something else.
-    // Let's format using local time to get what the user expects locally
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  }
-  return getTodayStr();
-}
+

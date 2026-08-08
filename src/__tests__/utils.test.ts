@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getDaysBetween, getTodayStr, fmtAmount, parseAmount } from '../utils';
+import { getDaysBetween, getTodayStr, fmtAmount, parseAmount, parseDate, normalizeDateStr, normalizeTimeStr, createDateObject, fmtDate } from '../utils';
 import { DAYS_IN_YEAR, ACCRUAL_STEP_MONTHLY } from '../types';
 
 describe('getDaysBetween', () => {
@@ -107,5 +107,96 @@ describe('fmtAmount and parseAmount', () => {
   it('formats numeric strings', () => {
     expect(fmtAmount('1000.5')).toBe('1\u00a0000,5');
     expect(fmtAmount('1234567')).toBe('1\u00a0234\u00a0567');
+  });
+});
+
+describe('Date/Time Unified Helpers', () => {
+  describe('parseDate', () => {
+    it('parses YYYY-MM-DD', () => {
+      const d = parseDate('2026-07-12');
+      expect(d).not.toBeNull();
+      expect(d!.getFullYear()).toBe(2026);
+      expect(d!.getMonth()).toBe(6); // July
+      expect(d!.getDate()).toBe(12);
+    });
+
+    it('parses DD.MM.YYYY', () => {
+      const d = parseDate('12.07.2026');
+      expect(d).not.toBeNull();
+      expect(d!.getFullYear()).toBe(2026);
+      expect(d!.getMonth()).toBe(6); // July
+      expect(d!.getDate()).toBe(12);
+    });
+
+    it('parses DD/MM/YYYY', () => {
+      const d = parseDate('12/07/2026');
+      expect(d).not.toBeNull();
+      expect(d!.getFullYear()).toBe(2026);
+      expect(d!.getMonth()).toBe(6); // July
+      expect(d!.getDate()).toBe(12);
+    });
+
+    it('returns null for invalid format', () => {
+      expect(parseDate('not-a-date')).toBeNull();
+    });
+  });
+
+  describe('normalizeDateStr', () => {
+    it('normalizes DD.MM.YYYY to YYYY-MM-DD', () => {
+      expect(normalizeDateStr('12.07.2026')).toBe('2026-07-12');
+    });
+
+    it('preserves YYYY-MM-DD', () => {
+      expect(normalizeDateStr('2026-07-12')).toBe('2026-07-12');
+    });
+
+    it('returns today for invalid date', () => {
+      const today = getTodayStr();
+      expect(normalizeDateStr('blah')).toBe(today);
+    });
+  });
+
+  describe('normalizeTimeStr', () => {
+    it('normalizes HH:MM', () => {
+      expect(normalizeTimeStr('20:15')).toBe('20:15');
+      expect(normalizeTimeStr('9:05')).toBe('09:05');
+      expect(normalizeTimeStr('  18:30  ')).toBe('18:30');
+    });
+
+    it('returns empty string for invalid time', () => {
+      expect(normalizeTimeStr('')).toBe('');
+      expect(normalizeTimeStr('abc')).toBe('');
+    });
+  });
+
+  describe('createDateObject', () => {
+    it('creates Date with correct year, month, date, hour, minute', () => {
+      const d = createDateObject('12.07.2026', '20:15');
+      expect(d.getFullYear()).toBe(2026);
+      expect(d.getMonth()).toBe(6);
+      expect(d.getDate()).toBe(12);
+      expect(d.getHours()).toBe(20);
+      expect(d.getMinutes()).toBe(15);
+    });
+
+    it('defaults time to 00:00 if not specified', () => {
+      const d = createDateObject('2026-07-12');
+      expect(d.getHours()).toBe(0);
+      expect(d.getMinutes()).toBe(0);
+    });
+  });
+
+  describe('fmtDate', () => {
+    it('formats YYYY-MM-DD to DD.MM.YYYY', () => {
+      expect(fmtDate('2026-07-12')).toBe('12.07.2026');
+    });
+
+    it('formats DD.MM.YYYY to DD.MM.YYYY', () => {
+      expect(fmtDate('12.07.2026')).toBe('12.07.2026');
+    });
+
+    it('formats YYYY-MM-DD with time', () => {
+      expect(fmtDate('2026-07-12', '20:15')).toBe('12.07.2026\u00a020:15');
+    });
   });
 });

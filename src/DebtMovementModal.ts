@@ -1,7 +1,9 @@
 import { App, Modal, Notice } from 'obsidian';
 import { getLocaleFromApp, t, Translations } from './i18n';
 import { DebtMovement, DebtMovementType } from './types';
-import { fmtAmount, parseAmount, getTodayStr } from './utils';
+import { parseAmount, getTodayStr } from './utils';
+import { createAmountInput } from './ui/AmountInput';
+import { createDateTimeField } from './ui/DateField';
 
 export interface DebtMovementOptions {
   title:           string;
@@ -17,7 +19,6 @@ export class DebtMovementModal extends Modal {
   private o: DebtMovementOptions;
   private mov: DebtMovement;
   private amountInput!: HTMLInputElement;
-  private typeInput!: HTMLSelectElement;
 
   constructor(app: App, opts: DebtMovementOptions) {
     super(app);
@@ -40,7 +41,7 @@ export class DebtMovementModal extends Modal {
     }
   }
 
-  onOpen(): void {
+  override onOpen(): void {
     const { contentEl } = this;
     contentEl.empty();
     contentEl.addClass('finance-modal');
@@ -59,69 +60,29 @@ export class DebtMovementModal extends Modal {
       : this.tr.repayAmountLabel;
     amtG.createEl('label', { text: labelText, cls: 'finance-field-label' });
 
-    this.amountInput = amtG.createEl('input', {
-      type: 'text',
-      cls: 'finance-input finance-amount-input',
+    const amountHandle = createAmountInput(amtG, {
+      value: this.mov.amount,
+      onChange: v => { this.mov.amount = v; },
     });
-    this.amountInput.setAttribute('inputmode', 'decimal');
-    this.amountInput.setAttribute('placeholder', '0');
-    this.amountInput.setAttribute('autocomplete', 'off');
-
-    this.amountInput.addEventListener('focus', () => {
-      if (this.mov.amount > 0) {
-        this.amountInput.value = String(this.mov.amount).replace('.', ',');
-      }
-    });
-
-    this.amountInput.addEventListener('input', () => {
-      const raw = this.amountInput.value;
-      this.mov.amount = parseAmount(raw);
-      const sel = this.amountInput.selectionStart ?? raw.length;
-      const rawBefore = raw.slice(0, sel).replace(/[^\d.,]/g, '').length;
-      const formatted = fmtAmount(raw);
-      if (formatted !== raw) {
-        this.amountInput.value = formatted;
-        let newPos = 0, rawCount = 0;
-        for (let i = 0; i < formatted.length; i++) {
-          if (/[\d.,]/.test(formatted[i])) rawCount++;
-          if (rawCount >= rawBefore) { newPos = i + 1; break; }
-        }
-        this.amountInput.setSelectionRange(newPos, newPos);
-      }
-    });
-
-    this.amountInput.addEventListener('blur', () => {
-      const n = parseAmount(this.amountInput.value);
-      this.mov.amount = n;
-      this.amountInput.value = n > 0 ? fmtAmount(String(n)) : '';
-    });
+    this.amountInput = amountHandle.input;
 
     // ── Full repayment link (only for repay type) ────────────────────────
     if (this.o.type === 'repay' && this.o.remainingAmount && this.o.remainingAmount > 0) {
       const cur = this.o.currency ?? '';
       const formatted = this.o.remainingAmount.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-      const link = amtG.createEl('span');
+      const link = amtG.createEl('span', { cls: 'finance-fill-remaining-link' });
       link.textContent = `→ ${formatted} ${cur}`;
-      link.style.cssText = 'cursor:pointer;color:var(--ft-accent);font-size:.85em;text-decoration:underline;display:inline-block;margin-top:4px;';
       link.addEventListener('click', () => {
-        this.amountInput.value = fmtAmount(String(this.o.remainingAmount!));
-        this.mov.amount = this.o.remainingAmount!;
+        amountHandle.set(this.o.remainingAmount!);
       });
     }
 
     // ── Date+Time ────────────────────────────────────────────────────────
-    const dtG = form.createDiv('finance-field-group');
-    dtG.createEl('label', { text: this.tr.dateTime, cls: 'finance-field-label' });
-    const dtIn = dtG.createEl('input', { type: 'datetime-local', cls: 'finance-input' });
-    dtIn.value = this.mov.date
-      ? `${this.mov.date}${this.mov.time ? 'T' + this.mov.time : 'T00:00'}`
-      : new Date().toISOString().slice(0, 16);
-    dtIn.addEventListener('change', () => {
-      if (dtIn.value) {
-        const [d, t] = dtIn.value.split('T');
-        this.mov.date = d;
-        this.mov.time = t || '';
-      }
+    createDateTimeField(form, {
+      label: this.tr.dateTime,
+      date: this.mov.date,
+      time: this.mov.time,
+      onChange: (d, t) => { this.mov.date = d; this.mov.time = t; },
     });
 
     // ── Note — visually distinct ─────────────────────────────────────────
@@ -157,5 +118,5 @@ export class DebtMovementModal extends Modal {
     this.close();
   }
 
-  onClose(): void { this.contentEl.empty(); }
+  override onClose(): void { this.contentEl.empty(); }
 }

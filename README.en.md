@@ -50,6 +50,8 @@ Insert in any note:
 ```
 ````
 
+On first open the plugin automatically inserts an `id: <hex>` line into the block — a unique account identifier. This lets you rename or move the note without losing data.
+
 Use `Insert account template` command from the command palette.
 
 <img src="assets/screenshots/records_usage_en.png" width="900" alt="Finance-account code block in a note">
@@ -173,6 +175,10 @@ Each account has four tabs, switched via the `•••` menu:
 - **Default currency** for new accounts
 - **Currency management**: add, remove, reorder currencies via drag-and-drop
 - **Records per page**
+
+### Commands
+
+**Find orphaned accounts** — shows data folders whose `id` does not appear in any note. This can happen if a note was deleted or its `finance-account` block was removed. The command lets you delete such folders manually.
 
 ---
 

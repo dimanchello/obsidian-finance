@@ -2,21 +2,23 @@ import { Notice } from 'obsidian';
 import { ViewContext } from '../context';
 import {
   DepositRecord, DepositTopUp, DepositWithdrawal, FinanceRecord,
-  DepositSortField, PLURAL_THRESHOLD, SEARCH_DEBOUNCE_MS, PAGE_RANGE_THRESHOLD,
-  DEFAULT_DEPOSIT_FILTER,
+  DepositSortField, PLURAL_THRESHOLD, PERCENT_100,
+  DEFAULT_DEPOSIT_FILTER, DEPOSIT_ACCRUAL_PAGE_SIZE,
 } from '../types';
 import { DepositModal } from '../DepositModal';
-import { ColumnVisibilityModal } from '../ColumnVisibilityModal';
 import { DepositTopUpModal } from '../DepositTopUpModal';
 import { DepositWithdrawalModal } from '../DepositWithdrawalModal';
 import { ConfirmModal } from '../ConfirmModal';
-import { getTodayStr } from '../utils';
+import { getTodayStr, getTodayTime } from '../utils';
+import { addMonthsClamped, daysBetweenStr } from '../domain/dateMath';
+import { sumMoney } from '../domain/money';
+import { DataTable, FilterControl } from '../ui/DataTable';
+
 export class DepositsTab {
   private ctx: ViewContext;
   private el: HTMLElement;
-  private depositPaginationEl?: HTMLElement;
-  private filterDebounce: ReturnType<typeof setTimeout> | null = null;
-  private filtersOpen = false;
+  private table: DataTable<DepositRecord>;
+  private depositAccrualPages = new Map<string, number>();
   onUpdate: (() => void) | null = null;
 
   private get tr() { return this.ctx.tr; }
@@ -24,67 +26,245 @@ export class DepositsTab {
   constructor(ctx: ViewContext, el: HTMLElement) {
     this.ctx = ctx;
     this.el = el;
+
+    this.table = new DataTable<DepositRecord>({
+      ctx,
+      items: () => this.getFilteredDeposits(),
+      itemId: d => d.id,
+      hasAnyItems: () => (this.ctx.data?.deposits.length ?? 0) > 0,
+      columns: [
+        { key: 'name', label: this.tr.name, cell: d => ({ text: d.name || '—' }) },
+        { key: 'bank', label: this.tr.bankName, cell: d => ({ text: d.bankName || '—' }) },
+        { key: 'type', label: this.tr.type, cell: d => ({ text: this.typeLabel(d) }) },
+        { key: 'amount', label: this.tr.sum, cell: d => ({ text: this.ctx.fmt(d.amount), cls: 'finance-amount-cell' }) },
+        {
+          key: 'profit', label: this.tr.profitLabel,
+          cell: d => {
+            const profit = this.getDepositProfit(d);
+            return {
+              text: profit > 0 ? this.ctx.fmt(profit) : '—',
+              cls: profit > 0 ? 'finance-amount-cell finance-amount-income' : 'finance-amount-cell',
+            };
+          },
+        },
+        { key: 'rate', label: this.tr.rate, cell: d => ({ text: `${d.interestRate}%` }) },
+        { key: 'date', label: this.tr.opened, cell: d => ({ text: this.ctx.fmtDate(d.startDate) }) },
+        {
+          key: 'endDate', label: this.tr.endDate,
+          cell: d => {
+            const endDate = this.calculateDepositEndDate(d);
+            return { text: endDate ? this.ctx.fmtDate(endDate) : '—', cls: endDate ? 'finance-due-date' : '' };
+          },
+        },
+      ],
+      rowCls: d => [d.status === 'active' ? 'finance-row-income' : 'finance-row-expense'],
+      rowActions: d => [
+        ...(d.status === 'active' ? [
+          { icon: '💰', title: this.tr.topUp, onClick: () => this.openDepositTopUpModal(d) },
+          { icon: '📤', title: this.tr.withdraw, onClick: () => this.openDepositWithdrawalModal(d) },
+          { icon: '✅', title: this.tr.closeAccount, onClick: () => this.confirmCloseDeposit(d) },
+        ] : []),
+        { icon: '✏️', title: this.tr.edit, onClick: () => this.openEditDepositModal(d) },
+        { icon: '🗑️', title: this.tr.delete, onClick: () => this.confirmDeleteDeposit(d), cls: 'finance-delete-btn' },
+      ],
+      expandable: {
+        hasContent: () => true,
+        toggleLabel: d => `📋 ${this.tr.depositAccruals} (${d.accruals.length})`,
+        render: (host, d) => this.renderDepositAccrualsPanel(host, d),
+      },
+      renderCard: (block, d) => this.renderCard(block, d),
+      filterControls: () => this.filterControls(),
+      sortFields: [
+        { field: 'date', label: this.tr.startDate },
+        { field: 'amount', label: this.tr.sum },
+        { field: 'bankName', label: this.tr.bankName },
+      ],
+      state: {
+        getPage: () => this.ctx.state.depositPage ?? 0,
+        setPage: p => { this.ctx.state.depositPage = p; },
+        getSort: () => this.ctx.state.depositSort ?? { field: 'date', dir: 'desc' },
+        setSort: s => { this.ctx.state.depositSort = s as { field: DepositSortField; dir: 'asc' | 'desc' }; },
+        resetFilter: () => { this.ctx.state.depositFilter = { ...DEFAULT_DEPOSIT_FILTER }; },
+        getColumns: () => (this.ctx.state.depositsColumns ??= {}),
+        setColumns: c => { this.ctx.state.depositsColumns = c; },
+      },
+      renderStats: host => this.renderStats(host),
+      toolbarButtons: toolbar => {
+        const btn = toolbar.createEl('button', { cls: 'finance-add-btn finance-accent-btn' });
+        btn.createEl('span', { text: '＋', cls: 'btn-icon' });
+        btn.createEl('span', { text: this.tr.newDeposit });
+        btn.addEventListener('click', () => this.openNewDepositModal());
+      },
+      emptyState: { icon: '📈', title: this.tr.noDeposits, subtitle: this.tr.addNewDebt },
+      emptyFiltered: { icon: '🔍', title: this.tr.noDepositsFiltered, subtitle: this.tr.tryChangeFilters },
+      onBulkDelete: async ids => {
+        const idSet = new Set(ids);
+        const depositsToDelete = (this.ctx.data?.deposits ?? []).filter(d => idSet.has(d.id));
+        await this.ctx.storage.deleteDepositsBatch(this.ctx.accountId, ids);
+
+        const otherRecords = this.ctx.data!.records.filter(r => !r.linkedId || !idSet.has(r.linkedId));
+        for (const deposit of depositsToDelete) {
+          if (deposit.status === 'active') {
+            const refund = this.refundRecord(deposit);
+            delete refund.linkedId;
+            otherRecords.push(refund);
+          }
+        }
+        await this.ctx.storage.saveAllRecords(this.ctx.accountId, otherRecords);
+        await this.reload(this.tr.deleted);
+      },
+      confirmBulkDeleteText: count => this.tr.confirmDeleteSelectedDeposits.replace('{count}', String(count)),
+      onFilterChange: () => {},
+      rerender: () => this.render(),
+    });
   }
 
   render(): void {
+    if (this.ctx.state.depositSort?.field === 'createdAt' as DepositSortField) {
+      this.ctx.state.depositSort = { field: 'date', dir: 'desc' };
+      this.ctx.saveState();
+    }
+    this.ctx.state.depositFilter ??= { ...DEFAULT_DEPOSIT_FILTER };
     this.el.empty();
-    this.renderDepositsView(this.el);
+    this.table.render(this.el);
   }
 
   update(): void {
     this.render();
   }
 
-  private isDepositClosed(deposit: DepositRecord): boolean {
-    return deposit.status === 'closed';
+  private async reload(notice?: string): Promise<void> {
+    this.ctx.data = await this.ctx.storage.load(this.ctx.accountId);
+    this.onUpdate?.();
+    if (notice) new Notice(notice);
+  }
+
+  // ── Derived helpers ──────────────────────────────────────────────────────
+
+  private typeLabel(deposit: DepositRecord): string {
+    switch (deposit.type) {
+      case 'demand': return this.tr.depositTypeDemand;
+      case 'savings': return this.tr.depositTypeSavings;
+      default: return this.tr.depositTypeTerm;
+    }
   }
 
   private getDepositAccrued(deposit: DepositRecord): number {
-    return deposit.accruals
-      .filter(a => a.status === 'paid')
-      .reduce((s, a) => s + a.amount, 0);
-  }
-
-  private getDepositTotal(deposit: DepositRecord): number {
-    if (deposit.accrualType === 'capitalization') {
-      return deposit.amount;
-    }
-    return deposit.amount + this.getDepositAccrued(deposit);
+    return sumMoney(deposit.accruals.filter(a => a.status === 'paid').map(a => a.amount));
   }
 
   private getDepositProfit(deposit: DepositRecord): number {
-    return deposit.accruals.reduce((s, a) => s + a.amount, 0);
+    return sumMoney(deposit.accruals.map(a => a.amount));
   }
 
   private calculateDepositEndDate(deposit: DepositRecord): string {
     if (!deposit.startDate) return '';
-    const startDate = new Date(deposit.startDate);
-    if (isNaN(startDate.getTime())) return '';
-    const term = deposit.termMonths || 0;
-    startDate.setUTCMonth(startDate.getUTCMonth() + term);
-    return startDate.toISOString().split('T')[0];
+    try {
+      return addMonthsClamped(deposit.startDate, deposit.termMonths || 0);
+    } catch {
+      return '';
+    }
   }
 
-  private mkActionBtn(parent: HTMLElement, icon: string, title: string, onClick: () => void, extraCls = ''): void {
-    const btn = document.createElement('button');
-    btn.classList.add('finance-action-btn');
-    if (extraCls) btn.classList.add(extraCls);
-    btn.title = title;
-    btn.textContent = icon;
-    btn.addEventListener('click', onClick);
-    parent.appendChild(btn);
+  private refundRecord(deposit: DepositRecord): FinanceRecord {
+    return {
+      id: crypto.randomUUID(),
+      createdAt: Date.now(),
+      date: getTodayStr(),
+      time: getTodayTime(),
+      type: 'income',
+      amount: deposit.amount,
+      category: this.tr.depositRefundCat,
+      tag: '',
+      payer: deposit.bankName,
+      note: `${this.tr.depositRefundNote} "${deposit.name}"`,
+      attachmentPath: '',
+      linkedId: deposit.id,
+    };
   }
 
-  private resetDepositPage(): void {
-    this.ctx.state.depositPage = 0;
-    this.ctx.saveState();
-    this.render();
+  // ── Stats ────────────────────────────────────────────────────────────────
+
+  private renderStats(host: HTMLElement): void {
+    this.ctx.renderRecordsStats(host);
+
+    const allDeposits = this.ctx.data?.deposits ?? [];
+    const summary = host.createDiv('finance-stats-container finance-stats-two-cols');
+    const activeDeposits = allDeposits.filter(d => d.status === 'active');
+    const closedDeposits = allDeposits.filter(d => d.status === 'closed');
+
+    const mkCard = (title: string, icon: string, amount: number, profit: number, count: number, isActive: boolean) => {
+      const card = summary.createDiv(`finance-stat-card finance-stat-${isActive ? 'deposit-active' : 'deposit-closed'}`);
+      const header = card.createDiv('finance-debt-summary-header');
+      header.createEl('span', { text: icon, cls: 'finance-debt-summary-icon' });
+      header.createEl('span', { text: title, cls: 'finance-debt-summary-title' });
+      const content = card.createDiv('finance-debt-summary-content');
+      content.createEl('div', { text: amount > 0 ? this.ctx.fmt(amount) : '—', cls: 'finance-debt-summary-main' });
+      const countLabel = count === 1 ? this.tr.depositCount_one : count < PLURAL_THRESHOLD ? this.tr.depositCount_few : this.tr.depositCount_many;
+      content.createEl('div', {
+        text: profit > 0
+          ? `${count} ${countLabel} · ${this.tr.profitLabel}: ${this.ctx.fmt(profit)}`
+          : `${count} ${countLabel}`,
+        cls: 'finance-debt-summary-sub',
+      });
+    };
+
+    mkCard(this.tr.activeCards, '💰',
+      sumMoney(activeDeposits.map(d => d.amount)),
+      sumMoney(activeDeposits.map(d => this.getDepositProfit(d))),
+      activeDeposits.length, true);
+    mkCard(this.tr.closedCards, '✅',
+      sumMoney(closedDeposits.map(d => d.amount)),
+      sumMoney(closedDeposits.map(d => this.getDepositProfit(d))),
+      closedDeposits.length, false);
+  }
+
+  // ── Filters ──────────────────────────────────────────────────────────────
+
+  private filterControls(): FilterControl[] {
+    const f = this.ctx.state.depositFilter ?? (this.ctx.state.depositFilter = { ...DEFAULT_DEPOSIT_FILTER });
+    return [
+      {
+        kind: 'search', label: this.tr.search, placeholder: this.tr.searchByName,
+        get: () => f.search, set: v => { f.search = v; },
+      },
+      {
+        kind: 'select', label: this.tr.status,
+        options: [
+          { value: 'all', label: this.tr.all },
+          { value: 'active', label: this.tr.depositActive },
+          { value: 'closed', label: this.tr.depositClosed },
+        ],
+        get: () => f.status, set: v => { f.status = v as typeof f.status; },
+      },
+      {
+        kind: 'searchSelect', label: this.tr.bankName,
+        options: () => [
+          { value: '', label: this.tr.allBanks },
+          ...[...new Set((this.ctx.data?.deposits ?? []).map(d => d.bankName).filter(Boolean))].map(b => ({ value: b, label: b })),
+        ],
+        get: () => f.bankName, set: v => { f.bankName = v; },
+      },
+      { kind: 'date', label: this.tr.from, get: () => f.dateFrom, set: v => { f.dateFrom = v; } },
+      { kind: 'date', label: this.tr.to, get: () => f.dateTo, set: v => { f.dateTo = v; } },
+      {
+        kind: 'select', label: this.tr.type,
+        options: [
+          { value: 'all', label: this.tr.allDepositTypes },
+          { value: 'term', label: this.tr.depositTypeTerm },
+          { value: 'demand', label: this.tr.depositTypeDemand },
+          { value: 'savings', label: this.tr.depositTypeSavings },
+        ],
+        get: () => f.type, set: v => { f.type = v as typeof f.type; },
+      },
+    ];
   }
 
   private getFilteredDeposits(): DepositRecord[] {
     if (!this.ctx.data) return [];
     const f = this.ctx.state.depositFilter ?? DEFAULT_DEPOSIT_FILTER;
-    const s = this.ctx.state.depositSort ?? { field: 'createdAt' as DepositSortField, dir: 'desc' };
+    const s = this.ctx.state.depositSort ?? { field: 'date' as DepositSortField, dir: 'desc' as const };
+
     let result = [...this.ctx.data.deposits];
     if (f.search) {
       const q = f.search.toLowerCase();
@@ -95,513 +275,127 @@ export class DepositsTab {
     if (f.type !== 'all') result = result.filter(d => d.type === f.type);
     if (f.dateFrom) result = result.filter(d => d.startDate >= f.dateFrom);
     if (f.dateTo) result = result.filter(d => d.startDate <= f.dateTo);
+
     result.sort((a, b) => {
       let cmp = 0;
-      if (s.field === 'date') cmp = a.startDate.localeCompare(b.startDate);
-      else if (s.field === 'amount') cmp = a.amount - b.amount;
+      if (s.field === 'amount') cmp = a.amount - b.amount;
       else if (s.field === 'bankName') cmp = a.bankName.localeCompare(b.bankName);
-      else cmp = a.createdAt - b.createdAt;
+      else cmp = a.startDate.localeCompare(b.startDate);
       return s.dir === 'asc' ? cmp : -cmp;
     });
     return result;
   }
 
-  private mkSearchSelect(
-    row: HTMLElement, label: string,
-    opts: { v: string; l: string }[],
-    cur: string, onChange: (v: string) => void,
-  ): void {
-    const g = row.createDiv('finance-filter-group');
-    g.createEl('label', { text: label, cls: 'finance-filter-label' });
+  // ── Mobile card ──────────────────────────────────────────────────────────
 
-    const wrapper = g.createDiv('finance-custom-select');
-    let selectedValue = cur;
+  private renderCard(block: HTMLElement, deposit: DepositRecord): void {
+    block.addClass(deposit.status === 'active' ? 'finance-row-income' : 'finance-row-expense');
 
-    const trigger = wrapper.createDiv('finance-custom-select-trigger');
-    trigger.setAttribute('tabindex', '0');
-    const triggerText = trigger.createEl('span', { cls: 'finance-custom-select-text' });
-    triggerText.textContent = opts.find(o => o.v === cur)?.l ?? cur ?? opts[0]?.l ?? '—';
+    const header = block.createDiv('finance-record-header');
+    header.createEl('span', {
+      text: '+' + this.ctx.fmt(deposit.amount),
+      cls: 'finance-record-amount finance-amount-income',
+    });
+    header.createEl('span', { text: `${deposit.bankName} · ${this.typeLabel(deposit)}`, cls: 'finance-record-date' });
 
-    let dropdown: HTMLElement | null = null;
-    let isOpen = false;
-    let outsideHandler: ((e: MouseEvent) => void) | null = null;
-    let searchDebounce: ReturnType<typeof setTimeout> | null = null;
+    const details = block.createDiv('finance-record-details');
+    details.createEl('span', { text: `📊 ${deposit.interestRate}${this.tr.percentPerAnnum}`, cls: 'finance-record-detail' });
+    const profit = this.getDepositProfit(deposit);
+    if (profit > 0) {
+      details.createEl('span', { text: `💰 ${this.tr.depositAccruals}: ${this.ctx.fmt(profit)}`, cls: 'finance-record-detail' });
+    }
+    const endDate = this.calculateDepositEndDate(deposit);
+    if (endDate && deposit.status === 'active') {
+      details.createEl('span', { text: `${this.tr.dueBy} ${this.ctx.fmtDate(endDate)}`, cls: 'finance-record-detail' });
+    }
 
-    const closeDropdown = () => {
-      if (!isOpen) return;
-      isOpen = false;
-      dropdown?.remove();
-      dropdown = null;
-      if (outsideHandler) { document.removeEventListener('mousedown', outsideHandler); outsideHandler = null; }
-    };
-
-    const resetSelection = () => {
-      selectedValue = opts[0]?.v ?? '';
-      triggerText.textContent = opts[0]?.l ?? '—';
-      onChange(selectedValue);
-      closeDropdown();
-    };
-
-    const openDropdown = () => {
-      if (isOpen) { closeDropdown(); return; }
-      isOpen = true;
-
-      dropdown = wrapper.createDiv('finance-custom-select-dropdown');
-
-      const searchInput = dropdown.createEl('input', {
-        type: 'text',
-        cls: 'finance-custom-select-search',
-        placeholder: this.tr.searchPlaceholder,
-      });
-
-      const list = dropdown.createDiv('finance-custom-select-options');
-
-      let filteredOpts = opts;
-
-      const renderOpts = () => {
-        list.empty();
-        filteredOpts.forEach(o => {
-          const item = list.createDiv({ cls: `finance-custom-select-item${o.v === selectedValue ? ' selected' : ''}` });
-          item.textContent = o.l;
-          item.addEventListener('mousedown', (e) => {
-            e.preventDefault();
-            selectedValue = o.v;
-            triggerText.textContent = o.l;
-            onChange(o.v);
-            closeDropdown();
-          });
-        });
-      };
-
-      searchInput.addEventListener('input', () => {
-        if (searchDebounce) clearTimeout(searchDebounce);
-        searchDebounce = setTimeout(() => {
-          const sq = searchInput.value.toLowerCase();
-          filteredOpts = opts.filter(o => o.l.toLowerCase().includes(sq));
-          renderOpts();
-        }, SEARCH_DEBOUNCE_MS);
-      });
-      searchInput.addEventListener('keydown', (e: KeyboardEvent) => {
-        if (e.key === 'Escape') { resetSelection(); }
-      });
-
-      renderOpts();
-
-      outsideHandler = (e: MouseEvent) => {
-        if (!wrapper.contains(e.target as Node)) closeDropdown();
-      };
-      document.addEventListener('mousedown', outsideHandler);
-    };
-
-    trigger.addEventListener('click', (e) => { e.stopPropagation(); openDropdown(); });
-    trigger.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDropdown(); });
+    if (deposit.note) {
+      block.createEl('div', { text: deposit.note, cls: 'finance-record-note' });
+    }
   }
 
-  private renderDepositFilters(container: HTMLElement): void {
-    const f = this.ctx.state.depositFilter ?? DEFAULT_DEPOSIT_FILTER;
-
-
-
-    const row1 = container.createDiv('finance-filters-row');
-
-    const sg = row1.createDiv('finance-filter-group finance-filter-search');
-    sg.createEl('label', { text: this.tr.search, cls: 'finance-filter-label' });
-    const si = sg.createEl('input', {
-      type: 'text', cls: 'finance-filter-input', placeholder: this.tr.searchByName,
-    });
-    si.value = f.search;
-    si.addEventListener('input', () => {
-      if (this.filterDebounce) clearTimeout(this.filterDebounce);
-      this.filterDebounce = setTimeout(() => {
-        this.ctx.state.depositFilter!.search = si.value;
-        this.resetDepositPage();
-      }, SEARCH_DEBOUNCE_MS);
-    });
-
-    const statusG = row1.createDiv('finance-filter-group');
-    statusG.createEl('label', { text: this.tr.status, cls: 'finance-filter-label' });
-    const statusSel = statusG.createEl('select', { cls: 'finance-filter-select' });
-    [
-      { v: 'all', l: this.tr.all },
-      { v: 'active', l: this.tr.depositActive },
-      { v: 'closed', l: this.tr.depositClosed },
-    ].forEach(({ v, l }) => {
-      const o = statusSel.createEl('option', { text: l });
-      o.value = v;
-      o.selected = v === f.status;
-    });
-    statusSel.addEventListener('change', () => {
-      this.ctx.state.depositFilter!.status = statusSel.value as 'all' | 'active' | 'closed';
-      this.resetDepositPage();
-    });
-
-    const allBanks = this.ctx.data ? [...new Set(this.ctx.data.deposits.map(d => d.bankName).filter(Boolean))] : [];
-    const bankOpts = [{ v: '', l: this.tr.allBanks }, ...allBanks.map(b => ({ v: b, l: b }))];
-    this.mkSearchSelect(row1, this.tr.bankName, bankOpts, f.bankName, (v) => {
-      this.ctx.state.depositFilter!.bankName = v;
-      this.resetDepositPage();
-    });
-
-    const row2 = container.createDiv('finance-filters-row');
-
-    const dfG = row2.createDiv('finance-filter-group');
-    dfG.createEl('label', { text: this.tr.from, cls: 'finance-filter-label' });
-    const dfI = dfG.createEl('input', { type: 'date', cls: 'finance-filter-input' });
-    dfI.value = f.dateFrom;
-    dfI.addEventListener('change', () => {
-      this.ctx.state.depositFilter!.dateFrom = dfI.value;
-      this.resetDepositPage();
-    });
-
-    const dtG = row2.createDiv('finance-filter-group');
-    dtG.createEl('label', { text: this.tr.to, cls: 'finance-filter-label' });
-    const dtI = dtG.createEl('input', { type: 'date', cls: 'finance-filter-input' });
-    dtI.value = f.dateTo;
-    dtI.addEventListener('change', () => {
-      this.ctx.state.depositFilter!.dateTo = dtI.value;
-      this.resetDepositPage();
-    });
-
-    const typeG = row2.createDiv('finance-filter-group');
-    typeG.createEl('label', { text: this.tr.type, cls: 'finance-filter-label' });
-    const typeSel = typeG.createEl('select', { cls: 'finance-filter-select' });
-    [
-      { v: 'all', l: this.tr.allDepositTypes },
-      { v: 'term', l: this.tr.depositTypeTerm },
-      { v: 'demand', l: this.tr.depositTypeDemand },
-      { v: 'savings', l: this.tr.depositTypeSavings },
-    ].forEach(({ v, l }) => {
-      const o = typeSel.createEl('option', { text: l });
-      o.value = v;
-      o.selected = v === f.type;
-    });
-    typeSel.addEventListener('change', () => {
-      this.ctx.state.depositFilter!.type = typeSel.value as 'all' | 'term' | 'demand' | 'savings';
-      this.resetDepositPage();
-    });
-
-    const rG = row2.createDiv('finance-filter-group finance-filter-reset');
-    rG.createEl('label', { text: '\u00A0', cls: 'finance-filter-label' });
-    rG.createEl('button', { text: this.tr.reset, cls: 'finance-reset-btn' })
-      .addEventListener('click', () => {
-        this.ctx.state.depositFilter = { ...DEFAULT_DEPOSIT_FILTER };
-        this.resetDepositPage();
-      });
-
-    const sortRow = container.createDiv('finance-sort-row');
-    sortRow.createEl('span', { text: this.tr.sortBy, cls: 'finance-sort-label' });
-
-    const sortFields: { field: DepositSortField; label: string }[] = [
-      { field: 'createdAt', label: this.tr.sortAdded },
-      { field: 'date', label: this.tr.startDate },
-      { field: 'amount', label: this.tr.sum },
-      { field: 'bankName', label: this.tr.bankName },
-    ];
-    const s = this.ctx.state.depositSort ?? { field: 'createdAt' as DepositSortField, dir: 'desc' };
-    sortFields.forEach(({ field, label }) => {
-      const active = s.field === field;
-      const btn = sortRow.createEl('button', {
-        cls: `finance-sort-btn${active ? ' active' : ''}`,
-        text: label + (active ? (s.dir === 'asc' ? ' ↑' : ' ↓') : ''),
-      });
-      btn.addEventListener('click', () => {
-        this.ctx.state.depositSort = s.field === field
-          ? { field, dir: s.dir === 'asc' ? 'desc' : 'asc' }
-          : { field, dir: 'desc' };
-        this.ctx.saveState();
-        this.render();
-      });
-    });
-  }
-
-  private renderDepositsView(body: HTMLElement): void {
-    const allDeposits = this.ctx.data?.deposits ?? [];
-
-    this.ctx.state.depositFilter ??= { ...DEFAULT_DEPOSIT_FILTER };
-
-    const filteredDeposits = this.getFilteredDeposits();
-
-    this.ctx.renderRecordsStats(body);
-
-    const summary = body.createDiv('finance-stats-container');
-    summary.style.setProperty('grid-template-columns', 'repeat(2,1fr)', 'important');
-    const activeDeposits = allDeposits.filter(d => d.status === 'active');
-    const closedDeposits = allDeposits.filter(d => d.status === 'closed');
-
-    const activeAmount = activeDeposits.reduce((s, d) => s + d.amount, 0);
-    const activeProfit = activeDeposits.reduce((s, d) => s + this.getDepositProfit(d), 0);
-    const closedAmount = closedDeposits.reduce((s, d) => s + d.amount, 0);
-    const closedProfit = closedDeposits.reduce((s, d) => s + this.getDepositProfit(d), 0);
-
-    const mkDepositCard = (title: string, icon: string, amount: number, profit: number, count: number, isActive: boolean) => {
-      const card = summary.createDiv(`finance-stat-card finance-stat-${isActive ? 'deposit-active' : 'deposit-closed'}`);
-      const header = card.createDiv('finance-debt-summary-header');
-      header.createEl('span', { text: icon, cls: 'finance-debt-summary-icon' });
-      header.createEl('span', { text: title, cls: 'finance-debt-summary-title' });
-
-      const content = card.createDiv('finance-debt-summary-content');
-      content.createEl('div', {
-        text: amount > 0 ? this.ctx.fmt(amount) : '—',
-        cls: 'finance-debt-summary-main',
-      });
-      const countLabel = count === 1 ? this.tr.depositCount_one : count < PLURAL_THRESHOLD ? this.tr.depositCount_few : this.tr.depositCount_many;
-      const subText = profit > 0
-        ? `${count} ${countLabel} · ${this.tr.profitLabel}: ${this.ctx.fmt(profit)}`
-        : `${count} ${countLabel}`;
-      content.createEl('div', {
-        text: subText,
-        cls: 'finance-debt-summary-sub',
-      });
-    };
-
-    mkDepositCard(this.tr.activeCards, '💰', activeAmount, activeProfit, activeDeposits.length, true);
-    mkDepositCard(this.tr.closedCards, '✅', closedAmount, closedProfit, closedDeposits.length, false);
-
-    const toolbar = body.createDiv('finance-debt-toolbar');
-    const newDepositBtn = toolbar.createEl('button', { cls: 'finance-add-btn finance-accent-btn' });
-    newDepositBtn.innerHTML = '<span class="btn-icon">＋</span><span>' + this.tr.newDeposit + '</span>';
-    newDepositBtn.addEventListener('click', () => this.openNewDepositModal());
-
-    const filtBtn = toolbar.createEl('button', { cls: 'finance-analytics-toggle-btn' });
-    const updateFiltBtn = () => {
-      filtBtn.textContent = `🔍 ${this.tr.filters} ${this.filtersOpen ? '▲' : '▼'}`;
-      filtBtn.classList.toggle('active', this.filtersOpen);
-    };
-    updateFiltBtn();
-    filtBtn.addEventListener('click', () => {
-      this.filtersOpen = !this.filtersOpen;
-      this.render();
-    });
-
-    const container = body.createDiv('finance-filters-container');
-    container.style.display = this.filtersOpen ? 'block' : 'none';
-    if (this.filtersOpen) {
-      this.renderDepositFilters(container);
-    }
-
-    if (!allDeposits.length) {
-      const e = body.createDiv('finance-empty-state');
-      e.createEl('div', { text: '📈', cls: 'finance-empty-icon' });
-      e.createEl('p', { text: this.tr.noDeposits, cls: 'finance-empty-title' });
-      e.createEl('p', { text: this.tr.addNewDebt, cls: 'finance-empty-sub' });
-      return;
-    }
-
-    if (!filteredDeposits.length) {
-      const e = body.createDiv('finance-empty-state');
-      e.createEl('div', { text: '🔍', cls: 'finance-empty-icon' });
-      e.createEl('p', { text: this.tr.noDepositsFiltered, cls: 'finance-empty-title' });
-      e.createEl('p', { text: this.tr.tryChangeFilters, cls: 'finance-empty-sub' });
-      return;
-    }
-
-    const tw = body.createDiv('finance-table-wrapper');
-    this.renderDepositsList(tw, filteredDeposits);
-  }
-
-  private renderDepositsList(wrapper: HTMLElement, filteredDeposits: DepositRecord[]): void {
-    wrapper.empty();
-    this.depositPaginationEl = undefined;
-
-    const container = wrapper.createDiv('finance-table-container');
-    this.depositPaginationEl = wrapper.createDiv('finance-pagination');
-
-    const pageSize = this.ctx.state.pageSize || this.ctx.settings.defaultPageSize;
-    const totalPages = Math.max(1, Math.ceil(filteredDeposits.length / pageSize));
-    const page = Math.max(0, Math.min(this.ctx.state.depositPage ?? 0, totalPages - 1));
-    this.ctx.state.depositPage = page;
-    const start = page * pageSize;
-    const pageDeposits = filteredDeposits.slice(start, start + pageSize);
-
-    if (!pageDeposits.length) {
-      const e = container.createDiv('finance-empty-state');
-      e.createEl('div', { text: '📊', cls: 'finance-empty-icon' });
-      e.createEl('p', { text: this.tr.noRecordsPage, cls: 'finance-empty-title' });
-      return;
-    }
-
-    const infoBar = container.createDiv('finance-table-info-bar');
-    const metaLeft = infoBar.createDiv('finance-table-meta');
-    metaLeft.createEl('span', {
-      text: `${start + 1}–${Math.min(start + pageSize, filteredDeposits.length)} ${this.tr.fromLower} ${filteredDeposits.length}`,
-      cls: 'finance-count-text',
-    });
-
-    const allDepositCols: { key: string; label: string }[] = [
-      { key: 'name',      label: this.tr.name },
-      { key: 'bank',      label: this.tr.bankName },
-      { key: 'type',      label: this.tr.type },
-      { key: 'amount',    label: this.tr.sum },
-      { key: 'profit',    label: this.tr.depositAccruals },
-      { key: 'rate',      label: this.tr.rate },
-      { key: 'date',      label: this.tr.opened },
-      { key: 'endDate',   label: this.tr.endDate },
-      { key: '_act',      label: '' },
-    ];
-
-    this.ctx.state.depositsColumns ??= {};
-
-    const visDepositCols = allDepositCols.filter(c => c.key === '_act' || this.ctx.state.depositsColumns![c.key] !== false);
-
-    if (!this.ctx.isMobile) {
-      const depositColVisCols = allDepositCols.filter(c => c.key !== '_act');
-      const gearBtn = infoBar.createEl('button', { cls: 'finance-colvis-btn', text: '⚙️' });
-      gearBtn.title = this.tr.columnSettings;
-      gearBtn.addEventListener('click', () => {
-        new ColumnVisibilityModal(this.ctx.app, {
-          columns: depositColVisCols,
-          visibility: { ...this.ctx.state.depositsColumns! },
-          accentColor: this.ctx.data?.accentColor,
-          onSave: (updated) => {
-            this.ctx.state.depositsColumns = updated;
-            this.ctx.saveState();
-            this.render();
-          },
-        }).open();
-      });
-    }
-
-    if (this.ctx.isMobile) {
-      this.renderDepositsAsBlocks(container, pageDeposits);
-    } else {
-      this.renderDepositsAsTable(container, pageDeposits, visDepositCols);
-    }
-
-    if (totalPages > 1) this.renderPaginationDeposits(totalPages, page);
-  }
+  // ── Accruals panel (expandable) ──────────────────────────────────────────
 
   private renderDepositAccrualsPanel(parent: HTMLElement, deposit: DepositRecord): void {
-    const wrapper = parent.createDiv();
-    wrapper.style.padding = '12px';
+    const wrapper = parent.createDiv('finance-payments-panel');
     const today = getTodayStr();
 
-    const startDate = deposit.startDate ? new Date(deposit.startDate) : null;
     const endDate = this.calculateDepositEndDate(deposit);
-    const endDateObj = endDate ? new Date(endDate) : null;
-
-    if (startDate && endDateObj && startDate.getTime() < endDateObj.getTime()) {
-      const totalDuration = endDateObj.getTime() - startDate.getTime();
-      const elapsed = Date.now() - startDate.getTime();
-      const progress = Math.min(100, Math.max(0, (elapsed / totalDuration) * 100));
+    if (deposit.startDate && endDate && deposit.startDate < endDate) {
+      const totalDays = daysBetweenStr(deposit.startDate, endDate);
+      const elapsedDays = daysBetweenStr(deposit.startDate, today);
+      const progress = Math.min(PERCENT_100, Math.max(0, (elapsedDays / totalDays) * PERCENT_100));
 
       const progressWrap = wrapper.createDiv('finance-deposit-progress');
-      progressWrap.style.maxWidth = '400px';
-      progressWrap.style.margin = '0 auto 16px';
-
       const progressLabel = progressWrap.createDiv('finance-deposit-progress-label');
-      progressLabel.style.textAlign = 'center';
-      progressLabel.style.fontSize = '12px';
-      progressLabel.style.color = '#6b7280';
-      progressLabel.style.marginBottom = '6px';
-
-      const startStr = this.ctx.fmtDate(deposit.startDate);
-      const endStr = this.ctx.fmtDate(endDate);
-      progressLabel.textContent = `${startStr} → ${endStr} (${Math.round(progress)}%)`;
+      progressLabel.textContent = `${this.ctx.fmtDate(deposit.startDate)} → ${this.ctx.fmtDate(endDate)} (${Math.round(progress)}%)`;
 
       const progressBar = progressWrap.createDiv('finance-deposit-progress-bar');
-      progressBar.style.height = '8px';
-      progressBar.style.borderRadius = '4px';
-      progressBar.style.background = '#e5e7eb';
-      progressBar.style.overflow = 'hidden';
-
       const progressFill = progressBar.createDiv('finance-deposit-progress-fill');
-      progressFill.style.height = '100%';
-      progressFill.style.width = `${progress}%`;
-      progressFill.style.borderRadius = '4px';
-      progressFill.style.background = progress >= 100 ? '#22c55e' : 'var(--ft-accent)';
-      progressFill.style.transition = 'width 0.3s ease';
+      progressFill.style.setProperty('--ft-progress', `${progress}%`);
+      if (progress >= PERCENT_100) progressFill.addClass('is-complete');
     }
 
-    const topUps = deposit.topUps || [];
-    if (topUps.length > 0) {
-      const topUpsHeader = wrapper.createEl('h4', { text: this.tr.topUpsHeader, cls: 'finance-section-title' });
-      topUpsHeader.style.margin = '0 0 8px';
-      topUpsHeader.style.fontSize = '13px';
-      topUpsHeader.style.color = '#6b7280';
-
-      const topUpsTable = wrapper.createEl('table', { cls: 'finance-mov-table' });
-      const topUpsHead = topUpsTable.createEl('thead').createEl('tr');
+    const renderMovementList = <M extends { date: string; time: string; amount: number; note: string; id: string }>(
+      title: string, items: M[], sign: '+' | '−', movCls: string, totalLabel: string,
+      onDelete: (item: M) => void,
+    ) => {
+      if (!items.length) return;
+      wrapper.createEl('h4', { text: title, cls: 'finance-section-title' });
+      const table = wrapper.createEl('table', { cls: 'finance-mov-table' });
+      const head = table.createEl('thead').createEl('tr');
       [this.tr.date, this.tr.sum, this.tr.note, ''].forEach(l => {
-        topUpsHead.createEl('th', { text: l, cls: 'finance-th finance-mov-th' });
+        head.createEl('th', { text: l, cls: 'finance-th finance-mov-th' });
       });
-      const topUpsBody = topUpsTable.createEl('tbody');
-
-      topUps.slice().reverse().forEach(tu => {
-        const tr = topUpsBody.createEl('tr');
-        tr.createEl('td', { text: this.ctx.fmtDate(tu.date, tu.time), cls: 'finance-td' });
-        tr.createEl('td', { text: '+' + this.ctx.fmt(tu.amount), cls: 'finance-td finance-td-mov-repay' });
-        tr.createEl('td', { text: tu.note || '—', cls: 'finance-td' });
+      const body = table.createEl('tbody');
+      items.slice().reverse().forEach(item => {
+        const tr = body.createEl('tr');
+        tr.createEl('td', { text: this.ctx.fmtDate(item.date, item.time), cls: 'finance-td' });
+        tr.createEl('td', { text: sign + this.ctx.fmt(item.amount), cls: `finance-td ${movCls}` });
+        tr.createEl('td', { text: item.note || '—', cls: 'finance-td' });
         const actTd = tr.createEl('td', { cls: 'finance-td' });
-        this.mkActionBtn(actTd, '🗑️', this.tr.delete, () => this.confirmDeleteDepositTopUp(deposit, tu), 'finance-delete-btn');
+        const btn = actTd.createEl('button', { cls: 'finance-action-btn finance-delete-btn', text: '🗑️' });
+        btn.title = this.tr.delete;
+        btn.addEventListener('click', () => onDelete(item));
       });
-
-      const totalTopUps = topUps.reduce((s, t) => s + t.amount, 0);
-      const topUpsSummary = wrapper.createDiv('finance-deposit-summary');
-      topUpsSummary.style.margin = '8px 0 16px';
-      topUpsSummary.style.fontSize = '13px';
-      topUpsSummary.style.color = '#6b7280';
-      topUpsSummary.textContent = `${this.tr.totalTopUps}: ${topUps.length} · ${this.ctx.fmt(totalTopUps)}`;
-    }
-
-    const withdrawals = deposit.withdrawals || [];
-    if (withdrawals.length > 0) {
-      const withdrawalsHeader = wrapper.createEl('h4', { text: this.tr.withdrawalsHeader, cls: 'finance-section-title' });
-      withdrawalsHeader.style.margin = '0 0 8px';
-      withdrawalsHeader.style.fontSize = '13px';
-      withdrawalsHeader.style.color = '#6b7280';
-
-      const withdrawalsTable = wrapper.createEl('table', { cls: 'finance-mov-table' });
-      const withdrawalsHead = withdrawalsTable.createEl('thead').createEl('tr');
-      [this.tr.date, this.tr.sum, this.tr.note, ''].forEach(l => {
-        withdrawalsHead.createEl('th', { text: l, cls: 'finance-th finance-mov-th' });
+      wrapper.createDiv({
+        cls: 'finance-deposit-summary',
+        text: `${totalLabel}: ${items.length} · ${this.ctx.fmt(sumMoney(items.map(i => i.amount)))}`,
       });
-      const withdrawalsBody = withdrawalsTable.createEl('tbody');
+    };
 
-      withdrawals.slice().reverse().forEach(w => {
-        const tr = withdrawalsBody.createEl('tr');
-        tr.createEl('td', { text: this.ctx.fmtDate(w.date, w.time), cls: 'finance-td' });
-        tr.createEl('td', { text: '−' + this.ctx.fmt(w.amount), cls: 'finance-td finance-td-mov-borrow' });
-        tr.createEl('td', { text: w.note || '—', cls: 'finance-td' });
-        const actTd = tr.createEl('td', { cls: 'finance-td' });
-        this.mkActionBtn(actTd, '🗑️', this.tr.delete, () => this.confirmDeleteDepositWithdrawal(deposit, w), 'finance-delete-btn');
-      });
-
-      const totalWithdrawals = withdrawals.reduce((s, w) => s + w.amount, 0);
-      const withdrawalsSummary = wrapper.createDiv('finance-deposit-summary');
-      withdrawalsSummary.style.margin = '8px 0 16px';
-      withdrawalsSummary.style.fontSize = '13px';
-      withdrawalsSummary.style.color = '#6b7280';
-      withdrawalsSummary.textContent = `${this.tr.totalWithdrawals}: ${withdrawals.length} · ${this.ctx.fmt(totalWithdrawals)}`;
-    }
+    renderMovementList(this.tr.topUpsHeader, deposit.topUps, '+', 'finance-td-mov-repay',
+      this.tr.totalTopUps, tu => this.confirmDeleteDepositTopUp(deposit, tu));
+    renderMovementList(this.tr.withdrawalsHeader, deposit.withdrawals, '−', 'finance-td-mov-borrow',
+      this.tr.totalWithdrawals, w => this.confirmDeleteDepositWithdrawal(deposit, w));
 
     const accrued = this.getDepositAccrued(deposit);
     if (accrued > 0) {
-      const incomeLabel = wrapper.createDiv('finance-deposit-summary');
-      incomeLabel.style.margin = '0 0 12px';
-      incomeLabel.style.fontSize = '13px';
-      incomeLabel.style.fontWeight = '600';
-      incomeLabel.style.color = '#16a34a';
-      incomeLabel.textContent = `${this.tr.accruedIncome}: ${this.ctx.fmt(accrued)}`;
+      wrapper.createDiv({
+        cls: 'finance-deposit-summary finance-deposit-accrued',
+        text: `${this.tr.accruedIncome}: ${this.ctx.fmt(accrued)}`,
+      });
     }
 
-    const accrualsHeader = wrapper.createEl('h4', { text: this.tr.accrualsHeader, cls: 'finance-section-title' });
-    accrualsHeader.style.margin = '0 0 8px';
-    accrualsHeader.style.fontSize = '13px';
-    accrualsHeader.style.color = '#6b7280';
+    wrapper.createEl('h4', { text: this.tr.accrualsHeader, cls: 'finance-section-title' });
 
     if (!deposit.accruals.length) {
       wrapper.createEl('p', { text: this.tr.noScheduledAccruals, cls: 'finance-empty-text' });
       return;
     }
 
-    const ACCRUAL_PAGE_SIZE = 20;
-    const totalAccruals = deposit.accruals.length;
-    const totalPages = Math.max(1, Math.ceil(totalAccruals / ACCRUAL_PAGE_SIZE));
-    const page = 0;
-    const start = page * ACCRUAL_PAGE_SIZE;
-    const pageAccruals = deposit.accruals.slice(start, start + ACCRUAL_PAGE_SIZE);
+    const totalPages = Math.max(1, Math.ceil(deposit.accruals.length / DEPOSIT_ACCRUAL_PAGE_SIZE));
+    let page = this.depositAccrualPages.get(deposit.id);
+    if (page === undefined) {
+      const lastPaidIdx = deposit.accruals.findLastIndex(a => a.status === 'paid');
+      page = lastPaidIdx >= 0 ? Math.floor(lastPaidIdx / DEPOSIT_ACCRUAL_PAGE_SIZE) : 0;
+    }
+    page = Math.max(0, Math.min(page, totalPages - 1));
+    this.depositAccrualPages.set(deposit.id, page);
+    const start = page * DEPOSIT_ACCRUAL_PAGE_SIZE;
+    const pageAccruals = deposit.accruals.slice(start, start + DEPOSIT_ACCRUAL_PAGE_SIZE);
 
-    const scrollWrapper = wrapper.createDiv({ cls: 'finance-mov-scroll' });
+    const scrollWrapper = wrapper.createDiv('finance-mov-scroll');
     const movTable = scrollWrapper.createEl('table', { cls: 'finance-mov-table' });
     const movHead = movTable.createEl('thead').createEl('tr');
     ['#', this.tr.date, this.tr.sum, this.tr.status].forEach(l => {
@@ -611,262 +405,45 @@ export class DepositsTab {
 
     pageAccruals.forEach((a, idx) => {
       const isPaid = a.status === 'paid' || a.dueDate <= today;
-      const bgColor = isPaid ? 'rgba(34, 197, 94, 0.08)' : '';
-      const textColor = isPaid ? '#16a34a' : '';
-      const mr = movBody.createEl('tr');
-
-      const rowNum = start + idx + 1;
-      const td1 = mr.createEl('td', { text: String(rowNum), cls: 'finance-td' });
-      td1.style.background = bgColor;
-      td1.style.color = textColor;
-
-      const td2 = mr.createEl('td', { text: this.ctx.fmtDate(a.dueDate, a.paidDate), cls: 'finance-td' });
-      td2.style.background = bgColor;
-      td2.style.color = textColor;
-
-      const td3 = mr.createEl('td', {
-        text: this.ctx.fmt(a.amount),
-        cls: 'finance-td',
-      });
-      td3.style.background = bgColor;
-      td3.style.color = textColor;
-
-      const statusCell = mr.createEl('td', { cls: 'finance-td' });
-      statusCell.style.background = bgColor;
-      if (isPaid) {
-        const isCapitalization = deposit.accrualType === 'capitalization';
-        statusCell.textContent = isCapitalization ? this.tr.accrualIncluded : this.tr.accrualPaidToAccount;
-        statusCell.style.color = '#16a34a';
-      } else {
-        statusCell.textContent = this.tr.pendingStatus;
-        statusCell.style.color = '#6b7280';
-      }
+      const mr = movBody.createEl('tr', { cls: isPaid ? 'finance-payment-paid' : 'finance-payment-pending' });
+      mr.createEl('td', { text: String(start + idx + 1), cls: 'finance-td' });
+      mr.createEl('td', { text: this.ctx.fmtDate(a.dueDate, a.paidDate), cls: 'finance-td' });
+      mr.createEl('td', { text: this.ctx.fmt(a.amount), cls: 'finance-td' });
+      const statusText = isPaid
+        ? (deposit.accrualType === 'capitalization' ? this.tr.accrualIncluded : this.tr.accrualPaidToAccount)
+        : this.tr.pendingStatus;
+      mr.createEl('td', { text: statusText, cls: 'finance-td finance-payment-status' });
     });
 
     if (totalPages > 1) {
-      const pagInfo = wrapper.createDiv('finance-deposit-pag-info');
-      pagInfo.style.textAlign = 'center';
-      pagInfo.style.marginTop = '8px';
-      pagInfo.style.fontSize = '12px';
-      pagInfo.style.color = '#6b7280';
-      pagInfo.textContent = `${start + 1}–${Math.min(start + ACCRUAL_PAGE_SIZE, totalAccruals)} ${this.tr.fromLower} ${totalAccruals}`;
+      const pagNav = wrapper.createDiv('finance-pagination-nav finance-panel-pagination');
+      const go = (newPage: number) => {
+        this.depositAccrualPages.set(deposit.id, newPage);
+        parent.empty();
+        this.renderDepositAccrualsPanel(parent, deposit);
+      };
+
+      const prev = pagNav.createEl('button', { cls: 'finance-page-btn', text: '←' });
+      prev.disabled = page === 0;
+      prev.addEventListener('click', () => go(page - 1));
+
+      this.accrualPageRange(page, totalPages).forEach(p => {
+        if (p === -1) { pagNav.createEl('span', { text: '…', cls: 'finance-page-ellipsis' }); return; }
+        const btn = pagNav.createEl('button', {
+          text: String(p + 1),
+          cls: `finance-page-btn${p === page ? ' active' : ''}`,
+        });
+        btn.addEventListener('click', () => go(p));
+      });
+
+      const next = pagNav.createEl('button', { cls: 'finance-page-btn', text: '→' });
+      next.disabled = page >= totalPages - 1;
+      next.addEventListener('click', () => go(page + 1));
     }
   }
 
-  private renderDepositsAsBlocks(container: HTMLElement, pageDeposits: DepositRecord[]): void {
-    const list = container.createDiv('finance-records-list');
-    const frag = document.createDocumentFragment();
-
-    pageDeposits.forEach(deposit => {
-      const block = document.createElement('div');
-      block.classList.add('finance-record-block');
-      if (deposit.status === 'active') {
-        block.classList.add('finance-row-income');
-      } else {
-        block.classList.add('finance-row-expense');
-      }
-
-      const header = block.createDiv('finance-record-header');
-      const amountText = '+' + this.ctx.fmt(deposit.amount);
-      header.createEl('span', {
-        text: amountText,
-        cls: 'finance-record-amount finance-amount-income',
-      });
-      const typeLabel = deposit.type === 'term' ? this.tr.depositTypeTerm : deposit.type === 'demand' ? this.tr.depositTypeDemand : this.tr.depositTypeSavings;
-      header.createEl('span', { text: `${deposit.bankName} · ${typeLabel}`, cls: 'finance-record-date' });
-
-      const details = block.createDiv('finance-record-details');
-      details.createEl('span', { text: `📊 ${deposit.interestRate}${this.tr.percentPerAnnum}`, cls: 'finance-record-detail' });
-      const profit = this.getDepositProfit(deposit);
-      if (profit > 0) {
-        details.createEl('span', { text: `💰 ${this.tr.depositAccruals}: ${this.ctx.fmt(profit)}`, cls: 'finance-record-detail' });
-      }
-      const endDate = this.calculateDepositEndDate(deposit);
-      if (endDate && deposit.status === 'active') {
-        details.createEl('span', { text: `${this.tr.dueBy} ${this.ctx.fmtDate(endDate)}`, cls: 'finance-record-detail' });
-      }
-
-      if (deposit.note) {
-        block.createEl('div', { text: deposit.note, cls: 'finance-record-note' });
-      }
-
-      const historyToggle = block.createEl('button', {
-        cls: 'finance-debt-history-toggle',
-        text: `📋 ${this.tr.depositAccruals} (${deposit.accruals.length}) ▼`,
-      });
-      const historyWrap = block.createDiv('finance-debt-history-panel');
-      this.renderDepositAccrualsPanel(historyWrap, deposit);
-
-      historyToggle.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const open = !historyWrap.hasClass('finance-debt-history-open');
-        historyWrap.toggleClass('finance-debt-history-open', open);
-        block.toggleClass('finance-debt-block-expanded', open);
-        historyToggle.textContent = open
-          ? `📋 ${this.tr.depositAccruals} (${deposit.accruals.length}) ▲`
-          : `📋 ${this.tr.depositAccruals} (${deposit.accruals.length}) ▼`;
-      });
-
-      const actions = block.createDiv('finance-record-actions');
-      if (deposit.status === 'active') {
-        this.mkActionBtn(actions, '💰', this.tr.topUp, () => this.openDepositTopUpModal(deposit));
-        this.mkActionBtn(actions, '📤', this.tr.withdraw, () => this.openDepositWithdrawalModal(deposit));
-        this.mkActionBtn(actions, '✅', this.tr.closeAccount, () => this.confirmCloseDeposit(deposit));
-      }
-      this.mkActionBtn(actions, '✏️', this.tr.edit, () => this.openEditDepositModal(deposit));
-      this.mkActionBtn(actions, '🗑️', this.tr.delete, () => this.confirmDeleteDeposit(deposit), 'finance-delete-btn');
-
-      frag.appendChild(block);
-    });
-
-    list.appendChild(frag);
-  }
-
-  private renderDepositsAsTable(container: HTMLElement, pageDeposits: DepositRecord[], cols: { key: string; label: string }[]): void {
-    const scroll = container.createDiv('finance-table-scroll');
-    const table = scroll.createEl('table', { cls: 'finance-table' });
-
-    const hRow = table.createEl('thead').createEl('tr');
-    cols.forEach(c => hRow.createEl('th', { text: c.label, cls: 'finance-th' }));
-
-    const tbody = table.createEl('tbody');
-    const frag = document.createDocumentFragment();
-
-    const dataCols = cols.filter(c => c.key !== '_act');
-
-    pageDeposits.forEach(deposit => {
-      const tr = document.createElement('tr');
-      tr.classList.add('finance-tr');
-      if (deposit.status === 'active') {
-        tr.classList.add('finance-row-income');
-      } else {
-        tr.classList.add('finance-row-expense');
-      }
-
-      const typeLabel = deposit.type === 'term' ? this.tr.depositTypeTerm : deposit.type === 'demand' ? this.tr.depositTypeDemand : this.tr.depositTypeSavings;
-      const profit = this.getDepositProfit(deposit);
-      const endDate = this.calculateDepositEndDate(deposit);
-      const endDateText = endDate ? this.ctx.fmtDate(endDate) : '—';
-
-      dataCols.forEach(c => {
-        let text = '';
-        let cls = '';
-        switch (c.key) {
-          case 'name':
-            text = deposit.name || '—';
-            break;
-          case 'bank':
-            text = deposit.bankName || '—';
-            break;
-          case 'type':
-            text = typeLabel;
-            break;
-          case 'amount':
-            text = this.ctx.fmt(deposit.amount);
-            cls = 'finance-amount-cell';
-            break;
-          case 'profit':
-            text = profit > 0 ? this.ctx.fmt(profit) : '—';
-            cls = profit > 0 ? 'finance-amount-cell finance-amount-income' : 'finance-amount-cell';
-            break;
-          case 'rate':
-            text = `${deposit.interestRate}%`;
-            break;
-          case 'date':
-            text = this.ctx.fmtDate(deposit.startDate);
-            break;
-          case 'endDate':
-            text = endDateText;
-            cls = endDate ? 'finance-due-date' : '';
-            break;
-        }
-        const td = document.createElement('td');
-        td.classList.add('finance-td');
-        if (cls) cls.split(' ').forEach(x => td.classList.add(x));
-        td.setAttribute('data-label', c.label);
-        td.textContent = text;
-        tr.appendChild(td);
-      });
-
-      if (cols.find(c => c.key === '_act')) {
-        const atd = document.createElement('td');
-        atd.classList.add('finance-td', 'finance-actions-td');
-        atd.setAttribute('data-label', '');
-
-        const actionsWrap = document.createElement('div');
-        actionsWrap.style.display = 'flex';
-        actionsWrap.style.gap = '2px';
-        actionsWrap.style.justifyContent = 'flex-end';
-        actionsWrap.style.alignItems = 'center';
-
-        if (deposit.status === 'active') {
-          this.mkActionBtn(actionsWrap, '💰', this.tr.topUp, () => this.openDepositTopUpModal(deposit));
-          this.mkActionBtn(actionsWrap, '📤', this.tr.withdraw, () => this.openDepositWithdrawalModal(deposit));
-          this.mkActionBtn(actionsWrap, '✅', this.tr.closeAccount, () => this.confirmCloseDeposit(deposit));
-        }
-        this.mkActionBtn(actionsWrap, '✏️', this.tr.edit, () => this.openEditDepositModal(deposit));
-        this.mkActionBtn(actionsWrap, '🗑️', this.tr.delete, () => this.confirmDeleteDeposit(deposit), 'finance-delete-btn');
-
-        atd.appendChild(actionsWrap);
-        tr.appendChild(atd);
-      }
-
-      const expandRow = document.createElement('tr');
-      expandRow.classList.add('finance-debt-expand-row');
-      const expandTd = document.createElement('td');
-      expandTd.setAttribute('colspan', String(cols.length));
-      expandTd.classList.add('finance-debt-expand-td');
-      this.renderDepositAccrualsPanel(expandTd, deposit);
-
-      expandRow.appendChild(expandTd);
-      expandRow.style.display = 'none';
-
-      tr.style.cursor = 'pointer';
-      tr.addEventListener('click', (e) => {
-        if ((e.target as HTMLElement).closest('.finance-action-btn')) return;
-        const open = expandRow.style.display === 'none';
-        expandRow.style.display = open ? 'table-row' : 'none';
-        tr.classList.toggle('finance-debt-row-expanded', open);
-        expandRow.classList.toggle('finance-debt-expand-open', open);
-      });
-
-      frag.appendChild(tr);
-      frag.appendChild(expandRow);
-    });
-
-    tbody.appendChild(frag);
-  }
-
-  private renderPaginationDeposits(totalPages: number, current: number): void {
-    if (!this.depositPaginationEl) return;
-    const nav = this.depositPaginationEl.createDiv('finance-pagination-nav');
-
-    const go = (page: number) => {
-      this.ctx.state.depositPage = page;
-      this.ctx.saveState();
-      this.render();
-    };
-
-    const prev = nav.createEl('button', { cls: 'finance-page-btn', text: '←' });
-    prev.disabled = current === 0;
-    prev.addEventListener('click', () => go(current - 1));
-
-    this.pageRange(current, totalPages).forEach(p => {
-      if (p === -1) { nav.createEl('span', { text: '…', cls: 'finance-page-ellipsis' }); return; }
-      const btn = nav.createEl('button', {
-        text: String(p + 1),
-        cls:  `finance-page-btn${p === current ? ' active' : ''}`,
-      });
-      btn.addEventListener('click', () => go(p));
-    });
-
-    const next = nav.createEl('button', { cls: 'finance-page-btn', text: '→' });
-    next.disabled = current >= totalPages - 1;
-    next.addEventListener('click', () => go(current + 1));
-  }
-
-  private pageRange(cur: number, total: number): number[] {
-    if (total <= PAGE_RANGE_THRESHOLD) return Array.from({ length: total }, (_, i) => i);
+  private accrualPageRange(cur: number, total: number): number[] {
+    if (total <= 7) return Array.from({ length: total }, (_, i) => i);
     const radius = this.ctx.isMobile ? 1 : 3;
     const p: number[] = [0];
     if (cur > radius + 1) p.push(-1);
@@ -876,6 +453,8 @@ export class DepositsTab {
     return p;
   }
 
+  // ── Modals ──────────────────────────────────────────────────────────────
+
   private openNewDepositModal(): void {
     if (!this.ctx.data) { new Notice(this.tr.loading); return; }
     const allBanks = this.ctx.data.deposits.map(d => d.bankName).filter(Boolean);
@@ -883,29 +462,26 @@ export class DepositsTab {
       title: this.tr.newDeposit,
       banks: allBanks,
       onSave: async (deposit, interestRecords) => {
-        await this.ctx.storage.addDeposit(this.ctx.notePath, deposit);
+        await this.ctx.storage.addDeposit(this.ctx.accountId, deposit);
         for (const r of interestRecords) {
-          await this.ctx.storage.addRecord(this.ctx.notePath, r);
+          await this.ctx.storage.addRecord(this.ctx.accountId, r);
         }
-        const nowTime = new Date().toTimeString().slice(0, 5);
         const rec: FinanceRecord = {
           id: crypto.randomUUID(),
           createdAt: Date.now(),
           date: deposit.startDate,
-          time: nowTime,
+          time: getTodayTime(),
           type: 'expense',
           amount: deposit.amount,
-          category: 'Вклад',
+          category: this.tr.depositDefaultCat,
           tag: '',
           payer: deposit.bankName,
-          note: `Открытие вклада "${deposit.name}"`,
+          note: `${this.tr.depositOpenNote} "${deposit.name}"`,
           attachmentPath: '',
           linkedId: deposit.id,
         };
-        await this.ctx.storage.addRecord(this.ctx.notePath, rec);
-        this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
-        this.onUpdate?.();
-        new Notice(this.tr.depositAdded);
+        await this.ctx.storage.addRecord(this.ctx.accountId, rec);
+        await this.reload(this.tr.depositAdded);
       },
     }).open();
   }
@@ -917,7 +493,7 @@ export class DepositsTab {
       title: this.tr.editRecord,
       deposit,
       banks: allBanks,
-      onSave: async (updated, _interestRecords) => {
+      onSave: async (updated) => {
         const accrualFieldsChanged =
           deposit.amount !== updated.amount ||
           deposit.startDate !== updated.startDate ||
@@ -926,66 +502,38 @@ export class DepositsTab {
           deposit.accrualType !== updated.accrualType;
 
         if (accrualFieldsChanged && updated.status === 'active') {
+          // Terms changed: drop mirrored records and the schedule; auto-transactions rebuild both
           const otherRecords = this.ctx.data!.records.filter(r => r.linkedId !== updated.id);
-
-          const nowTime = new Date().toTimeString().slice(0, 5);
-          const expenseRec: FinanceRecord = {
+          otherRecords.push({
             id: crypto.randomUUID(),
             createdAt: Date.now(),
             date: updated.startDate,
-            time: nowTime,
+            time: getTodayTime(),
             type: 'expense',
             amount: updated.amount,
-            category: 'Вклад',
+            category: this.tr.depositDefaultCat,
             tag: '',
             payer: updated.bankName,
-            note: `Открытие вклада "${updated.name}"`,
+            note: `${this.tr.depositOpenNote} "${updated.name}"`,
             attachmentPath: '',
             linkedId: updated.id,
-          };
-          otherRecords.push(expenseRec);
-
+          });
           updated.accruals = [];
-
-          await this.ctx.storage.saveAllRecords(this.ctx.notePath, otherRecords);
-          await this.ctx.storage.updateDeposit(this.ctx.notePath, updated);
-        } else {
-          await this.ctx.storage.updateDeposit(this.ctx.notePath, updated);
+          await this.ctx.storage.saveAllRecords(this.ctx.accountId, otherRecords);
         }
-
-        this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
-        this.onUpdate?.();
-        new Notice(this.tr.depositUpdated);
+        await this.ctx.storage.updateDeposit(this.ctx.accountId, updated);
+        await this.reload(this.tr.depositUpdated);
       },
     }).open();
   }
 
   private confirmCloseDeposit(deposit: DepositRecord): void {
     const label = `${deposit.name} · ${this.ctx.fmt(deposit.amount)}`;
-    const nowTime = new Date().toTimeString().slice(0, 5);
     new ConfirmModal(this.ctx.app, `${this.tr.confirmCloseDeposit}\n${label}`, async () => {
       deposit.status = 'closed';
-      await this.ctx.storage.updateDeposit(this.ctx.notePath, deposit);
-
-      const refundRec: FinanceRecord = {
-        id: crypto.randomUUID(),
-        createdAt: Date.now(),
-        date: getTodayStr(),
-        time: nowTime,
-        type: 'income',
-        amount: deposit.amount,
-        category: 'Возврат вклада',
-        tag: '',
-        payer: deposit.bankName,
-        note: `Возврат тела вклада "${deposit.name}"`,
-        attachmentPath: '',
-        linkedId: deposit.id,
-      };
-      await this.ctx.storage.addRecord(this.ctx.notePath, refundRec);
-
-      this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
-      this.onUpdate?.();
-      new Notice(this.tr.depositClosed);
+      await this.ctx.storage.updateDeposit(this.ctx.accountId, deposit);
+      await this.ctx.storage.addRecord(this.ctx.accountId, this.refundRecord(deposit));
+      await this.reload(this.tr.depositClosed);
     }).open();
   }
 
@@ -995,32 +543,15 @@ export class DepositsTab {
       ? `\n\n${this.tr.closeDepositRefund.replace('{amount}', this.ctx.fmt(deposit.amount))}`
       : '';
     new ConfirmModal(this.ctx.app, `${this.tr.confirmDeleteDeposit}${refundNote}\n\n${label}`, async () => {
-      await this.ctx.storage.deleteDeposit(this.ctx.notePath, deposit.id);
+      await this.ctx.storage.deleteDeposit(this.ctx.accountId, deposit.id);
       const otherRecords = this.ctx.data!.records.filter(r => r.linkedId !== deposit.id);
-
       if (deposit.status === 'active') {
-        const nowDate = getTodayStr();
-        const nowTime = new Date().toTimeString().slice(0, 5);
-        const refundRec: FinanceRecord = {
-          id: crypto.randomUUID(),
-          createdAt: Date.now(),
-          date: nowDate,
-          time: nowTime,
-          type: 'income',
-          amount: deposit.amount,
-          category: 'Возврат вклада',
-          tag: '',
-          payer: deposit.bankName,
-          note: `Возврат тела вклада "${deposit.name}"`,
-          attachmentPath: '',
-        };
-        otherRecords.push(refundRec);
+        const refund = this.refundRecord(deposit);
+        delete refund.linkedId;
+        otherRecords.push(refund);
       }
-
-      await this.ctx.storage.saveAllRecords(this.ctx.notePath, otherRecords);
-      this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
-      this.onUpdate?.();
-      new Notice(this.tr.depositDeleted);
+      await this.ctx.storage.saveAllRecords(this.ctx.accountId, otherRecords);
+      await this.reload(this.tr.depositDeleted);
     }).open();
   }
 
@@ -1029,10 +560,8 @@ export class DepositsTab {
       title: `💰 ${this.tr.topUp} — ${deposit.name}`,
       deposit,
       onSave: async topUp => {
-        await this.ctx.storage.addDepositTopUp(this.ctx.notePath, deposit.id, topUp);
-        this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
-        this.onUpdate?.();
-        new Notice(this.tr.depositUpdated);
+        await this.ctx.storage.addDepositTopUp(this.ctx.accountId, deposit.id, topUp);
+        await this.reload(this.tr.depositUpdated);
       },
     }).open();
   }
@@ -1040,25 +569,26 @@ export class DepositsTab {
   private confirmDeleteDepositTopUp(deposit: DepositRecord, topUp: DepositTopUp): void {
     const label = `${deposit.name} · ${this.ctx.fmt(topUp.amount)} · ${this.ctx.fmtDate(topUp.date, topUp.time)}`;
     new ConfirmModal(this.ctx.app, `${this.tr.confirmDeleteTopUp}\n${label}`, async () => {
-      await this.ctx.storage.deleteDepositTopUp(this.ctx.notePath, deposit.id, topUp.id);
-      this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
-      this.onUpdate?.();
-      new Notice(this.tr.deleted);
+      await this.ctx.storage.deleteDepositTopUp(this.ctx.accountId, deposit.id, topUp.id);
+      const linkedRec = this.ctx.data?.records.find(r =>
+        r.linkedId === deposit.id && r.date === topUp.date && r.amount === topUp.amount && r.type === 'expense');
+      if (linkedRec) {
+        await this.ctx.storage.deleteRecord(this.ctx.accountId, linkedRec.id);
+      }
+      await this.reload(this.tr.deleted);
     }).open();
   }
 
   private openDepositWithdrawalModal(deposit: DepositRecord): void {
-    const cur = this.ctx.currency;
+    const alreadyWithdrawn = sumMoney(deposit.withdrawals.map(w => w.amount));
     new DepositWithdrawalModal(this.ctx.app, {
       title: `${this.tr.withdraw} — ${deposit.name}`,
       deposit,
-      maxAmount: deposit.amount,
-      currency: cur,
+      maxAmount: Math.max(0, deposit.amount - alreadyWithdrawn),
+      currency: this.ctx.currency,
       onSave: async withdrawal => {
-        await this.ctx.storage.addDepositWithdrawal(this.ctx.notePath, deposit.id, withdrawal);
-        this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
-        this.onUpdate?.();
-        new Notice(this.tr.depositUpdated);
+        await this.ctx.storage.addDepositWithdrawal(this.ctx.accountId, deposit.id, withdrawal);
+        await this.reload(this.tr.depositUpdated);
       },
     }).open();
   }
@@ -1066,10 +596,13 @@ export class DepositsTab {
   private confirmDeleteDepositWithdrawal(deposit: DepositRecord, withdrawal: DepositWithdrawal): void {
     const label = `${deposit.name} · ${this.ctx.fmt(withdrawal.amount)} · ${this.ctx.fmtDate(withdrawal.date, withdrawal.time)}`;
     new ConfirmModal(this.ctx.app, `${this.tr.confirmDeleteWithdrawal}\n${label}`, async () => {
-      await this.ctx.storage.deleteDepositWithdrawal(this.ctx.notePath, deposit.id, withdrawal.id);
-      this.ctx.data = await this.ctx.storage.load(this.ctx.notePath);
-      this.onUpdate?.();
-      new Notice(this.tr.deleted);
+      await this.ctx.storage.deleteDepositWithdrawal(this.ctx.accountId, deposit.id, withdrawal.id);
+      const linkedRec = this.ctx.data?.records.find(r =>
+        r.linkedId === deposit.id && r.date === withdrawal.date && r.amount === withdrawal.amount && r.type === 'income');
+      if (linkedRec) {
+        await this.ctx.storage.deleteRecord(this.ctx.accountId, linkedRec.id);
+      }
+      await this.reload(this.tr.deleted);
     }).open();
   }
 }

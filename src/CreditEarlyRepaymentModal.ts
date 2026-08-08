@@ -1,7 +1,9 @@
 import { App, Modal, Notice } from 'obsidian';
 import { getLocaleFromApp, t, Translations } from './i18n';
 import { CreditRecord, CreditPayment } from './types';
-import { fmtAmount, parseAmount, getTodayStr } from './utils';
+import { fmtAmount, parseAmount, getTodayStr, normalizeDateStr } from './utils';
+import { createAmountInput } from './ui/AmountInput';
+import { round2, sumMoney } from './domain/money';
 
 export interface EarlyRepaymentOptions {
   title: string;
@@ -31,7 +33,7 @@ export class CreditEarlyRepaymentModal extends Modal {
     this.actualRemaining = Math.max(0, totalToPay - paidAmount);
   }
 
-  onOpen(): void {
+  override onOpen(): void {
     const { contentEl } = this;
     contentEl.empty();
     contentEl.addClass('finance-modal');
@@ -54,79 +56,25 @@ export class CreditEarlyRepaymentModal extends Modal {
     dateIn.value = today;
 
     const optRow = form.createDiv('finance-early-options');
-    optRow.style.display = 'flex';
-    optRow.style.gap = '8px';
-    optRow.style.marginBottom = '16px';
 
-    const baseBtnStyle = (btn: HTMLElement) => {
-      btn.style.flex = '1';
-      btn.style.padding = '10px 16px';
-      btn.style.borderRadius = '8px';
-      btn.style.border = '2px solid #e5e7eb';
-      btn.style.fontSize = '14px';
-      btn.style.fontWeight = '500';
-      btn.style.cursor = 'pointer';
-      btn.style.transition = 'all 0.2s ease';
-      btn.style.background = '#f9fafb';
-      btn.style.color = '#374151';
-    };
-
-    const activeBtnStyle = (btn: HTMLElement) => {
-      btn.style.background = '#7c3aed';
-      btn.style.color = '#fff';
-      btn.style.borderColor = '#7c3aed';
-    };
-
-    const inactiveBtnStyle = (btn: HTMLElement) => {
-      btn.style.background = '#f9fafb';
-      btn.style.color = '#374151';
-      btn.style.borderColor = '#e5e7eb';
-    };
-
-    const amountBtn = optRow.createEl('button', { text: this.tr.repayAmountShort });
-    baseBtnStyle(amountBtn);
-    activeBtnStyle(amountBtn);
-
-    const termBtn = optRow.createEl('button', { text: this.tr.repayTermShort });
-    baseBtnStyle(termBtn);
-    inactiveBtnStyle(termBtn);
+    const amountBtn = optRow.createEl('button', {
+      text: this.tr.repayAmountShort,
+      cls: 'finance-early-opt-btn is-active',
+    });
+    const termBtn = optRow.createEl('button', {
+      text: this.tr.repayTermShort,
+      cls: 'finance-early-opt-btn',
+    });
 
     const amountSection = form.createDiv('finance-early-amount-section');
     amountSection.createEl('label', { text: this.tr.earlyRepaymentAmount, cls: 'finance-field-label' });
 
-    this.amountInput = amountSection.createEl('input', {
-      type: 'text',
-      cls: 'finance-input finance-amount-input',
-    });
-    this.amountInput.setAttribute('inputmode', 'decimal');
-    this.amountInput.setAttribute('placeholder', '0');
-    this.amountInput.setAttribute('autocomplete', 'off');
-    this.amountInput.value = fmtAmount(String(this.actualRemaining));
+    this.amountInput = createAmountInput(amountSection, {
+      value: this.actualRemaining,
+      onChange: () => {},
+    }).input;
 
-    this.amountInput.addEventListener('focus', () => {
-      if (this.actualRemaining > 0) {
-        this.amountInput.value = String(this.actualRemaining).replace('.', ',');
-      }
-    });
-
-    this.amountInput.addEventListener('input', () => {
-      const raw = this.amountInput.value;
-      const sel = this.amountInput.selectionStart ?? raw.length;
-      const rawBefore = raw.slice(0, sel).replace(/[^\d.,]/g, '').length;
-      const formatted = fmtAmount(raw);
-      if (formatted !== raw) {
-        this.amountInput.value = formatted;
-        let newPos = 0, rawCount = 0;
-        for (let i = 0; i < formatted.length; i++) {
-          if (/[\d.,]/.test(formatted[i])) rawCount++;
-          if (rawCount >= rawBefore) { newPos = i + 1; break; }
-        }
-        this.amountInput.setSelectionRange(newPos, newPos);
-      }
-    });
-
-    const termSection = form.createDiv('finance-early-term-section');
-    termSection.style.display = 'none';
+    const termSection = form.createDiv('finance-early-term-section is-hidden');
     termSection.createEl('label', { text: this.tr.reduceTermLabel, cls: 'finance-field-label' });
     const termInput = termSection.createEl('input', {
       type: 'number',
@@ -136,21 +84,17 @@ export class CreditEarlyRepaymentModal extends Modal {
     termInput.setAttribute('max', String(this.pendingPayments.length));
     termInput.value = '1';
 
-    amountBtn.addEventListener('click', () => {
-      this.selectedOption = 'amount';
-      activeBtnStyle(amountBtn);
-      inactiveBtnStyle(termBtn);
-      amountSection.style.display = 'block';
-      termSection.style.display = 'none';
-    });
+    const selectOption = (option: 'amount' | 'term') => {
+      this.selectedOption = option;
+      const byAmount = option === 'amount';
+      amountBtn.classList.toggle('is-active', byAmount);
+      termBtn.classList.toggle('is-active', !byAmount);
+      amountSection.classList.toggle('is-hidden', !byAmount);
+      termSection.classList.toggle('is-hidden', byAmount);
+    };
 
-    termBtn.addEventListener('click', () => {
-      this.selectedOption = 'term';
-      activeBtnStyle(termBtn);
-      inactiveBtnStyle(amountBtn);
-      amountSection.style.display = 'none';
-      termSection.style.display = 'block';
-    });
+    amountBtn.addEventListener('click', () => selectOption('amount'));
+    termBtn.addEventListener('click', () => selectOption('term'));
 
     const noteG = form.createDiv('finance-field-group');
     noteG.createEl('label', { text: this.tr.note, cls: 'finance-field-label' });
@@ -164,7 +108,7 @@ export class CreditEarlyRepaymentModal extends Modal {
     btnRow.createEl('button', { text: this.tr.repay, cls: 'finance-btn-save' })
       .addEventListener('click', () => {
         const todayStr = getTodayStr();
-        const repaymentDate = dateIn.value || todayStr;
+        const repaymentDate = normalizeDateStr(dateIn.value || todayStr);
 
         if (this.selectedOption === 'amount') {
           const amount = parseAmount(this.amountInput.value);
@@ -184,7 +128,7 @@ export class CreditEarlyRepaymentModal extends Modal {
               payment.paidDate = repaymentDate;
               if (noteIn.value) payment.note = noteIn.value;
             } else {
-              payment.amount = Math.round((payment.amount - remainingAmount) * 100) / 100;
+              payment.amount = round2(payment.amount - remainingAmount);
               if (noteIn.value) {
                 payment.note = payment.note ? `${payment.note}; ${noteIn.value}` : noteIn.value;
               }
@@ -193,7 +137,7 @@ export class CreditEarlyRepaymentModal extends Modal {
           }
 
           const stillPending = this.credit.payments.filter(p => p.status === 'pending');
-          this.credit.currentAmount = Math.round(stillPending.reduce((s, p) => s + p.amount, 0) * 100) / 100;
+          this.credit.currentAmount = sumMoney(stillPending.map(p => p.amount));
           if (this.credit.currentAmount <= 0 || stillPending.length === 0) {
             this.credit.status = 'paid';
           }
@@ -202,14 +146,14 @@ export class CreditEarlyRepaymentModal extends Modal {
           const monthsToRemove = parseInt(termInput.value) || 1;
           const toRemove = Math.min(monthsToRemove, this.pendingPayments.length);
 
-          for (let i = 0; i < toRemove; i++) {
-            this.pendingPayments[i].status = 'paid';
-            this.pendingPayments[i].paidDate = repaymentDate;
-            if (noteIn.value) this.pendingPayments[i].note = noteIn.value;
+          for (const p of this.pendingPayments.slice(0, toRemove)) {
+            p.status = 'paid';
+            p.paidDate = repaymentDate;
+            if (noteIn.value) p.note = noteIn.value;
           }
 
           const stillPending = this.credit.payments.filter(p => p.status === 'pending');
-          this.credit.currentAmount = stillPending.reduce((s, p) => s + p.amount, 0);
+          this.credit.currentAmount = sumMoney(stillPending.map(p => p.amount));
           this.credit.status = stillPending.length === 0 ? 'paid' : 'active';
         }
 
@@ -218,5 +162,5 @@ export class CreditEarlyRepaymentModal extends Modal {
       });
   }
 
-  onClose(): void { this.contentEl.empty(); }
+  override onClose(): void { this.contentEl.empty(); }
 }

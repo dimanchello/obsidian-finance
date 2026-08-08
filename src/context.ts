@@ -1,19 +1,14 @@
-import { App } from 'obsidian';
+import { App, Platform } from 'obsidian';
 import { FinanceStorage } from './storage';
-import {
-  AccountData, PluginSettings, ViewState,
-  DEFAULT_FILTER, DEFAULT_SORT, DEFAULT_DEBT_FILTER, DEFAULT_CREDIT_FILTER, DEFAULT_DEPOSIT_FILTER,
-  MOBILE_BREAKPOINT,
-} from './types';
+import { AccountData, PluginSettings, ViewState, MOBILE_BREAKPOINT } from './types';
 import { fmt, fmtDate } from './utils';
+import { defaultViewState, parseViewState } from './domain/viewState';
 import { getLocaleFromApp, t, type Translations, type Locale } from './i18n';
-
-const LS = (pid: string) => `ft-view:${pid}:`;
 
 export class ViewContext {
   app: App;
   storage: FinanceStorage;
-  notePath: string;
+  accountId: string;
   pluginId: string;
   settings: PluginSettings;
   isMobile: boolean;
@@ -28,21 +23,21 @@ export class ViewContext {
   constructor(
     app: App,
     storage: FinanceStorage,
-    notePath: string,
+    accountId: string,
     pluginId: string,
     settings: PluginSettings,
     container: HTMLElement,
   ) {
     this.app = app;
     this.storage = storage;
-    this.notePath = notePath;
+    this.accountId = accountId;
     this.pluginId = pluginId;
     this.settings = settings;
     this.container = container;
     this.locale = getLocaleFromApp(app);
     this.tr = t(this.locale);
-    this.isMobile = (app as any).isMobile ?? window.innerWidth <= MOBILE_BREAKPOINT;
-    this._state = this.loadState(this.settings.defaultPageSize);
+    this.isMobile = Platform.isMobile || window.innerWidth <= MOBILE_BREAKPOINT;
+    this._state = defaultViewState(this.settings.defaultPageSize);
   }
 
   get data(): AccountData | null {
@@ -65,58 +60,18 @@ export class ViewContext {
     return this._data?.currency ?? this.settings.defaultCurrency;
   }
 
+  /** state.json is the single source of truth: it survives reinstalls and travels with the account. */
   saveState(): void {
-    try {
-      localStorage.setItem(LS(this.pluginId) + this.notePath, JSON.stringify({ ...this._state, page: 0 }));
-    } catch { /* ignore */ }
-    this.storage.saveViewState(this.notePath, { ...this._state, page: 0 }).catch(() => {});
+    this.storage.saveViewState(this.accountId, { ...this._state, page: 0 }).catch((e: unknown) => {
+      console.error('[finance] saveState failed:', e);
+    });
   }
 
   async loadStateFromFile(): Promise<void> {
     try {
-      const fileState = await this.storage.loadViewState(this.notePath);
-      if (fileState) {
-        this._state = { ...this._state, ...fileState } as ViewState;
-      }
-    } catch { /* ignore */ }
-  }
-
-  loadState(pageSize: number): ViewState {
-    try {
-      const raw = localStorage.getItem(LS(this.pluginId) + this.notePath);
-      if (raw) {
-        const v = JSON.parse(raw) as ViewState;
-        v.page = 0;
-        v.debtFilter ??= { ...DEFAULT_DEBT_FILTER };
-        v.debtSort ??= { field: 'createdAt', dir: 'desc' };
-        if (typeof v.debtPage !== 'number') v.debtPage = 0;
-        v.creditFilter ??= { ...DEFAULT_CREDIT_FILTER };
-        v.creditSort ??= { field: 'createdAt', dir: 'desc' };
-        if (typeof v.creditPage !== 'number') v.creditPage = 0;
-        v.depositFilter ??= { ...DEFAULT_DEPOSIT_FILTER };
-        v.depositSort ??= { field: 'createdAt', dir: 'desc' };
-        if (typeof v.depositPage !== 'number') v.depositPage = 0;
-        if (v.filter.showInternal === undefined || typeof v.filter.showInternal === 'boolean') {
-          v.filter.showInternal = v.filter.showInternal === true ? 'only' : 'all';
-        }
-        return v;
-      }
-    } catch { /* ignore */ }
-    return {
-      sort: { ...DEFAULT_SORT },
-      filter: { ...DEFAULT_FILTER },
-      debtSort: { field: 'createdAt', dir: 'desc' },
-      debtFilter: { ...DEFAULT_DEBT_FILTER },
-      creditSort: { field: 'createdAt', dir: 'desc' },
-      creditFilter: { ...DEFAULT_CREDIT_FILTER },
-      depositSort: { field: 'createdAt', dir: 'desc' },
-      depositFilter: { ...DEFAULT_DEPOSIT_FILTER },
-      page: 0,
-      debtPage: 0,
-      creditPage: 0,
-      depositPage: 0,
-      pageSize,
-    };
+      const raw = await this.storage.loadViewState(this.accountId);
+      this._state = parseViewState(raw, this.settings.defaultPageSize);
+    } catch { /* keep defaults */ }
   }
 
   fmt(n: number): string {
@@ -132,9 +87,9 @@ export class ViewContext {
     const recs = this._data.records;
     const inc = recs.filter(r => r.type === 'income' && !r.isInternal).reduce((s, r) => s + r.amount, 0);
     const exp = recs.filter(r => r.type === 'expense' && !r.isInternal).reduce((s, r) => s + r.amount, 0);
-    const lent = this._data.debts.filter(d => d.direction === 'lent').reduce((s, d) => s + d.amount, 0);
-    const borrowed = this._data.debts.filter(d => d.direction === 'borrowed').reduce((s, d) => s + d.amount, 0);
-    const bal = inc - exp - lent + borrowed;
+    const totalInc = recs.filter(r => r.type === 'income').reduce((s, r) => s + r.amount, 0);
+    const totalExp = recs.filter(r => r.type === 'expense').reduce((s, r) => s + r.amount, 0);
+    const bal = totalInc - totalExp;
 
     const el = container.createDiv('finance-stats-container');
     const items = [

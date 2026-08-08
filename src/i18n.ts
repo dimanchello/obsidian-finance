@@ -26,6 +26,11 @@ export interface Translations {
   deleted: string;
   fileNotFound: string;
   confirmDelete: string;
+  bulkSelect: string;
+  confirmDeleteSelectedRecords: string;
+  confirmDeleteSelectedDebts: string;
+  confirmDeleteSelectedCredits: string;
+  confirmDeleteSelectedDeposits: string;
   enterYes: string;
   allDataDeleted: string;
   debtAdded: string;
@@ -40,6 +45,7 @@ export interface Translations {
   arrayNotFound: string;
   tagNotFound: string;
   importSuccess: string;
+  importSkipped: string;
   income: string;
   expense: string;
   debts: string;
@@ -320,11 +326,38 @@ export interface Translations {
   currencyPlaceholder: string;
   templateInserted: string;
   commandInsertTemplate: string;
+  commandFindOrphans: string;
+  blockInvalidIdTitle: string;
+  blockInvalidIdDesc: string;
+  blockReadOnlyTitle: string;
+  blockReadOnlyDesc: string;
+  orphansTitle: string;
+  orphansDesc: string;
+  orphansNone: string;
+  orphanDeleted: string;
   uncategorized: string;
   notSpecified: string;
   lentGiven: string;
   borrowedTaken: string;
   creditDefaultCat: string;
+  creditPaymentCat: string;
+  creditReceiptNote: string;
+  creditPaymentNote: string;
+  depositDefaultCat: string;
+  depositInterestCat: string;
+  depositRefundCat: string;
+  depositOpenNote: string;
+  depositInterestNote: string;
+  depositRefundNote: string;
+  depositTopUpNote: string;
+  depositWithdrawNote: string;
+  debtDefaultCat: string;
+  debtLentCat: string;
+  debtRepaidCat: string;
+  debtBorrowedNote: string;
+  debtLentNote: string;
+  debtRepayNote: string;
+  debtBorrowMoreNote: string;
   remainingCreditLabel: string;
   monthlyPaymentLabel: string;
   remainingPaymentsLabel: string;
@@ -345,6 +378,13 @@ export interface Translations {
   confirmCloseDeposit: string;
   closeDepositRefund: string;
   confirmDeleteRecord: string;
+  purchasePriceLabel: string;
+  downPaymentLabel: string;
+  downPaymentDateLabel: string;
+  downPaymentDateRequired: string;
+  downPaymentAmountRequired: string;
+  finalAmountLabel: string;
+  downPaymentNotePrefix: string;
   fileNotFoundWithPath: string;
   creditFieldDescriptionsSub: string;
   debtFieldDescriptionsSub: string;
@@ -355,6 +395,8 @@ export interface Translations {
   fieldDescCreditType: string;
   fieldDescCreditMonthlyPayment: string;
   fieldDescCreditBank: string;
+  isEscrowLabel: string;
+  isEscrowDesc: string;
   fieldDescDebtAmount: string;
   fieldDescDebtRate: string;
   fieldDescDebtDateCreated: string;
@@ -418,6 +460,11 @@ const ru: Translations = {
   deleted: '🗑️ Удалено',
   fileNotFound: '⚠️ Файл не найден',
   confirmDelete: 'Удалить запись?',
+  bulkSelect: 'Выбор',
+  confirmDeleteSelectedRecords: 'Удалить выбранные записи ({count})?',
+  confirmDeleteSelectedDebts: 'Удалить выбранные долги ({count})?',
+  confirmDeleteSelectedCredits: 'Удалить выбранные кредиты ({count})?',
+  confirmDeleteSelectedDeposits: 'Удалить выбранные вклады ({count})?',
   enterYes: '⚠️ Введите "Yes" для подтверждения',
   allDataDeleted: '🗑️ Все данные удалены',
   debtAdded: '✅ Долг добавлен',
@@ -432,6 +479,7 @@ const ru: Translations = {
   arrayNotFound: '⚠️ По указанному пути не найден массив',
   tagNotFound: '⚠️ Тег не найден',
   importSuccess: '✅ Импортировано',
+  importSkipped: 'пропущено строк: {count}',
   income: '↑ Доход',
   expense: '↓ Расход',
   debts: 'Долги',
@@ -670,11 +718,38 @@ const ru: Translations = {
   currencyPlaceholder: 'напр. CNY, KRW, INR…',
   templateInserted: '✅ Шаблон счёта вставлен',
   commandInsertTemplate: 'Вставить шаблон счёта',
+  commandFindOrphans: 'Найти брошенные счета',
+  blockInvalidIdTitle: 'Некорректный идентификатор счёта',
+  blockInvalidIdDesc: 'Значение «{id}» не похоже на идентификатор счёта (12 шестнадцатеричных символов). Данные не потеряны: исправьте опечатку, чтобы вернуть счёт. Если удалить строку id, будет создан новый пустой счёт.',
+  blockReadOnlyTitle: 'Счёт доступен только для чтения',
+  blockReadOnlyDesc: 'В этом представлении заметка недоступна для записи, поэтому идентификатор счёта не может быть выдан. Откройте заметку обычным способом.',
+  orphansTitle: 'Брошенные счета',
+  orphansDesc: 'Папки с данными, чей идентификатор не встречается ни в одном блоке finance-account. Удаление необратимо.',
+  orphansNone: 'Брошенных счетов не найдено',
+  orphanDeleted: 'Счёт удалён',
   uncategorized: 'Без категории',
   notSpecified: 'Не указан',
   lentGiven: 'Дано в долг',
   borrowedTaken: 'Взято в долг',
   creditDefaultCat: 'Кредит',
+  creditPaymentCat: 'Платёж по кредиту',
+  creditReceiptNote: 'Получение кредита',
+  creditPaymentNote: 'Платёж по кредиту',
+  depositDefaultCat: 'Вклад',
+  depositInterestCat: 'Проценты по вкладу',
+  depositRefundCat: 'Возврат вклада',
+  depositOpenNote: 'Открытие вклада',
+  depositInterestNote: 'Начисление процентов по вкладу',
+  depositRefundNote: 'Возврат вклада',
+  depositTopUpNote: 'Пополнение вклада',
+  depositWithdrawNote: 'Снятие с вклада',
+  debtDefaultCat: 'Долг',
+  debtLentCat: 'Дано в долг',
+  debtRepaidCat: 'Возврат долга',
+  debtBorrowedNote: 'Взято в долг',
+  debtLentNote: 'Дано в долг',
+  debtRepayNote: 'Возврат долга',
+  debtBorrowMoreNote: 'Дополнительно взято',
   remainingCreditLabel: 'Остаток кредита',
   monthlyPaymentLabel: 'Ежемесячный платёж',
   remainingPaymentsLabel: 'Осталось платежей',
@@ -695,6 +770,13 @@ const ru: Translations = {
   confirmCloseDeposit: 'Закрыть вклад?',
   closeDepositRefund: 'Сумма {amount} будет возвращена на счёт.',
   confirmDeleteRecord: 'Удалить запись?',
+  purchasePriceLabel: 'Стоимость покупки *',
+  downPaymentLabel: 'Первоначальный взнос',
+  downPaymentDateLabel: 'Дата взноса',
+  downPaymentDateRequired: '⚠️ Необходимо указать дату первоначального взноса',
+  downPaymentAmountRequired: '⚠️ Сумма первоначального взноса должна быть больше нуля',
+  finalAmountLabel: 'Итого сумма кредита',
+  downPaymentNotePrefix: 'Первоначальный взнос — ',
   fileNotFoundWithPath: '⚠️ Файл не найден: {path}',
   chartView: 'Вид:',
   barChart: '▮▮ Столбцы',
@@ -747,6 +829,8 @@ const ru: Translations = {
   fieldDescCreditType: 'Тип кредита: потребительский, автокредит или ипотека. Влияет на группировку и фильтрацию.',
   fieldDescCreditMonthlyPayment: 'Фиксированная сумма, которую нужно платить каждый месяц. Рассчитывается автоматически на основе суммы, ставки и срока.',
   fieldDescCreditBank: 'Название банка, в котором оформлен кредит. Используется для группировки и фильтрации.',
+  isEscrowLabel: 'Средства на эскроу-счёт',
+  isEscrowDesc: 'Деньги перечислены банком застройщику через эскроу-счёт и не поступают на баланс счёта',
   fieldDescDebtAmount: 'Сумма долга. Если указан процент, итоговая сумма будет увеличена на процент.',
   fieldDescDebtRate: 'Процент за пользование деньгами. Итоговая сумма долга = сумма + процент.',
   fieldDescDebtDateCreated: 'Дата, когда долг был оформлен.',
@@ -810,6 +894,11 @@ const en: Translations = {
   deleted: '🗑️ Deleted',
   fileNotFound: '⚠️ File not found',
   confirmDelete: 'Delete record?',
+  bulkSelect: 'Select',
+  confirmDeleteSelectedRecords: 'Delete selected records ({count})?',
+  confirmDeleteSelectedDebts: 'Delete selected debts ({count})?',
+  confirmDeleteSelectedCredits: 'Delete selected credits ({count})?',
+  confirmDeleteSelectedDeposits: 'Delete selected deposits ({count})?',
   enterYes: '⚠️ Enter "Yes" to confirm',
   allDataDeleted: '🗑️ All data deleted',
   debtAdded: '✅ Debt added',
@@ -824,6 +913,7 @@ const en: Translations = {
   arrayNotFound: '⚠️ Array not found at specified path',
   tagNotFound: '⚠️ Tag not found',
   importSuccess: '✅ Imported',
+  importSkipped: 'skipped rows: {count}',
   income: '↑ Income',
   expense: '↓ Expense',
   debts: 'Debts',
@@ -1062,11 +1152,38 @@ const en: Translations = {
   currencyPlaceholder: 'e.g. CNY, KRW, INR…',
   templateInserted: '✅ Account template inserted',
   commandInsertTemplate: 'Insert account template',
+  commandFindOrphans: 'Find orphaned accounts',
+  blockInvalidIdTitle: 'Invalid account id',
+  blockInvalidIdDesc: 'The value "{id}" is not an account id (12 hexadecimal characters). No data was lost: fix the typo to restore the account. Removing the id line creates a new empty account.',
+  blockReadOnlyTitle: 'Account is read-only',
+  blockReadOnlyDesc: 'This view cannot write to the note, so an account id cannot be assigned. Open the note normally.',
+  orphansTitle: 'Orphaned accounts',
+  orphansDesc: 'Data folders whose id appears in no finance-account block. Deletion cannot be undone.',
+  orphansNone: 'No orphaned accounts found',
+  orphanDeleted: 'Account deleted',
   uncategorized: 'Uncategorized',
   notSpecified: 'Not specified',
   lentGiven: 'Given as debt',
   borrowedTaken: 'Taken as debt',
   creditDefaultCat: 'Credit',
+  creditPaymentCat: 'Credit payment',
+  creditReceiptNote: 'Credit receipt',
+  creditPaymentNote: 'Credit payment',
+  depositDefaultCat: 'Deposit',
+  depositInterestCat: 'Deposit interest',
+  depositRefundCat: 'Deposit refund',
+  depositOpenNote: 'Deposit opening',
+  depositInterestNote: 'Deposit interest accrual',
+  depositRefundNote: 'Deposit refund',
+  depositTopUpNote: 'Deposit top-up',
+  depositWithdrawNote: 'Deposit withdrawal',
+  debtDefaultCat: 'Debt',
+  debtLentCat: 'Lent',
+  debtRepaidCat: 'Debt repayment',
+  debtBorrowedNote: 'Borrowed',
+  debtLentNote: 'Lent',
+  debtRepayNote: 'Debt repayment',
+  debtBorrowMoreNote: 'Additional borrowing',
   remainingCreditLabel: 'Remaining credit',
   monthlyPaymentLabel: 'Monthly payment',
   remainingPaymentsLabel: 'Remaining payments',
@@ -1087,6 +1204,13 @@ const en: Translations = {
   confirmCloseDeposit: 'Close deposit?',
   closeDepositRefund: 'Amount {amount} will be refunded to account.',
   confirmDeleteRecord: 'Delete record?',
+  purchasePriceLabel: 'Purchase price *',
+  downPaymentLabel: 'Down payment',
+  downPaymentDateLabel: 'Payment date',
+  downPaymentDateRequired: '⚠️ Please specify the down payment date',
+  downPaymentAmountRequired: '⚠️ Down payment amount must be greater than zero',
+  finalAmountLabel: 'Final credit amount',
+  downPaymentNotePrefix: 'Down payment — ',
   fileNotFoundWithPath: '⚠️ File not found: {path}',
   chartView: 'View:',
   barChart: '▮▮ Bars',
@@ -1139,6 +1263,8 @@ const en: Translations = {
   fieldDescCreditType: 'Credit type: consumer, auto loan, or mortgage. Used for grouping and filtering.',
   fieldDescCreditMonthlyPayment: 'Fixed monthly payment amount. Calculated automatically based on amount, rate, and term.',
   fieldDescCreditBank: 'Bank name where the loan was taken. Used for grouping and filtering.',
+  isEscrowLabel: 'Funds via escrow account',
+  isEscrowDesc: 'Funds are transferred by the bank to the developer via escrow and do not appear in your account balance',
   fieldDescDebtAmount: 'Debt amount. If interest is set, the total amount is increased by the interest.',
   fieldDescDebtRate: 'Interest rate for borrowing. Total debt = amount + interest.',
   fieldDescDebtDateCreated: 'Date when the debt was created.',

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { FinanceStorage } from '../storage';
+import { AccountFiles } from '../storage/AccountFiles';
 
 interface MockAdapter {
   exists: ReturnType<typeof vi.fn>;
@@ -8,6 +9,8 @@ interface MockAdapter {
   mkdir: ReturnType<typeof vi.fn>;
   remove: ReturnType<typeof vi.fn>;
   rename: ReturnType<typeof vi.fn>;
+  list: ReturnType<typeof vi.fn>;
+  rmdir: ReturnType<typeof vi.fn>;
 }
 
 interface MockApp {
@@ -29,6 +32,8 @@ describe('FinanceStorage', () => {
           mkdir: vi.fn().mockResolvedValue(undefined),
           remove: vi.fn().mockResolvedValue(undefined),
           rename: vi.fn().mockResolvedValue(undefined),
+          list: vi.fn().mockResolvedValue({ files: [], folders: [] }),
+          rmdir: vi.fn().mockResolvedValue(undefined),
         },
       },
     };
@@ -105,6 +110,19 @@ describe('FinanceStorage', () => {
       expect(data.records).toHaveLength(0);
     });
 
+    it('should delete records in batch', async () => {
+      const notePath = 'test/note.md';
+      const r1 = { id: 'rec-1', createdAt: 1, date: '2024-01-01', time: '', type: 'expense' as const, amount: 100, category: 'Test', tag: '', payer: '', note: '', attachmentPath: '' };
+      const r2 = { id: 'rec-2', createdAt: 2, date: '2024-01-02', time: '', type: 'expense' as const, amount: 200, category: 'Test', tag: '', payer: '', note: '', attachmentPath: '' };
+      await storage.addRecord(notePath, r1);
+      await storage.addRecord(notePath, r2);
+
+      await storage.deleteRecordsBatch(notePath, ['rec-1', 'rec-2']);
+
+      const data = await storage.load(notePath);
+      expect(data.records).toHaveLength(0);
+    });
+
     it('should calculate debt amount from movements', async () => {
       const notePath = 'test/note.md';
 
@@ -162,62 +180,99 @@ describe('FinanceStorage', () => {
     });
   });
 
-  describe('backward compatibility', () => {
-    it('adds missing fields for old data', async () => {
+  describe('boundary validation', () => {
+    it('не читает старый плоский файл — миграций больше нет', async () => {
       const legacyData = {
-        version: 1,
-        name: 'Test',
-        currency: '₽',
-        records: [{ id: '1', createdAt: 1, date: '2024-01-01', type: 'expense', amount: 100, category: '', tag: '', payer: '', note: '', attachmentPath: '', time: '' }],
-        categories: ['Test'],
-        tags: [],
-        payers: [],
-        debts: [],
-        credits: [],
-        deposits: [],
+        version: 1, name: 'Test', currency: '₽',
+        records: [{ id: '1', createdAt: 1, date: '2024-01-01', type: 'expense', amount: 100, category: 'Старое', tag: '', payer: '', note: '', attachmentPath: '', time: '' }],
+        categories: ['Старое'], tags: [], payers: [], debts: [], credits: [], deposits: [],
       };
-
-      const filesOnDisk = new Map<string, string>();
-      mockAdapter.write.mockImplementation(async (path: string, content: string) => {
-        filesOnDisk.set(path, content);
-      });
-      mockAdapter.exists.mockImplementation(async (path: string) => {
-        if (path.endsWith('test_path.md.json')) return true;
-        return filesOnDisk.has(path);
-      });
-      mockAdapter.read.mockImplementation(async (path: string) => {
-        if (path.endsWith('test_path.md.json')) return JSON.stringify(legacyData);
-        return filesOnDisk.get(path) ?? '';
-      });
-      mockAdapter.remove.mockResolvedValue(undefined);
+      mockAdapter.exists.mockImplementation(async (path: string) => path.endsWith('test_path.md.json'));
+      mockAdapter.read.mockImplementation(async () => JSON.stringify(legacyData));
 
       const data = await storage.load('test/path.md');
+
+      expect(data.records).toHaveLength(0);
+      expect(data.version).toBe(1);
+    });
+
+    it('повреждённый JSON даёт пустой счёт, а не исключение', async () => {
+      mockAdapter.exists.mockResolvedValue(true);
+      mockAdapter.read.mockResolvedValue('{ не json');
+
+      const data = await storage.load('test/note.md');
+
+      expect(data.records).toEqual([]);
+      expect(data.debts).toEqual([]);
       expect(data.currency).toBe('₽');
-      expect(data.records[0].time).toBe('');
+    });
+
+    it('отбрасывает записи без id и оставляет годные', async () => {
+      mockAdapter.exists.mockImplementation(async (path: string) => path.endsWith('records.json'));
+      mockAdapter.read.mockResolvedValue(JSON.stringify({
+        version: 1,
+        records: [
+          { id: '', date: '2024-01-01', type: 'expense', amount: 1 },
+          { id: 'ok', createdAt: 1, date: '2024-01-01', time: '', type: 'expense', amount: 100, category: 'Т', tag: '', payer: '', note: '', attachmentPath: '' },
+        ],
+        categories: ['Т'], tags: [], payers: [],
+      }));
+
+      const data = await storage.load('test/note.md');
+
+      expect(data.records).toHaveLength(1);
+      expect(data.records[0].id).toBe('ok');
     });
   });
 
-  describe('noteFolder', () => {
-    it('uses last 2 segments for nested paths', () => {
-      const result = (storage as any).noteFolder('Люди/Я/Финансы/Счета/Доллары.md');
-      expect(result).toContain('Счета_Доллары');
+  describe('AccountFiles', () => {
+    it('папка называется по id и ни от чего внешнего не зависит', () => {
+      const files = new AccountFiles('obsidian-finance');
+      expect(files.folder('a7f3c92b4e1d')).toContain('accounts_a7f3c92b4e1d');
     });
 
-    it('uses single segment for root notes', () => {
-      const result = (storage as any).noteFolder('Доллары.md');
-      expect(result).toContain('accounts_Доллары');
+    it('один и тот же id всегда даёт одну и ту же папку', () => {
+      const files = new AccountFiles('obsidian-finance');
+      expect(files.folder('a7f3c92b4e1d')).toBe(files.folder('a7f3c92b4e1d'));
+    });
+
+    it('разные id не сталкиваются', () => {
+      const files = new AccountFiles('obsidian-finance');
+      expect(files.folder('aaaaaaaaaaaa')).not.toBe(files.folder('bbbbbbbbbbbb'));
+    });
+  });
+
+  describe('findOrphanedAccounts', () => {
+    it('возвращает папки, чей id не встречается ни в одном блоке', async () => {
+      mockAdapter.exists.mockResolvedValue(true);
+      mockAdapter.list.mockResolvedValue({
+        files: [],
+        folders: ['.obsidian/plugins/obsidian-finance/accounts/aaaaaaaaaaaa',
+                  '.obsidian/plugins/obsidian-finance/accounts/bbbbbbbbbbbb'],
+      });
+
+      const orphans = await storage.findOrphanedAccounts(new Set(['aaaaaaaaaaaa']));
+
+      expect(orphans).toEqual(['bbbbbbbbbbbb']);
+    });
+
+    it('пустой список, когда папки счетов ещё нет', async () => {
+      mockAdapter.exists.mockResolvedValue(false);
+      expect(await storage.findOrphanedAccounts(new Set())).toEqual([]);
     });
   });
 
   describe('saveViewState / loadViewState', () => {
     it('saves and loads view state', async () => {
-      mockAdapter.exists.mockResolvedValue(true);
       const state = { filter: { search: '' }, sort: { field: 'date' as const, dir: 'asc' as const }, page: 0, pageSize: 25 };
-      await storage.saveViewState('test/note.md', state as any);
-      expect(mockAdapter.write).toHaveBeenCalled();
+      await storage.saveViewState('a7f3c92b4e1d', state as any);
+      await storage.flush();
+      // atomicWrite: содержимое уходит во временный файл
+      const stateWrite = mockAdapter.write.mock.calls.find((args: unknown[]) => (args[0] as string).includes('state.json'));
+      expect(stateWrite).toBeDefined();
+      expect(JSON.parse(stateWrite![1] as string)).toEqual(state);
 
-      mockAdapter.read.mockResolvedValue(JSON.stringify(state));
-      const loaded = await storage.loadViewState('test/note.md');
+      const loaded = await storage.loadViewState('a7f3c92b4e1d');
       expect(loaded).toEqual(state);
     });
 
@@ -240,8 +295,8 @@ describe('FinanceStorage', () => {
       });
       mockAdapter.read.mockImplementation(async (path: string) => {
         if (path.endsWith('debts.json')) return filesOnDisk.get(path) ?? '[]';
-        if (path.endsWith('meta.json')) return JSON.stringify({ version: 4, name: 'Test', currency: '₽' });
-        if (path.endsWith('records.json')) return JSON.stringify({ version: 4, records: [], categories: [], tags: [], payers: [] });
+        if (path.endsWith('meta.json')) return JSON.stringify({ version: 1, name: 'Test', currency: '₽' });
+        if (path.endsWith('records.json')) return JSON.stringify({ version: 1, records: [], categories: [], tags: [], payers: [] });
         return '[]';
       });
 
@@ -305,8 +360,8 @@ describe('FinanceStorage', () => {
       });
       mockAdapter.read.mockImplementation(async (path: string) => {
         if (path.endsWith('credits.json')) return filesOnDisk.get(path) ?? '[]';
-        if (path.endsWith('meta.json')) return JSON.stringify({ version: 4, name: 'Test', currency: '₽' });
-        if (path.endsWith('records.json')) return JSON.stringify({ version: 4, records: [], categories: [], tags: [], payers: [] });
+        if (path.endsWith('meta.json')) return JSON.stringify({ version: 1, name: 'Test', currency: '₽' });
+        if (path.endsWith('records.json')) return JSON.stringify({ version: 1, records: [], categories: [], tags: [], payers: [] });
         return '[]';
       });
 
@@ -334,6 +389,46 @@ describe('FinanceStorage', () => {
       expect(data.credits).toHaveLength(1);
       expect(data.credits[0].name).toBe('Ипотека');
     });
+
+    it('поля предоплаты получают явные значения при разборе', async () => {
+      mockAdapter.exists.mockImplementation(async (path: string) => {
+        if (path.endsWith('meta.json')) return true;
+        if (path.endsWith('credits.json')) return true;
+        return false;
+      });
+      mockAdapter.read.mockImplementation(async (path: string) => {
+        if (path.endsWith('credits.json')) {
+          return JSON.stringify([{
+            id: 'credit-1',
+            name: 'Ипотека',
+            bankName: 'Сбер',
+            originalAmount: 10000,
+            currentAmount: 10000,
+            interestRate: 10,
+            termMonths: 12,
+            monthlyPayment: 1000,
+            startDate: '2024-01-01',
+            status: 'active',
+            payments: [],
+            type: 'consumer',
+            createdAt: 1700000000000,
+            note: '',
+            earlyRepaymentOption: 'term',
+          }]);
+        }
+        if (path.endsWith('meta.json')) return JSON.stringify({ version: 1, name: 'Test', currency: '₽' });
+        return '[]';
+      });
+
+      const data = await storage.load('test-parse.md');
+      expect(data.credits).toHaveLength(1);
+      const c = data.credits[0];
+      expect(c.purchasePrice).toBe(0);
+      expect(c.downPayment).toBe(0);
+      expect(c.downPaymentType).toBe('amount');
+      expect(c.downPaymentValue).toBe(0);
+      expect(c.downPaymentDate).toBe('');
+    });
   });
 
   describe('deposits CRUD', () => {
@@ -348,8 +443,8 @@ describe('FinanceStorage', () => {
       });
       mockAdapter.read.mockImplementation(async (path: string) => {
         if (path.endsWith('deposits.json')) return filesOnDisk.get(path) ?? '[]';
-        if (path.endsWith('meta.json')) return JSON.stringify({ version: 4, name: 'Test', currency: '₽' });
-        if (path.endsWith('records.json')) return JSON.stringify({ version: 4, records: [], categories: [], tags: [], payers: [] });
+        if (path.endsWith('meta.json')) return JSON.stringify({ version: 1, name: 'Test', currency: '₽' });
+        if (path.endsWith('records.json')) return JSON.stringify({ version: 1, records: [], categories: [], tags: [], payers: [] });
         return '[]';
       });
 

@@ -1,5 +1,6 @@
-import { FinanceRecord, MOBILE_BREAKPOINT, ONE_WEEK_MS } from './types';
+import { FinanceRecord, MOBILE_BREAKPOINT } from './types';
 import { Translations } from './i18n';
+import { isoWeek } from './domain/dateMath';
 
 type ChartType = 'bar' | 'pie';
 type GroupBy   = 'category' | 'payer' | 'month' | 'week' | 'year';
@@ -22,15 +23,6 @@ function shortMonth(m: number, locale: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-function getWeekNumber(dateStr: string): number {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  const date = new Date(y, m - 1, d);
-  const start = new Date(date.getFullYear(), 0, 1);
-  const diff = date.getTime() - start.getTime();
-  const oneWeek = ONE_WEEK_MS;
-  return Math.ceil((diff + (start.getDay() + 6) * 86400000) / oneWeek);
-}
-
 // ── SVG helper ────────────────────────────────────────────────────────────────
 function svg<K extends keyof SVGElementTagNameMap>(
   tag: K, attrs: Record<string, string | number> = {},
@@ -44,6 +36,39 @@ function fmtShort(n: number): string {
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
   if (n >= 1_000)     return (n / 1_000).toFixed(0) + 'K';
   return String(Math.round(n));
+}
+
+const TOOLTIP_EDGE_GAP = 6;
+const TOOLTIP_CURSOR_GAP = 10;
+
+/**
+ * Cursor-following tooltip appended to body (so it escapes SVG clipping).
+ * Position is genuinely runtime, so it stays inline; everything else is CSS.
+ */
+function createChartTooltip(): {
+  showTip: (e: MouseEvent, text: string) => void;
+  hideTip: () => void;
+} {
+  const tooltip = document.createElement('div');
+  tooltip.className = 'finance-bar-tooltip';
+  document.body.appendChild(tooltip);
+
+  return {
+    showTip: (e: MouseEvent, text: string) => {
+      tooltip.textContent = text;
+      tooltip.addClass('is-visible');
+      const tw = tooltip.offsetWidth;
+      const th = tooltip.offsetHeight;
+      let left = e.clientX - tw / 2;
+      let top = e.clientY - th - TOOLTIP_CURSOR_GAP;
+      if (left < TOOLTIP_EDGE_GAP) left = TOOLTIP_EDGE_GAP;
+      if (left + tw > window.innerWidth - TOOLTIP_EDGE_GAP) left = window.innerWidth - tw - TOOLTIP_EDGE_GAP;
+      if (top < 4) top = e.clientY + 12;
+      tooltip.style.setProperty('--ft-tip-left', `${left}px`);
+      tooltip.style.setProperty('--ft-tip-top', `${top}px`);
+    },
+    hideTip: () => { tooltip.removeClass('is-visible'); },
+  };
 }
 
 // ── Main class ────────────────────────────────────────────────────────────────
@@ -89,35 +114,26 @@ export class AnalyticsView {
 
     // ── controls ──────────────────────────────────────────────────────────
     const ctrl = this.el.createDiv('finance-analytics-controls');
+    this.el.toggleClass('is-mobile', isMobile);
 
     // chart type (row 1)
     const tg = ctrl.createDiv('finance-analytics-group');
-    if (isMobile) { tg.style.flexDirection = 'column'; tg.style.alignItems = 'flex-start'; }
     tg.createEl('span', { text: this.tr.chartView, cls: 'finance-analytics-label' });
-    const tgBtnWrap = tg.createDiv();
-    tgBtnWrap.style.display = 'flex';
-    tgBtnWrap.style.gap = '6px';
-    if (isMobile) { tgBtnWrap.style.width = '100%'; }
+    const tgBtnWrap = tg.createDiv('finance-analytics-btn-wrap');
     const barBtn = this.mkToggle(tgBtnWrap, this.tr.barChart, this.chartType === 'bar');
     const pieBtn = this.mkToggle(tgBtnWrap, this.tr.pieChart, this.chartType === 'pie');
     barBtn.addEventListener('click', () => { this.chartType = 'bar'; barBtn.classList.add('active'); pieBtn.classList.remove('active'); this.redrawChart(); });
     pieBtn.addEventListener('click', () => { this.chartType = 'pie'; pieBtn.classList.add('active'); barBtn.classList.remove('active'); this.redrawChart(); });
 
     // row 2: group by + show type
-    const ctrl2 = ctrl.createDiv('finance-analytics-group');
-    if (isMobile) {
-      ctrl2.style.flexDirection = 'column';
-      ctrl2.style.alignItems = 'stretch';
-    }
+    const ctrl2 = ctrl.createDiv('finance-analytics-group finance-analytics-group-row');
 
     const gg = ctrl2.createDiv('finance-analytics-group');
-    if (isMobile) { gg.style.flexDirection = 'column'; gg.style.alignItems = 'flex-start'; }
     gg.createEl('span', { text: this.tr.groupBy, cls: 'finance-analytics-label' });
     const gSel = this.mkSelect(gg, [['category',this.tr.byCategory],['payer',this.tr.byPayer],['week',this.tr.byWeek],['month',this.tr.byMonth],['year',this.tr.byYear]], this.groupBy);
     gSel.addEventListener('change', () => { this.groupBy = gSel.value as GroupBy; this.redrawChart(); });
 
     const sg = ctrl2.createDiv('finance-analytics-group');
-    if (isMobile) { sg.style.flexDirection = 'column'; sg.style.alignItems = 'flex-start'; }
     sg.createEl('span', { text: this.tr.showData, cls: 'finance-analytics-label' });
     const sSel = this.mkSelect(sg, [['both',this.tr.all],['income',this.tr.incomeStat],['expense',this.tr.expenseStat]], this.showType);
     sSel.addEventListener('change', () => { this.showType = sSel.value as ShowType; this.redrawChart(); });
@@ -132,8 +148,8 @@ export class AnalyticsView {
     dfI.addEventListener('change', () => {
       if (dfI.value) {
         const [d, t] = dfI.value.split('T');
-        this.dateFrom = d;
-        this.timeFrom = t;
+        this.dateFrom = d ?? '';
+        this.timeFrom = t ?? '00:00';
       } else {
         this.dateFrom = '';
         this.timeFrom = '00:00';
@@ -148,8 +164,8 @@ export class AnalyticsView {
     dtI.addEventListener('change', () => {
       if (dtI.value) {
         const [d, t] = dtI.value.split('T');
-        this.dateTo = d;
-        this.timeTo = t;
+        this.dateTo = d ?? '';
+        this.timeTo = t ?? '23:59';
       } else {
         this.dateTo = '';
         this.timeTo = '23:59';
@@ -184,6 +200,8 @@ export class AnalyticsView {
     const map = new Map<string, { income: number; expense: number }>();
 
     this.records.forEach(r => {
+      if (r.isInternal) return;
+
       // Filter by analytics date range
       if (this.dateFrom && r.date < this.dateFrom) return;
       if (this.dateTo && r.date > this.dateTo) return;
@@ -195,11 +213,11 @@ export class AnalyticsView {
       else if (this.groupBy === 'payer')    key = r.payer    || this.tr.notSpecified;
       else if (this.groupBy === 'year') {
         if (!r.date) return;
-        key = r.date.split('-')[0];
+        key = r.date.slice(0, 4);
       } else if (this.groupBy === 'week') {
-        if (!r.date) return;
-        const w = getWeekNumber(r.date);
-        key = `${r.date.split('-')[0]}-W${String(w).padStart(2, '0')}`;
+        const iso = r.date ? isoWeek(r.date) : null;
+        if (!iso) return;
+        key = `${iso.year}-W${String(iso.week).padStart(2, '0')}`;
       } else {
         if (!r.date) return;
         const [y, m] = r.date.split('-');
@@ -217,7 +235,7 @@ export class AnalyticsView {
       items.sort((a, b) => a.label.localeCompare(b.label));
       items = items.map(d => {
         const [y, m] = d.label.split('-');
-        return { ...d, label: `${shortMonth((parseInt(m) - 1) % 12, this.locale)} ${y}` };
+        return { ...d, label: `${shortMonth((parseInt(m ?? '1') - 1) % 12, this.locale)} ${y}` };
       });
     } else if (this.groupBy === 'week') {
       items.sort((a, b) => a.label.localeCompare(b.label));
@@ -244,8 +262,7 @@ export class AnalyticsView {
 
     const data = this.aggregate();
     if (!data.length) {
-      const e = this.chartEl.createDiv('finance-empty-state');
-      e.style.padding = '32px';
+      const e = this.chartEl.createDiv('finance-empty-state finance-empty-chart');
       e.createEl('p', { text: this.tr.noChartData, cls: 'finance-empty-sub' });
       return;
     }
@@ -299,25 +316,7 @@ export class AnalyticsView {
     const root = svg('svg', { viewBox: `0 0 ${W} ${CH}` });
     root.classList.add('finance-chart-svg');
 
-    const tooltip = document.createElement('div');
-    tooltip.className = 'finance-bar-tooltip';
-    tooltip.style.cssText = 'display:none;position:fixed;z-index:10000;pointer-events:none;padding:5px 10px;background:var(--background-primary);border:1px solid var(--background-modifier-border);border-radius:5px;font-size:13px;color:var(--text-normal);box-shadow:0 2px 6px rgba(0,0,0,.15);line-height:1.4;max-width:320px;';
-    document.body.appendChild(tooltip);
-
-    const showTip = (e: MouseEvent, text: string) => {
-      tooltip.textContent = text;
-      tooltip.style.display = 'block';
-      const tw = tooltip.offsetWidth;
-      const th = tooltip.offsetHeight;
-      let left = e.clientX - tw / 2;
-      let top  = e.clientY - th - 10;
-      if (left < 6) left = 6;
-      if (left + tw > window.innerWidth - 6) left = window.innerWidth - tw - 6;
-      if (top < 4) top = e.clientY + 12;
-      tooltip.style.left = `${left}px`;
-      tooltip.style.top  = `${top}px`;
-    };
-    const hideTip = () => { tooltip.style.display = 'none'; };
+    const { showTip, hideTip } = createChartTooltip();
 
     for (let i = 0; i <= 4; i++) {
       const y   = PT + chartH * i / 4;
@@ -342,7 +341,7 @@ export class AnalyticsView {
         const h = (d.income / maxVal) * chartH;
         const x = this.showType === 'both' ? cx - barW - gap / 2 : cx - barW / 2;
         const rect = svg('rect', { x, y: PT + chartH - h, width: barW, height: h, fill: '#22c55e', rx: 3 });
-        rect.style.cursor = 'pointer';
+        rect.classList.add('finance-chart-clickable');
         rect.addEventListener('click', fireClick);
         rect.addEventListener('mouseenter', (e) => showTip(e, `${d.label} — ${this.tr.incomeStat.toLowerCase()}: ${this.fmtNum(d.income)}`));
         rect.addEventListener('mousemove', (e) => showTip(e, `${d.label} — ${this.tr.incomeStat.toLowerCase()}: ${this.fmtNum(d.income)}`));
@@ -354,7 +353,7 @@ export class AnalyticsView {
         const h = (d.expense / maxVal) * chartH;
         const x = this.showType === 'both' ? cx + gap / 2 : cx - barW / 2;
         const rect = svg('rect', { x, y: PT + chartH - h, width: barW, height: h, fill: '#ef4444', rx: 3 });
-        rect.style.cursor = 'pointer';
+        rect.classList.add('finance-chart-clickable');
         rect.addEventListener('click', fireClick);
         rect.addEventListener('mouseenter', (e) => showTip(e, `${d.label} — ${this.tr.expenseStat.toLowerCase()}: ${this.fmtNum(d.expense)}`));
         rect.addEventListener('mousemove', (e) => showTip(e, `${d.label} — ${this.tr.expenseStat.toLowerCase()}: ${this.fmtNum(d.expense)}`));
@@ -375,17 +374,21 @@ export class AnalyticsView {
     });
 
     const wrap = this.chartEl.createDiv('finance-chart-svg-wrap');
-    root.style.display = 'block';
-    root.style.width = `${W}px`;
-    root.style.height = `${CH}px`;
+    root.classList.add('finance-bar-chart-svg');
+    root.style.setProperty('--ft-chart-w', `${W}px`);
+    root.style.setProperty('--ft-chart-h', `${CH}px`);
     wrap.appendChild(root);
 
     if (this.showType === 'both') {
       const legEl = this.chartEl.createDiv('finance-chart-legend');
-      [['#22c55e', this.tr.incomeStat], ['#ef4444', this.tr.expenseStat]].forEach(([c, lbl]) => {
+      const legendItems: [string, string][] = [
+        ['#22c55e', this.tr.incomeStat],
+        ['#ef4444', this.tr.expenseStat],
+      ];
+      legendItems.forEach(([c, lbl]) => {
         const row = legEl.createDiv('finance-chart-legend-row');
         const dot = row.createDiv('finance-chart-legend-dot');
-        dot.style.background = c;
+        dot.style.setProperty('--ft-dot-color', c);
         row.createEl('span', { text: lbl });
       });
     }
@@ -394,7 +397,6 @@ export class AnalyticsView {
   // ── Pie / donut chart (SVG) ───────────────────────────────────────────────
 
   private renderPie(rawData: Item[]): void {
-    const isMobile = window.innerWidth <= MOBILE_BREAKPOINT;
     const MAX = 14;
     let items = rawData
       .map(d => ({
@@ -421,25 +423,7 @@ export class AnalyticsView {
     const root = svg('svg', { viewBox: `0 0 ${SZ} ${SZ}` });
     root.classList.add('finance-chart-svg');
 
-    const tooltip = document.createElement('div');
-    tooltip.className = 'finance-bar-tooltip';
-    tooltip.style.cssText = 'display:none;position:fixed;z-index:10000;pointer-events:none;padding:5px 10px;background:var(--background-primary);border:1px solid var(--background-modifier-border);border-radius:5px;font-size:13px;color:var(--text-normal);box-shadow:0 2px 6px rgba(0,0,0,.15);line-height:1.4;max-width:320px;';
-    document.body.appendChild(tooltip);
-
-    const showTip = (e: MouseEvent, text: string) => {
-      tooltip.textContent = text;
-      tooltip.style.display = 'block';
-      const tw = tooltip.offsetWidth;
-      const th = tooltip.offsetHeight;
-      let left = e.clientX - tw / 2;
-      let top  = e.clientY - th - 10;
-      if (left < 6) left = 6;
-      if (left + tw > window.innerWidth - 6) left = window.innerWidth - tw - 6;
-      if (top < 4) top = e.clientY + 12;
-      tooltip.style.left = `${left}px`;
-      tooltip.style.top  = `${top}px`;
-    };
-    const hideTip = () => { tooltip.style.display = 'none'; };
+    const { showTip, hideTip } = createChartTooltip();
 
     let angle = -Math.PI / 2;
 
@@ -458,11 +442,11 @@ export class AnalyticsView {
 
       const path = svg('path', {
         d:   `M ${f(ix1)} ${f(iy1)} L ${f(x1)} ${f(y1)} A ${R} ${R} 0 ${large} 1 ${f(x2)} ${f(y2)} L ${f(ix2)} ${f(iy2)} A ${iR} ${iR} 0 ${large} 0 ${f(ix1)} ${f(iy1)} Z`,
-        fill: PALETTE[idx % PALETTE.length],
+        fill: PALETTE[idx % PALETTE.length]!,
         stroke: 'var(--background-primary)',
         'stroke-width': 2,
       });
-      path.style.cursor = 'pointer';
+      path.classList.add('finance-chart-clickable');
       path.addEventListener('mouseenter', (e) => showTip(e, `${d.label}: ${this.fmtNum(d.value)} (${pct(d.value, total)})`));
       path.addEventListener('mousemove', (e) => showTip(e, `${d.label}: ${this.fmtNum(d.value)} (${pct(d.value, total)})`));
       path.addEventListener('mouseleave', hideTip);
@@ -481,19 +465,14 @@ export class AnalyticsView {
 
     // Layout: chart + legend
     const wrap = this.chartEl.createDiv('finance-pie-wrap');
-    root.style.flexShrink = '0';
-    if (isMobile) {
-      root.style.height = '260px';
-    } else {
-      root.style.height = '100%';
-    }
+    root.classList.add('finance-pie-chart-svg');
     wrap.appendChild(root);
 
     const legend = wrap.createDiv('finance-pie-legend');
     items.forEach((d, idx) => {
       const row = legend.createDiv('finance-pie-legend-row');
       const dot = row.createDiv('finance-pie-dot');
-      dot.style.background = PALETTE[idx % PALETTE.length];
+      dot.style.setProperty('--ft-dot-color', PALETTE[idx % PALETTE.length]!);
       row.createEl('span', { text: d.label,                      cls: 'finance-pie-label' });
       row.createEl('span', { text: `${this.fmtNum(d.value)} · ${pct(d.value, total)}`, cls: 'finance-pie-val' });
     });

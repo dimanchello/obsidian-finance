@@ -19,12 +19,7 @@ describe('i18n', () => {
     it('has all required keys for both locales', () => {
       const ru = t('ru');
       const en = t('en');
-      const requiredKeys = ['pluginTitle', 'income', 'expense', 'save', 'cancel', 'search', 'balance', 'analytics'];
-
-      for (const key of requiredKeys) {
-        expect(ru).toHaveProperty(key);
-        expect(en).toHaveProperty(key);
-      }
+      expect(Object.keys(ru).sort()).toEqual(Object.keys(en).sort());
     });
 
     it('returns correct Russian strings', () => {

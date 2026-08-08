@@ -1,0 +1,86 @@
+import { describe, it, expect } from 'vitest';
+import { defaultViewState, parseViewState } from '../domain/viewState';
+
+describe('defaultViewState', () => {
+  it('заполняет все разделы и берёт pageSize из настроек', () => {
+    const s = defaultViewState(50);
+    expect(s.pageSize).toBe(50);
+    expect(s.page).toBe(0);
+    expect(s.sort).toEqual({ field: 'date', dir: 'desc' });
+    expect(s.debtFilter).toBeDefined();
+    expect(s.creditFilter).toBeDefined();
+    expect(s.depositFilter).toBeDefined();
+  });
+});
+
+describe('parseViewState', () => {
+  it('незнакомая форма даёт дефолты, а не исключение', () => {
+    expect(parseViewState(null, 25)).toEqual(defaultViewState(25));
+    expect(parseViewState('мусор', 25)).toEqual(defaultViewState(25));
+    expect(parseViewState([], 25)).toEqual(defaultViewState(25));
+    expect(parseViewState({ совсем: 'не то' }, 25)).toEqual(defaultViewState(25));
+  });
+
+  it('сохраняет известные поля', () => {
+    const s = parseViewState({
+      sort: { field: 'amount', dir: 'asc' },
+      filter: { search: 'кофе', type: 'expense', category: 'Еда', tag: '', payer: '', dateFrom: '', dateTo: '', showInternal: 'only' },
+      pageSize: 100,
+    }, 25);
+
+    expect(s.sort).toEqual({ field: 'amount', dir: 'asc' });
+    expect(s.filter.search).toBe('кофе');
+    expect(s.filter.type).toBe('expense');
+    expect(s.filter.showInternal).toBe('only');
+    expect(s.pageSize).toBe(100);
+  });
+
+  it('страницы всегда сбрасываются в 0', () => {
+    const s = parseViewState({ page: 7, debtPage: 3, creditPage: 2, depositPage: 9 }, 25);
+    expect(s.page).toBe(0);
+    expect(s.debtPage).toBe(0);
+    expect(s.creditPage).toBe(0);
+    expect(s.depositPage).toBe(0);
+  });
+
+  it('неизвестное поле сортировки откатывается на date', () => {
+    const s = parseViewState({ sort: { field: 'createdAt', dir: 'вбок' } }, 25);
+    expect(s.sort).toEqual({ field: 'date', dir: 'desc' });
+  });
+
+  it('битый фильтр восстанавливается по полю, а не целиком', () => {
+    const s = parseViewState({
+      filter: { search: 'x', type: 'что-то', showInternal: true },
+    }, 25);
+    expect(s.filter.search).toBe('x');
+    expect(s.filter.type).toBe('all');
+    expect(s.filter.showInternal).toBe('all');
+  });
+
+  it('видимость колонок принимает только булевы значения', () => {
+    const s = parseViewState({
+      recordsColumns: { date: true, amount: false, note: 'да' },
+    }, 25);
+    expect(s.recordsColumns).toEqual({ date: true, amount: false });
+  });
+
+  it('нулевой или отрицательный pageSize откатывается на настройку', () => {
+    expect(parseViewState({ pageSize: 0 }, 25).pageSize).toBe(25);
+    expect(parseViewState({ pageSize: -5 }, 25).pageSize).toBe(25);
+    expect(parseViewState({ pageSize: NaN }, 25).pageSize).toBe(25);
+  });
+
+  it('фильтры долгов/кредитов/вкладов разбираются независимо', () => {
+    const s = parseViewState({
+      debtFilter: { search: 'иван', status: 'unpaid', direction: 'lent', dateFrom: '', dateTo: '', person: '' },
+      creditFilter: { search: '', status: 'active', bankName: 'Сбер', type: 'mortgage', dateFrom: '', dateTo: '' },
+      depositFilter: 42,
+    }, 25);
+
+    expect(s.debtFilter!.status).toBe('unpaid');
+    expect(s.debtFilter!.direction).toBe('lent');
+    expect(s.creditFilter!.bankName).toBe('Сбер');
+    expect(s.creditFilter!.type).toBe('mortgage');
+    expect(s.depositFilter).toEqual(defaultViewState(25).depositFilter);
+  });
+});

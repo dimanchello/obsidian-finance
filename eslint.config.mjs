@@ -10,7 +10,7 @@ export default [
     languageOptions: {
       parser: tsparser,
       parserOptions: {
-        project: true,
+        project: ['./tsconfig.json', './src/__tests__/tsconfig.json'],
         tsconfigRootDir: import.meta.dirname,
       },
     },
@@ -46,6 +46,25 @@ export default [
       '@typescript-eslint/no-empty-function': 'off',
       '@typescript-eslint/prefer-regexp-exec': 'off',
       '@typescript-eslint/dot-notation': 'off',
+
+      'no-restricted-syntax': ['error',
+        {
+          selector: "CallExpression > MemberExpression[property.name='toISOString']",
+          message: 'toISOString() конвертирует в UTC и сдвигает локальную дату на день назад. Используйте toDateStr/toDateTimeLocalStr из src/domain/dateMath.',
+        },
+        {
+          selector: "CallExpression > MemberExpression[property.name=/^set(UTC)?Month$/]",
+          message: 'setMonth переполняет месяц: 31 января + 1 = 3 марта. Используйте addMonthsClamped из src/domain/dateMath.',
+        },
+        {
+          selector: "AssignmentExpression > MemberExpression[property.name=/^(inner|outer)HTML$/]",
+          message: 'innerHTML с интерполяцией — ожидающий своего часа XSS. Используйте createEl/createSpan или empty().',
+        },
+        {
+          selector: "AssignmentExpression > MemberExpression[property.name='cssText']",
+          message: 'Инлайн-стили не переопределяются темами Obsidian. Используйте класс в styles.css.',
+        },
+      ],
     },
   },
 ];
