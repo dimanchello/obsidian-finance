@@ -13,6 +13,7 @@ import { getTodayStr, getTodayTime } from '../utils';
 import { addMonthsClamped, daysBetweenStr } from '../domain/dateMath';
 import { round2, sumMoney } from '../domain/money';
 import { DataTable, FilterControl } from '../ui/DataTable';
+import { CreditsAnalyticsView } from '../CreditsAnalyticsView';
 
 export class CreditsTab {
   private ctx: ViewContext;
@@ -78,11 +79,30 @@ export class CreditsTab {
         setColumns: c => { this.ctx.state.creditsColumns = c; },
       },
       renderStats: host => this.renderStats(host),
-      toolbarButtons: toolbar => {
+      toolbarButtons: (toolbar, rerender) => {
         const btn = toolbar.createEl('button', { cls: 'finance-add-btn finance-accent-btn' });
         btn.createEl('span', { text: '＋', cls: 'btn-icon' });
         btn.createEl('span', { text: this.tr.newCredit });
         btn.addEventListener('click', () => this.openNewCreditModal());
+
+        const open = (this.ctx.state.creditActiveTab ?? 'list') === 'analytics';
+        const toggleBtn = toolbar.createEl('button', {
+          cls: `finance-analytics-toggle-btn${open ? ' active' : ''}`,
+          text: `📈 ${this.tr.analytics} ${open ? '▲' : '▼'}`,
+        });
+        toggleBtn.addEventListener('click', () => {
+          this.ctx.state.creditActiveTab = open ? 'list' : 'analytics';
+          this.ctx.saveState();
+          rerender();
+        });
+      },
+      renderPanels: host => {
+        if ((this.ctx.state.creditActiveTab ?? 'list') === 'analytics') {
+          const panel = host.createDiv('finance-analytics-panel');
+          const credits = this.ctx.data?.credits ?? [];
+          const records = this.ctx.data?.records ?? [];
+          new CreditsAnalyticsView(panel, credits, records, this.ctx).render();
+        }
       },
       emptyState: { icon: '🏦', title: this.tr.noCredits, subtitle: this.tr.addNewDebt },
       emptyFiltered: { icon: '🔍', title: this.tr.noCreditsFiltered, subtitle: this.tr.tryChangeFilters },
@@ -112,6 +132,7 @@ export class CreditsTab {
     }
     this.ctx.state.creditFilter ??= { ...DEFAULT_CREDIT_FILTER };
     this.el.empty();
+
     this.table.render(this.el);
   }
 

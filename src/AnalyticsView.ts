@@ -1,4 +1,12 @@
-import { FinanceRecord, MOBILE_BREAKPOINT } from './types';
+import {
+  FinanceRecord, MOBILE_BREAKPOINT,
+  CHART_PALETTE, CHART_COLOR_INCOME, CHART_COLOR_EXPENSE,
+  CHART_SVG_HEIGHT, CHART_SVG_PAD_LEFT, CHART_SVG_PAD_RIGHT, CHART_SVG_PAD_TOP, CHART_SVG_PAD_BOTTOM,
+  CHART_MIN_GROUP_MOBILE, CHART_MIN_GROUP_DESKTOP,
+  CHART_MAX_BAR_W_MOBILE, CHART_MAX_BAR_W_SMALL, CHART_MAX_BAR_W_MED, CHART_MAX_BAR_W_LARGE,
+  CHART_BAR_RATIO_MOBILE, CHART_BAR_RATIO_DESKTOP,
+  CHART_MAX_ITEMS, CHART_BAR_GAP, CHART_BAR_RADIUS, CHART_LABEL_ROTATE_THRESHOLD,
+} from './types';
 import { Translations } from './i18n';
 import { isoWeek } from './domain/dateMath';
 
@@ -11,11 +19,6 @@ interface Item { label: string; rawKey: string; income: number; expense: number;
 export interface BarClickAction { groupBy: GroupBy; rawKey: string; label: string; }
 export type OnBarClick = (action: BarClickAction) => void;
 
-const PALETTE = [
-  '#6366f1','#f59e0b','#10b981','#f43f5e','#3b82f6',
-  '#8b5cf6','#14b8a6','#fb923c','#22c55e','#a855f7',
-  '#06b6d4','#84cc16','#e879f9','#64748b',
-];
 
 function shortMonth(m: number, locale: string): string {
   const d = new Date(2024, m, 1);
@@ -274,13 +277,12 @@ export class AnalyticsView {
   // ── Bar chart (SVG) ───────────────────────────────────────────────────────
 
   private renderBar(rawData: Item[]): void {
-    const MAX = 20;
     let data = rawData;
 
-    if (this.groupBy !== 'month' && this.groupBy !== 'week' && this.groupBy !== 'year' && data.length > MAX) {
-      const rest = data.slice(MAX);
+    if (this.groupBy !== 'month' && this.groupBy !== 'week' && this.groupBy !== 'year' && data.length > CHART_MAX_ITEMS) {
+      const rest = data.slice(CHART_MAX_ITEMS);
       data = [
-        ...data.slice(0, MAX),
+        ...data.slice(0, CHART_MAX_ITEMS),
         {
           label:   this.tr.other,
           rawKey:  'Другое',
@@ -292,15 +294,15 @@ export class AnalyticsView {
 
     const isMobile = window.innerWidth <= MOBILE_BREAKPOINT;
     const containerW = this.chartEl.clientWidth || 600;
-    const MIN_GROUP = data.length > 12 ? 35 : data.length > 6 ? 50 : data.length > 3 ? 55 : 60;
-    const PL = 45, PR = 12;
+    const MIN_GROUP = data.length > 12 ? CHART_MIN_GROUP_MOBILE : data.length > 6 ? 50 : data.length > 3 ? 55 : CHART_MIN_GROUP_DESKTOP;
+    const PL = CHART_SVG_PAD_LEFT, PR = CHART_SVG_PAD_RIGHT;
     const minW = PL + data.length * MIN_GROUP + PR;
-    const W = isMobile ? Math.max(minW, containerW) : minW;
-    const CH = 340;
-    const PT = 18, PB = 96;
+    const W = Math.max(minW, containerW);
+    const CH = CHART_SVG_HEIGHT;
+    const PT = CHART_SVG_PAD_TOP, PB = CHART_SVG_PAD_BOTTOM;
     const chartH = CH - PT - PB;
     const fsY = 14, fsX = 12;
-    const gap = 2;
+    const gap = CHART_BAR_GAP;
 
     let maxVal = 1;
     data.forEach(d => {
@@ -309,8 +311,8 @@ export class AnalyticsView {
     });
 
     const groupW = (W - PL - PR) / data.length;
-    const maxBarW = isMobile ? 20 : (data.length <= 4 ? 50 : data.length <= 8 ? 30 : 20);
-    const barRatio = isMobile ? 0.40 : 0.35;
+    const maxBarW = isMobile ? CHART_MAX_BAR_W_MOBILE : (data.length <= 4 ? CHART_MAX_BAR_W_SMALL : data.length <= 8 ? CHART_MAX_BAR_W_MED : CHART_MAX_BAR_W_LARGE);
+    const barRatio = isMobile ? CHART_BAR_RATIO_MOBILE : CHART_BAR_RATIO_DESKTOP;
     const barW   = Math.max(2, Math.min(groupW * barRatio, maxBarW));
 
     const root = svg('svg', { viewBox: `0 0 ${W} ${CH}` });
@@ -340,7 +342,7 @@ export class AnalyticsView {
       if (this.showType !== 'expense' && d.income > 0) {
         const h = (d.income / maxVal) * chartH;
         const x = this.showType === 'both' ? cx - barW - gap / 2 : cx - barW / 2;
-        const rect = svg('rect', { x, y: PT + chartH - h, width: barW, height: h, fill: '#22c55e', rx: 3 });
+        const rect = svg('rect', { x, y: PT + chartH - h, width: barW, height: h, fill: CHART_COLOR_INCOME, rx: CHART_BAR_RADIUS });
         rect.classList.add('finance-chart-clickable');
         rect.addEventListener('click', fireClick);
         rect.addEventListener('mouseenter', (e) => showTip(e, `${d.label} — ${this.tr.incomeStat.toLowerCase()}: ${this.fmtNum(d.income)}`));
@@ -352,7 +354,7 @@ export class AnalyticsView {
       if (this.showType !== 'income' && d.expense > 0) {
         const h = (d.expense / maxVal) * chartH;
         const x = this.showType === 'both' ? cx + gap / 2 : cx - barW / 2;
-        const rect = svg('rect', { x, y: PT + chartH - h, width: barW, height: h, fill: '#ef4444', rx: 3 });
+        const rect = svg('rect', { x, y: PT + chartH - h, width: barW, height: h, fill: CHART_COLOR_EXPENSE, rx: CHART_BAR_RADIUS });
         rect.classList.add('finance-chart-clickable');
         rect.addEventListener('click', fireClick);
         rect.addEventListener('mouseenter', (e) => showTip(e, `${d.label} — ${this.tr.expenseStat.toLowerCase()}: ${this.fmtNum(d.expense)}`));
@@ -366,7 +368,7 @@ export class AnalyticsView {
         'text-anchor': 'middle', fill: 'var(--text-muted)', 'font-size': fsX,
       });
       lbl.textContent = d.label;
-      if (data.length > 10) {
+      if (data.length > CHART_LABEL_ROTATE_THRESHOLD) {
         lbl.setAttribute('transform', `rotate(-30, ${cx}, ${CH - PB + 20})`);
         lbl.setAttribute('text-anchor', 'end');
       }
@@ -382,8 +384,8 @@ export class AnalyticsView {
     if (this.showType === 'both') {
       const legEl = this.chartEl.createDiv('finance-chart-legend');
       const legendItems: [string, string][] = [
-        ['#22c55e', this.tr.incomeStat],
-        ['#ef4444', this.tr.expenseStat],
+        [CHART_COLOR_INCOME, this.tr.incomeStat],
+        [CHART_COLOR_EXPENSE, this.tr.expenseStat],
       ];
       legendItems.forEach(([c, lbl]) => {
         const row = legEl.createDiv('finance-chart-legend-row');
@@ -442,7 +444,7 @@ export class AnalyticsView {
 
       const path = svg('path', {
         d:   `M ${f(ix1)} ${f(iy1)} L ${f(x1)} ${f(y1)} A ${R} ${R} 0 ${large} 1 ${f(x2)} ${f(y2)} L ${f(ix2)} ${f(iy2)} A ${iR} ${iR} 0 ${large} 0 ${f(ix1)} ${f(iy1)} Z`,
-        fill: PALETTE[idx % PALETTE.length]!,
+        fill: CHART_PALETTE[idx % CHART_PALETTE.length]!,
         stroke: 'var(--background-primary)',
         'stroke-width': 2,
       });
@@ -472,7 +474,7 @@ export class AnalyticsView {
     items.forEach((d, idx) => {
       const row = legend.createDiv('finance-pie-legend-row');
       const dot = row.createDiv('finance-pie-dot');
-      dot.style.setProperty('--ft-dot-color', PALETTE[idx % PALETTE.length]!);
+      dot.style.setProperty('--ft-dot-color', CHART_PALETTE[idx % CHART_PALETTE.length]!);
       row.createEl('span', { text: d.label,                      cls: 'finance-pie-label' });
       row.createEl('span', { text: `${this.fmtNum(d.value)} · ${pct(d.value, total)}`, cls: 'finance-pie-val' });
     });

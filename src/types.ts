@@ -84,6 +84,9 @@ export interface DebtFilterState {
   person: string;
 }
 
+export type CreditAnalyticsGroupBy  = 'month' | 'quarter' | 'year' | 'type' | 'bank';
+export type DepositAnalyticsGroupBy = 'month' | 'quarter' | 'year' | 'type' | 'bank';
+
 export interface ViewState {
   sort: SortState; filter: FilterState; page: number; pageSize: number;
   debtPage?: number;
@@ -99,6 +102,14 @@ export interface ViewState {
   debtsColumns?: Record<string, boolean>;
   creditsColumns?: Record<string, boolean>;
   depositsColumns?: Record<string, boolean>;
+  creditActiveTab?:          'list' | 'analytics';
+  creditAnalyticsGroupBy?:   CreditAnalyticsGroupBy;
+  creditAnalyticsDateFrom?:  string;
+  creditAnalyticsDateTo?:    string;
+  depositActiveTab?:         'list' | 'analytics';
+  depositAnalyticsGroupBy?:  DepositAnalyticsGroupBy;
+  depositAnalyticsDateFrom?: string;
+  depositAnalyticsDateTo?:   string;
 }
 
 export interface PluginSettings {
@@ -156,6 +167,33 @@ export const COMMON_CURRENCIES = [
   '₽', '$', '€', '£', '¥', '₸', '₴', '₾', 'CHF',
   'BTC', 'ETH', 'USDT', 'USDC', 'TON', 'SOL',
 ];
+
+export const DEFAULT_ACCENT_COLOR   = '#7c3aed';
+export const CHART_COLOR_INCOME     = '#22c55e';
+export const CHART_COLOR_EXPENSE    = '#ef4444';
+export const CHART_PALETTE = [
+  '#6366f1','#f59e0b','#10b981','#f43f5e','#3b82f6',
+  '#8b5cf6','#14b8a6','#fb923c','#22c55e','#a855f7',
+  '#06b6d4','#84cc16','#e879f9','#64748b',
+];
+
+export const CHART_SVG_HEIGHT             = 340;
+export const CHART_SVG_PAD_LEFT           = 45;
+export const CHART_SVG_PAD_RIGHT          = 12;
+export const CHART_SVG_PAD_TOP            = 18;
+export const CHART_SVG_PAD_BOTTOM         = 96;
+export const CHART_MIN_GROUP_MOBILE       = 35;
+export const CHART_MIN_GROUP_DESKTOP      = 60;
+export const CHART_MAX_BAR_W_MOBILE       = 20;
+export const CHART_MAX_BAR_W_SMALL        = 50;
+export const CHART_MAX_BAR_W_MED          = 30;
+export const CHART_MAX_BAR_W_LARGE        = 20;
+export const CHART_BAR_RATIO_MOBILE       = 0.40;
+export const CHART_BAR_RATIO_DESKTOP      = 0.35;
+export const CHART_MAX_ITEMS              = 20;
+export const CHART_BAR_GAP                = 2;
+export const CHART_BAR_RADIUS             = 3;
+export const CHART_LABEL_ROTATE_THRESHOLD = 10;
 
 export const CREDIT_PAGE_SIZE = 20;
 export const CREDIT_PAYMENT_PAGE_SIZE = 15;

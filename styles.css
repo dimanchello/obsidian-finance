@@ -2310,6 +2310,9 @@
 }
 
 .finance-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   padding: 10px 14px;
   cursor: pointer;
   font-size: 14px;
@@ -2831,3 +2834,90 @@
 
 .finance-more-btn { border: 2px solid transparent; }
 .finance-more-btn.is-active-mode { border-color: var(--ft-accent); }
+
+/* ── Credit & Deposit analytics ─────────────────────────────────────────── */
+.finance-credit-analytics-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.finance-analytics-section-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin: 20px 0 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.finance-analytics-month-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin: 12px 0 6px;
+}
+
+.finance-credit-progress-list {
+  margin-top: 8px;
+}
+
+.finance-credit-progress-item {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.finance-credit-progress-item:last-child {
+  border-bottom: none;
+}
+
+.finance-credit-progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 4px;
+}
+
+.finance-credit-progress-name {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.finance-credit-progress-pct {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ft-accent);
+}
+
+.finance-credit-progress-sub {
+  display: flex;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.finance-credit-progress-bank { color: var(--text-muted); }
+.finance-credit-progress-date { color: var(--text-muted); }
+.finance-credit-progress-amount { margin-left: auto; font-weight: 500; color: var(--text-normal); }
+
+.finance-maturity-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.finance-stat-neutral .finance-stat-value { color: var(--text-normal); }
+
+@media (max-width: 480px) {
+  .finance-credit-analytics-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .finance-credit-progress-sub {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+}

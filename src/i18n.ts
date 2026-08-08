@@ -439,6 +439,33 @@ export interface Translations {
   importEmptyFile: string;
   exportFormatCsv: string;
   exportFormatJson: string;
+  // Analytics shared
+  dateRange: string;
+  groupByType: string;
+  groupByBank: string;
+  groupByQuarter: string;
+  list: string;
+  // Credits analytics
+  creditAnalytics: string;
+  creditTotalBorrowed: string;
+  creditTotalRemaining: string;
+  creditTotalPaid: string;
+  creditTotalInterest: string;
+  creditRepaymentProgress: string;
+  creditPaymentSchedule: string;
+  creditByType: string;
+  creditNoAnalyticsData: string;
+  // Deposits analytics
+  depositAnalytics: string;
+  depositTotalBalance: string;
+  depositTotalAccrued: string;
+  depositProjectedIncome: string;
+  depositAvgRate: string;
+  depositInterestSchedule: string;
+  depositMaturityTimeline: string;
+  depositByType: string;
+  depositNoAnalyticsData: string;
+  depositMaturitySoon: string;
 }
 
 const ru: Translations = {
@@ -873,6 +900,30 @@ const ru: Translations = {
   importEmptyFile: 'Файл пустой',
   exportFormatCsv: 'CSV',
   exportFormatJson: 'JSON',
+  dateRange: 'Диапазон дат',
+  groupByType: 'По типу',
+  groupByBank: 'По банку',
+  groupByQuarter: 'По кварталу',
+  list: 'Список',
+  creditAnalytics: 'Аналитика кредитов',
+  creditTotalBorrowed: 'Итого взято',
+  creditTotalRemaining: 'Остаток долга',
+  creditTotalPaid: 'Уже выплачено',
+  creditTotalInterest: 'Переплата',
+  creditRepaymentProgress: 'Прогресс погашения',
+  creditPaymentSchedule: 'График платежей',
+  creditByType: 'По типу кредита',
+  creditNoAnalyticsData: 'Нет данных для аналитики',
+  depositAnalytics: 'Аналитика вкладов',
+  depositTotalBalance: 'Итого на вкладах',
+  depositTotalAccrued: 'Начислено %',
+  depositProjectedIncome: 'Прогноз дохода',
+  depositAvgRate: 'Средняя ставка',
+  depositInterestSchedule: 'График начислений',
+  depositMaturityTimeline: 'Сроки закрытия',
+  depositByType: 'По типу вклада',
+  depositNoAnalyticsData: 'Нет данных для аналитики',
+  depositMaturitySoon: 'Закрытие в ближайшие 6 мес.',
 };
 
 const en: Translations = {
@@ -1307,6 +1358,30 @@ const en: Translations = {
   importEmptyFile: 'File is empty',
   exportFormatCsv: 'CSV',
   exportFormatJson: 'JSON',
+  dateRange: 'Date range',
+  groupByType: 'By type',
+  groupByBank: 'By bank',
+  groupByQuarter: 'By quarter',
+  list: 'List',
+  creditAnalytics: 'Credit analytics',
+  creditTotalBorrowed: 'Total borrowed',
+  creditTotalRemaining: 'Total remaining',
+  creditTotalPaid: 'Total paid',
+  creditTotalInterest: 'Total interest',
+  creditRepaymentProgress: 'Repayment progress',
+  creditPaymentSchedule: 'Payment schedule',
+  creditByType: 'By credit type',
+  creditNoAnalyticsData: 'No analytics data',
+  depositAnalytics: 'Deposit analytics',
+  depositTotalBalance: 'Total balance',
+  depositTotalAccrued: 'Total accrued',
+  depositProjectedIncome: 'Projected income',
+  depositAvgRate: 'Average rate',
+  depositInterestSchedule: 'Accrual schedule',
+  depositMaturityTimeline: 'Maturity timeline',
+  depositByType: 'By deposit type',
+  depositNoAnalyticsData: 'No analytics data',
+  depositMaturitySoon: 'Closing within 6 months',
 };
 
 const translations: Record<Locale, Translations> = { ru, en };

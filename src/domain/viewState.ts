@@ -1,6 +1,7 @@
 import {
   DebtFilterState, CreditFilterState, DepositFilterState, FilterState, SortDir, ViewState,
   DEFAULT_FILTER, DEFAULT_SORT, DEFAULT_DEBT_FILTER, DEFAULT_CREDIT_FILTER, DEFAULT_DEPOSIT_FILTER,
+  CreditAnalyticsGroupBy, DepositAnalyticsGroupBy,
 } from '../types';
 
 function isObject(v: unknown): v is Record<string, unknown> {
@@ -106,6 +107,14 @@ export function defaultViewState(pageSize: number): ViewState {
     creditPage: 0,
     depositPage: 0,
     pageSize,
+    creditActiveTab: 'list',
+    creditAnalyticsGroupBy: 'month',
+    creditAnalyticsDateFrom: '',
+    creditAnalyticsDateTo: '',
+    depositActiveTab: 'list',
+    depositAnalyticsGroupBy: 'month',
+    depositAnalyticsDateFrom: '',
+    depositAnalyticsDateTo: '',
   };
 }
 
@@ -142,6 +151,18 @@ export function parseViewState(raw: unknown, pageSize: number): ViewState {
   if (debtsColumns) state.debtsColumns = debtsColumns;
   if (creditsColumns) state.creditsColumns = creditsColumns;
   if (depositsColumns) state.depositsColumns = depositsColumns;
+
+  const CREDIT_ANALYTICS_GROUP_BY: readonly CreditAnalyticsGroupBy[] = ['month', 'quarter', 'year', 'type', 'bank'];
+  const DEPOSIT_ANALYTICS_GROUP_BY: readonly DepositAnalyticsGroupBy[] = ['month', 'quarter', 'year', 'type', 'bank'];
+
+  state.creditActiveTab = oneOf(raw.creditActiveTab, ['list', 'analytics'] as const, 'list');
+  state.creditAnalyticsGroupBy = oneOf(raw.creditAnalyticsGroupBy, CREDIT_ANALYTICS_GROUP_BY, 'month');
+  state.creditAnalyticsDateFrom = str(raw.creditAnalyticsDateFrom, '');
+  state.creditAnalyticsDateTo = str(raw.creditAnalyticsDateTo, '');
+  state.depositActiveTab = oneOf(raw.depositActiveTab, ['list', 'analytics'] as const, 'list');
+  state.depositAnalyticsGroupBy = oneOf(raw.depositAnalyticsGroupBy, DEPOSIT_ANALYTICS_GROUP_BY, 'month');
+  state.depositAnalyticsDateFrom = str(raw.depositAnalyticsDateFrom, '');
+  state.depositAnalyticsDateTo = str(raw.depositAnalyticsDateTo, '');
 
   return state;
 }

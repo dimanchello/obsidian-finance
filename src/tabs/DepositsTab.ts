@@ -13,6 +13,7 @@ import { getTodayStr, getTodayTime } from '../utils';
 import { addMonthsClamped, daysBetweenStr } from '../domain/dateMath';
 import { sumMoney } from '../domain/money';
 import { DataTable, FilterControl } from '../ui/DataTable';
+import { DepositsAnalyticsView } from '../DepositsAnalyticsView';
 
 export class DepositsTab {
   private ctx: ViewContext;
@@ -89,11 +90,29 @@ export class DepositsTab {
         setColumns: c => { this.ctx.state.depositsColumns = c; },
       },
       renderStats: host => this.renderStats(host),
-      toolbarButtons: toolbar => {
+      toolbarButtons: (toolbar, rerender) => {
         const btn = toolbar.createEl('button', { cls: 'finance-add-btn finance-accent-btn' });
         btn.createEl('span', { text: '＋', cls: 'btn-icon' });
         btn.createEl('span', { text: this.tr.newDeposit });
         btn.addEventListener('click', () => this.openNewDepositModal());
+
+        const open = (this.ctx.state.depositActiveTab ?? 'list') === 'analytics';
+        const toggleBtn = toolbar.createEl('button', {
+          cls: `finance-analytics-toggle-btn${open ? ' active' : ''}`,
+          text: `📈 ${this.tr.analytics} ${open ? '▲' : '▼'}`,
+        });
+        toggleBtn.addEventListener('click', () => {
+          this.ctx.state.depositActiveTab = open ? 'list' : 'analytics';
+          this.ctx.saveState();
+          rerender();
+        });
+      },
+      renderPanels: host => {
+        if ((this.ctx.state.depositActiveTab ?? 'list') === 'analytics') {
+          const panel = host.createDiv('finance-analytics-panel');
+          const deposits = this.ctx.data?.deposits ?? [];
+          new DepositsAnalyticsView(panel, deposits, this.ctx).render();
+        }
       },
       emptyState: { icon: '📈', title: this.tr.noDeposits, subtitle: this.tr.addNewDebt },
       emptyFiltered: { icon: '🔍', title: this.tr.noDepositsFiltered, subtitle: this.tr.tryChangeFilters },
@@ -126,6 +145,7 @@ export class DepositsTab {
     }
     this.ctx.state.depositFilter ??= { ...DEFAULT_DEPOSIT_FILTER };
     this.el.empty();
+
     this.table.render(this.el);
   }
 

@@ -5,6 +5,7 @@ import {
   DEFAULT_FILTER,
   SortField,
   PAGE_SIZE_OPTIONS,
+  DEFAULT_ACCENT_COLOR,
 } from '../types';
 import { RecordModal } from '../RecordModal';
 import { ConfirmModal } from '../ConfirmModal';
@@ -442,7 +443,7 @@ export class RecordsTab {
     acRow.createEl('label', { text: this.tr.accentColor, cls: 'finance-filter-label' });
     const acC = acRow.createDiv('finance-settings-controls');
     const acIn = acC.createEl('input', { type: 'color', cls: 'finance-settings-color-input' });
-    acIn.value = this.ctx.data.accentColor ?? '#7c3aed';
+    acIn.value = this.ctx.data.accentColor ?? DEFAULT_ACCENT_COLOR;
     const hexLabel = acC.createEl('span', { text: acIn.value, cls: 'finance-settings-hex' });
     acIn.addEventListener('input', async () => {
       hexLabel.textContent = acIn.value;
@@ -455,8 +456,8 @@ export class RecordsTab {
       await this.ctx.storage.updateMeta(this.ctx.accountId, { accentColor: '' });
       this.ctx.data = await this.ctx.storage.load(this.ctx.accountId);
       this.applyAccentColor('');
-      acIn.value = '#7c3aed';
-      hexLabel.textContent = '#7c3aed';
+      acIn.value = DEFAULT_ACCENT_COLOR;
+      hexLabel.textContent = DEFAULT_ACCENT_COLOR;
     });
 
     const ieRow = row();
