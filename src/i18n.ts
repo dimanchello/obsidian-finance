@@ -395,6 +395,8 @@ export interface Translations {
   fieldDescCreditType: string;
   fieldDescCreditMonthlyPayment: string;
   fieldDescCreditBank: string;
+  isEscrowLabel: string;
+  isEscrowDesc: string;
   fieldDescDebtAmount: string;
   fieldDescDebtRate: string;
   fieldDescDebtDateCreated: string;
@@ -827,6 +829,8 @@ const ru: Translations = {
   fieldDescCreditType: 'Тип кредита: потребительский, автокредит или ипотека. Влияет на группировку и фильтрацию.',
   fieldDescCreditMonthlyPayment: 'Фиксированная сумма, которую нужно платить каждый месяц. Рассчитывается автоматически на основе суммы, ставки и срока.',
   fieldDescCreditBank: 'Название банка, в котором оформлен кредит. Используется для группировки и фильтрации.',
+  isEscrowLabel: 'Средства на эскроу-счёт',
+  isEscrowDesc: 'Деньги перечислены банком застройщику через эскроу-счёт и не поступают на баланс счёта',
   fieldDescDebtAmount: 'Сумма долга. Если указан процент, итоговая сумма будет увеличена на процент.',
   fieldDescDebtRate: 'Процент за пользование деньгами. Итоговая сумма долга = сумма + процент.',
   fieldDescDebtDateCreated: 'Дата, когда долг был оформлен.',
@@ -1259,6 +1263,8 @@ const en: Translations = {
   fieldDescCreditType: 'Credit type: consumer, auto loan, or mortgage. Used for grouping and filtering.',
   fieldDescCreditMonthlyPayment: 'Fixed monthly payment amount. Calculated automatically based on amount, rate, and term.',
   fieldDescCreditBank: 'Bank name where the loan was taken. Used for grouping and filtering.',
+  isEscrowLabel: 'Funds via escrow account',
+  isEscrowDesc: 'Funds are transferred by the bank to the developer via escrow and do not appear in your account balance',
   fieldDescDebtAmount: 'Debt amount. If interest is set, the total amount is increased by the interest.',
   fieldDescDebtRate: 'Interest rate for borrowing. Total debt = amount + interest.',
   fieldDescDebtDateCreated: 'Date when the debt was created.',

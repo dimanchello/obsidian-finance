@@ -9,7 +9,7 @@ import { DepositModal } from '../DepositModal';
 import { DepositTopUpModal } from '../DepositTopUpModal';
 import { DepositWithdrawalModal } from '../DepositWithdrawalModal';
 import { ConfirmModal } from '../ConfirmModal';
-import { getTodayStr } from '../utils';
+import { getTodayStr, getTodayTime } from '../utils';
 import { addMonthsClamped, daysBetweenStr } from '../domain/dateMath';
 import { sumMoney } from '../domain/money';
 import { DataTable, FilterControl } from '../ui/DataTable';
@@ -18,6 +18,7 @@ export class DepositsTab {
   private ctx: ViewContext;
   private el: HTMLElement;
   private table: DataTable<DepositRecord>;
+  private depositAccrualPages = new Map<string, number>();
   onUpdate: (() => void) | null = null;
 
   private get tr() { return this.ctx.tr; }
@@ -103,7 +104,11 @@ export class DepositsTab {
 
         const otherRecords = this.ctx.data!.records.filter(r => !r.linkedId || !idSet.has(r.linkedId));
         for (const deposit of depositsToDelete) {
-          if (deposit.status === 'active') otherRecords.push(this.refundRecord(deposit));
+          if (deposit.status === 'active') {
+            const refund = this.refundRecord(deposit);
+            delete refund.linkedId;
+            otherRecords.push(refund);
+          }
         }
         await this.ctx.storage.saveAllRecords(this.ctx.accountId, otherRecords);
         await this.reload(this.tr.deleted);
@@ -166,7 +171,7 @@ export class DepositsTab {
       id: crypto.randomUUID(),
       createdAt: Date.now(),
       date: getTodayStr(),
-      time: new Date().toTimeString().slice(0, 5),
+      time: getTodayTime(),
       type: 'income',
       amount: deposit.amount,
       category: this.tr.depositRefundCat,
@@ -379,7 +384,17 @@ export class DepositsTab {
       return;
     }
 
-    const pageAccruals = deposit.accruals.slice(0, DEPOSIT_ACCRUAL_PAGE_SIZE);
+    const totalPages = Math.max(1, Math.ceil(deposit.accruals.length / DEPOSIT_ACCRUAL_PAGE_SIZE));
+    let page = this.depositAccrualPages.get(deposit.id);
+    if (page === undefined) {
+      const lastPaidIdx = deposit.accruals.findLastIndex(a => a.status === 'paid');
+      page = lastPaidIdx >= 0 ? Math.floor(lastPaidIdx / DEPOSIT_ACCRUAL_PAGE_SIZE) : 0;
+    }
+    page = Math.max(0, Math.min(page, totalPages - 1));
+    this.depositAccrualPages.set(deposit.id, page);
+    const start = page * DEPOSIT_ACCRUAL_PAGE_SIZE;
+    const pageAccruals = deposit.accruals.slice(start, start + DEPOSIT_ACCRUAL_PAGE_SIZE);
+
     const scrollWrapper = wrapper.createDiv('finance-mov-scroll');
     const movTable = scrollWrapper.createEl('table', { cls: 'finance-mov-table' });
     const movHead = movTable.createEl('thead').createEl('tr');
@@ -391,7 +406,7 @@ export class DepositsTab {
     pageAccruals.forEach((a, idx) => {
       const isPaid = a.status === 'paid' || a.dueDate <= today;
       const mr = movBody.createEl('tr', { cls: isPaid ? 'finance-payment-paid' : 'finance-payment-pending' });
-      mr.createEl('td', { text: String(idx + 1), cls: 'finance-td' });
+      mr.createEl('td', { text: String(start + idx + 1), cls: 'finance-td' });
       mr.createEl('td', { text: this.ctx.fmtDate(a.dueDate, a.paidDate), cls: 'finance-td' });
       mr.createEl('td', { text: this.ctx.fmt(a.amount), cls: 'finance-td' });
       const statusText = isPaid
@@ -400,12 +415,42 @@ export class DepositsTab {
       mr.createEl('td', { text: statusText, cls: 'finance-td finance-payment-status' });
     });
 
-    if (deposit.accruals.length > DEPOSIT_ACCRUAL_PAGE_SIZE) {
-      wrapper.createDiv({
-        cls: 'finance-deposit-pag-info',
-        text: `1–${DEPOSIT_ACCRUAL_PAGE_SIZE} ${this.tr.fromLower} ${deposit.accruals.length}`,
+    if (totalPages > 1) {
+      const pagNav = wrapper.createDiv('finance-pagination-nav finance-panel-pagination');
+      const go = (newPage: number) => {
+        this.depositAccrualPages.set(deposit.id, newPage);
+        parent.empty();
+        this.renderDepositAccrualsPanel(parent, deposit);
+      };
+
+      const prev = pagNav.createEl('button', { cls: 'finance-page-btn', text: '←' });
+      prev.disabled = page === 0;
+      prev.addEventListener('click', () => go(page - 1));
+
+      this.accrualPageRange(page, totalPages).forEach(p => {
+        if (p === -1) { pagNav.createEl('span', { text: '…', cls: 'finance-page-ellipsis' }); return; }
+        const btn = pagNav.createEl('button', {
+          text: String(p + 1),
+          cls: `finance-page-btn${p === page ? ' active' : ''}`,
+        });
+        btn.addEventListener('click', () => go(p));
       });
+
+      const next = pagNav.createEl('button', { cls: 'finance-page-btn', text: '→' });
+      next.disabled = page >= totalPages - 1;
+      next.addEventListener('click', () => go(page + 1));
     }
+  }
+
+  private accrualPageRange(cur: number, total: number): number[] {
+    if (total <= 7) return Array.from({ length: total }, (_, i) => i);
+    const radius = this.ctx.isMobile ? 1 : 3;
+    const p: number[] = [0];
+    if (cur > radius + 1) p.push(-1);
+    for (let i = Math.max(1, cur - radius); i <= Math.min(total - 2, cur + radius); i++) p.push(i);
+    if (cur < total - (radius + 2)) p.push(-1);
+    p.push(total - 1);
+    return p;
   }
 
   // ── Modals ──────────────────────────────────────────────────────────────
@@ -425,7 +470,7 @@ export class DepositsTab {
           id: crypto.randomUUID(),
           createdAt: Date.now(),
           date: deposit.startDate,
-          time: new Date().toTimeString().slice(0, 5),
+          time: getTodayTime(),
           type: 'expense',
           amount: deposit.amount,
           category: this.tr.depositDefaultCat,
@@ -463,7 +508,7 @@ export class DepositsTab {
             id: crypto.randomUUID(),
             createdAt: Date.now(),
             date: updated.startDate,
-            time: new Date().toTimeString().slice(0, 5),
+            time: getTodayTime(),
             type: 'expense',
             amount: updated.amount,
             category: this.tr.depositDefaultCat,
@@ -535,10 +580,11 @@ export class DepositsTab {
   }
 
   private openDepositWithdrawalModal(deposit: DepositRecord): void {
+    const alreadyWithdrawn = sumMoney(deposit.withdrawals.map(w => w.amount));
     new DepositWithdrawalModal(this.ctx.app, {
       title: `${this.tr.withdraw} — ${deposit.name}`,
       deposit,
-      maxAmount: deposit.amount,
+      maxAmount: Math.max(0, deposit.amount - alreadyWithdrawn),
       currency: this.ctx.currency,
       onSave: async withdrawal => {
         await this.ctx.storage.addDepositWithdrawal(this.ctx.accountId, deposit.id, withdrawal);

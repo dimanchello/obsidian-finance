@@ -16,7 +16,8 @@ export interface FinanceRecord {
   note:           string;
   attachmentPath: string;
   isInternal?:    boolean;  // if true, excluded from income/expense stats
-  linkedId?:      string;   // links to credit/deposit/debt record (hidden from UI)
+  linkedId?:        string;   // links to credit/deposit/debt record (hidden from UI)
+  linkedMovementId?: string | undefined;   // links to the specific DebtMovement within a debt
   exchangeRate?:  number | undefined;   // optional currency exchange rate (e.g., 95.5 for ₽→$)
 }
 
@@ -209,6 +210,7 @@ export interface CreditRecord {
   downPaymentValue?: number;
   downPaymentDate?: string;
   downPaymentRecordId?: string | undefined;
+  isEscrow?: boolean; // funds go to developer via escrow account, not added to balance
 }
 
 export type DepositType = 'term' | 'demand' | 'savings';

@@ -1,4 +1,4 @@
-import { App } from 'obsidian';
+import { App, Platform } from 'obsidian';
 import { FinanceStorage } from './storage';
 import { AccountData, PluginSettings, ViewState, MOBILE_BREAKPOINT } from './types';
 import { fmt, fmtDate } from './utils';
@@ -36,7 +36,7 @@ export class ViewContext {
     this.container = container;
     this.locale = getLocaleFromApp(app);
     this.tr = t(this.locale);
-    this.isMobile = (app as any).isMobile ?? window.innerWidth <= MOBILE_BREAKPOINT;
+    this.isMobile = Platform.isMobile || window.innerWidth <= MOBILE_BREAKPOINT;
     this._state = defaultViewState(this.settings.defaultPageSize);
   }
 
@@ -62,7 +62,9 @@ export class ViewContext {
 
   /** state.json is the single source of truth: it survives reinstalls and travels with the account. */
   saveState(): void {
-    this.storage.saveViewState(this.accountId, { ...this._state, page: 0 }).catch(() => {});
+    this.storage.saveViewState(this.accountId, { ...this._state, page: 0 }).catch((e: unknown) => {
+      console.error('[finance] saveState failed:', e);
+    });
   }
 
   async loadStateFromFile(): Promise<void> {

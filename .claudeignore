@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.git/
+.idea/
+.claude/
+assets/
+package-lock.json
+README.md
+README.en.md
+AGENTS.md
+LICENSE

@@ -26,6 +26,7 @@ export class RecordModal extends Modal {
   private tr: Translations;
   private o:   RecordModalOptions;
   private rec: Partial<FinanceRecord>;
+  private uploadInProgress = false;
 
   private amountInput!:      HTMLInputElement;
   private amountHandle!:     AmountInputHandle;
@@ -361,8 +362,10 @@ export class RecordModal extends Modal {
     }
 
     fi.addEventListener('change', async () => {
+      if (this.uploadInProgress) return;
       const file = fi.files?.[0];
       if (!file) return;
+      this.uploadInProgress = true;
       nameEl.textContent = file.name;
 
       if (file.type.startsWith('image/')) {
@@ -394,6 +397,7 @@ export class RecordModal extends Modal {
         nameEl.textContent = `✓ ${file.name}`;
         nameEl.classList.add('finance-attach-ok');
       } catch { new Notice(this.tr.saveError); }
+      finally { this.uploadInProgress = false; }
     });
   }
 

@@ -228,8 +228,8 @@ export class ImportExportModal extends Modal {
       const arr = tryArr(node);
       if (!arr) { new Notice(this.tr.arrayNotFound); return; }
       this.setRawData(arr);
-      const next = container.createDiv();
-      this.renderMappingStep(next);
+      container.empty();
+      this.renderMappingStep(container);
     });
   }
 

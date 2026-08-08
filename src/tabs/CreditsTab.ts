@@ -9,7 +9,7 @@ import { CreditModal } from '../CreditModal';
 import { CreditPaymentModal } from '../CreditPaymentModal';
 import { CreditEarlyRepaymentModal } from '../CreditEarlyRepaymentModal';
 import { ConfirmModal } from '../ConfirmModal';
-import { getTodayStr } from '../utils';
+import { getTodayStr, getTodayTime } from '../utils';
 import { addMonthsClamped, daysBetweenStr } from '../domain/dateMath';
 import { round2, sumMoney } from '../domain/money';
 import { DataTable, FilterControl } from '../ui/DataTable';
@@ -366,7 +366,7 @@ export class CreditsTab {
   // ── Modals ──────────────────────────────────────────────────────────────
 
   private nowTime(): string {
-    return new Date().toTimeString().slice(0, 5);
+    return getTodayTime();
   }
 
   private openNewCreditModal(): void {
@@ -379,20 +379,22 @@ export class CreditsTab {
       onSave: async (credit, updatedRecords) => {
         await this.ctx.storage.addCredit(this.ctx.accountId, credit);
         const nowTime = this.nowTime();
-        updatedRecords.push({
-          id: crypto.randomUUID(),
-          createdAt: Date.now(),
-          date: credit.startDate,
-          time: nowTime,
-          type: 'income',
-          amount: credit.originalAmount,
-          category: this.tr.creditDefaultCat,
-          tag: '',
-          payer: credit.bankName,
-          note: `${this.tr.creditReceiptNote} "${credit.name}"`,
-          attachmentPath: '',
-          linkedId: credit.id,
-        });
+        if (!credit.isEscrow) {
+          updatedRecords.push({
+            id: crypto.randomUUID(),
+            createdAt: Date.now(),
+            date: credit.startDate,
+            time: nowTime,
+            type: 'income',
+            amount: credit.originalAmount,
+            category: this.tr.creditDefaultCat,
+            tag: '',
+            payer: credit.bankName,
+            note: `${this.tr.creditReceiptNote} "${credit.name}"`,
+            attachmentPath: '',
+            linkedId: credit.id,
+          });
+        }
         for (const payment of credit.payments) {
           if (payment.status === 'paid') {
             updatedRecords.push({
@@ -430,11 +432,30 @@ export class CreditsTab {
         const nowTime = this.nowTime();
 
         const receiptRec = updatedRecords.find(r => r.linkedId === updated.id && r.type === 'income');
-        if (receiptRec) {
+        if (updated.isEscrow) {
+          if (receiptRec) {
+            updatedRecords.splice(updatedRecords.indexOf(receiptRec), 1);
+          }
+        } else if (receiptRec) {
           receiptRec.amount = updated.originalAmount;
           receiptRec.date = updated.startDate;
           receiptRec.payer = updated.bankName;
           receiptRec.note = `${this.tr.creditReceiptNote} "${updated.name}"`;
+        } else {
+          updatedRecords.push({
+            id: crypto.randomUUID(),
+            createdAt: Date.now(),
+            date: updated.startDate,
+            time: nowTime,
+            type: 'income',
+            amount: updated.originalAmount,
+            category: this.tr.creditDefaultCat,
+            tag: '',
+            payer: updated.bankName,
+            note: `${this.tr.creditReceiptNote} "${updated.name}"`,
+            attachmentPath: '',
+            linkedId: updated.id,
+          });
         }
 
         for (const payment of updated.payments) {
@@ -471,12 +492,12 @@ export class CreditsTab {
       title: `💰 ${this.tr.paymentLabel} — ${credit.name}`,
       credit,
       onSave: async payment => {
-        credit.payments.push(payment);
-        const paidAmount = sumMoney(credit.payments.filter(p => p.status === 'paid').map(p => p.amount));
-        const totalToPay = round2(credit.monthlyPayment * credit.termMonths);
-        credit.currentAmount = Math.max(0, round2(totalToPay - paidAmount));
-        if (paidAmount >= totalToPay) credit.status = 'paid';
-        await this.ctx.storage.updateCredit(this.ctx.accountId, credit);
+        const updatedCredit = { ...credit, payments: [...credit.payments, payment] };
+        const paidAmount = sumMoney(updatedCredit.payments.filter(p => p.status === 'paid').map(p => p.amount));
+        const totalToPay = round2(updatedCredit.monthlyPayment * updatedCredit.termMonths);
+        updatedCredit.currentAmount = Math.max(0, round2(totalToPay - paidAmount));
+        if (paidAmount >= totalToPay) updatedCredit.status = 'paid';
+        await this.ctx.storage.updateCredit(this.ctx.accountId, updatedCredit);
 
         const rec: FinanceRecord = {
           id: crypto.randomUUID(),
@@ -487,11 +508,11 @@ export class CreditsTab {
           amount: payment.amount,
           category: this.tr.creditDefaultCat,
           tag: '',
-          payer: credit.bankName,
-          note: `${this.tr.creditPaymentNote} "${credit.name}"`,
+          payer: updatedCredit.bankName,
+          note: `${this.tr.creditPaymentNote} "${updatedCredit.name}"`,
           attachmentPath: '',
           isInternal: false,
-          linkedId: credit.id,
+          linkedId: updatedCredit.id,
         };
         await this.ctx.storage.addRecord(this.ctx.accountId, rec);
         await this.reload(this.tr.creditPaymentRecorded);

@@ -153,7 +153,7 @@ export class CreditEarlyRepaymentModal extends Modal {
           }
 
           const stillPending = this.credit.payments.filter(p => p.status === 'pending');
-          this.credit.currentAmount = stillPending.reduce((s, p) => s + p.amount, 0);
+          this.credit.currentAmount = sumMoney(stillPending.map(p => p.amount));
           this.credit.status = stillPending.length === 0 ? 'paid' : 'active';
         }
 

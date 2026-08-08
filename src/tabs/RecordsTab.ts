@@ -11,7 +11,7 @@ import { ConfirmModal } from '../ConfirmModal';
 import { ImportExportModal } from '../ImportExportModal';
 import { AnalyticsView, type BarClickAction } from '../AnalyticsView';
 import { noteFilename } from '../utils';
-import { isoWeekRange } from '../domain/dateMath';
+import { isoWeekRange, daysInMonth } from '../domain/dateMath';
 import { DataTable, DataTableApi, FilterControl } from '../ui/DataTable';
 
 type Panel = 'analytics' | 'filters' | 'settings';
@@ -398,7 +398,7 @@ export class RecordsTab {
       f.dateTo = `${rawKey}-12-31`;
     } else if (groupBy === 'month') {
       const [y, m] = rawKey.split('-');
-      const lastDay = new Date(Number(y), Number(m), 0).getDate();
+      const lastDay = daysInMonth(Number(y), Number(m));
       f.category = ''; f.payer = '';
       f.dateFrom = `${y}-${m}-01`;
       f.dateTo = `${y}-${m}-${String(lastDay).padStart(2, '0')}`;

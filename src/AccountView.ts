@@ -221,8 +221,8 @@ export class AccountView extends MarkdownRenderChild {
       el.removeClass('finance-title-editing');
       const val = el.textContent?.trim() || current;
       if (val !== current && this.data) {
-        this.data.name = val;
         await this.storage.updateMeta(this.accountId, { name: val });
+        this.data.name = val;
       }
       el.textContent = val;
     };

@@ -67,6 +67,7 @@ export class CreditModal extends Modal {
           downPaymentValue: 0,
           downPaymentDate: '',
           downPaymentRecordId: undefined,
+          isEscrow: false,
         };
   }
 
@@ -264,7 +265,31 @@ export class CreditModal extends Modal {
       const opt = typeSel.createEl('option', { value: t.value, text: t.label });
       if (t.value === this.credit.type) opt.selected = true;
     });
-    typeSel.addEventListener('change', () => { this.credit.type = typeSel.value as CreditType; });
+    // === РЯД 4.5: Эскроу (только для ипотеки) ===
+    const rowEscrow = form.createDiv('finance-form-row finance-full-width');
+    const escrowG = rowEscrow.createDiv('finance-field-group finance-full-width');
+    const escrowLabel = escrowG.createEl('label', { cls: 'finance-checkbox-label finance-escrow-label' });
+    const escrowCheck = escrowLabel.createEl('input', { type: 'checkbox', cls: 'finance-checkbox' });
+    escrowCheck.checked = this.credit.isEscrow ?? false;
+    escrowLabel.createSpan({ text: this.tr.isEscrowLabel });
+    escrowG.createEl('p', { text: this.tr.isEscrowDesc, cls: 'finance-field-hint' });
+
+    const setEscrowRowVisible = (visible: boolean) => {
+      rowEscrow.style.display = visible ? '' : 'none';
+    };
+    setEscrowRowVisible(this.credit.type === 'mortgage');
+
+    escrowCheck.addEventListener('change', () => { this.credit.isEscrow = escrowCheck.checked; });
+
+    typeSel.addEventListener('change', () => {
+      this.credit.type = typeSel.value as CreditType;
+      const isMortgage = this.credit.type === 'mortgage';
+      setEscrowRowVisible(isMortgage);
+      if (!isMortgage) {
+        this.credit.isEscrow = false;
+        escrowCheck.checked = false;
+      }
+    });
 
     // === РЯД 5: Примечание (на всю ширину) ===
     const row5 = form.createDiv('finance-form-row finance-full-width');

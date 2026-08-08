@@ -5,7 +5,7 @@
   "main": "main.js",
   "scripts": {
     "dev": "node esbuild.config.mjs",
-    "build": "tsc --noEmit --skipLibCheck && tsc --noEmit --skipLibCheck -p src/__tests__ && node esbuild.config.mjs production",
+    "build": "tsc --noEmit && tsc --noEmit -p src/__tests__ && node esbuild.config.mjs production",
     "lint": "eslint src/",
     "test": "vitest run",
     "test:watch": "vitest"
@@ -17,10 +17,11 @@
     "@types/node": "^20.0.0",
     "@typescript-eslint/eslint-plugin": "^8.59.4",
     "@typescript-eslint/parser": "^8.59.4",
+    "@vitest/coverage-v8": "^2.1.9",
     "builtin-modules": "^3.3.0",
     "esbuild": "^0.28.0",
-    "eslint": "^10.4.0",
-    "obsidian": "latest",
+    "eslint": "^9.0.0",
+    "obsidian": "1.7.2",
     "tslib": "^2.6.0",
     "typescript": "^5.3.0",
     "vitest": "^2.0.0"

@@ -9,6 +9,7 @@ import { DebtModal } from '../DebtModal';
 import { DebtMovementModal } from '../DebtMovementModal';
 import { ConfirmModal } from '../ConfirmModal';
 import { round2, sumMoney } from '../domain/money';
+import { getTodayTime } from '../utils';
 import { DataTable, FilterControl } from '../ui/DataTable';
 
 export class DebtsTab {
@@ -188,7 +189,7 @@ export class DebtsTab {
     const lentDebts = allDebts.filter(d => d.direction === 'lent');
     const borrowedDebts = allDebts.filter(d => d.direction !== 'lent');
     const remainingOf = (debts: DebtRecord[]) =>
-      sumMoney(debts.map(d => this.getDebtOriginal(d) - this.getDebtRepaid(d)));
+      sumMoney(debts.map(d => this.getDebtRemaining(d)));
 
     mkDebtCard(this.tr.lent, '💸', remainingOf(lentDebts), lentDebts.length, true);
     mkDebtCard(this.tr.borrowed, '💳', remainingOf(borrowedDebts), borrowedDebts.length, false);
@@ -257,7 +258,7 @@ export class DebtsTab {
     return rows.sort((a, b) => {
       let av: string | number, bv: string | number;
       switch (s.field) {
-        case 'amount': av = a.amount; bv = b.amount; break;
+        case 'amount': av = this.getDebtRemaining(a); bv = this.getDebtRemaining(b); break;
         case 'person': av = a.person; bv = b.person; break;
         default: av = a.date; bv = b.date;
       }
@@ -351,12 +352,12 @@ export class DebtsTab {
     new Notice(notice);
   }
 
-  private mirrorRecord(debt: DebtRecord, mov: { date: string; time: string; amount: number }, type: RecordType, note: string): FinanceRecord {
+  private mirrorRecord(debt: DebtRecord, mov: { id: string; date: string; time: string; amount: number }, type: RecordType, note: string): FinanceRecord {
     return {
       id: crypto.randomUUID(),
       createdAt: Date.now(),
       date: mov.date,
-      time: mov.time || new Date().toTimeString().slice(0, 5),
+      time: mov.time || getTodayTime(),
       type,
       amount: mov.amount,
       category: this.tr.debtDefaultCat,
@@ -365,6 +366,7 @@ export class DebtsTab {
       note,
       attachmentPath: '',
       linkedId: debt.id,
+      linkedMovementId: mov.id,
     };
   }
 
@@ -377,7 +379,7 @@ export class DebtsTab {
       allPersons: this.ctx.data.payers,
       onSave: async debt => {
         const note = debt.direction === 'lent' ? this.tr.lentGiven : this.tr.borrowedTaken;
-        debt.movements = [{
+        const initialMovement: DebtMovement = {
           id: crypto.randomUUID(),
           type: 'borrow',
           amount: debt.amount,
@@ -385,14 +387,15 @@ export class DebtsTab {
           time: debt.time,
           createdAt: debt.createdAt,
           note,
-        }];
+        };
+        debt.movements = [initialMovement];
         await this.ctx.storage.addDebt(this.ctx.accountId, debt);
 
         const recType: RecordType = debt.direction === 'lent' ? 'expense' : 'income';
         const recNote = debt.direction === 'lent'
           ? `${this.tr.debtLentNote}: ${debt.person}`
           : `${this.tr.debtBorrowedNote}: ${debt.person}`;
-        await this.ctx.storage.addRecord(this.ctx.accountId, this.mirrorRecord(debt, debt, recType, recNote));
+        await this.ctx.storage.addRecord(this.ctx.accountId, this.mirrorRecord(debt, initialMovement, recType, recNote));
         await this.reload(this.tr.debtAdded);
       },
     }).open();
@@ -454,7 +457,7 @@ export class DebtsTab {
         await this.ctx.storage.updateDebtMovement(this.ctx.accountId, debt.id, updated);
 
         const linkedRec = this.ctx.data?.records.find(r =>
-          r.linkedId === debt.id && r.date === oldDate && r.amount === oldAmount);
+          r.linkedId === debt.id && (r.linkedMovementId === mov.id || (r.date === oldDate && r.amount === oldAmount)));
         if (linkedRec) {
           linkedRec.date = updated.date;
           linkedRec.amount = updated.amount;
@@ -472,7 +475,7 @@ export class DebtsTab {
       await this.ctx.storage.deleteDebtMovement(this.ctx.accountId, debt.id, mov.id);
 
       const linkedRec = this.ctx.data?.records.find(r =>
-        r.linkedId === debt.id && r.date === mov.date && r.amount === mov.amount);
+        r.linkedId === debt.id && (r.linkedMovementId === mov.id || (r.date === mov.date && r.amount === mov.amount)));
       if (linkedRec) {
         await this.ctx.storage.deleteRecord(this.ctx.accountId, linkedRec.id);
       }
