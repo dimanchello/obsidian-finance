@@ -103,4 +103,12 @@ export function isoWeekRange(year: number, week: number): { from: string; to: st
   return { from: fmt(monday), to: fmt(sunday) };
 }
 
+/**
+ * Returns the number of days in a year (365 or 366 for leap years).
+ * Used for precise interest calculations that need actual/365 or actual/366 day count convention.
+ */
+export function daysInYear(year: number): number {
+  return isLeapYear(year) ? 366 : 365;
+}
+
 

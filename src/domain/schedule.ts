@@ -1,5 +1,5 @@
-import { CreditPayment, CreditRecord, DepositAccrual, DepositRecord, DAYS_IN_YEAR, PERCENT_100 } from '../types';
-import { addMonthsClamped, daysBetweenStr, parseDateStr } from './dateMath';
+import { CreditPayment, CreditRecord, DepositAccrual, DepositRecord, PERCENT_100 } from '../types';
+import { addMonthsClamped, daysBetweenStr, parseDateStr, daysInYear } from './dateMath';
 import { round2 } from './money';
 
 /** Everything non-deterministic is passed in — that is what makes these functions testable. */
@@ -8,8 +8,17 @@ export interface ScheduleDeps {
   newId: () => string;
 }
 
-function simpleInterest(principal: number, ratePercent: number, days: number): number {
-  return principal * (ratePercent / PERCENT_100) * days / DAYS_IN_YEAR;
+/**
+ * Simple interest calculation with proper leap year handling.
+ * Uses actual/365 or actual/366 day count convention depending on the year.
+ *
+ * @param principal - Principal amount
+ * @param ratePercent - Annual interest rate as percentage (e.g., 10 for 10%)
+ * @param days - Number of days in the period
+ * @param year - Calendar year for the period (determines 365 vs 366 denominator)
+ */
+function simpleInterest(principal: number, ratePercent: number, days: number, year: number): number {
+  return principal * (ratePercent / PERCENT_100) * days / daysInYear(year);
 }
 
 function canSchedule(startDate: string, termMonths: number): boolean {
@@ -32,7 +41,9 @@ export function buildDepositSchedule(deposit: DepositRecord, deps: ScheduleDeps)
   for (let i = 1; i <= deposit.termMonths; i++) {
     const dueDate = addMonthsClamped(deposit.startDate, i);
     const days = daysBetweenStr(prevDate, dueDate);
-    const interest = round2(simpleInterest(principal, deposit.interestRate, days));
+    // Use the year of the period end for leap year determination
+    const year = parseDateStr(dueDate)?.year ?? new Date().getFullYear();
+    const interest = round2(simpleInterest(principal, deposit.interestRate, days, year));
     if (compounding) principal = round2(principal + interest);
 
     const isPast = dueDate <= deps.today;
@@ -91,7 +102,9 @@ export function recalcFutureAccruals(deposit: DepositRecord, today: string): Dep
 
   for (const accrual of future) {
     const days = daysBetweenStr(prevDate, accrual.dueDate);
-    const interest = round2(simpleInterest(principal, deposit.interestRate, days));
+    // Use the year of the accrual due date for leap year handling
+    const year = parseDateStr(accrual.dueDate)?.year ?? new Date().getFullYear();
+    const interest = round2(simpleInterest(principal, deposit.interestRate, days, year));
     if (compounding) principal = round2(principal + interest);
     repriced.set(accrual.id, interest);
     prevDate = accrual.dueDate;

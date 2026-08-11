@@ -123,14 +123,25 @@ export class CalculatorModal extends Modal {
     const current = parseFloat(this.display);
     const prev = this.previousValue ?? 0;
     let result = 0;
+    let error = false;
     switch (this.operation) {
       case '+': result = prev + current; break;
       case '-': result = prev - current; break;
       case '×': result = prev * current; break;
-      case '÷': result = current !== 0 ? prev / current : 0; break;
+      case '÷':
+        if (current === 0) {
+          // Show error message for division by zero
+          this.display = 'Ошибка';
+          error = true;
+        } else {
+          result = prev / current;
+        }
+        break;
     }
-    this.display = String(result);
-    this.previousValue = result;
+    if (!error) {
+      this.display = String(result);
+      this.previousValue = result;
+    }
   }
 
   private handleOk(): void {

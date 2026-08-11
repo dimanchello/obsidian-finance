@@ -197,6 +197,7 @@ export interface Translations {
   repayAmount: string;
   repayTerm: string;
   partialRepayment: string;
+  partialPaymentNote: string;
   fullRepayment: string;
   creditActive: string;
   creditPaid: string;
@@ -616,6 +617,7 @@ const ru: Translations = {
   repayAmount: 'Гасить сумму',
   repayTerm: 'Гасить срок',
   partialRepayment: 'Частичное',
+  partialPaymentNote: 'Частичная оплата',
   fullRepayment: 'Полное',
   creditActive: 'Активен',
   creditPaid: 'Погашен',
@@ -1074,6 +1076,7 @@ const en: Translations = {
   repayAmount: 'Repay amount',
   repayTerm: 'Repay term',
   partialRepayment: 'Partial',
+  partialPaymentNote: 'Partial payment',
   fullRepayment: 'Full',
   creditActive: 'Active',
   creditPaid: 'Paid',

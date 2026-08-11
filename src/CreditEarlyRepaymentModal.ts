@@ -122,18 +122,29 @@ export class CreditEarlyRepaymentModal extends Modal {
 
           for (const payment of this.pendingPayments) {
             if (remainingAmount <= 0) break;
-            const payAmount = Math.min(payment.amount, remainingAmount);
+
             if (remainingAmount >= payment.amount) {
+              // Full payment: mark as paid
               payment.status = 'paid';
               payment.paidDate = repaymentDate;
               if (noteIn.value) payment.note = noteIn.value;
+              remainingAmount -= payment.amount;
             } else {
+              // Partial payment: reduce the amount but keep payment pending
+              // The reduced payment will still be due on its original due date
               payment.amount = round2(payment.amount - remainingAmount);
+              const partialNote = `${this.tr.partialPaymentNote} ${repaymentDate}: ${this.o.currency} ${remainingAmount.toFixed(2)}`;
               if (noteIn.value) {
-                payment.note = payment.note ? `${payment.note}; ${noteIn.value}` : noteIn.value;
+                payment.note = payment.note
+                  ? `${payment.note}; ${partialNote}; ${noteIn.value}`
+                  : `${partialNote}; ${noteIn.value}`;
+              } else {
+                payment.note = payment.note
+                  ? `${payment.note}; ${partialNote}`
+                  : partialNote;
               }
+              remainingAmount = 0;
             }
-            remainingAmount -= payAmount;
           }
 
           const stillPending = this.credit.payments.filter(p => p.status === 'pending');

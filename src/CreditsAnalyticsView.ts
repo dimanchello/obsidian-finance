@@ -168,7 +168,9 @@ export class CreditsAnalyticsView {
     const totalRemaining = credits.filter(c => c.status === 'active').reduce((s, c) => s + c.currentAmount, 0);
     const totalPaid = credits.reduce((s, c) => s + (c.originalAmount - c.currentAmount), 0);
     const totalPayments = credits.reduce((s, c) => s + c.payments.filter(p => p.status === 'paid').reduce((ps, p) => ps + p.amount, 0), 0);
-    const totalInterest = Math.max(0, totalPayments - (totalBorrowed - totalRemaining));
+    // Fixed: Interest = Total Payments Made - Principal Repaid
+    // Principal Repaid = Original Amount - Current Remaining
+    const totalInterest = Math.max(0, totalPayments - totalPaid);
 
     const wrap = this.el.createDiv('finance-credit-analytics-cards');
     const cards: { label: string; value: string; mod?: string }[] = [

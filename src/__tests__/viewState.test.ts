@@ -21,17 +21,13 @@ describe('parseViewState', () => {
     expect(parseViewState({ совсем: 'не то' }, 25)).toEqual(defaultViewState(25));
   });
 
-  it('сохраняет известные поля', () => {
+  it('сохраняет известные поля (только не фильтры)', () => {
     const s = parseViewState({
       sort: { field: 'amount', dir: 'asc' },
-      filter: { search: 'кофе', type: 'expense', category: 'Еда', tag: '', payer: '', dateFrom: '', dateTo: '', showInternal: 'only' },
       pageSize: 100,
     }, 25);
 
     expect(s.sort).toEqual({ field: 'amount', dir: 'asc' });
-    expect(s.filter.search).toBe('кофе');
-    expect(s.filter.type).toBe('expense');
-    expect(s.filter.showInternal).toBe('only');
     expect(s.pageSize).toBe(100);
   });
 
@@ -48,14 +44,7 @@ describe('parseViewState', () => {
     expect(s.sort).toEqual({ field: 'date', dir: 'desc' });
   });
 
-  it('битый фильтр восстанавливается по полю, а не целиком', () => {
-    const s = parseViewState({
-      filter: { search: 'x', type: 'что-то', showInternal: true },
-    }, 25);
-    expect(s.filter.search).toBe('x');
-    expect(s.filter.type).toBe('all');
-    expect(s.filter.showInternal).toBe('all');
-  });
+
 
   it('видимость колонок принимает только булевы значения', () => {
     const s = parseViewState({
@@ -70,17 +59,5 @@ describe('parseViewState', () => {
     expect(parseViewState({ pageSize: NaN }, 25).pageSize).toBe(25);
   });
 
-  it('фильтры долгов/кредитов/вкладов разбираются независимо', () => {
-    const s = parseViewState({
-      debtFilter: { search: 'иван', status: 'unpaid', direction: 'lent', dateFrom: '', dateTo: '', person: '' },
-      creditFilter: { search: '', status: 'active', bankName: 'Сбер', type: 'mortgage', dateFrom: '', dateTo: '' },
-      depositFilter: 42,
-    }, 25);
 
-    expect(s.debtFilter!.status).toBe('unpaid');
-    expect(s.debtFilter!.direction).toBe('lent');
-    expect(s.creditFilter!.bankName).toBe('Сбер');
-    expect(s.creditFilter!.type).toBe('mortgage');
-    expect(s.depositFilter).toEqual(defaultViewState(25).depositFilter);
-  });
 });

@@ -22,7 +22,13 @@ export function attachAutocomplete(input: HTMLInputElement, opts: AutocompleteOp
   if (!wrapper) return;
   let dropdown: HTMLElement | null = null;
 
-  const close = () => { dropdown?.remove(); dropdown = null; };
+  const close = () => {
+    const el = dropdown;
+    dropdown = null;
+    if (el?.parentNode) {
+      el.remove();
+    }
+  };
 
   const pick = (value: string) => {
     input.value = value;
@@ -118,8 +124,12 @@ export class Combobox {
   }
 
   private labelFor(value: string): string {
-    return this.opts.options.find(o => o.value === value)?.label
-      ?? (value !== '' ? value : (this.opts.options[0]?.label ?? '—'));
+    const match = this.opts.options.find(o => o.value === value);
+    if (match) return match.label;
+    // If no match and value is non-empty, show the value itself (edge case)
+    if (value !== '') return value;
+    // If value is empty and no match, show first option or fallback
+    return this.opts.options[0]?.label ?? '—';
   }
 
   private toggle(wrapper: HTMLElement): void {
@@ -242,7 +252,12 @@ export class Combobox {
       document.removeEventListener('mousedown', this.outsideHandler);
       this.outsideHandler = null;
     }
-    this.dropdown?.remove();
-    this.dropdown = null;
+
+    const el = this.dropdown;
+    this.dropdown = null; // Set to null before removing to prevent re-entrancy from synchronous focusout events
+
+    if (el?.parentNode) {
+      el.remove();
+    }
   }
 }

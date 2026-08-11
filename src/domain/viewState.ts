@@ -1,5 +1,5 @@
 import {
-  DebtFilterState, CreditFilterState, DepositFilterState, FilterState, SortDir, ViewState,
+  SortDir, ViewState,
   DEFAULT_FILTER, DEFAULT_SORT, DEFAULT_DEBT_FILTER, DEFAULT_CREDIT_FILTER, DEFAULT_DEPOSIT_FILTER,
   CreditAnalyticsGroupBy, DepositAnalyticsGroupBy,
 } from '../types';
@@ -29,59 +29,6 @@ function sortState<F extends string>(v: unknown, fields: readonly F[], fallbackF
   return { field: oneOf(v.field, fields, fallbackField), dir: sortDir(v.dir) };
 }
 
-function filterState(v: unknown): FilterState {
-  const d = DEFAULT_FILTER;
-  if (!isObject(v)) return { ...d };
-  return {
-    search: str(v.search, d.search),
-    type: oneOf(v.type, ['all', 'income', 'expense'] as const, 'all'),
-    category: str(v.category, d.category),
-    tag: str(v.tag, d.tag),
-    payer: str(v.payer, d.payer),
-    dateFrom: str(v.dateFrom, d.dateFrom),
-    dateTo: str(v.dateTo, d.dateTo),
-    showInternal: oneOf(v.showInternal, ['all', 'only'] as const, 'all'),
-  };
-}
-
-function debtFilter(v: unknown): DebtFilterState {
-  const d = DEFAULT_DEBT_FILTER;
-  if (!isObject(v)) return { ...d };
-  return {
-    search: str(v.search, d.search),
-    status: oneOf(v.status, ['all', 'paid', 'unpaid'] as const, 'all'),
-    direction: oneOf(v.direction, ['all', 'lent', 'borrowed'] as const, 'all'),
-    dateFrom: str(v.dateFrom, d.dateFrom),
-    dateTo: str(v.dateTo, d.dateTo),
-    person: str(v.person, d.person),
-  };
-}
-
-function creditFilter(v: unknown): CreditFilterState {
-  const d = DEFAULT_CREDIT_FILTER;
-  if (!isObject(v)) return { ...d };
-  return {
-    search: str(v.search, d.search),
-    status: oneOf(v.status, ['all', 'active', 'paid'] as const, 'all'),
-    bankName: str(v.bankName, d.bankName),
-    type: oneOf(v.type, ['all', 'consumer', 'auto', 'mortgage'] as const, 'all'),
-    dateFrom: str(v.dateFrom, d.dateFrom),
-    dateTo: str(v.dateTo, d.dateTo),
-  };
-}
-
-function depositFilter(v: unknown): DepositFilterState {
-  const d = DEFAULT_DEPOSIT_FILTER;
-  if (!isObject(v)) return { ...d };
-  return {
-    search: str(v.search, d.search),
-    status: oneOf(v.status, ['all', 'active', 'closed'] as const, 'all'),
-    bankName: str(v.bankName, d.bankName),
-    type: oneOf(v.type, ['all', 'term', 'demand', 'savings'] as const, 'all'),
-    dateFrom: str(v.dateFrom, d.dateFrom),
-    dateTo: str(v.dateTo, d.dateTo),
-  };
-}
 
 function columns(v: unknown): Record<string, boolean> | undefined {
   if (!isObject(v)) return undefined;
@@ -129,13 +76,13 @@ export function parseViewState(raw: unknown, pageSize: number): ViewState {
 
   const state: ViewState = {
     sort: sortState(raw.sort, ['date', 'amount', 'category', 'type', 'payer', 'tag'] as const, 'date'),
-    filter: filterState(raw.filter),
+    filter: { ...DEFAULT_FILTER },
     debtSort: sortState(raw.debtSort, ['date', 'amount', 'person'] as const, 'date'),
-    debtFilter: debtFilter(raw.debtFilter),
+    debtFilter: { ...DEFAULT_DEBT_FILTER },
     creditSort: sortState(raw.creditSort, ['date', 'amount', 'bankName'] as const, 'date'),
-    creditFilter: creditFilter(raw.creditFilter),
+    creditFilter: { ...DEFAULT_CREDIT_FILTER },
     depositSort: sortState(raw.depositSort, ['date', 'amount', 'bankName'] as const, 'date'),
-    depositFilter: depositFilter(raw.depositFilter),
+    depositFilter: { ...DEFAULT_DEPOSIT_FILTER },
     page: 0,
     debtPage: 0,
     creditPage: 0,

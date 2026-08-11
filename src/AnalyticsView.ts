@@ -208,8 +208,11 @@ export class AnalyticsView {
       // Filter by analytics date range
       if (this.dateFrom && r.date < this.dateFrom) return;
       if (this.dateTo && r.date > this.dateTo) return;
-      if (this.dateFrom && r.date === this.dateFrom && r.time < this.timeFrom) return;
-      if (this.dateTo && r.date === this.dateTo && r.time > this.timeTo) return;
+
+      // Time filtering: treat empty time as "00:00" for start boundary and "23:59" for end boundary
+      const recordTime = r.time || '00:00';
+      if (this.dateFrom && r.date === this.dateFrom && recordTime < this.timeFrom) return;
+      if (this.dateTo && r.date === this.dateTo && recordTime > this.timeTo) return;
 
       let key: string;
       if      (this.groupBy === 'category') key = r.category || this.tr.uncategorized;

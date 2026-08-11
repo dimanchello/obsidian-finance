@@ -99,7 +99,48 @@ describe('buildDepositSchedule', () => {
     let principal = deposit.amount;
     for (const a of schedule) principal = round2(principal + a.amount);
 
-    expect(round2(principal - deposit.amount)).toBe(totalInterest);
+    expect(totalInterest).toBe(round2(principal - deposit.amount));
+  });
+
+  it('високосный год: использует 366 дней для расчёта процентов в 2024', () => {
+    // 2024 — високосный год (366 дней)
+    const deposit = mkDeposit({
+      startDate: '2024-01-31',
+      termMonths: 2,
+      amount: 100_000,
+      interestRate: 12,
+      accrualType: 'to_account',
+    });
+    const schedule = buildDepositSchedule(deposit, mkDeps('2024-01-01'));
+
+    // Февраль 2024 = 29 дней (високосный)
+    // Процент за февраль: 100000 * 0.12 * 29 / 366
+    const expectedFeb = round2(100_000 * 0.12 * 29 / 366);
+    expect(schedule[0].amount).toBe(expectedFeb);
+    expect(schedule[0].dueDate).toBe('2024-02-29');
+
+    // Март 2024 = 31 день
+    // Процент за март: 100000 * 0.12 * 31 / 366
+    const expectedMar = round2(100_000 * 0.12 * 31 / 366);
+    expect(schedule[1].amount).toBe(expectedMar);
+  });
+
+  it('невисокосный год: использует 365 дней для расчёта процентов', () => {
+    // 2026 — невисокосный год (365 дней)
+    const deposit = mkDeposit({
+      startDate: '2026-01-31',
+      termMonths: 2,
+      amount: 100_000,
+      interestRate: 12,
+      accrualType: 'to_account',
+    });
+    const schedule = buildDepositSchedule(deposit, mkDeps('2026-01-01'));
+
+    // Февраль 2026 = 28 дней (невисокосный)
+    // Процент за февраль: 100000 * 0.12 * 28 / 365
+    const expectedFeb = round2(100_000 * 0.12 * 28 / 365);
+    expect(schedule[0].amount).toBe(expectedFeb);
+    expect(schedule[0].dueDate).toBe('2026-02-28');
   });
 
   it('прошедшие начисления помечены paid с датой, будущие — pending без неё', () => {
