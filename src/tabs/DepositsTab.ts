@@ -73,6 +73,7 @@ export class DepositsTab {
         toggleLabel: d => `📋 ${this.tr.depositAccruals} (${d.accruals.length})`,
         render: (host, d) => this.renderDepositAccrualsPanel(host, d),
       },
+      actionsPosition: 'above',
       renderCard: (block, d) => this.renderCard(block, d),
       filterControls: () => this.filterControls(),
       sortFields: [

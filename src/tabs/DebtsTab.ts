@@ -83,6 +83,7 @@ export class DebtsTab {
         toggleLabel: d => `📋 ${this.tr.movementHistory} (${d.movements.length})`,
         render: (host, d) => this.renderDebtMovementsPanel(host, d),
       },
+      actionsPosition: 'above',
       renderCard: (block, d) => this.renderCard(block, d),
       filterControls: () => this.filterControls(),
       sortFields: [

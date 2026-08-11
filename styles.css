@@ -64,8 +64,7 @@
 .finance-header {
   display: flex; align-items: center; justify-content: space-between;
   flex-wrap: wrap; gap: 10px;
-  padding: 4px 0 16px; margin-bottom: 18px;
-  border-bottom: 2px solid var(--ft-border);
+  padding: 4px 0 16px; margin-bottom: 0px;
 }
 .finance-header-left  { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .finance-header-right { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -500,6 +499,7 @@
   border-collapse: collapse;
   font-size: .875em;
   table-layout: auto;
+  margin: 0 !important;
 }
 
 /* Date, type, amount — keep compact */
@@ -544,9 +544,29 @@
   border-bottom: none;
   border-radius: 0 !important;
 }
+.finance-item-tbody:hover .finance-tr .finance-td,
 .finance-tr:hover .finance-td {
   background: var(--background-modifier-hover);
   transition: background .1s;
+}
+.finance-actions-tr .finance-td {
+  padding-top: 6px !important;
+  padding-bottom: 6px !important;
+  border-bottom: none !important;
+}
+.finance-data-tr .finance-td {
+  padding-top: 2px !important;
+}
+.finance-actions-container-above {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+}
+.finance-actions-container-above .finance-action-btn {
+  opacity: 0.6;
+}
+.finance-item-tbody:hover .finance-action-btn {
+  opacity: 1;
 }
 
 /* Left stripe — on first td directly, gives proper gap from text */
@@ -875,7 +895,7 @@
   background: #dc2626; color: #fff;
   border-color: #b91c1c; font-weight: 700;
 }
-.finance-calc-btn.finance-calc-clear:hover { background: #b91c1c; border-color: #991b1b; }
+.finance-calc-btn.finance-calc-clear:hover { background: #b91c1c; border-color: #991b1c; }
 .finance-calc-btn.finance-calc-clear:active { background: #991b1b; }
 .finance-calc-eq {
   grid-column: 1 / -1; width: auto;
@@ -1387,7 +1407,8 @@
   .finance-debt-block.finance-debt-lent::before { background: #22c55e; }
   .finance-debt-block.finance-debt-borrowed::before { background: #ef4444; }
 
-  .finance-debt-block.finance-debt-unpaid { background: rgba(239, 68, 68, 0.08); }
+  .finance-debt-block.finance-debt-unpaid.finance-debt-lent { background: rgba(34, 197, 94, 0.08); }
+  .finance-debt-block.finance-debt-unpaid.finance-debt-borrowed { background: rgba(239, 68, 68, 0.08); }
   .finance-debt-block.finance-debt-paid { background: rgba(34, 197, 94, 0.08); }
 
   .finance-debt-header {
@@ -1737,6 +1758,17 @@
 }
 
 /* Obsidian mobile app: JS renders blocks regardless of viewport width */
+.finance-tracker--mobile .finance-record-actions {
+  display: flex; gap: 8px; justify-content: flex-end;
+  margin-top: 12px; padding-top: 12px;
+  border-top: 1px solid var(--ft-border);
+}
+.finance-actions-above-card {
+  margin-top: 0; padding-top: 0; border-top: none;
+  margin-bottom: 12px; padding-bottom: 12px;
+  border-bottom: 1px solid var(--ft-border);
+  justify-content: center;
+}
 .finance-tracker--mobile .finance-table-scroll,
 .finance-tracker--mobile .finance-debt-table-scroll { display: none !important; }
 .finance-tracker--mobile .finance-records-list,
@@ -1911,22 +1943,19 @@
   cursor: pointer;
   transition: background .1s;
 }
-.finance-debt-lent {
-  border-left: 4px solid #16a34a;
+.finance-debt-lent .finance-tr .finance-td:first-child {
+  border-left-color: #16a34a;
 }
-.finance-debt-borrowed {
-  border-left: 4px solid #dc2626;
+.finance-debt-borrowed .finance-tr .finance-td:first-child {
+  border-left-color: #dc2626;
 }
-.finance-debt-unpaid .finance-td {
-  background: color-mix(in srgb, #ef4444 10%, var(--ft-table-body-bg));
+.finance-debt-unpaid.finance-debt-lent .finance-tr .finance-td:first-child {
+  border-left-color: #22c55e;
 }
-.finance-debt-unpaid .finance-td:first-child {
+.finance-debt-unpaid.finance-debt-borrowed .finance-tr .finance-td:first-child {
   border-left-color: #ef4444;
 }
-.finance-debt-paid .finance-td {
-  background: color-mix(in srgb, #22c55e 10%, var(--ft-table-body-bg));
-}
-.finance-debt-paid .finance-td:first-child {
+.finance-debt-paid .finance-tr .finance-td:first-child {
   border-left-color: #22c55e;
 }
 .finance-debt-table tr.finance-debt-row.finance-debt-row-expanded .finance-td {

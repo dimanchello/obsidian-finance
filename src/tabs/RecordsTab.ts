@@ -192,7 +192,6 @@ export class RecordsTab {
     const recs = this.ctx.data.records;
     const inc = recs.filter(r => r.type === 'income' && !r.isInternal).reduce((s, r) => s + r.amount, 0);
     const exp = recs.filter(r => r.type === 'expense' && !r.isInternal).reduce((s, r) => s + r.amount, 0);
-    const borrowed = this.ctx.data.debts.filter(d => d.direction === 'borrowed').reduce((s, d) => s + d.amount, 0);
     const totalInc = recs.filter(r => r.type === 'income').reduce((s, r) => s + r.amount, 0);
     const totalExp = recs.filter(r => r.type === 'expense').reduce((s, r) => s + r.amount, 0);
     const bal = totalInc - totalExp;
@@ -205,9 +204,6 @@ export class RecordsTab {
         mod: bal >= 0 ? 'positive' : 'negative', icon: '＝',
       },
     ];
-    if (borrowed > 0) {
-      cards.push({ label: this.tr.borrowed, value: this.ctx.fmt(borrowed), mod: 'expense', icon: '👈' });
-    }
 
     cards.forEach(item => {
       const card = statsEl.createDiv(`finance-stat-card finance-stat-${item.mod}`);

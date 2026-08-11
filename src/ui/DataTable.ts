@@ -76,6 +76,7 @@ export interface TableSpec<T> {
   emptyState: { icon: string; title: string; subtitle: string };
   emptyFiltered: { icon: string; title: string; subtitle: string };
   hasAnyItems: () => boolean;
+  actionsPosition?: 'inline' | 'above';
   /** Replaces the default toolbar content entirely when provided. */
   ownToolbar?: (toolbar: HTMLElement, api: DataTableApi) => void;
   toolbarButtons?: (toolbar: HTMLElement, rerender: () => void, api: DataTableApi) => void;
@@ -402,6 +403,7 @@ export class DataTable<T> {
     const scroll = container.createDiv('finance-table-scroll');
     const table = scroll.createEl('table', { cls: 'finance-table' });
     const cols = this.visibleColumns();
+    const colSpan = cols.length + (this.bulkMode ? 1 : 0) + (this.spec.actionsPosition !== 'above' ? 1 : 0);
 
     const hRow = table.createEl('thead').createEl('tr');
     if (this.bulkMode) {
@@ -417,17 +419,41 @@ export class DataTable<T> {
       });
     }
     cols.forEach(c => hRow.createEl('th', { cls: 'finance-th', text: c.label }));
-    hRow.createEl('th', { cls: 'finance-th' });
+    if (this.spec.actionsPosition !== 'above') {
+      hRow.createEl('th', { cls: 'finance-th' });
+    }
 
-    const tbody = table.createEl('tbody');
     const frag = document.createDocumentFragment();
-    const colSpan = cols.length + 1 + (this.bulkMode ? 1 : 0);
 
     pageItems.forEach(item => {
       const id = this.spec.itemId(item);
+      const itemTbody = document.createElement('tbody');
+      itemTbody.classList.add('finance-item-tbody');
+      
       const tr = document.createElement('tr');
-      tr.classList.add('finance-tr');
-      this.spec.rowCls?.(item).forEach(c => tr.classList.add(c));
+      tr.classList.add('finance-tr', 'finance-data-tr');
+      this.spec.rowCls?.(item).forEach(c => {
+        tr.classList.add(c);
+        itemTbody.classList.add(c);
+      });
+
+      // Actions above
+      if (this.spec.actionsPosition === 'above') {
+        const actionTr = document.createElement('tr');
+        actionTr.classList.add('finance-tr', 'finance-actions-tr');
+        this.spec.rowCls?.(item).forEach(c => actionTr.classList.add(c));
+        
+        const actionTd = document.createElement('td');
+        actionTd.colSpan = colSpan;
+        actionTd.classList.add('finance-td', 'finance-actions-td-above');
+        
+        const actionsContainer = document.createElement('div');
+        actionsContainer.classList.add('finance-actions-container-above');
+        this.spec.rowActions(item).forEach(a => this.mkActionBtn(actionsContainer, a));
+        actionTd.appendChild(actionsContainer);
+        actionTr.appendChild(actionTd);
+        itemTbody.appendChild(actionTr);
+      }
 
       if (this.bulkMode) {
         const std = document.createElement('td');
@@ -448,30 +474,37 @@ export class DataTable<T> {
         tr.appendChild(td);
       });
 
-      const atd = document.createElement('td');
-      atd.classList.add('finance-td', 'finance-actions-td');
-      atd.setAttribute('data-label', '');
-      this.spec.rowActions(item).forEach(a => this.mkActionBtn(atd, a));
-      tr.appendChild(atd);
+      if (this.spec.actionsPosition !== 'above') {
+        const atd = document.createElement('td');
+        atd.classList.add('finance-td', 'finance-actions-td');
+        atd.setAttribute('data-label', '');
+        this.spec.rowActions(item).forEach(a => this.mkActionBtn(atd, a));
+        tr.appendChild(atd);
+      }
+
+      itemTbody.appendChild(tr);
+
+      const interactiveElements = [tr];
+      if (this.spec.actionsPosition === 'above') {
+        interactiveElements.push(itemTbody.firstChild as HTMLTableRowElement); // The actions row
+      }
 
       if (this.bulkMode) {
-        tr.classList.add('finance-tr-selectable');
-        tr.addEventListener('click', (e) => {
+        interactiveElements.forEach(el => el.classList.add('finance-tr-selectable'));
+        interactiveElements.forEach(el => el.addEventListener('click', (e) => {
           const t = e.target as HTMLElement;
           if (t.tagName === 'INPUT' || t.closest('.finance-action-btn')) return;
           this.toggleSelected(id);
-        });
+        }));
       } else if (this.spec.expandable?.hasContent(item)) {
-        tr.classList.add('finance-tr-expandable');
-        tr.addEventListener('click', (e) => {
+        interactiveElements.forEach(el => el.classList.add('finance-tr-expandable'));
+        interactiveElements.forEach(el => el.addEventListener('click', (e) => {
           const t = e.target as HTMLElement;
           if (t.closest('.finance-action-btn')) return;
           this.expandedId = this.expandedId === id ? null : id;
           this.spec.rerender();
-        });
+        }));
       }
-
-      frag.appendChild(tr);
 
       if (this.spec.expandable && this.expandedId === id && this.spec.expandable.hasContent(item)) {
         const exTr = document.createElement('tr');
@@ -481,11 +514,13 @@ export class DataTable<T> {
         exTd.colSpan = colSpan;
         this.spec.expandable.render(exTd, item);
         exTr.appendChild(exTd);
-        frag.appendChild(exTr);
+        itemTbody.appendChild(exTr);
       }
+      
+      frag.appendChild(itemTbody);
     });
 
-    tbody.appendChild(frag);
+    table.appendChild(frag);
   }
 
   private renderCards(container: HTMLElement, pageItems: T[]): void {
@@ -504,6 +539,13 @@ export class DataTable<T> {
         cb.addEventListener('change', (e) => { e.stopPropagation(); this.toggleSelected(id); });
       }
 
+      if (this.spec.actionsPosition === 'above') {
+        const actionsTop = document.createElement('div');
+        actionsTop.classList.add('finance-record-actions', 'finance-actions-above-card');
+        this.spec.rowActions(item).forEach(a => this.mkActionBtn(actionsTop, a));
+        block.appendChild(actionsTop);
+      }
+
       this.spec.renderCard(block, item);
 
       if (this.spec.expandable?.hasContent(item)) {
@@ -514,8 +556,10 @@ export class DataTable<T> {
         }
       }
 
-      const actions = block.createDiv('finance-record-actions');
-      this.spec.rowActions(item).forEach(a => this.mkActionBtn(actions, a));
+      if (this.spec.actionsPosition !== 'above') {
+        const actions = block.createDiv('finance-record-actions');
+        this.spec.rowActions(item).forEach(a => this.mkActionBtn(actions, a));
+      }
 
       if (this.bulkMode) {
         block.classList.add('finance-tr-selectable');

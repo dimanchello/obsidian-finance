@@ -62,6 +62,7 @@ export class CreditsTab {
         toggleLabel: c => `📋 ${this.tr.creditPayments} (${c.payments.length})`,
         render: (host, c) => this.renderCreditPaymentsPanel(host, c),
       },
+      actionsPosition: 'above',
       renderCard: (block, c) => this.renderCard(block, c),
       filterControls: () => this.filterControls(),
       sortFields: [

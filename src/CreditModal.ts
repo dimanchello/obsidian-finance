@@ -359,15 +359,16 @@ export class CreditModal extends Modal {
     // Validate Down Payment
     const dpVal = this.credit.downPayment ?? 0;
     const dpDate = this.credit.downPaymentDate;
-    if (dpVal > 0 && !dpDate) {
-      new Notice(this.tr.downPaymentDateRequired);
-      this.downPaymentDateInput.focus();
-      return;
-    }
-    if (dpDate && dpVal <= 0) {
-      new Notice(this.tr.downPaymentAmountRequired);
-      this.downPaymentValueInput.focus();
-      return;
+    if (dpVal <= 0) {
+      this.credit.downPaymentDate = '';
+      this.credit.downPayment = 0;
+      this.credit.downPaymentValue = 0;
+    } else {
+      if (!dpDate) {
+        new Notice(this.tr.downPaymentDateRequired);
+        this.downPaymentDateInput.focus();
+        return;
+      }
     }
 
     const loanPrincipal = this.credit.originalAmount;
