@@ -12,6 +12,35 @@ import { Translations } from './i18n';
 import { addMonthsClamped, toDateStr } from './domain/dateMath';
 import { round2 } from './domain/money';
 
+const TOOLTIP_CURSOR_GAP = 12;
+const TOOLTIP_EDGE_GAP = 8;
+
+function createChartTooltip(): {
+  showTip: (e: MouseEvent, text: string) => void;
+  hideTip: () => void;
+} {
+  const tooltip = document.createElement('div');
+  tooltip.className = 'finance-bar-tooltip';
+  document.body.appendChild(tooltip);
+
+  return {
+    showTip: (e: MouseEvent, text: string) => {
+      tooltip.textContent = text;
+      tooltip.classList.add('is-visible');
+      const tw = tooltip.offsetWidth;
+      const th = tooltip.offsetHeight;
+      let left = e.clientX - tw / 2;
+      let top = e.clientY - th - TOOLTIP_CURSOR_GAP;
+      if (left < TOOLTIP_EDGE_GAP) left = TOOLTIP_EDGE_GAP;
+      if (left + tw > window.innerWidth - TOOLTIP_EDGE_GAP) left = window.innerWidth - tw - TOOLTIP_EDGE_GAP;
+      if (top < 4) top = e.clientY + 12;
+      tooltip.style.setProperty('--ft-tip-left', `${left}px`);
+      tooltip.style.setProperty('--ft-tip-top', `${top}px`);
+    },
+    hideTip: () => { tooltip.classList.remove('is-visible'); },
+  };
+}
+
 function svg<K extends keyof SVGElementTagNameMap>(
   tag: K, attrs: Record<string, string | number> = {},
 ): SVGElementTagNameMap[K] {
@@ -70,6 +99,13 @@ export class DepositsAnalyticsView {
     this.renderAccrualChart();
     this.renderDepositList();
     this.renderMaturityTimeline();
+  }
+
+  private depositTypeLabel(type: string): string {
+    if (type === 'term') return this.tr.depositTypeTerm;
+    if (type === 'demand') return this.tr.depositTypeDemand;
+    if (type === 'savings') return this.tr.depositTypeSavings;
+    return type;
   }
 
   private renderControls(): void {
@@ -183,7 +219,7 @@ export class DepositsAnalyticsView {
         } else if (groupBy === 'year') {
           key = dt.slice(0, 4);
         } else if (groupBy === 'type') {
-          key = d.type;
+          key = this.depositTypeLabel(d.type);
         } else {
           key = d.bankName || '—';
         }
@@ -247,6 +283,8 @@ export class DepositsAnalyticsView {
 
     const hasBoth = data.some(d => d.cap > 0) && data.some(d => d.toAccount > 0);
 
+    const { showTip, hideTip } = createChartTooltip();
+
     const root = svg('svg', { viewBox: `0 0 ${W} ${CH}` });
     root.classList.add('finance-chart-svg', 'finance-bar-chart-svg');
     root.style.setProperty('--ft-chart-w', `${W}px`);
@@ -270,12 +308,18 @@ export class DepositsAnalyticsView {
         const h = (d.cap / maxVal) * chartH;
         const x = hasBoth ? cx - barW - gap / 2 : cx - barW / 2;
         const rect = svg('rect', { x, y: PT + chartH - h, width: barW, height: h, fill: CHART_COLOR_INCOME, rx: CHART_BAR_RADIUS });
+        rect.addEventListener('mouseenter', (e) => showTip(e, `${d.label} — ${this.tr.accrualCapitalization.toLowerCase()}: ${this.fmt(d.cap)}`));
+        rect.addEventListener('mousemove', (e) => showTip(e, `${d.label} — ${this.tr.accrualCapitalization.toLowerCase()}: ${this.fmt(d.cap)}`));
+        rect.addEventListener('mouseleave', hideTip);
         root.appendChild(rect);
       }
       if (d.toAccount > 0) {
         const h = (d.toAccount / maxVal) * chartH;
         const x = hasBoth ? cx + gap / 2 : cx - barW / 2;
         const rect = svg('rect', { x, y: PT + chartH - h, width: barW, height: h, fill: CHART_PALETTE[2]!, rx: CHART_BAR_RADIUS });
+        rect.addEventListener('mouseenter', (e) => showTip(e, `${d.label} — ${this.tr.accrualToAccount.toLowerCase()}: ${this.fmt(d.toAccount)}`));
+        rect.addEventListener('mousemove', (e) => showTip(e, `${d.label} — ${this.tr.accrualToAccount.toLowerCase()}: ${this.fmt(d.toAccount)}`));
+        rect.addEventListener('mouseleave', hideTip);
         root.appendChild(rect);
       }
 

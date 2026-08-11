@@ -11,6 +11,35 @@ import { Translations } from './i18n';
 import { addMonthsClamped } from './domain/dateMath';
 import { round2 } from './domain/money';
 
+const TOOLTIP_CURSOR_GAP = 12;
+const TOOLTIP_EDGE_GAP = 8;
+
+function createChartTooltip(): {
+  showTip: (e: MouseEvent, text: string) => void;
+  hideTip: () => void;
+} {
+  const tooltip = document.createElement('div');
+  tooltip.className = 'finance-bar-tooltip';
+  document.body.appendChild(tooltip);
+
+  return {
+    showTip: (e: MouseEvent, text: string) => {
+      tooltip.textContent = text;
+      tooltip.classList.add('is-visible');
+      const tw = tooltip.offsetWidth;
+      const th = tooltip.offsetHeight;
+      let left = e.clientX - tw / 2;
+      let top = e.clientY - th - TOOLTIP_CURSOR_GAP;
+      if (left < TOOLTIP_EDGE_GAP) left = TOOLTIP_EDGE_GAP;
+      if (left + tw > window.innerWidth - TOOLTIP_EDGE_GAP) left = window.innerWidth - tw - TOOLTIP_EDGE_GAP;
+      if (top < 4) top = e.clientY + 12;
+      tooltip.style.setProperty('--ft-tip-left', `${left}px`);
+      tooltip.style.setProperty('--ft-tip-top', `${top}px`);
+    },
+    hideTip: () => { tooltip.classList.remove('is-visible'); },
+  };
+}
+
 function svg<K extends keyof SVGElementTagNameMap>(
   tag: K, attrs: Record<string, string | number> = {},
 ): SVGElementTagNameMap[K] {
@@ -68,6 +97,13 @@ export class CreditsAnalyticsView {
     this.chartEl = this.el.createDiv('finance-chart-area');
     this.renderPaymentChart();
     this.renderProgressList();
+  }
+
+  private creditTypeLabel(type: string): string {
+    if (type === 'consumer') return this.tr.creditTypeConsumer;
+    if (type === 'auto') return this.tr.creditTypeAuto;
+    if (type === 'mortgage') return this.tr.creditTypeMortgage;
+    return type;
   }
 
   private renderControls(): void {
@@ -173,7 +209,7 @@ export class CreditsAnalyticsView {
         } else if (groupBy === 'year') {
           key = d.slice(0, 4);
         } else if (groupBy === 'type') {
-          key = c.type;
+          key = this.creditTypeLabel(c.type);
         } else {
           key = c.bankName || '—';
         }
@@ -221,6 +257,8 @@ export class CreditsAnalyticsView {
     let maxVal = 1;
     data.forEach(d => { maxVal = Math.max(maxVal, d.value); });
 
+    const { showTip, hideTip } = createChartTooltip();
+
     const root = svg('svg', { viewBox: `0 0 ${W} ${CH}` });
     root.classList.add('finance-chart-svg', 'finance-bar-chart-svg');
     root.style.setProperty('--ft-chart-w', `${W}px`);
@@ -243,6 +281,9 @@ export class CreditsAnalyticsView {
         const h = (d.value / maxVal) * chartH;
         const x = cx - barW / 2;
         const rect = svg('rect', { x, y: PT + chartH - h, width: barW, height: h, fill: CHART_COLOR_EXPENSE, rx: CHART_BAR_RADIUS });
+        rect.addEventListener('mouseenter', (e) => showTip(e, `${d.label} — ${this.tr.creditTotalPaid.toLowerCase()}: ${this.fmt(d.value)}`));
+        rect.addEventListener('mousemove', (e) => showTip(e, `${d.label} — ${this.tr.creditTotalPaid.toLowerCase()}: ${this.fmt(d.value)}`));
+        rect.addEventListener('mouseleave', hideTip);
         root.appendChild(rect);
       }
       const lbl = svg('text', { x: cx, y: CH - PB + 20, 'text-anchor': 'middle', fill: 'var(--text-muted)', 'font-size': 12 });
