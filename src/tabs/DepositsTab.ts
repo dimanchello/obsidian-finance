@@ -90,7 +90,7 @@ export class DepositsTab {
         setColumns: c => { this.ctx.state.depositsColumns = c; },
       },
       renderStats: host => this.renderStats(host),
-      toolbarButtons: (toolbar, rerender) => {
+      toolbarButtons: (toolbar, rerender, api) => {
         const btn = toolbar.createEl('button', { cls: 'finance-add-btn finance-accent-btn' });
         btn.createEl('span', { text: '＋', cls: 'btn-icon' });
         btn.createEl('span', { text: this.tr.newDeposit });
@@ -103,6 +103,7 @@ export class DepositsTab {
         });
         toggleBtn.addEventListener('click', () => {
           this.ctx.state.depositActiveTab = open ? 'list' : 'analytics';
+          if (!open) api.closeFilters();
           this.ctx.saveState();
           rerender();
         });
@@ -134,6 +135,12 @@ export class DepositsTab {
       },
       confirmBulkDeleteText: count => this.tr.confirmDeleteSelectedDeposits.replace('{count}', String(count)),
       onFilterChange: () => {},
+      onFiltersToggle: () => {
+        if (this.ctx.state.depositActiveTab === 'analytics') {
+          this.ctx.state.depositActiveTab = 'list';
+          this.ctx.saveState();
+        }
+      },
       rerender: () => this.render(),
     });
   }

@@ -232,7 +232,6 @@ export class Combobox {
   }
 
   private select(o: ComboOption): void {
-    this.opts.value = o.value;
     this.triggerText.textContent = o.label;
     this.close();
     this.opts.onChange(o.value);

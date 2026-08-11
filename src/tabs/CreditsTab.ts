@@ -79,7 +79,7 @@ export class CreditsTab {
         setColumns: c => { this.ctx.state.creditsColumns = c; },
       },
       renderStats: host => this.renderStats(host),
-      toolbarButtons: (toolbar, rerender) => {
+      toolbarButtons: (toolbar, rerender, api) => {
         const btn = toolbar.createEl('button', { cls: 'finance-add-btn finance-accent-btn' });
         btn.createEl('span', { text: '＋', cls: 'btn-icon' });
         btn.createEl('span', { text: this.tr.newCredit });
@@ -92,6 +92,7 @@ export class CreditsTab {
         });
         toggleBtn.addEventListener('click', () => {
           this.ctx.state.creditActiveTab = open ? 'list' : 'analytics';
+          if (!open) api.closeFilters();
           this.ctx.saveState();
           rerender();
         });
@@ -121,6 +122,12 @@ export class CreditsTab {
       },
       confirmBulkDeleteText: count => this.tr.confirmDeleteSelectedCredits.replace('{count}', String(count)),
       onFilterChange: () => {},
+      onFiltersToggle: () => {
+        if (this.ctx.state.creditActiveTab === 'analytics') {
+          this.ctx.state.creditActiveTab = 'list';
+          this.ctx.saveState();
+        }
+      },
       rerender: () => this.render(),
     });
   }

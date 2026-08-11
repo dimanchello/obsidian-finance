@@ -55,6 +55,7 @@ export interface ExpandableSpec<T> {
 export interface DataTableApi {
   filtersOpen: boolean;
   toggleFilters: () => void;
+  closeFilters: () => void;
   bulkMode: boolean;
   toggleBulkMode: () => void;
 }
@@ -77,13 +78,14 @@ export interface TableSpec<T> {
   hasAnyItems: () => boolean;
   /** Replaces the default toolbar content entirely when provided. */
   ownToolbar?: (toolbar: HTMLElement, api: DataTableApi) => void;
-  toolbarButtons?: (toolbar: HTMLElement, rerender: () => void) => void;
+  toolbarButtons?: (toolbar: HTMLElement, rerender: () => void, api: DataTableApi) => void;
   /** Rendered between the toolbar and the filter panel (analytics, settings, …). */
   renderPanels?: (host: HTMLElement) => void;
   infoBarSums?: (host: HTMLElement, filtered: T[]) => void;
   onBulkDelete: (ids: string[]) => Promise<void>;
   confirmBulkDeleteText: (count: number) => string;
   onFilterChange: () => void;
+  onFiltersToggle?: () => void;
   rerender: () => void;
 }
 
@@ -99,6 +101,7 @@ export class DataTable<T> {
   private selectedIds = new Set<string>();
   private filterDebounce: ReturnType<typeof setTimeout> | null = null;
   private expandedId: string | null = null;
+  private lastFocusedSearch: HTMLInputElement | null = null;
 
   constructor(spec: TableSpec<T>) {
     this.spec = spec;
@@ -156,6 +159,15 @@ export class DataTable<T> {
     }
 
     if (totalPages > 1) this.renderPagination(paginationEl, totalPages, page);
+
+    if (this.lastFocusedSearch) {
+      const activeEl = document.activeElement;
+      if (!activeEl?.matches('input')) {
+        this.lastFocusedSearch.focus();
+        const len = this.lastFocusedSearch.value.length;
+        this.lastFocusedSearch.setSelectionRange(len, len);
+      }
+    }
   }
 
   private renderEmpty(host: HTMLElement, spec: { icon: string; title: string; subtitle: string }): void {
@@ -169,6 +181,7 @@ export class DataTable<T> {
     return {
       filtersOpen: this.filtersOpen,
       toggleFilters: () => { this.filtersOpen = !this.filtersOpen; this.spec.rerender(); },
+      closeFilters: () => { if (this.filtersOpen) { this.filtersOpen = false; this.spec.rerender(); } },
       bulkMode: this.bulkMode,
       toggleBulkMode: () => this.toggleBulkMode(),
     };
@@ -182,7 +195,7 @@ export class DataTable<T> {
       return;
     }
 
-    this.spec.toolbarButtons?.(toolbar, () => this.spec.rerender());
+    this.spec.toolbarButtons?.(toolbar, () => this.spec.rerender(), this.api());
 
     const filtBtn = toolbar.createEl('button', {
       cls: `finance-analytics-toggle-btn${this.filtersOpen ? ' active' : ''}`,
@@ -190,6 +203,7 @@ export class DataTable<T> {
     });
     filtBtn.addEventListener('click', () => {
       this.filtersOpen = !this.filtersOpen;
+      if (this.filtersOpen) this.spec.onFiltersToggle?.();
       this.spec.rerender();
     });
 
@@ -214,10 +228,10 @@ export class DataTable<T> {
     const row1 = container.createDiv('finance-filters-row');
     const row2 = container.createDiv('finance-filters-row');
     const controls = this.spec.filterControls();
-    const half = Math.ceil(controls.length / 2);
 
+    // Распределяем фильтры логично: Поиск, Тип, Категория → row1; С, По, Плательщик, Тег, Внутренние → row2
     controls.forEach((control, i) => {
-      const row = i < half ? row1 : row2;
+      const row = i < 3 ? row1 : row2;
       this.renderFilterControl(row, control);
     });
 
@@ -249,9 +263,12 @@ export class DataTable<T> {
         g.createEl('label', { text: control.label, cls: 'finance-filter-label' });
         const si = g.createEl('input', { type: 'text', cls: 'finance-filter-input', placeholder: control.placeholder });
         si.value = control.get();
+        si.addEventListener('focus', () => { this.lastFocusedSearch = si; });
+        si.addEventListener('blur', () => { this.lastFocusedSearch = null; });
         si.addEventListener('input', () => {
+          control.set(si.value);
           if (this.filterDebounce) clearTimeout(this.filterDebounce);
-          this.filterDebounce = setTimeout(() => { control.set(si.value); apply(); }, SEARCH_DEBOUNCE_MS);
+          this.filterDebounce = setTimeout(() => apply(), SEARCH_DEBOUNCE_MS);
         });
         break;
       }
@@ -434,16 +451,6 @@ export class DataTable<T> {
       const atd = document.createElement('td');
       atd.classList.add('finance-td', 'finance-actions-td');
       atd.setAttribute('data-label', '');
-      if (this.spec.expandable?.hasContent(item)) {
-        this.mkActionBtn(atd, {
-          icon: this.expandedId === id ? '▲' : '▼',
-          title: this.spec.expandable.toggleLabel(item),
-          onClick: () => {
-            this.expandedId = this.expandedId === id ? null : id;
-            this.spec.rerender();
-          },
-        });
-      }
       this.spec.rowActions(item).forEach(a => this.mkActionBtn(atd, a));
       tr.appendChild(atd);
 
@@ -453,6 +460,14 @@ export class DataTable<T> {
           const t = e.target as HTMLElement;
           if (t.tagName === 'INPUT' || t.closest('.finance-action-btn')) return;
           this.toggleSelected(id);
+        });
+      } else if (this.spec.expandable?.hasContent(item)) {
+        tr.classList.add('finance-tr-expandable');
+        tr.addEventListener('click', (e) => {
+          const t = e.target as HTMLElement;
+          if (t.closest('.finance-action-btn')) return;
+          this.expandedId = this.expandedId === id ? null : id;
+          this.spec.rerender();
         });
       }
 
@@ -493,15 +508,6 @@ export class DataTable<T> {
 
       if (this.spec.expandable?.hasContent(item)) {
         const open = this.expandedId === id;
-        const toggle = block.createEl('button', {
-          cls: 'finance-debt-history-toggle',
-          text: `${this.spec.expandable.toggleLabel(item)} ${open ? '▲' : '▼'}`,
-        });
-        toggle.addEventListener('click', (e) => {
-          e.stopPropagation();
-          this.expandedId = open ? null : id;
-          this.spec.rerender();
-        });
         if (open) {
           const panel = block.createDiv('finance-debt-history-panel finance-debt-history-open');
           this.spec.expandable.render(panel, item);
@@ -515,8 +521,16 @@ export class DataTable<T> {
         block.classList.add('finance-tr-selectable');
         block.addEventListener('click', (e) => {
           const t = e.target as HTMLElement;
-          if (t.tagName === 'INPUT' || t.closest('.finance-action-btn') || t.closest('.finance-debt-history-toggle')) return;
+          if (t.tagName === 'INPUT' || t.closest('.finance-action-btn')) return;
           this.toggleSelected(id);
+        });
+      } else if (this.spec.expandable?.hasContent(item)) {
+        block.classList.add('finance-tr-expandable');
+        block.addEventListener('click', (e) => {
+          const t = e.target as HTMLElement;
+          if (t.closest('.finance-action-btn')) return;
+          this.expandedId = this.expandedId === id ? null : id;
+          this.spec.rerender();
         });
       }
 
