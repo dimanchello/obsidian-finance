@@ -1540,7 +1540,7 @@
   .finance-record-header {
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-start;
     gap: 8px;
   }
 
@@ -1548,6 +1548,7 @@
     font-size: 1.1em;
     font-weight: 700;
     font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
   }
   .finance-record-amount.finance-amount-income { color: #16a34a; }
   .finance-record-amount.finance-amount-expense { color: #dc2626; }
@@ -1555,7 +1556,11 @@
   .finance-record-date {
     font-size: .85em;
     color: var(--text-muted);
-    white-space: nowrap;
+    white-space: normal;
+    text-align: right;
+    word-break: break-word;
+    flex: 1;
+    min-width: 0;
   }
 
   .finance-record-category {
@@ -1630,10 +1635,10 @@
   /* ── Debt расширенная строка (movements table) ────────────────────── */
   .finance-debt-expand-row .finance-debt-expand-td { padding: 10px 12px 12px; }
   .finance-mov-panel-body { padding: 10px 12px 12px; }
-  .finance-mov-table { font-size: .8em; width: 100% !important; }
-  .finance-mov-scroll { overflow-x: auto; }
-  .finance-mov-table .finance-th { font-size: .65em; padding: 6px 8px; }
-  .finance-mov-table .finance-td { padding: 5px 8px; }
+  .finance-mov-table { font-size: .8em; width: 100% !important; min-width: max-content; }
+  .finance-mov-scroll { overflow-x: auto; width: 100%; -webkit-overflow-scrolling: touch; }
+  .finance-mov-table .finance-th { font-size: .65em; padding: 6px 8px; white-space: nowrap; }
+  .finance-mov-table .finance-td { padding: 5px 8px; white-space: nowrap; }
 
   /* ── Debt toolbar на узких экранах ──────────────────────────────────── */
   .finance-debt-toolbar { flex-wrap: wrap; }

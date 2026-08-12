@@ -308,40 +308,42 @@ export class DebtsTab {
   // ── Mobile card ──────────────────────────────────────────────────────────
 
   private renderCard(block: HTMLElement, debt: DebtRecord): void {
-    const header = block.createDiv('finance-debt-header');
-    header.createEl('span', { text: debt.person || '—', cls: 'finance-debt-person' });
+    block.addClass(debt.direction === 'lent' ? 'finance-row-income' : 'finance-row-expense');
+    
+    const remaining = this.getDebtRemaining(debt);
+    
+    const header = block.createDiv('finance-record-header');
     header.createEl('span', {
-      text: debt.direction === 'lent' ? this.tr.lent : this.tr.borrowed,
-      cls: 'finance-debt-direction ' + (debt.direction === 'lent' ? 'finance-dir-lent' : 'finance-dir-borrowed'),
+      text: this.ctx.fmt(remaining),
+      cls: 'finance-record-amount ' + (debt.direction === 'lent' ? 'finance-amount-income' : 'finance-amount-expense'),
+    });
+    header.createEl('span', {
+      text: `${debt.person || '—'} · ${debt.direction === 'lent' ? this.tr.lent : this.tr.borrowed}`,
+      cls: 'finance-record-date',
     });
 
-    const amounts = block.createDiv('finance-debt-amounts');
+    const details = block.createDiv('finance-record-details');
     const original = this.getDebtOriginal(debt);
     const withInterest = this.getDebtWithInterest(debt);
-    const remaining = this.getDebtRemaining(debt);
     const hasInterest = debt.interestRate > 0;
 
-    const amtOrig = amounts.createDiv('finance-debt-amount');
-    amtOrig.createEl('span', { text: hasInterest ? this.tr.withInterest : this.tr.sum, cls: 'finance-debt-amount-label' });
-    amtOrig.createEl('span', {
-      text: hasInterest ? `${this.ctx.fmt(original)} → ${this.ctx.fmt(withInterest)}` : this.ctx.fmt(original),
-      cls: 'finance-debt-amount-value',
+    details.createEl('span', { 
+      text: `💰 ${hasInterest ? this.tr.withInterest : this.tr.sum}: ${hasInterest ? `${this.ctx.fmt(original)} → ${this.ctx.fmt(withInterest)}` : this.ctx.fmt(original)}`,
+      cls: 'finance-record-detail' 
     });
 
     if (remaining > 0) {
-      const amtRem = amounts.createDiv('finance-debt-amount');
-      amtRem.createEl('span', { text: this.tr.remaining, cls: 'finance-debt-amount-label' });
-      amtRem.createEl('span', { text: this.ctx.fmt(remaining), cls: 'finance-debt-amount-value finance-debt-remaining' });
+      details.createEl('span', { text: `📉 ${this.tr.remaining}: ${this.ctx.fmt(remaining)}`, cls: 'finance-record-detail' });
     }
 
     if (debt.dueDate) {
-      block.createEl('div', { text: `${this.tr.dueBy} ${this.ctx.fmtDate(debt.dueDate)}`, cls: 'finance-debt-due-date' });
+      details.createEl('span', { text: `📅 ${this.tr.dueBy} ${this.ctx.fmtDate(debt.dueDate)}`, cls: 'finance-record-detail' });
     }
     if (hasInterest) {
-      block.createEl('div', { text: `📊 ${debt.interestRate}%`, cls: 'finance-debt-due-date' });
+      details.createEl('span', { text: `📊 ${debt.interestRate}%`, cls: 'finance-record-detail' });
     }
     if (debt.note) {
-      block.createEl('div', { text: debt.note, cls: 'finance-debt-note' });
+      block.createEl('div', { text: debt.note, cls: 'finance-record-note' });
     }
   }
 

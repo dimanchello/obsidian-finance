@@ -60,6 +60,7 @@ export interface AccountData extends AccountMeta {
   debts:      DebtRecord[];
   credits:    CreditRecord[];
   deposits:   DepositRecord[];
+  exchanges:  CurrencyExchange[];
   categories: string[];
   tags:       string[];
   payers:     string[];
@@ -98,10 +99,14 @@ export interface ViewState {
   depositPage?: number;
   depositSort?: { field: DepositSortField; dir: SortDir };
   depositFilter?: DepositFilterState;
+  currencyPage?: number;
+  currencySort?: { field: CurrencySortField; dir: SortDir };
+  currencyFilter?: CurrencyFilterState;
   recordsColumns?: Record<string, boolean>;
   debtsColumns?: Record<string, boolean>;
   creditsColumns?: Record<string, boolean>;
   depositsColumns?: Record<string, boolean>;
+  currencyColumns?: Record<string, boolean>;
   creditActiveTab?:          'list' | 'analytics';
   creditAnalyticsGroupBy?:   CreditAnalyticsGroupBy;
   creditAnalyticsDateFrom?:  string;
@@ -300,3 +305,36 @@ export interface DepositRecord {
   topUps: DepositTopUp[];
   withdrawals: DepositWithdrawal[];
 }
+
+export type CurrencyOperationType = 'buy' | 'sell' | 'add' | 'spend';
+export type CurrencySortField = 'date' | 'amount' | 'targetCurrency' | 'provider';
+
+export interface CurrencyExchange {
+  id: string;
+  createdAt: number;
+  date: string;
+  time: string;
+  type: CurrencyOperationType;
+  amountInAccountCurrency: number;
+  targetCurrency: string;
+  targetAmount: number;
+  exchangeRate: number;
+  provider: string;
+  category?: string;
+  fee?: number;
+  note: string;
+}
+
+export interface CurrencyFilterState {
+  search: string;
+  type: 'all' | CurrencyOperationType;
+  targetCurrency: string;
+  provider: string;
+  category: string;
+  dateFrom: string;
+  dateTo: string;
+}
+
+export const DEFAULT_CURRENCY_FILTER: CurrencyFilterState = {
+  search: '', type: 'all', targetCurrency: '', provider: '', category: '', dateFrom: '', dateTo: '',
+};
