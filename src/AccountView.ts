@@ -12,6 +12,7 @@ import { RecordsTab } from './tabs/RecordsTab';
 import { DebtsTab } from './tabs/DebtsTab';
 import { CreditsTab } from './tabs/CreditsTab';
 import { DepositsTab } from './tabs/DepositsTab';
+import { CurrencyTab } from './tabs/CurrencyTab';
 
 export class AccountView extends MarkdownRenderChild {
   private app:      App;
@@ -23,10 +24,11 @@ export class AccountView extends MarkdownRenderChild {
   private pluginId: string;
   private ctx:      ViewContext;
 
-  private mode:     'records' | 'debts' | 'credits' | 'deposits' = 'records';
+  private mode:     'records' | 'debts' | 'credits' | 'deposits' | 'currency' = 'records';
   private isMobile = false;
   private isCheckingAutoTransactions = false;
   private autoTxTimer: ReturnType<typeof setInterval> | null = null;
+  private actionsContainer!: HTMLElement;
 
   constructor(
     app: App, root: HTMLElement, accountId: string, notePath: string,
@@ -102,16 +104,7 @@ export class AccountView extends MarkdownRenderChild {
     this.renderCurrencyBadge(curWrap);
 
     const right  = header.createDiv('finance-header-right');
-
-    const mkIconBtn = (cls: string, icon: string, label: string) => {
-      const btn = right.createEl('button', { cls: `finance-add-btn ${cls}` });
-      btn.createEl('span', { text: icon, cls: 'btn-icon' });
-      btn.createEl('span', { text: label });
-      return btn;
-    };
-
-    const incBtn = mkIconBtn('finance-income-btn', '↑', this.ctx.tr.typeIncome);
-    const expBtn = mkIconBtn('finance-expense-btn', '↓', this.ctx.tr.typeExpense);
+    this.actionsContainer = right.createDiv('finance-header-actions');
 
     const moreWrap = right.createDiv('finance-more-dropdown');
     const moreBtn = moreWrap.createEl('button', { cls: 'finance-add-btn finance-more-btn', text: '•••' });
@@ -125,7 +118,7 @@ export class AccountView extends MarkdownRenderChild {
       item.createEl('span', { text: label });
       if (this.mode !== targetMode) {
         item.addEventListener('click', () => {
-          this.mode = targetMode as 'records' | 'debts' | 'credits' | 'deposits';
+          this.mode = targetMode as 'records' | 'debts' | 'credits' | 'deposits' | 'currency';
           this.updateHeaderButtons();
           this.renderBodyContent();
           dropdown.addClass('is-hidden');
@@ -141,6 +134,7 @@ export class AccountView extends MarkdownRenderChild {
         mkDropdownItem('💳', this.ctx.tr.debts, 'debts');
         mkDropdownItem('🏦', this.ctx.tr.credits, 'credits');
         mkDropdownItem('📈', this.ctx.tr.deposits, 'deposits');
+        mkDropdownItem('💱', this.ctx.tr.currencyExchange, 'currency');
         dropdown.createDiv('finance-dropdown-separator');
         dropdown.removeClass('is-hidden');
       } else {
@@ -149,15 +143,12 @@ export class AccountView extends MarkdownRenderChild {
     });
 
     this.registerDomEvent(document, 'click', () => { dropdown.addClass('is-hidden'); });
-
-    incBtn.addEventListener('click', () => { this.mode = 'records'; this.renderBodyContent(); this.openAddModal('income'); });
-    expBtn.addEventListener('click', () => { this.mode = 'records'; this.renderBodyContent(); this.openAddModal('expense'); });
   }
 
   private updateHeaderButtons(): void {
     const moreBtn = this.root.querySelector<HTMLElement>('.finance-more-btn');
     if (moreBtn) {
-      const isActive = this.mode === 'debts' || this.mode === 'credits' || this.mode === 'deposits';
+      const isActive = this.mode === 'debts' || this.mode === 'credits' || this.mode === 'deposits' || this.mode === 'currency';
       moreBtn.toggleClass('is-active-mode', isActive);
     }
   }
@@ -167,34 +158,62 @@ export class AccountView extends MarkdownRenderChild {
     if (!body) return;
     body.empty();
 
+    if (this.actionsContainer) {
+      this.actionsContainer.empty();
+    }
+
     if (this.mode === 'debts') {
       this.renderDebtsTab(body);
     } else if (this.mode === 'credits') {
       this.renderCreditsTab(body);
     } else if (this.mode === 'deposits') {
       this.renderDepositsTab(body);
+    } else if (this.mode === 'currency') {
+      this.renderCurrencyTab(body);
     } else {
       this.renderRecordsTab(body);
     }
   }
 
   private renderRecordsTab(body: HTMLElement): void {
+    const incBtn = this.actionsContainer.createEl('button', { cls: 'finance-add-btn finance-income-btn' });
+    incBtn.createEl('span', { text: '↑', cls: 'btn-icon' });
+    incBtn.createEl('span', { text: this.ctx.tr.typeIncome });
+    
+    const expBtn = this.actionsContainer.createEl('button', { cls: 'finance-add-btn finance-expense-btn' });
+    expBtn.createEl('span', { text: '↓', cls: 'btn-icon' });
+    expBtn.createEl('span', { text: this.ctx.tr.typeExpense });
+    
+    incBtn.addEventListener('click', () => { this.mode = 'records'; this.renderBodyContent(); this.openAddModal('income'); });
+    expBtn.addEventListener('click', () => { this.mode = 'records'; this.renderBodyContent(); this.openAddModal('expense'); });
+
     new RecordsTab(this.ctx, body).render();
   }
 
   private renderDebtsTab(body: HTMLElement): void {
     const tab = new DebtsTab(this.ctx, body);
     tab.onUpdate = () => this.refreshAndRender();
+    tab.renderHeaderActions?.(this.actionsContainer);
     tab.render();
   }
 
   private renderCreditsTab(body: HTMLElement): void {
-    new CreditsTab(this.ctx, body).render();
+    const tab = new CreditsTab(this.ctx, body);
+    tab.renderHeaderActions?.(this.actionsContainer);
+    tab.render();
   }
 
   private renderDepositsTab(body: HTMLElement): void {
     const tab = new DepositsTab(this.ctx, body);
     tab.onUpdate = () => this.refreshAndRender();
+    tab.renderHeaderActions?.(this.actionsContainer);
+    tab.render();
+  }
+
+  private renderCurrencyTab(body: HTMLElement): void {
+    const tab = new CurrencyTab(this.ctx, body);
+    tab.onUpdate = () => this.refreshAndRender();
+    tab.renderHeaderActions?.(this.actionsContainer);
     tab.render();
   }
 

@@ -1,9 +1,9 @@
 import { normalizePath } from 'obsidian';
 
-export type AccountFileKind = 'meta' | 'records' | 'debts' | 'credits' | 'deposits' | 'state';
+export type AccountFileKind = 'meta' | 'records' | 'debts' | 'credits' | 'deposits' | 'exchanges' | 'state';
 
 export const ACCOUNT_FILE_KINDS: readonly AccountFileKind[] =
-  ['meta', 'records', 'debts', 'credits', 'deposits', 'state'];
+  ['meta', 'records', 'debts', 'credits', 'deposits', 'exchanges', 'state'];
 
 export class AccountFiles {
   readonly base: string;

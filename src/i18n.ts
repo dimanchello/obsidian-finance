@@ -269,6 +269,7 @@ export interface Translations {
   showInternal: string;
   allBanks: string;
   rate: string;
+  percent: string;
   opened: string;
   endDate: string;
   percentPerAnnum: string;
@@ -404,6 +405,15 @@ export interface Translations {
   fieldDescDebtDueDate: string;
   fieldDescDebtPerson: string;
   fieldDescDebtDirection: string;
+  fieldDescCurrencyType: string;
+  fieldDescCurrencyDateTime: string;
+  fieldDescCurrencyTarget: string;
+  fieldDescCurrencyTargetAmount: string;
+  fieldDescCurrencyAccountAmount: string;
+  fieldDescCurrencyRate: string;
+  fieldDescCurrencyFee: string;
+  fieldDescCurrencyProvider: string;
+  fieldDescCurrencyCategory: string;
   importStep1: string;
   importStep1b: string;
   importStep2: string;
@@ -467,6 +477,75 @@ export interface Translations {
   depositByType: string;
   depositNoAnalyticsData: string;
   depositMaturitySoon: string;
+  // Currency
+  currencyExchange: string;
+  currencyBuy: string;
+  currencySell: string;
+  currencyAdd: string;
+  currencySpendOp: string;
+  newCurrencyExchange: string;
+  buy: string;
+  sell: string;
+  add: string;
+  spend: string;
+  buyButton: string;
+  sellButton: string;
+  addButton: string;
+  spendButton: string;
+  amountSpent: string;
+  amountReceived: string;
+  amountAdded: string;
+  targetAmount: string;
+  targetAmountBuy: string;
+  targetAmountSell: string;
+  targetAmountAdd: string;
+  targetAmountSpend: string;
+  inAccountCurrency: string;
+  rateLabel: string;
+  provider: string;
+  sourceLabel: string;
+  whereSpent: string;
+  feeLabel: string;
+  feeIncluded: string;
+  placeholderBuy: string;
+  placeholderSell: string;
+  placeholderAdd: string;
+  placeholderSpend: string;
+  currencyBalance: string;
+  availableBalance: string;
+  insufficientBalance: string;
+  currencyExchangeAdded: string;
+  currencyExchangeUpdated: string;
+  currencyExchangeDeleted: string;
+  noRecordCreated: string;
+  totalBought: string;
+  totalAdded: string;
+  totalSold: string;
+  totalSpent: string;
+  averageRate: string;
+  valueInAccountCurrency: string;
+  currencyExchangeCat: string;
+  currencySaleCat: string;
+  currencySpendCat: string;
+  currencyPurchase: string;
+  currencySale: string;
+  currencySpend: string;
+  confirmDeleteSelectedExchanges: string;
+  categoryRequired: string;
+  allOperationTypes: string;
+  allCategories: string;
+  balanceAfter: string;
+  categoryColumn: string;
+  helpCurrencyBuy: string;
+  helpCurrencySell: string;
+  helpCurrencyAdd: string;
+  helpCurrencySpend: string;
+  recordPreview: string;
+  expenseRecord: string;
+  incomeRecord: string;
+  fetchingRates: string;
+  rateFromAPI: string;
+  rateAPIError: string;
 }
 
 const ru: Translations = {
@@ -688,7 +767,8 @@ const ru: Translations = {
   internal: 'Внутренние',
   showInternal: 'Только внутр.',
   allBanks: 'Все банки',
-  rate: 'Ставка',
+  rate: 'Курс',
+  percent: 'Процент',
   opened: 'Открыт',
   endDate: 'Окончание',
   percentPerAnnum: '% годовых',
@@ -866,6 +946,15 @@ const ru: Translations = {
   fieldDescDebtDueDate: 'Крайний срок возврата долга. Если не указана, долг считается бессрочным.',
   fieldDescDebtPerson: 'Кому вы должны или кто должен вам. Зависит от выбранного направления.',
   fieldDescDebtDirection: '«Мне должны» — вы дали в долг. «Я должен» — вы взяли в долг.',
+  fieldDescCurrencyType: 'Тип операции: Покупка/Продажа (с конвертацией), Добавление/Трата (без конвертации основной валюты).',
+  fieldDescCurrencyDateTime: 'Дата и время совершения операции.',
+  fieldDescCurrencyTarget: 'Валюта, с которой производится операция (например, USD, EUR).',
+  fieldDescCurrencyTargetAmount: 'Сумма в целевой валюте.',
+  fieldDescCurrencyAccountAmount: 'Сумма в основной валюте счёта.',
+  fieldDescCurrencyRate: 'Курс конвертации. Рассчитывается автоматически при вводе обеих сумм.',
+  fieldDescCurrencyFee: 'Комиссия за операцию (в основной валюте).',
+  fieldDescCurrencyProvider: 'Место или способ обмена/покупки (например, Банк, Обменник).',
+  fieldDescCurrencyCategory: 'Категория для учёта расходов/доходов.',
   importStep1: 'Шаг 1 — Выберите файл (CSV, JSON)',
   importStep1b: 'Шаг 1б — Укажите путь к массиву записей',
   importStep2: 'Шаг 2 — Соотнесение полей  (найдено {count} записей)',
@@ -926,6 +1015,74 @@ const ru: Translations = {
   depositByType: 'По типу вклада',
   depositNoAnalyticsData: 'Нет данных для аналитики',
   depositMaturitySoon: 'Закрытие в ближайшие 6 мес.',
+  currencyExchange: 'Валюты',
+  currencyBuy: 'Покупка валюты',
+  currencySell: 'Продажа валюты',
+  currencyAdd: 'Добавление валюты',
+  currencySpendOp: 'Трата валюты',
+  newCurrencyExchange: 'Новая операция',
+  buy: 'Покупка',
+  sell: 'Продажа',
+  add: 'Добавление',
+  spend: 'Трата',
+  buyButton: 'Купить',
+  sellButton: 'Продать',
+  addButton: 'Добавить',
+  spendButton: 'Потратить',
+  amountSpent: 'Потрачено',
+  amountReceived: 'Получено',
+  amountAdded: 'Добавлено',
+  targetAmount: 'Количество',
+  targetAmountBuy: 'Получено ({currency})',
+  targetAmountSell: 'Продано ({currency})',
+  targetAmountAdd: 'Добавлено ({currency})',
+  targetAmountSpend: 'Потрачено ({currency})',
+  inAccountCurrency: 'В рублях ({currency})',
+  rateLabel: '1 {currency} = ? {accountCurrency}',
+  provider: 'Место обмена',
+  sourceLabel: 'Источник',
+  whereSpent: 'Где потратили',
+  feeLabel: 'Комиссия',
+  feeIncluded: 'Уже включена в сумму',
+  placeholderBuy: 'Например: Покупка для поездки в Турцию',
+  placeholderSell: 'Например: Продажа после возвращения',
+  placeholderAdd: 'Например: Привёз из командировки',
+  placeholderSpend: 'Например: Оплата отеля',
+  currencyBalance: 'Баланс валюты',
+  availableBalance: 'Доступно: {amount} {currency}',
+  insufficientBalance: 'Недостаточно валюты',
+  currencyExchangeAdded: 'Операция добавлена',
+  currencyExchangeUpdated: 'Операция обновлена',
+  currencyExchangeDeleted: 'Операция удалена',
+  noRecordCreated: 'Запись в журнале НЕ будет создана',
+  totalBought: 'Всего куплено',
+  totalAdded: 'Всего добавлено',
+  totalSold: 'Всего продано',
+  totalSpent: 'Всего потрачено',
+  averageRate: 'Средний курс',
+  valueInAccountCurrency: 'Стоимость в {currency}',
+  currencyExchangeCat: 'Покупка валюты',
+  currencySaleCat: 'Продажа валюты',
+  currencySpendCat: 'Трата валюты',
+  currencyPurchase: 'Покупка',
+  currencySale: 'Продажа',
+  currencySpend: 'Трата',
+  confirmDeleteSelectedExchanges: 'Удалить выбранные операции?',
+  categoryRequired: 'Выберите категорию для траты',
+  allOperationTypes: 'Все типы',
+  allCategories: 'Все категории',
+  balanceAfter: 'Баланс после',
+  categoryColumn: 'Категория',
+  helpCurrencyBuy: 'Покупка валюты через банк/обменник. Создаёт расход в основной валюте.',
+  helpCurrencySell: 'Продажа валюты обратно. Создаёт доход в основной валюте.',
+  helpCurrencyAdd: 'Добавление наличной валюты, которая уже есть у вас (из поездки, подарок). Не создаёт записей в журнале.',
+  helpCurrencySpend: 'Трата наличной валюты. Создаёт расход в пересчёте на основную валюту.',
+  recordPreview: 'Будет создана запись:',
+  expenseRecord: 'Расход',
+  incomeRecord: 'Доход',
+  fetchingRates: 'Загрузка курсов...',
+  rateFromAPI: 'Курс от {date}',
+  rateAPIError: 'Не удалось загрузить курс',
 };
 
 const en: Translations = {
@@ -1148,6 +1305,7 @@ const en: Translations = {
   showInternal: 'Internal only',
   allBanks: 'All banks',
   rate: 'Rate',
+  percent: 'Percent',
   opened: 'Opened',
   endDate: 'End date',
   percentPerAnnum: '% p.a.',
@@ -1323,8 +1481,17 @@ const en: Translations = {
   fieldDescDebtRate: 'Interest rate for borrowing. Total debt = amount + interest.',
   fieldDescDebtDateCreated: 'Date when the debt was created.',
   fieldDescDebtDueDate: 'Deadline for debt repayment. If not set, the debt is considered indefinite.',
-  fieldDescDebtPerson: 'Who owes you or who you owe. Depends on the selected direction.',
-  fieldDescDebtDirection: '"Owed to me" — you lent money. "I owe" — you borrowed money.',
+  fieldDescDebtPerson: 'Who you owe or who owes you. Depends on the chosen direction.',
+  fieldDescDebtDirection: '«They owe me» — you lent money. «I owe» — you borrowed money.',
+  fieldDescCurrencyType: 'Operation type: Buy/Sell (with conversion), Add/Spend (without main currency conversion).',
+  fieldDescCurrencyDateTime: 'Date and time of the operation.',
+  fieldDescCurrencyTarget: 'Target currency of the operation (e.g. USD, EUR).',
+  fieldDescCurrencyTargetAmount: 'Amount in target currency.',
+  fieldDescCurrencyAccountAmount: 'Amount in main account currency.',
+  fieldDescCurrencyRate: 'Exchange rate. Calculated automatically when both amounts are entered.',
+  fieldDescCurrencyFee: 'Exchange fee (in main account currency).',
+  fieldDescCurrencyProvider: 'Place or method of exchange (e.g. Bank, Exchange).',
+  fieldDescCurrencyCategory: 'Category for expense/income tracking.',
   importStep1: 'Step 1 — Select a file (CSV, JSON)',
   importStep1b: 'Step 1b — Specify the path to the records array',
   importStep2: 'Step 2 — Field mapping  ({count} records found)',
@@ -1385,6 +1552,74 @@ const en: Translations = {
   depositByType: 'By deposit type',
   depositNoAnalyticsData: 'No analytics data',
   depositMaturitySoon: 'Closing within 6 months',
+  currencyExchange: 'Currency Exchange',
+  currencyBuy: 'Buy Currency',
+  currencySell: 'Sell Currency',
+  currencyAdd: 'Add Currency',
+  currencySpendOp: 'Spend Currency',
+  newCurrencyExchange: 'New Exchange',
+  buy: 'Buy',
+  sell: 'Sell',
+  add: 'Add',
+  spend: 'Spend',
+  buyButton: 'Buy',
+  sellButton: 'Sell',
+  addButton: 'Add',
+  spendButton: 'Spend',
+  amountSpent: 'Spent',
+  amountReceived: 'Received',
+  amountAdded: 'Added',
+  targetAmount: 'Amount',
+  targetAmountBuy: 'Received ({currency})',
+  targetAmountSell: 'Sold ({currency})',
+  targetAmountAdd: 'Added ({currency})',
+  targetAmountSpend: 'Spent ({currency})',
+  inAccountCurrency: 'In {currency}',
+  rateLabel: '1 {currency} = ? {accountCurrency}',
+  provider: 'Exchange place',
+  sourceLabel: 'Source',
+  whereSpent: 'Where Spent',
+  feeLabel: 'Fee',
+  feeIncluded: 'Already included in amount',
+  placeholderBuy: 'e.g. Buying for trip to Turkey',
+  placeholderSell: 'e.g. Selling after return',
+  placeholderAdd: 'e.g. Brought from business trip',
+  placeholderSpend: 'e.g. Hotel payment',
+  currencyBalance: 'Currency Balance',
+  availableBalance: 'Available: {amount} {currency}',
+  insufficientBalance: 'Insufficient balance',
+  currencyExchangeAdded: 'Exchange added',
+  currencyExchangeUpdated: 'Exchange updated',
+  currencyExchangeDeleted: 'Exchange deleted',
+  noRecordCreated: 'No journal entry will be created',
+  totalBought: 'Total Bought',
+  totalAdded: 'Total Added',
+  totalSold: 'Total Sold',
+  totalSpent: 'Total Spent',
+  averageRate: 'Average Rate',
+  valueInAccountCurrency: 'Value in {currency}',
+  currencyExchangeCat: 'Currency Purchase',
+  currencySaleCat: 'Currency Sale',
+  currencySpendCat: 'Currency Spending',
+  currencyPurchase: 'Bought',
+  currencySale: 'Sold',
+  currencySpend: 'Spent',
+  confirmDeleteSelectedExchanges: 'Delete selected exchanges?',
+  categoryRequired: 'Select a category for spending',
+  allOperationTypes: 'All Types',
+  allCategories: 'All Categories',
+  balanceAfter: 'Balance After',
+  categoryColumn: 'Category',
+  helpCurrencyBuy: 'Buying currency via bank/exchange. Creates an expense in main currency.',
+  helpCurrencySell: 'Selling currency back. Creates an income in main currency.',
+  helpCurrencyAdd: 'Adding cash currency you already have (from trip, gift). Creates no journal entries.',
+  helpCurrencySpend: 'Spending cash currency. Creates an expense converted to main currency.',
+  recordPreview: 'Record will be created:',
+  expenseRecord: 'Expense',
+  incomeRecord: 'Income',
+  fetchingRates: 'Fetching rates...',
+  rateFromAPI: 'Rate from {date}',
+  rateAPIError: 'Failed to fetch rate',
 };
 
 const translations: Record<Locale, Translations> = { ru, en };

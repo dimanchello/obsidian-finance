@@ -101,12 +101,6 @@ export class DebtsTab {
         setColumns: c => { this.ctx.state.debtsColumns = c; },
       },
       renderStats: host => this.renderStats(host),
-      toolbarButtons: toolbar => {
-        const newDebtBtn = toolbar.createEl('button', { cls: 'finance-add-btn finance-accent-btn' });
-        newDebtBtn.createEl('span', { text: '＋', cls: 'btn-icon' });
-        newDebtBtn.createEl('span', { text: this.tr.newDebt });
-        newDebtBtn.addEventListener('click', () => this.openNewDebtModal());
-      },
       emptyState: { icon: '💳', title: this.tr.noDebts, subtitle: this.tr.addNewDebt },
       emptyFiltered: { icon: '🔍', title: this.tr.noDebtsFiltered, subtitle: this.tr.tryChangeFilters },
       onBulkDelete: async ids => {
@@ -122,6 +116,13 @@ export class DebtsTab {
       onFilterChange: () => {},
       rerender: () => this.render(),
     });
+  }
+
+  public renderHeaderActions(container: HTMLElement): void {
+    const newDebtBtn = container.createEl('button', { cls: 'finance-add-btn finance-accent-btn' });
+    newDebtBtn.createEl('span', { text: '＋', cls: 'btn-icon' });
+    newDebtBtn.createEl('span', { text: this.tr.newDebt });
+    newDebtBtn.addEventListener('click', () => this.openNewDebtModal());
   }
 
   render(): void {

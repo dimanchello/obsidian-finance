@@ -48,7 +48,7 @@ export class DepositsTab {
             };
           },
         },
-        { key: 'rate', label: this.tr.rate, cell: d => ({ text: `${d.interestRate}%` }) },
+        { key: 'rate', label: this.tr.percent, cell: d => ({ text: `${d.interestRate}%` }) },
         { key: 'date', label: this.tr.opened, cell: d => ({ text: this.ctx.fmtDate(d.startDate) }) },
         {
           key: 'endDate', label: this.tr.endDate,
@@ -92,11 +92,6 @@ export class DepositsTab {
       },
       renderStats: host => this.renderStats(host),
       toolbarButtons: (toolbar, rerender, api) => {
-        const btn = toolbar.createEl('button', { cls: 'finance-add-btn finance-accent-btn' });
-        btn.createEl('span', { text: '＋', cls: 'btn-icon' });
-        btn.createEl('span', { text: this.tr.newDeposit });
-        btn.addEventListener('click', () => this.openNewDepositModal());
-
         const open = (this.ctx.state.depositActiveTab ?? 'list') === 'analytics';
         const toggleBtn = toolbar.createEl('button', {
           cls: `finance-analytics-toggle-btn${open ? ' active' : ''}`,
@@ -144,6 +139,13 @@ export class DepositsTab {
       },
       rerender: () => this.render(),
     });
+  }
+
+  public renderHeaderActions(container: HTMLElement): void {
+    const btn = container.createEl('button', { cls: 'finance-add-btn finance-accent-btn' });
+    btn.createEl('span', { text: '＋', cls: 'btn-icon' });
+    btn.createEl('span', { text: this.tr.newDeposit });
+    btn.addEventListener('click', () => this.openNewDepositModal());
   }
 
   render(): void {

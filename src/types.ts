@@ -102,6 +102,7 @@ export interface ViewState {
   currencyPage?: number;
   currencySort?: { field: CurrencySortField; dir: SortDir };
   currencyFilter?: CurrencyFilterState;
+  currencyActiveTab?: 'list' | 'analytics';
   recordsColumns?: Record<string, boolean>;
   debtsColumns?: Record<string, boolean>;
   creditsColumns?: Record<string, boolean>;
@@ -217,6 +218,8 @@ export const ONE_WEEK_MS = 604_800_000;
 export const AUTO_TX_INTERVAL_MS = 3_600_000;
 export const MINT_GUARD_MS = 3_000;
 export const PERCENT_100 = 100;
+export const CURRENCY_ROUNDING_PRECISION = 100;      // 2 decimal places
+export const EXCHANGE_RATE_PRECISION = 10000;        // 4 decimal places
 
 export type CreditType = 'consumer' | 'auto' | 'mortgage';
 export type CreditStatus = 'active' | 'paid';

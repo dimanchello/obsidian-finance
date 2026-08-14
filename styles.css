@@ -68,6 +68,7 @@
 }
 .finance-header-left  { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .finance-header-right { display: flex; gap: 8px; flex-wrap: wrap; }
+.finance-header-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 
 /* ── Account name ───────────────────────────────────────────────────────────── */
 .finance-title {
@@ -1252,6 +1253,7 @@
   .finance-ie-modal .finance-export-grid { grid-template-columns: 1fr 1fr !important; }
   .finance-header             { flex-direction: column; align-items: flex-start; gap: 8px; }
   .finance-header-right       { width: 100%; flex-wrap: wrap; }
+  .finance-header-actions     { flex: 1; min-width: 0; flex-wrap: wrap; }
   .finance-analytics-controls { flex-direction: column; align-items: flex-start; }
   .finance-analytics-date-row { flex-direction: column; gap: 12px; }
   .finance-table-info-bar     { flex-direction: column; align-items: flex-start; gap: 6px; }
@@ -1261,6 +1263,7 @@
 
   /* ── Header: кнопки на всю ширину ───────────────────────────────────── */
   .finance-add-btn            { flex: 1; justify-content: center; min-width: 0; }
+  .finance-currency-btn-text  { display: none; }
 
 /* ── Stats: вертикальный столбик вместо горизонтального скролла ─────── */
   .finance-stats-container {
@@ -2654,6 +2657,29 @@
 
 .finance-stats-two-cols {
   grid-template-columns: repeat(2, 1fr) !important;
+}
+.max .finance-stats-container.finance-stats-two-cols {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+}
+
+/* ── Currency Tab Dynamic Layout ────────────────────────────────────────── */
+.finance-analytics-panel {
+  container-type: inline-size;
+}
+.finance-stats-container.finance-stats-currency {
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)) !important;
+}
+.max .finance-stats-container.finance-stats-currency {
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)) !important;
+}
+.finance-currency-toolbar-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.finance-currency-toolbar-container .finance-debt-toolbar {
+  margin-bottom: 0;
 }
 .finance-mov-panel {
   padding: 10px 12px 12px;

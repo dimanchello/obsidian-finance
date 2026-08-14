@@ -38,7 +38,7 @@ function mkCredit(over: Partial<CreditRecord> = {}): CreditRecord {
 function mkData(over: Partial<AccountData> = {}): AccountData {
   return {
     version: 1, name: '', currency: '₽',
-    records: [], debts: [], credits: [], deposits: [],
+    records: [], debts: [], credits: [], deposits: [], exchanges: [],
     categories: [], tags: [], payers: [], ...over,
   };
 }

@@ -81,11 +81,6 @@ export class CreditsTab {
       },
       renderStats: host => this.renderStats(host),
       toolbarButtons: (toolbar, rerender, api) => {
-        const btn = toolbar.createEl('button', { cls: 'finance-add-btn finance-accent-btn' });
-        btn.createEl('span', { text: '＋', cls: 'btn-icon' });
-        btn.createEl('span', { text: this.tr.newCredit });
-        btn.addEventListener('click', () => this.openNewCreditModal());
-
         const open = (this.ctx.state.creditActiveTab ?? 'list') === 'analytics';
         const toggleBtn = toolbar.createEl('button', {
           cls: `finance-analytics-toggle-btn${open ? ' active' : ''}`,
@@ -133,7 +128,14 @@ export class CreditsTab {
     });
   }
 
-  render(): void {
+  public renderHeaderActions(container: HTMLElement): void {
+    const btn = container.createEl('button', { cls: 'finance-add-btn finance-accent-btn' });
+    btn.createEl('span', { text: '＋', cls: 'btn-icon' });
+    btn.createEl('span', { text: this.tr.newCredit });
+    btn.addEventListener('click', () => this.openNewCreditModal());
+  }
+
+  public render(): void {
     if (this.ctx.state.creditSort?.field === 'createdAt' as CreditSortField) {
       this.ctx.state.creditSort = { field: 'date', dir: 'desc' };
       this.ctx.saveState();

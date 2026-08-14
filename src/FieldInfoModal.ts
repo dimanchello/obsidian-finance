@@ -38,6 +38,19 @@ export const CREDIT_FIELDS: FieldDef[] = [
   { labelKey: 'note', descKey: 'fieldDescNote' },
 ];
 
+export const CURRENCY_FIELDS: FieldDef[] = [
+  { labelKey: 'type', descKey: 'fieldDescCurrencyType' },
+  { labelKey: 'dateTime', descKey: 'fieldDescCurrencyDateTime' },
+  { labelKey: 'currency', descKey: 'fieldDescCurrencyTarget' },
+  { labelKey: 'targetAmount', descKey: 'fieldDescCurrencyTargetAmount' },
+  { labelKey: 'inAccountCurrency', descKey: 'fieldDescCurrencyAccountAmount' },
+  { labelKey: 'rateLabel', descKey: 'fieldDescCurrencyRate' },
+  { labelKey: 'feeLabel', descKey: 'fieldDescCurrencyFee' },
+  { labelKey: 'provider', descKey: 'fieldDescCurrencyProvider' },
+  { labelKey: 'category', descKey: 'fieldDescCurrencyCategory' },
+  { labelKey: 'note', descKey: 'fieldDescNote' },
+];
+
 /** Field reference sheet — one modal for deposits, debts and credits. */
 export class FieldInfoModal extends Modal {
   private tr: Translations;

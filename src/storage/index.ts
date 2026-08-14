@@ -1,9 +1,9 @@
 import { App } from 'obsidian';
-import { AccountData, AccountMeta, CreditRecord, DebtMovement, DebtRecord, DepositRecord, DepositTopUp, DepositWithdrawal, FinanceRecord } from '../types';
+import { AccountData, AccountMeta, CreditRecord, CurrencyExchange, DebtMovement, DebtRecord, DepositRecord, DepositTopUp, DepositWithdrawal, FinanceRecord } from '../types';
 import { getTodayStr } from '../utils';
 import { recalcFutureAccruals } from '../domain/schedule';
 import { round2, sumMoney } from '../domain/money';
-import { parseCredits, parseDebts, parseDeposits, parseRecords, parseStringList } from '../domain/validate';
+import { parseCredits, parseDebts, parseDeposits, parseRecords, parseStringList, parseExchanges } from '../domain/validate';
 import { VaultAdapter } from './VaultAdapter';
 import { AccountFiles } from './AccountFiles';
 import { FileStore, FlushScheduler } from './AccountRepo';
@@ -58,6 +58,7 @@ export class FinanceStorage {
   private debts: FileStore<DebtRecord[]>;
   private credits: FileStore<CreditRecord[]>;
   private deposits: FileStore<DepositRecord[]>;
+  private exchanges: FileStore<CurrencyExchange[]>;
   private state: FileStore<Record<string, unknown> | null>;
   private allStores: FileStore<unknown>[];
 
@@ -73,8 +74,9 @@ export class FinanceStorage {
     this.debts = new FileStore('debts', parseDebts, dirty);
     this.credits = new FileStore('credits', parseCredits, dirty);
     this.deposits = new FileStore('deposits', parseDeposits, dirty);
+    this.exchanges = new FileStore('exchanges', parseExchanges, dirty);
     this.state = new FileStore('state', raw => (isObject(raw) ? raw : null), dirty);
-    this.allStores = [this.meta, this.records, this.debts, this.credits, this.deposits, this.state] as FileStore<unknown>[];
+    this.allStores = [this.meta, this.records, this.debts, this.credits, this.deposits, this.exchanges, this.state] as FileStore<unknown>[];
   }
 
   setDefaultCurrency(c: string) { this.defaultCurrency = c; }
@@ -121,6 +123,10 @@ export class FinanceStorage {
     return this.deposits.load(this.vault, this.files, accountId);
   }
 
+  private loadExchanges(accountId: string): Promise<CurrencyExchange[]> {
+    return this.exchanges.load(this.vault, this.files, accountId);
+  }
+
   // ── Composite load (for AccountView) ──────────────────────────────────────
 
   async load(accountId: string): Promise<AccountData> {
@@ -129,6 +135,7 @@ export class FinanceStorage {
     const debts = await this.loadDebts(accountId);
     const credits = await this.loadCredits(accountId);
     const deposits = await this.loadDeposits(accountId);
+    const exchanges = await this.loadExchanges(accountId);
 
     return {
       version: DATA_VERSION,
@@ -142,6 +149,7 @@ export class FinanceStorage {
       debts,
       credits,
       deposits,
+      exchanges,
     };
   }
 
@@ -382,6 +390,40 @@ export class FinanceStorage {
     });
   }
 
+  // ── Currency Exchange CRUD ────────────────────────────────────────────────
+
+  async addExchange(accountId: string, exchange: CurrencyExchange): Promise<void> {
+    (await this.loadExchanges(accountId)).push(exchange);
+    this.exchanges.markDirty(accountId);
+  }
+
+  async updateExchange(accountId: string, exchange: CurrencyExchange): Promise<void> {
+    const d = await this.loadExchanges(accountId);
+    const idx = d.findIndex(x => x.id === exchange.id);
+    if (idx === -1) return;
+    d[idx] = exchange;
+    this.exchanges.markDirty(accountId);
+  }
+
+  async deleteExchange(accountId: string, id: string): Promise<void> {
+    const d = await this.loadExchanges(accountId);
+    this.exchanges.set(accountId, d.filter(x => x.id !== id));
+  }
+
+  async deleteExchangesBatch(accountId: string, ids: string[]): Promise<void> {
+    const idSet = new Set(ids);
+    const d = await this.loadExchanges(accountId);
+    this.exchanges.set(accountId, d.filter(x => !idSet.has(x.id)));
+  }
+
+  async saveAllExchanges(accountId: string, exchanges: CurrencyExchange[]): Promise<void> {
+    this.exchanges.set(accountId, exchanges);
+  }
+  
+  async loadAllExchanges(accountId: string): Promise<CurrencyExchange[]> {
+    return this.loadExchanges(accountId);
+  }
+
   // ── View State ────────────────────────────────────────────────────────────
 
   async saveViewState(accountId: string, state: Record<string, unknown>): Promise<void> {
@@ -406,6 +448,7 @@ export class FinanceStorage {
     this.debts.set(accountId, []);
     this.credits.set(accountId, []);
     this.deposits.set(accountId, []);
+    this.exchanges.set(accountId, []);
   }
 
   /** Account folders whose id is not referenced by any block in the vault. */

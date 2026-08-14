@@ -2,7 +2,7 @@ import {
   CreditPayment, CreditRecord, CreditStatus, CreditType,
   DebtDirection, DebtMovement, DebtMovementType, DebtRecord,
   DepositAccrual, DepositAccrualType, DepositRecord, DepositStatus, DepositTopUp, DepositType, DepositWithdrawal,
-  FinanceRecord, RecordType,
+  FinanceRecord, RecordType, CurrencyExchange, CurrencyOperationType,
 } from '../types';
 import { normalizeDateStr, normalizeTimeStr } from '../utils';
 
@@ -57,6 +57,7 @@ const DEPOSIT_TYPES = ['term', 'demand', 'savings'] as const satisfies readonly 
 const DEPOSIT_STATUSES = ['active', 'closed'] as const satisfies readonly DepositStatus[];
 const ACCRUAL_TYPES = ['to_account', 'capitalization'] as const satisfies readonly DepositAccrualType[];
 const SCHEDULE_STATUSES = ['pending', 'paid'] as const;
+const CURRENCY_OPERATION_TYPES = ['buy', 'sell', 'add', 'spend'] as const satisfies readonly CurrencyOperationType[];
 
 export function parseRecord(o: Record<string, unknown>): FinanceRecord | null {
   const id = str(o.id);
@@ -204,6 +205,26 @@ export function parseDeposit(o: Record<string, unknown>): DepositRecord | null {
   };
 }
 
+export function parseExchange(o: Record<string, unknown>): CurrencyExchange | null {
+  const id = str(o.id);
+  if (!id) return null;
+  return {
+    id,
+    createdAt: num(o.createdAt),
+    date: normalizeDateStr(str(o.date)),
+    time: normalizeTimeStr(str(o.time)),
+    type: oneOf(o.type, CURRENCY_OPERATION_TYPES, 'buy'),
+    amountInAccountCurrency: num(o.amountInAccountCurrency),
+    targetCurrency: str(o.targetCurrency),
+    targetAmount: num(o.targetAmount),
+    exchangeRate: num(o.exchangeRate),
+    provider: str(o.provider),
+    ...(str(o.category) ? { category: str(o.category) } : {}),
+    ...(typeof o.fee === 'number' ? { fee: num(o.fee) } : {}),
+    note: str(o.note),
+  };
+}
+
 export function parseRecords(raw: unknown): FinanceRecord[] {
   return parseList(raw, parseRecord);
 }
@@ -218,6 +239,10 @@ export function parseCredits(raw: unknown): CreditRecord[] {
 
 export function parseDeposits(raw: unknown): DepositRecord[] {
   return parseList(raw, parseDeposit);
+}
+
+export function parseExchanges(raw: unknown): CurrencyExchange[] {
+  return parseList(raw, parseExchange);
 }
 
 export function parseStringList(raw: unknown): string[] {
