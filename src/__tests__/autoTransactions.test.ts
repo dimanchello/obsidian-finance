@@ -164,9 +164,13 @@ describe('applyAutoTransactions — вклады', () => {
     const res = applyAutoTransactions(data, mkDeps('2026-04-01'));
 
     expect(res.deposits[0].accruals).toHaveLength(6);
-    expect(res.records).toHaveLength(2);
-    expect(res.records.map(r => r.date)).toEqual(['2026-02-15', '2026-03-15']);
-    expect(res.records.every(r => r.type === 'income' && r.linkedId === 'dep-1')).toBe(true);
+    expect(res.records).toHaveLength(3); // открытие (expense) + 2 начисления (income)
+    const opening = res.records.find(r => r.type === 'expense');
+    expect(opening).toBeDefined();
+    expect(opening!.date).toBe('2026-01-15');
+    const incomes = res.records.filter(r => r.type === 'income');
+    expect(incomes.map(r => r.date)).toEqual(['2026-02-15', '2026-03-15']);
+    expect(incomes.every(r => r.linkedId === 'dep-1')).toBe(true);
     expect(res.changed).toEqual({ records: true, deposits: true, credits: false });
   });
 
@@ -177,7 +181,9 @@ describe('applyAutoTransactions — вклады', () => {
 
     const res = applyAutoTransactions(data, mkDeps('2026-04-01'));
 
-    expect(res.records).toHaveLength(0);
+    expect(res.records).toHaveLength(1); // только открытие вклада (expense)
+    expect(res.records[0].type).toBe('expense');
+    expect(res.records[0].date).toBe('2026-01-15');
     expect(res.deposits[0].amount).toBeGreaterThan(100_000);
   });
 

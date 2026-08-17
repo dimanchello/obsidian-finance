@@ -2,7 +2,7 @@ import { App, Modal, Notice } from 'obsidian';
 import { getLocaleFromApp, t, Translations } from './i18n';
 import { CreditRecord, CreditType, ACCRUAL_STEP_MONTHLY, PERCENT_100 } from './types';
 import { fmtAmount, parseAmount, getTodayStr, normalizeDateStr } from './utils';
-import { addMonthsClamped } from './domain/dateMath';
+import { addMonthsClamped, withDayClamped, parseDateStr } from './domain/dateMath';
 import { round2, sumMoney } from './domain/money';
 import { FieldInfoModal, CREDIT_FIELDS } from './FieldInfoModal';
 import { attachAutocomplete } from './ui/Combobox';
@@ -26,6 +26,7 @@ export class CreditModal extends Modal {
   private termInput!: HTMLInputElement;
   private downPaymentValueInput!: HTMLInputElement;
   private downPaymentDateInput!: HTMLInputElement;
+  private paymentDayInput!: HTMLInputElement;
   private finalAmountDisplay!: HTMLElement;
   private calcTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -265,6 +266,21 @@ export class CreditModal extends Modal {
       const opt = typeSel.createEl('option', { value: t.value, text: t.label });
       if (t.value === this.credit.type) opt.selected = true;
     });
+    // === РЯД 4.2: День платежа ===
+    const row42 = form.createDiv('finance-form-row finance-full-width');
+    const pdG = row42.createDiv('finance-field-group');
+    pdG.createEl('label', { text: this.tr.paymentDayLabel, cls: 'finance-field-label' });
+    this.paymentDayInput = pdG.createEl('input', { type: 'number', cls: 'finance-input' });
+    this.paymentDayInput.setAttribute('min', '1');
+    this.paymentDayInput.setAttribute('max', '31');
+    const defaultDay = this.credit.paymentDay ?? (parseDateStr(this.credit.startDate)?.day ?? 1);
+    this.paymentDayInput.value = String(defaultDay);
+    this.credit.paymentDay ??= defaultDay;
+    this.paymentDayInput.addEventListener('change', () => {
+      const v = parseInt(this.paymentDayInput.value);
+      this.credit.paymentDay = (v >= 1 && v <= 31) ? v : defaultDay;
+    });
+
     // === РЯД 4.5: Эскроу (только для ипотеки) ===
     const rowEscrow = form.createDiv('finance-form-row finance-full-width');
     const escrowG = rowEscrow.createDiv('finance-field-group finance-full-width');
@@ -396,7 +412,10 @@ export class CreditModal extends Modal {
       this.credit.payments = [...kept];
 
       for (let i = kept.length + 1; i <= this.credit.termMonths; i++) {
-        const dueDateStr = addMonthsClamped(startDate, i);
+        const base = addMonthsClamped(startDate, i);
+        const dueDateStr = this.credit.paymentDay !== undefined
+          ? withDayClamped(base, this.credit.paymentDay)
+          : base;
         const isPast = dueDateStr <= today;
         this.credit.payments.push({
           id: crypto.randomUUID(),

@@ -426,6 +426,10 @@
   outline: none; font-family: inherit;
   transition: border-color .15s, box-shadow .15s;
 }
+.finance-input-error {
+  border-color: var(--ft-expense) !important;
+  background: rgba(239, 68, 68, 0.05) !important;
+}
 .finance-textarea {
   height: auto; line-height: 1.5; padding: 8px 10px;
 }

@@ -63,11 +63,11 @@ export class CurrencyTab {
         getColumns: () => (this.ctx.state.currencyColumns ??= {}),
         setColumns: c => { this.ctx.state.currencyColumns = c; },
       },
-      renderStats: () => {},
+      renderStats: host => this.ctx.renderRecordsStats(host),
       renderPanels: host => {
         if ((this.ctx.state.currencyActiveTab ?? 'list') === 'analytics') {
           const panel = host.createDiv('finance-analytics-panel');
-          this.renderStats(panel);
+          this.renderCurrencyCards(panel);
           return { hideTable: true, hideEmptyState: true };
         }
         return {};
@@ -207,23 +207,23 @@ export class CurrencyTab {
     }
   }
 
-  private renderStats(host: HTMLElement): void {
+  private renderCurrencyCards(host: HTMLElement): void {
     const balances = getCurrencyBalances(this.ctx.data?.exchanges ?? []);
     if (balances.size === 0) return;
-    
+
     const summary = host.createDiv('finance-stats-container finance-stats-currency');
-    
+
     balances.forEach((metrics, currency) => {
       if (metrics.balance === 0) return;
-      
+
       const card = summary.createDiv('finance-stat-card finance-stat-deposit-active');
       const header = card.createDiv('finance-debt-summary-header');
       header.createEl('span', { text: '💱', cls: 'finance-debt-summary-icon' });
       header.createEl('span', { text: currency, cls: 'finance-debt-summary-title' });
-      
+
       const content = card.createDiv('finance-debt-summary-content');
-      content.createEl('div', { text: this.ctx.fmt(metrics.balance), cls: 'finance-debt-summary-main' });
-      
+      content.createEl('div', { text: fmt(metrics.balance, currency), cls: 'finance-debt-summary-main' });
+
       let subText = `${this.tr.averageRate}: ${metrics.averageBuyRate.toFixed(2)}`;
       if (metrics.averageBuyRate > 0 && this.ctx.data) {
         subText += ` · ~ ${this.ctx.fmt(metrics.balance * metrics.averageBuyRate)}`;

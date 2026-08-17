@@ -31,6 +31,7 @@ export const CREDIT_FIELDS: FieldDef[] = [
   { labelKey: 'amountLabel', descKey: 'fieldDescCreditAmount' },
   { labelKey: 'interestRate', descKey: 'fieldDescCreditRate' },
   { labelKey: 'startDate', descKey: 'fieldDescCreditStartDate' },
+  { labelKey: 'paymentDayLabel', descKey: 'fieldDescCreditPaymentDay' },
   { labelKey: 'termLabel', descKey: 'fieldDescCreditTerm' },
   { labelKey: 'creditTypeLabel', descKey: 'fieldDescCreditType' },
   { labelKey: 'monthlyPayment', descKey: 'fieldDescCreditMonthlyPayment' },

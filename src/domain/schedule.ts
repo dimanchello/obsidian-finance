@@ -1,5 +1,5 @@
 import { CreditPayment, CreditRecord, DepositAccrual, DepositRecord, PERCENT_100 } from '../types';
-import { addMonthsClamped, daysBetweenStr, parseDateStr, daysInYear } from './dateMath';
+import { addMonthsClamped, withDayClamped, daysBetweenStr, parseDateStr, daysInYear } from './dateMath';
 import { round2 } from './money';
 
 /** Everything non-deterministic is passed in — that is what makes these functions testable. */
@@ -66,7 +66,8 @@ export function buildCreditSchedule(credit: CreditRecord, deps: ScheduleDeps): C
 
   const payments: CreditPayment[] = [];
   for (let i = 1; i <= credit.termMonths; i++) {
-    const dueDate = addMonthsClamped(credit.startDate, i);
+    const base = addMonthsClamped(credit.startDate, i);
+    const dueDate = credit.paymentDay !== undefined ? withDayClamped(base, credit.paymentDay) : base;
     const isPast = dueDate <= deps.today;
     payments.push({
       id: deps.newId(),

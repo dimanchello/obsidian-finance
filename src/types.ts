@@ -245,6 +245,7 @@ export interface CreditRecord {
   monthlyPayment: number;
   termMonths: number;
   startDate: string;
+  paymentDay?: number;
   createdAt: number;
   note: string;
   status: CreditStatus;

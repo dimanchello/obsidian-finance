@@ -3,6 +3,7 @@ import {
 } from '../types';
 import { buildCreditSchedule, buildDepositSchedule, type ScheduleDeps } from './schedule';
 import { round2 } from './money';
+import { parseDateStr } from './dateMath';
 
 export interface AutoTxLabels {
   depositInterestCat: string;
@@ -102,6 +103,19 @@ function processDeposit(
     accruals = buildDepositSchedule(deposit, deps);
     if (!accruals.length) return { deposit, changed: false };
     changed = true;
+
+    // Create expense record for opening the deposit (transfer to bank)
+    // Use a special category to distinguish it from the refund
+    mirror.ensure({
+      date: deposit.startDate,
+      type: 'expense',
+      amount: deposit.amount,
+      category: `${deps.labels.depositRefundCat} (открытие)`,
+      payer: deposit.bankName,
+      note: `Открытие вклада "${deposit.name}"`,
+      linkedId: deposit.id,
+    }, deps);
+
     if (deposit.accrualType === 'capitalization') {
       for (const a of accruals) {
         if (a.status === 'paid') amount = round2(amount + a.amount);
@@ -168,6 +182,19 @@ function processCredit(
     if (!payments.length) return { credit, changed: false };
     changed = true;
   } else {
+    if (credit.paymentDay !== undefined) {
+      const pendingWithWrongDay = payments.filter(p => {
+        if (p.status !== 'pending') return false;
+        const parsed = parseDateStr(p.dueDate);
+        return parsed !== null && parsed.day !== credit.paymentDay;
+      });
+      if (pendingWithWrongDay.length > 0) {
+        const paid = payments.filter(p => p.status === 'paid');
+        const rebuilt = buildCreditSchedule(credit, deps);
+        payments = [...paid, ...rebuilt.filter(p => p.status === 'pending')];
+        changed = true;
+      }
+    }
     const due = settleDue(payments, deps.today);
     if (due.settled.length) {
       payments = due.items;

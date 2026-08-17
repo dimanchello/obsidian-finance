@@ -54,6 +54,13 @@ export function addMonthsClamped(dateStr: string, months: number): string {
   return `${String(year).padStart(4, '0')}-${pad2(month)}-${pad2(day)}`;
 }
 
+export function withDayClamped(dateStr: string, day: number): string {
+  const parsed = parseDateStr(dateStr);
+  if (!parsed) return dateStr;
+  const clamped = Math.min(day, daysInMonth(parsed.year, parsed.month));
+  return `${String(parsed.year).padStart(4, '0')}-${pad2(parsed.month)}-${pad2(clamped)}`;
+}
+
 const MS_PER_DAY = 86_400_000;
 
 /** Whole days between two `YYYY-MM-DD` strings; negative when `to` precedes `from`. */

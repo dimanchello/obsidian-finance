@@ -191,6 +191,7 @@ export interface Translations {
   interestRate: string;
   monthlyPayment: string;
   startDate: string;
+  paymentDayLabel: string;
   creditPayments: string;
   depositAccruals: string;
   earlyRepayment: string;
@@ -393,6 +394,7 @@ export interface Translations {
   fieldDescCreditAmount: string;
   fieldDescCreditRate: string;
   fieldDescCreditStartDate: string;
+  fieldDescCreditPaymentDay: string;
   fieldDescCreditTerm: string;
   fieldDescCreditType: string;
   fieldDescCreditMonthlyPayment: string;
@@ -690,6 +692,7 @@ const ru: Translations = {
   interestRate: 'Процентная ставка',
   monthlyPayment: 'Ежемесячный платёж',
   startDate: 'Дата начала',
+  paymentDayLabel: 'День платежа',
   creditPayments: 'Платежи',
   depositAccruals: 'Начисления',
   earlyRepayment: 'Досрочное погашение',
@@ -881,7 +884,7 @@ const ru: Translations = {
   confirmDeleteRecord: 'Удалить запись?',
   purchasePriceLabel: 'Стоимость покупки *',
   downPaymentLabel: 'Первоначальный взнос',
-  downPaymentDateLabel: 'Дата взноса',
+  downPaymentDateLabel: 'Дата первоначального взноса',
   downPaymentDateRequired: '⚠️ Необходимо указать дату первоначального взноса',
   downPaymentAmountRequired: '⚠️ Сумма первоначального взноса должна быть больше нуля',
   finalAmountLabel: 'Итого сумма кредита',
@@ -933,7 +936,8 @@ const ru: Translations = {
   debtFieldDescriptionsSub: 'Краткое описание каждого поля формы долга',
   fieldDescCreditAmount: 'Сумма основного долга — то, что вы взяли в банке. Проценты и ежемесячные платежи рассчитываются от этой суммы.',
   fieldDescCreditRate: 'Годовая процентная ставка. Используется для расчёта ежемесячного платежа.',
-  fieldDescCreditStartDate: 'Дата выдачи кредита. Если указана в прошлом, будет учтена при расчёте графика платежей.',
+  fieldDescCreditStartDate: 'Дата выдачи кредита банком. Используется как точка отсчёта для графика платежей — от неё считаются месяцы.',
+  fieldDescCreditPaymentDay: 'Число месяца, в которое нужно вносить ежемесячный платёж. Например, 15 — платёж будет 15-го каждого месяца. Если не указано, число берётся из даты начала кредита.',
   fieldDescCreditTerm: 'Срок кредита в месяцах. От него зависит сумма ежемесячного платежа и общая переплата.',
   fieldDescCreditType: 'Тип кредита: потребительский, автокредит или ипотека. Влияет на группировку и фильтрацию.',
   fieldDescCreditMonthlyPayment: 'Фиксированная сумма, которую нужно платить каждый месяц. Рассчитывается автоматически на основе суммы, ставки и срока.',
@@ -1227,6 +1231,7 @@ const en: Translations = {
   interestRate: 'Interest rate',
   monthlyPayment: 'Monthly payment',
   startDate: 'Start date',
+  paymentDayLabel: 'Payment day',
   creditPayments: 'Payments',
   depositAccruals: 'Accruals',
   earlyRepayment: 'Early repayment',
@@ -1418,7 +1423,7 @@ const en: Translations = {
   confirmDeleteRecord: 'Delete record?',
   purchasePriceLabel: 'Purchase price *',
   downPaymentLabel: 'Down payment',
-  downPaymentDateLabel: 'Payment date',
+  downPaymentDateLabel: 'Down payment date',
   downPaymentDateRequired: '⚠️ Please specify the down payment date',
   downPaymentAmountRequired: '⚠️ Down payment amount must be greater than zero',
   finalAmountLabel: 'Final credit amount',
@@ -1470,7 +1475,8 @@ const en: Translations = {
   debtFieldDescriptionsSub: 'Brief description of each debt form field',
   fieldDescCreditAmount: 'Principal loan amount — what you borrowed from the bank. Interest and monthly payments are calculated from this amount.',
   fieldDescCreditRate: 'Annual interest rate. Used to calculate the monthly payment.',
-  fieldDescCreditStartDate: 'Loan origination date. If set in the past, it will be considered in the payment schedule calculation.',
+  fieldDescCreditStartDate: 'Loan origination date — when the bank issued the loan. Used as the starting point for the payment schedule: months are counted from this date.',
+  fieldDescCreditPaymentDay: 'Day of the month on which the monthly payment is due. For example, 15 means payment falls on the 15th each month. If not set, the day is taken from the start date.',
   fieldDescCreditTerm: 'Loan term in months. Affects the monthly payment amount and total overpayment.',
   fieldDescCreditType: 'Credit type: consumer, auto loan, or mortgage. Used for grouping and filtering.',
   fieldDescCreditMonthlyPayment: 'Fixed monthly payment amount. Calculated automatically based on amount, rate, and term.',

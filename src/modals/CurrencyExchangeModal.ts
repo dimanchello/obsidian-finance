@@ -186,21 +186,33 @@ export class CurrencyExchangeModal extends Modal {
       const rateG = grid.createDiv('finance-field-group');
       rateG.createEl('label', { text: tr.rateLabel.replace('{currency}', this.targetCurrency || '?').replace('{accountCurrency}', this.options.accountCurrency), cls: 'finance-field-label' });
       this.rateInput = rateG.createEl('input', { type: 'text', cls: 'finance-input', attr: { inputmode: 'decimal' } });
-      this.rateInput.value = this.exchangeRate ? String(this.exchangeRate).replace('.', ',') : '';
+      this.rateInput.value = this.exchangeRate ? String(this.exchangeRate) : '';
       this.rateInput.addEventListener('input', () => {
-        const val = parseFloat(this.rateInput!.value.replace(',', '.'));
+        const raw = this.rateInput!.value;
+        if (raw.includes(',')) {
+          this.rateInput!.classList.add('finance-input-error');
+        } else {
+          this.rateInput!.classList.remove('finance-input-error');
+        }
+        const val = parseFloat(raw);
         this.exchangeRate = isNaN(val) ? 0 : val;
         this.markFieldEdited('exchangeRate');
         this.recalculateFields();
       });
-      
+
       // Fee
       const feeG = grid.createDiv('finance-field-group');
       feeG.createEl('label', { text: tr.feeLabel + ` (${this.options.accountCurrency})`, cls: 'finance-field-label' });
       const feeIn = feeG.createEl('input', { type: 'text', cls: 'finance-input', attr: { inputmode: 'decimal' } });
-      feeIn.value = this.fee ? String(this.fee).replace('.', ',') : '';
+      feeIn.value = this.fee ? String(this.fee) : '';
       feeIn.addEventListener('input', () => {
-        const val = parseFloat(feeIn.value.replace(',', '.'));
+        const raw = feeIn.value;
+        if (raw.includes(',')) {
+          feeIn.classList.add('finance-input-error');
+        } else {
+          feeIn.classList.remove('finance-input-error');
+        }
+        const val = parseFloat(raw);
         this.fee = isNaN(val) ? undefined : val;
       });
     }
@@ -314,7 +326,7 @@ export class CurrencyExchangeModal extends Modal {
         } else if (field === 'targetAmount' && this.targetAmountHandle) {
           this.targetAmountHandle.set(this.targetAmount);
         } else if (field === 'exchangeRate' && this.rateInput) {
-          this.rateInput.value = String(this.exchangeRate).replace('.', ',');
+          this.rateInput.value = String(this.exchangeRate);
         }
       };
       
