@@ -336,6 +336,8 @@ export class AccountView extends MarkdownRenderChild {
           depositInterestNote: this.ctx.tr.depositInterestNote,
           depositRefundCat: this.ctx.tr.depositRefundCat,
           depositRefundNote: this.ctx.tr.depositRefundNote,
+          depositOpeningCat: this.ctx.tr.depositOpeningCat,
+          depositOpenNote: this.ctx.tr.depositOpenNote,
           creditDefaultCat: this.ctx.tr.creditDefaultCat,
           creditPaymentNote: this.ctx.tr.creditPaymentNote,
         },

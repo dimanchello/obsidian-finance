@@ -1,19 +1,22 @@
+import { fmtDate } from "../utils";
 import { Notice } from 'obsidian';
 import { ViewContext } from '../context';
 import {
   CreditRecord, FinanceRecord,
-  CreditSortField, PLURAL_THRESHOLD, PERCENT_100,
-  DEFAULT_CREDIT_FILTER, CREDIT_PAYMENT_PAGE_SIZE, PAGE_RANGE_THRESHOLD,
+  CreditSortField, PLURAL_THRESHOLD,
+  DEFAULT_CREDIT_FILTER, CREDIT_PAYMENT_PAGE_SIZE,
 } from '../types';
 import { CreditModal } from '../CreditModal';
 import { CreditPaymentModal } from '../CreditPaymentModal';
 import { CreditEarlyRepaymentModal } from '../CreditEarlyRepaymentModal';
 import { ConfirmModal } from '../ConfirmModal';
-import { getTodayStr, getTodayTime } from '../utils';
-import { addMonthsClamped, daysBetweenStr } from '../domain/dateMath';
-import { round2, sumMoney } from '../domain/money';
+import { getTodayTime } from '../utils';
+import { addMonthsClamped } from '../domain/dateMath';
+import { sumMoney } from '../domain/money';
+import { calculatePaymentBreakdown, calculateRemainingPrincipal } from '../domain/creditCalculations';
 import { DataTable, FilterControl } from '../ui/DataTable';
 import { CreditsAnalyticsView } from '../CreditsAnalyticsView';
+import { renderMobileCard, renderSummaryCard, renderProgressBar, renderPaginatedSchedule, pageRange, dateRangeControls, compareValues } from '../ui/tabHelpers';
 
 export class CreditsTab {
   private ctx: ViewContext;
@@ -39,12 +42,12 @@ export class CreditsTab {
         { key: 'amount', label: this.tr.remaining, cell: c => ({ text: this.ctx.fmt(c.currentAmount), cls: 'finance-amount-cell' }) },
         { key: 'payment', label: this.tr.monthlyPayment, cell: c => ({ text: this.ctx.fmt(c.monthlyPayment), cls: 'finance-amount-cell' }) },
         { key: 'rate', label: this.tr.rate, cell: c => ({ text: `${c.interestRate}%` }) },
-        { key: 'date', label: this.tr.opened, cell: c => ({ text: this.ctx.fmtDate(c.startDate) }) },
+        { key: 'date', label: this.tr.opened, cell: c => ({ text: fmtDate(c.startDate) }) },
         {
           key: 'endDate', label: this.tr.endDate,
           cell: c => {
             const endDate = this.calculateCreditEndDate(c);
-            return { text: endDate ? this.ctx.fmtDate(endDate) : '—', cls: endDate ? 'finance-due-date' : '' };
+            return { text: endDate ? fmtDate(endDate) : '—', cls: endDate ? 'finance-due-date' : '' };
           },
         },
       ],
@@ -78,6 +81,8 @@ export class CreditsTab {
         resetFilter: () => { this.ctx.state.creditFilter = { ...DEFAULT_CREDIT_FILTER }; },
         getColumns: () => (this.ctx.state.creditsColumns ??= {}),
         setColumns: c => { this.ctx.state.creditsColumns = c; },
+        getExpandedId: () => this.ctx.state.creditExpandedId ?? null,
+        setExpandedId: id => { if (id === null) delete this.ctx.state.creditExpandedId; else this.ctx.state.creditExpandedId = id; }
       },
       renderStats: host => this.renderStats(host),
       toolbarButtons: (toolbar, rerender, api) => {
@@ -104,16 +109,7 @@ export class CreditsTab {
       emptyState: { icon: '🏦', title: this.tr.noCredits, subtitle: this.tr.addNewDebt },
       emptyFiltered: { icon: '🔍', title: this.tr.noCreditsFiltered, subtitle: this.tr.tryChangeFilters },
       onBulkDelete: async ids => {
-        const idSet = new Set(ids);
-        const dpRecordIds = new Set(
-          (this.ctx.data?.credits ?? [])
-            .filter(c => idSet.has(c.id) && c.downPaymentRecordId)
-            .map(c => c.downPaymentRecordId!),
-        );
-        await this.ctx.storage.deleteCreditsBatch(this.ctx.accountId, ids);
-        const otherRecords = this.ctx.data!.records.filter(r =>
-          (!r.linkedId || !idSet.has(r.linkedId)) && !dpRecordIds.has(r.id));
-        await this.ctx.storage.saveAllRecords(this.ctx.accountId, otherRecords);
+        await this.ctx.storage.deleteCreditsWithLinkedRecords(this.ctx.accountId, ids);
         await this.reload(this.tr.deleted);
       },
       confirmBulkDeleteText: count => this.tr.confirmDeleteSelectedCredits.replace('{count}', String(count)),
@@ -184,21 +180,21 @@ export class CreditsTab {
     const activeCredits = allCredits.filter(c => c.status === 'active');
     const paidCredits = allCredits.filter(c => c.status === 'paid');
 
-    const mkCard = (title: string, icon: string, amount: number, count: number, isActive: boolean) => {
-      const card = summary.createDiv(`finance-stat-card finance-stat-${isActive ? 'credit-active' : 'credit-paid'}`);
-      const header = card.createDiv('finance-debt-summary-header');
-      header.createEl('span', { text: icon, cls: 'finance-debt-summary-icon' });
-      header.createEl('span', { text: title, cls: 'finance-debt-summary-title' });
-      const content = card.createDiv('finance-debt-summary-content');
-      content.createEl('div', { text: amount > 0 ? this.ctx.fmt(amount) : '—', cls: 'finance-debt-summary-main' });
-      content.createEl('div', {
-        text: `${count} ${count === 1 ? this.tr.creditCount_one : count < PLURAL_THRESHOLD ? this.tr.creditCount_few : this.tr.creditCount_many}`,
-        cls: 'finance-debt-summary-sub',
-      });
-    };
+    const countSub = (count: number) => `${count} ${count === 1 ? this.tr.creditCount_one : count < PLURAL_THRESHOLD ? this.tr.creditCount_few : this.tr.creditCount_many}`;
 
-    mkCard(this.tr.activeCards, '💳', sumMoney(activeCredits.map(c => c.currentAmount)), activeCredits.length, true);
-    mkCard(this.tr.paidCards, '✅', sumMoney(paidCredits.map(c => c.originalAmount)), paidCredits.length, false);
+    renderSummaryCard(summary, {
+      icon: '💳', title: this.tr.activeCards,
+      main: sumMoney(activeCredits.map(c => c.currentAmount)) > 0 ? this.ctx.fmt(sumMoney(activeCredits.map(c => c.currentAmount))) : '—',
+      sub: countSub(activeCredits.length),
+      mod: 'finance-stat-credit-active'
+    });
+
+    renderSummaryCard(summary, {
+      icon: '✅', title: this.tr.paidCards,
+      main: sumMoney(paidCredits.map(c => c.originalAmount)) > 0 ? this.ctx.fmt(sumMoney(paidCredits.map(c => c.originalAmount))) : '—',
+      sub: countSub(paidCredits.length),
+      mod: 'finance-stat-credit-paid'
+    });
   }
 
   // ── Filters ──────────────────────────────────────────────────────────────
@@ -227,8 +223,7 @@ export class CreditsTab {
         ],
         get: () => f.bankName, set: v => { f.bankName = v; },
       },
-      { kind: 'date', label: this.tr.from, get: () => f.dateFrom, set: v => { f.dateFrom = v; } },
-      { kind: 'date', label: this.tr.to, get: () => f.dateTo, set: v => { f.dateTo = v; } },
+      ...dateRangeControls(f, this.tr),
       {
         kind: 'select', label: this.tr.type,
         options: [
@@ -259,11 +254,11 @@ export class CreditsTab {
     if (f.dateTo) result = result.filter(c => c.startDate <= f.dateTo);
 
     result.sort((a, b) => {
-      let cmp = 0;
-      if (s.field === 'amount') cmp = a.currentAmount - b.currentAmount;
-      else if (s.field === 'bankName') cmp = a.bankName.localeCompare(b.bankName);
-      else cmp = a.startDate.localeCompare(b.startDate);
-      return s.dir === 'asc' ? cmp : -cmp;
+      let av: string | number, bv: string | number;
+      if (s.field === 'amount') { av = a.currentAmount; bv = b.currentAmount; }
+      else if (s.field === 'bankName') { av = a.bankName; bv = b.bankName; }
+      else { av = a.startDate; bv = b.startDate; }
+      return compareValues(av, bv, s.dir);
     });
     return result;
   }
@@ -273,53 +268,36 @@ export class CreditsTab {
   private renderCard(block: HTMLElement, credit: CreditRecord): void {
     block.addClass(credit.status === 'active' ? 'finance-row-income' : 'finance-row-expense');
 
-    const header = block.createDiv('finance-record-header');
-    header.createEl('span', {
-      text: '−' + this.ctx.fmt(credit.currentAmount),
-      cls: 'finance-record-amount finance-amount-expense',
-    });
-    header.createEl('span', { text: `${credit.bankName} · ${this.typeLabel(credit)}`, cls: 'finance-record-date' });
-
-    const details = block.createDiv('finance-record-details');
-    details.createEl('span', { text: `📊 ${credit.interestRate}${this.tr.percentPerAnnum}`, cls: 'finance-record-detail' });
-    details.createEl('span', { text: `💰 ${this.tr.paymentLabel}: ${this.ctx.fmt(credit.monthlyPayment)}`, cls: 'finance-record-detail' });
+    const details = [];
+    details.push({ label: `📊`, value: `${credit.interestRate}${this.tr.percentPerAnnum}` });
+    details.push({ label: `💰 ${this.tr.paymentLabel}:`, value: this.ctx.fmt(credit.monthlyPayment) });
 
     const paidCount = credit.payments.filter(p => p.status === 'paid').length;
     if (credit.payments.length > 0) {
-      details.createEl('span', { text: `✅ ${paidCount}/${credit.payments.length} ${this.tr.paymentsCount}`, cls: 'finance-record-detail' });
+      details.push({ label: `✅`, value: `${paidCount}/${credit.payments.length} ${this.tr.paymentsCount}` });
     }
 
     const endDate = this.calculateCreditEndDate(credit);
     if (endDate && credit.status === 'active') {
-      details.createEl('span', { text: `${this.tr.dueBy} ${this.ctx.fmtDate(endDate)}`, cls: 'finance-record-detail' });
+      details.push({ label: this.tr.dueBy, value: fmtDate(endDate) });
     }
 
-    if (credit.note) {
-      block.createEl('div', { text: credit.note, cls: 'finance-record-note' });
-    }
+    renderMobileCard(block, {
+      amountText: '−' + this.ctx.fmt(credit.currentAmount),
+      amountCls: 'finance-amount-expense',
+      subtitle: `${credit.bankName} · ${this.typeLabel(credit)}`,
+      details,
+      note: credit.note,
+    });
   }
 
   // ── Payments panel (expandable) ──────────────────────────────────────────
 
   private renderCreditPaymentsPanel(parent: HTMLElement, credit: CreditRecord): void {
     const wrapper = parent.createDiv('finance-payments-panel');
-    const today = getTodayStr();
-
     const endDate = this.calculateCreditEndDate(credit);
-    if (credit.startDate && endDate && credit.startDate < endDate) {
-      const totalDays = daysBetweenStr(credit.startDate, endDate);
-      const elapsedDays = daysBetweenStr(credit.startDate, today);
-      const progress = Math.min(PERCENT_100, Math.max(0, (elapsedDays / totalDays) * PERCENT_100));
-
-      const progressWrap = wrapper.createDiv('finance-deposit-progress');
-      const progressLabel = progressWrap.createDiv('finance-deposit-progress-label');
-      progressLabel.textContent = `${this.ctx.fmtDate(credit.startDate)} → ${this.ctx.fmtDate(endDate)} (${Math.round(progress)}%)`;
-
-      const progressBar = progressWrap.createDiv('finance-deposit-progress-bar');
-      const progressFill = progressBar.createDiv('finance-deposit-progress-fill');
-      progressFill.style.setProperty('--ft-progress', `${progress}%`);
-      if (progress >= PERCENT_100) progressFill.addClass('is-complete');
-    }
+    
+    renderProgressBar(wrapper, credit.startDate, endDate, this.tr, fmtDate.bind(this.ctx));
 
     wrapper.createEl('h4', { text: this.tr.creditPayments, cls: 'finance-section-title' });
 
@@ -336,25 +314,15 @@ export class CreditsTab {
     }
     page = Math.max(0, Math.min(page, totalPages - 1));
     this.creditPaymentPages.set(credit.id, page);
-    const start = page * CREDIT_PAYMENT_PAGE_SIZE;
-    const pagePayments = credit.payments.slice(start, start + CREDIT_PAYMENT_PAGE_SIZE);
 
-    const scrollWrapper = wrapper.createDiv('finance-mov-scroll');
-    const movTable = scrollWrapper.createEl('table', { cls: 'finance-mov-table' });
-    const movHead = movTable.createEl('thead').createEl('tr');
-    ['#', this.tr.date, this.tr.sum, this.tr.status].forEach(l => {
-      movHead.createEl('th', { text: l, cls: 'finance-th finance-mov-th' });
-    });
-    const movBody = movTable.createEl('tbody');
-
-    pagePayments.forEach((p, idx) => {
-      const isPaid = p.status === 'paid' || p.dueDate <= today;
-      const mr = movBody.createEl('tr', { cls: isPaid ? 'finance-payment-paid' : 'finance-payment-pending' });
-      mr.createEl('td', { text: String(start + idx + 1), cls: 'finance-td' });
-      mr.createEl('td', { text: this.ctx.fmtDate(p.dueDate), cls: 'finance-td' });
-      mr.createEl('td', { text: this.ctx.fmt(p.amount), cls: 'finance-td' });
-      mr.createEl('td', { text: isPaid ? this.tr.paidStatus : this.tr.pendingStatus, cls: 'finance-td finance-payment-status' });
-    });
+    renderPaginatedSchedule(
+      wrapper,
+      credit.payments,
+      page,
+      CREDIT_PAYMENT_PAGE_SIZE,
+      ['#', this.tr.date, this.tr.sum, this.tr.status],
+      this.ctx
+    );
 
     if (totalPages > 1) {
       const pagNav = wrapper.createDiv('finance-pagination-nav finance-panel-pagination');
@@ -368,8 +336,8 @@ export class CreditsTab {
       prev.disabled = page === 0;
       prev.addEventListener('click', () => go(page - 1));
 
-      this.pageRange(page, totalPages).forEach(p => {
-        if (p === -1) { pagNav.createEl('span', { text: '…', cls: 'finance-page-ellipsis' }); return; }
+      pageRange(page, totalPages, this.ctx.isMobile).forEach(p => {
+        if (p === '…') { pagNav.createEl('span', { text: '…', cls: 'finance-page-ellipsis' }); return; }
         const btn = pagNav.createEl('button', {
           text: String(p + 1),
           cls: `finance-page-btn${p === page ? ' active' : ''}`,
@@ -383,22 +351,9 @@ export class CreditsTab {
     }
   }
 
-  private pageRange(cur: number, total: number): number[] {
-    if (total <= PAGE_RANGE_THRESHOLD) return Array.from({ length: total }, (_, i) => i);
-    const radius = this.ctx.isMobile ? 1 : 3;
-    const p: number[] = [0];
-    if (cur > radius + 1) p.push(-1);
-    for (let i = Math.max(1, cur - radius); i <= Math.min(total - 2, cur + radius); i++) p.push(i);
-    if (cur < total - (radius + 2)) p.push(-1);
-    p.push(total - 1);
-    return p;
-  }
-
   // ── Modals ──────────────────────────────────────────────────────────────
 
-  private nowTime(): string {
-    return getTodayTime();
-  }
+
 
   private openNewCreditModal(): void {
     if (!this.ctx.data) { new Notice(this.tr.loading); return; }
@@ -406,11 +361,12 @@ export class CreditsTab {
     new CreditModal(this.ctx.app, {
       title: this.tr.newCredit,
       banks: allBanks,
+      pluginId: this.ctx.pluginId,
       records: [...this.ctx.data.records],
       onSave: async (credit, updatedRecords) => {
         await this.ctx.storage.addCredit(this.ctx.accountId, credit);
-        const nowTime = this.nowTime();
-        if (!credit.isEscrow) {
+        const nowTime = getTodayTime();
+        if (!credit.isEscrow && credit.type !== 'mortgage') {
           updatedRecords.push({
             id: crypto.randomUUID(),
             createdAt: Date.now(),
@@ -457,22 +413,23 @@ export class CreditsTab {
       title: this.tr.editRecord,
       credit,
       banks: allBanks,
+      pluginId: this.ctx.pluginId,
       records: [...this.ctx.data.records],
       onSave: async (updated, updatedRecords) => {
         await this.ctx.storage.updateCredit(this.ctx.accountId, updated);
-        const nowTime = this.nowTime();
+        const nowTime = getTodayTime();
 
-        const receiptRec = updatedRecords.find(r => r.linkedId === updated.id && r.type === 'income');
-        if (updated.isEscrow) {
-          if (receiptRec) {
-            updatedRecords.splice(updatedRecords.indexOf(receiptRec), 1);
-          }
-        } else if (receiptRec) {
-          receiptRec.amount = updated.originalAmount;
-          receiptRec.date = updated.startDate;
-          receiptRec.payer = updated.bankName;
-          receiptRec.note = `${this.tr.creditReceiptNote} "${updated.name}"`;
-        } else {
+        // Полный пересчёт: удаляем все автогенерированные записи для этого кредита.
+        // Записи с isInternal === false добавлены вручную пользователем (через кнопку «платёж»)
+        // — их сохраняем. Сохраняем также запись первоначального взноса.
+        updatedRecords = updatedRecords.filter(r =>
+          r.linkedId !== updated.id ||
+          r.id === updated.downPaymentRecordId ||
+          r.isInternal === false,
+        );
+
+        // Доходная запись (получение кредита) — не создаём для ипотеки и эскроу
+        if (!updated.isEscrow && updated.type !== 'mortgage') {
           updatedRecords.push({
             id: crypto.randomUUID(),
             createdAt: Date.now(),
@@ -489,29 +446,32 @@ export class CreditsTab {
           });
         }
 
+        // Расходные записи для оплаченных платежей — пропускаем те, для которых
+        // уже есть вручную добавленная запись с той же датой.
+        const manualExpenseDates = new Set(
+          updatedRecords
+            .filter(r => r.linkedId === updated.id && r.isInternal === false && r.type === 'expense')
+            .map(r => (r as FinanceRecord).date),
+        );
         for (const payment of updated.payments) {
           if (payment.status !== 'paid') continue;
-          const existingRec = updatedRecords.find(r =>
-            r.linkedId === updated.id && r.date === payment.dueDate && r.type === 'expense');
-          if (existingRec) {
-            if (existingRec.amount !== payment.amount) existingRec.amount = payment.amount;
-          } else {
-            updatedRecords.push({
-              id: crypto.randomUUID(),
-              createdAt: Date.now(),
-              date: payment.dueDate,
-              time: nowTime,
-              type: 'expense',
-              amount: payment.amount,
-              category: this.tr.creditDefaultCat,
-              tag: '',
-              payer: updated.bankName,
-              note: `${this.tr.creditPaymentNote} "${updated.name}"`,
-              attachmentPath: '',
-              linkedId: updated.id,
-            });
-          }
+          if (manualExpenseDates.has(payment.dueDate)) continue;
+          updatedRecords.push({
+            id: crypto.randomUUID(),
+            createdAt: Date.now(),
+            date: payment.dueDate,
+            time: nowTime,
+            type: 'expense',
+            amount: payment.amount,
+            category: this.tr.creditDefaultCat,
+            tag: '',
+            payer: updated.bankName,
+            note: `${this.tr.creditPaymentNote} "${updated.name}"`,
+            attachmentPath: '',
+            linkedId: updated.id,
+          });
         }
+
         await this.ctx.storage.saveAllRecords(this.ctx.accountId, updatedRecords);
         await this.reload(this.tr.creditUpdated);
       },
@@ -523,11 +483,14 @@ export class CreditsTab {
       title: `💰 ${this.tr.paymentLabel} — ${credit.name}`,
       credit,
       onSave: async payment => {
+        const breakdown = calculatePaymentBreakdown(credit.currentAmount, payment.amount, credit.interestRate);
+        payment.principalPart = breakdown.principalPart;
+        payment.interestPart = breakdown.interestPart;
+        payment.remainingDebt = breakdown.remainingDebt;
+
         const updatedCredit = { ...credit, payments: [...credit.payments, payment] };
-        const paidAmount = sumMoney(updatedCredit.payments.filter(p => p.status === 'paid').map(p => p.amount));
-        const totalToPay = round2(updatedCredit.monthlyPayment * updatedCredit.termMonths);
-        updatedCredit.currentAmount = Math.max(0, round2(totalToPay - paidAmount));
-        if (paidAmount >= totalToPay) updatedCredit.status = 'paid';
+        updatedCredit.currentAmount = calculateRemainingPrincipal(updatedCredit);
+        if (updatedCredit.currentAmount <= 0) updatedCredit.status = 'paid';
         await this.ctx.storage.updateCredit(this.ctx.accountId, updatedCredit);
 
         const rec: FinanceRecord = {
@@ -566,12 +529,7 @@ export class CreditsTab {
   private confirmDeleteCredit(credit: CreditRecord): void {
     const label = `${credit.name} · ${this.ctx.fmt(credit.currentAmount)}`;
     new ConfirmModal(this.ctx.app, `${this.tr.confirmDeleteCredit}\n${label}`, async () => {
-      await this.ctx.storage.deleteCredit(this.ctx.accountId, credit.id);
-      let recs = this.ctx.data!.records.filter(r => r.linkedId !== credit.id);
-      if (credit.downPaymentRecordId) {
-        recs = recs.filter(r => r.id !== credit.downPaymentRecordId);
-      }
-      await this.ctx.storage.saveAllRecords(this.ctx.accountId, recs);
+      await this.ctx.storage.deleteCreditsWithLinkedRecords(this.ctx.accountId, [credit.id]);
       await this.reload(this.tr.creditDeleted);
     }).open();
   }

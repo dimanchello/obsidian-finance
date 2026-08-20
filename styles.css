@@ -774,7 +774,8 @@
    Must set color-scheme so -webkit-datetime-edit parts respect our theme colors.
    Use --background-secondary which is always distinct from modal bg. */
 .finance-input[type="time"],
-.finance-input[type="date"] {
+.finance-input[type="date"],
+.finance-input[type="datetime-local"] {
   -webkit-appearance: none !important;
   appearance: none !important;
   background: var(--background-secondary) !important;
@@ -785,16 +786,21 @@
   box-sizing: border-box;
 }
 .theme-dark  .finance-input[type="time"],
-.theme-dark  .finance-input[type="date"] { color-scheme: dark; }
+.theme-dark  .finance-input[type="date"],
+.theme-dark  .finance-input[type="datetime-local"] { color-scheme: dark; }
 .theme-light .finance-input[type="time"],
-.theme-light .finance-input[type="date"] { color-scheme: light; }
+.theme-light .finance-input[type="date"],
+.theme-light .finance-input[type="datetime-local"] { color-scheme: light; }
 
 .finance-input[type="time"]::-webkit-datetime-edit,
-.finance-input[type="date"]::-webkit-datetime-edit { color: var(--text-normal) !important; }
+.finance-input[type="date"]::-webkit-datetime-edit,
+.finance-input[type="datetime-local"]::-webkit-datetime-edit { color: var(--text-normal) !important; }
 .finance-input[type="time"]::-webkit-datetime-edit-fields-wrapper,
-.finance-input[type="date"]::-webkit-datetime-edit-fields-wrapper { background: transparent; }
+.finance-input[type="date"]::-webkit-datetime-edit-fields-wrapper,
+.finance-input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper { background: transparent; }
 .finance-input[type="time"]::-webkit-calendar-picker-indicator,
-.finance-input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(50%); cursor: pointer; }
+.finance-input[type="date"]::-webkit-calendar-picker-indicator,
+.finance-input[type="datetime-local"]::-webkit-calendar-picker-indicator { filter: invert(50%); cursor: pointer; }
 
 /* Amount input */
 .finance-amount-group { margin-bottom: 2px; }
@@ -855,8 +861,19 @@
 .finance-attach-label:hover { border-color: var(--ft-accent); background: var(--background-modifier-hover); }
 .finance-attach-name    { font-size: .8em; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 200px; }
 .finance-attach-ok      { color: #16a34a; font-weight: 700; }
-.finance-image-preview  { display: none; margin-top: 10px; border-radius: var(--ft-radius-sm); overflow: hidden; background: var(--background-secondary); border: 1px solid var(--ft-border); padding: 6px; }
+.finance-image-preview  { margin-top: 10px; border-radius: var(--ft-radius-sm); overflow: hidden; background: var(--background-secondary); border: 1px solid var(--ft-border); padding: 6px; }
 .finance-preview-img    { display: block; max-width: 100%; max-height: 180px; object-fit: contain; border-radius: 4px; }
+/* Open-existing attachment button */
+.finance-attach-open-wrap { margin-bottom: 6px; }
+.finance-attach-open-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 10px; border-radius: var(--ft-radius-sm);
+  border: 1px solid var(--ft-accent); color: var(--ft-accent);
+  background: transparent; cursor: pointer; font-size: .82em;
+  transition: background .15s;
+}
+.finance-attach-open-btn:hover { background: var(--background-modifier-hover); }
+.finance-attach-open-name { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .finance-modal-btns { display: flex; justify-content: flex-end; gap: 10px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--ft-border); }
 
@@ -2671,11 +2688,42 @@
   container-type: inline-size;
 }
 .finance-stats-container.finance-stats-currency {
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)) !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
 }
 .max .finance-stats-container.finance-stats-currency {
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)) !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
 }
+
+@media (max-width: 768px) {
+  .finance-stats-container.finance-stats-currency,
+  .max .finance-stats-container.finance-stats-currency {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .finance-stats-container.finance-stats-currency,
+  .max .finance-stats-container.finance-stats-currency {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+.finance-chart-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.finance-chart-header-row .finance-analytics-section-title {
+  margin: 0;
+}
+.finance-chart-header-row .finance-chart-legend {
+  padding: 0;
+  gap: 12px;
+}
+
 .finance-currency-toolbar-container {
   display: flex;
   flex-direction: column;

@@ -1,7 +1,7 @@
 import { App, Platform } from 'obsidian';
 import { FinanceStorage } from './storage';
 import { AccountData, PluginSettings, ViewState, MOBILE_BREAKPOINT } from './types';
-import { fmt, fmtDate } from './utils';
+import { fmt } from './utils';
 import { defaultViewState, parseViewState } from './domain/viewState';
 import { getLocaleFromApp, t, type Translations, type Locale } from './i18n';
 
@@ -78,9 +78,6 @@ export class ViewContext {
     return fmt(n, this.currency);
   }
 
-  fmtDate(d: string, t?: string): string {
-    return fmtDate(d, t);
-  }
 
   renderRecordsStats(container: HTMLElement): void {
     if (!this._data) return;

@@ -92,6 +92,7 @@ export interface Translations {
   total: string;
   amountRequired: string;
   calculatorTitle: string;
+  calculatorError: string;
   exchangeRateQuestion: string;
   exchangeRateExample: string;
   exchangeRateHide: string;
@@ -349,6 +350,7 @@ export interface Translations {
   depositDefaultCat: string;
   depositInterestCat: string;
   depositRefundCat: string;
+  depositOpeningCat: string;
   depositOpenNote: string;
   depositInterestNote: string;
   depositRefundNote: string;
@@ -464,6 +466,10 @@ export interface Translations {
   creditTotalRemaining: string;
   creditTotalPaid: string;
   creditTotalInterest: string;
+  creditPrincipalPaid: string;
+  creditInterestPaid: string;
+  creditPrincipal: string;
+  creditInterest: string;
   creditRepaymentProgress: string;
   creditPaymentSchedule: string;
   creditByType: string;
@@ -479,6 +485,8 @@ export interface Translations {
   depositByType: string;
   depositNoAnalyticsData: string;
   depositMaturitySoon: string;
+  depositActiveList: string;
+  depositExpectedProfit: string;
   // Currency
   currencyExchange: string;
   currencyBuy: string;
@@ -850,6 +858,7 @@ const ru: Translations = {
   depositDefaultCat: 'Вклад',
   depositInterestCat: 'Проценты по вкладу',
   depositRefundCat: 'Возврат вклада',
+  depositOpeningCat: 'Возврат вклада (открытие)',
   depositOpenNote: 'Открытие вклада',
   depositInterestNote: 'Начисление процентов по вкладу',
   depositRefundNote: 'Возврат вклада',
@@ -907,6 +916,7 @@ const ru: Translations = {
   total: 'Итого',
   amountRequired: 'Сумма * ({currency})',
   calculatorTitle: 'Калькулятор',
+  calculatorError: 'Ошибка',
   exchangeRateQuestion: 'Курс (1 {currency} = ?)',
   exchangeRateExample: 'напр. 95,50',
   exchangeRateHide: '− Курс',
@@ -1005,6 +1015,10 @@ const ru: Translations = {
   creditTotalRemaining: 'Остаток долга',
   creditTotalPaid: 'Уже выплачено',
   creditTotalInterest: 'Переплата',
+  creditPrincipalPaid: 'Выплачено долга',
+  creditInterestPaid: 'Выплачено процентов',
+  creditPrincipal: 'Основной долг',
+  creditInterest: 'Проценты банку',
   creditRepaymentProgress: 'Прогресс погашения',
   creditPaymentSchedule: 'График платежей',
   creditByType: 'По типу кредита',
@@ -1019,6 +1033,8 @@ const ru: Translations = {
   depositByType: 'По типу вклада',
   depositNoAnalyticsData: 'Нет данных для аналитики',
   depositMaturitySoon: 'Закрытие в ближайшие 6 мес.',
+  depositActiveList: 'Действующие вклады',
+  depositExpectedProfit: 'Ожидаемый доход',
   currencyExchange: 'Валюты',
   currencyBuy: 'Покупка валюты',
   currencySell: 'Продажа валюты',
@@ -1389,6 +1405,7 @@ const en: Translations = {
   depositDefaultCat: 'Deposit',
   depositInterestCat: 'Deposit interest',
   depositRefundCat: 'Deposit refund',
+  depositOpeningCat: 'Deposit refund (opening)',
   depositOpenNote: 'Deposit opening',
   depositInterestNote: 'Deposit interest accrual',
   depositRefundNote: 'Deposit refund',
@@ -1446,6 +1463,7 @@ const en: Translations = {
   total: 'Total',
   amountRequired: 'Amount * ({currency})',
   calculatorTitle: 'Calculator',
+  calculatorError: 'Error',
   exchangeRateQuestion: 'Rate (1 {currency} = ?)',
   exchangeRateExample: 'e.g. 95.50',
   exchangeRateHide: '− Rate',
@@ -1544,6 +1562,10 @@ const en: Translations = {
   creditTotalRemaining: 'Total remaining',
   creditTotalPaid: 'Total paid',
   creditTotalInterest: 'Total interest',
+  creditPrincipalPaid: 'Principal paid',
+  creditInterestPaid: 'Interest paid',
+  creditPrincipal: 'Principal',
+  creditInterest: 'Bank interest',
   creditRepaymentProgress: 'Repayment progress',
   creditPaymentSchedule: 'Payment schedule',
   creditByType: 'By credit type',
@@ -1558,6 +1580,8 @@ const en: Translations = {
   depositByType: 'By deposit type',
   depositNoAnalyticsData: 'No analytics data',
   depositMaturitySoon: 'Closing within 6 months',
+  depositActiveList: 'Active deposits',
+  depositExpectedProfit: 'Expected profit',
   currencyExchange: 'Currency Exchange',
   currencyBuy: 'Buy Currency',
   currencySell: 'Sell Currency',

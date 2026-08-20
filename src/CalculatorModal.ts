@@ -131,7 +131,7 @@ export class CalculatorModal extends Modal {
       case '÷':
         if (current === 0) {
           // Show error message for division by zero
-          this.display = 'Ошибка';
+          this.display = this.tr.calculatorError;
           error = true;
         } else {
           result = prev / current;

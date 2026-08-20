@@ -1,8 +1,9 @@
+import { fmtDate } from "../utils";
 import { Notice } from 'obsidian';
 import { ViewContext } from '../context';
 import {
   DepositRecord, DepositTopUp, DepositWithdrawal, FinanceRecord,
-  DepositSortField, PLURAL_THRESHOLD, PERCENT_100,
+  DepositSortField, PLURAL_THRESHOLD,
   DEFAULT_DEPOSIT_FILTER, DEPOSIT_ACCRUAL_PAGE_SIZE,
 } from '../types';
 import { DepositModal } from '../DepositModal';
@@ -10,10 +11,11 @@ import { DepositTopUpModal } from '../DepositTopUpModal';
 import { DepositWithdrawalModal } from '../DepositWithdrawalModal';
 import { ConfirmModal } from '../ConfirmModal';
 import { getTodayStr, getTodayTime } from '../utils';
-import { addMonthsClamped, daysBetweenStr } from '../domain/dateMath';
+import { addMonthsClamped } from '../domain/dateMath';
 import { sumMoney } from '../domain/money';
 import { DataTable, FilterControl } from '../ui/DataTable';
 import { DepositsAnalyticsView } from '../DepositsAnalyticsView';
+import { renderMobileCard, renderSummaryCard, renderProgressBar, renderPaginatedSchedule, pageRange, dateRangeControls, compareValues } from '../ui/tabHelpers';
 
 export class DepositsTab {
   private ctx: ViewContext;
@@ -49,12 +51,12 @@ export class DepositsTab {
           },
         },
         { key: 'rate', label: this.tr.percent, cell: d => ({ text: `${d.interestRate}%` }) },
-        { key: 'date', label: this.tr.opened, cell: d => ({ text: this.ctx.fmtDate(d.startDate) }) },
+        { key: 'date', label: this.tr.opened, cell: d => ({ text: fmtDate(d.startDate) }) },
         {
           key: 'endDate', label: this.tr.endDate,
           cell: d => {
             const endDate = this.calculateDepositEndDate(d);
-            return { text: endDate ? this.ctx.fmtDate(endDate) : '—', cls: endDate ? 'finance-due-date' : '' };
+            return { text: endDate ? fmtDate(endDate) : '—', cls: endDate ? 'finance-due-date' : '' };
           },
         },
       ],
@@ -87,8 +89,10 @@ export class DepositsTab {
         getSort: () => this.ctx.state.depositSort ?? { field: 'date', dir: 'desc' },
         setSort: s => { this.ctx.state.depositSort = s as { field: DepositSortField; dir: 'asc' | 'desc' }; },
         resetFilter: () => { this.ctx.state.depositFilter = { ...DEFAULT_DEPOSIT_FILTER }; },
-        getColumns: () => (this.ctx.state.depositsColumns ??= {}),
+        getColumns: () => this.ctx.state.depositsColumns ?? {},
         setColumns: c => { this.ctx.state.depositsColumns = c; },
+        getExpandedId: () => this.ctx.state.depositExpandedId ?? null,
+        setExpandedId: id => { if (id === null) delete this.ctx.state.depositExpandedId; else this.ctx.state.depositExpandedId = id; }
       },
       renderStats: host => this.renderStats(host),
       toolbarButtons: (toolbar, rerender, api) => {
@@ -223,30 +227,24 @@ export class DepositsTab {
     const activeDeposits = allDeposits.filter(d => d.status === 'active');
     const closedDeposits = allDeposits.filter(d => d.status === 'closed');
 
-    const mkCard = (title: string, icon: string, amount: number, profit: number, count: number, isActive: boolean) => {
-      const card = summary.createDiv(`finance-stat-card finance-stat-${isActive ? 'deposit-active' : 'deposit-closed'}`);
-      const header = card.createDiv('finance-debt-summary-header');
-      header.createEl('span', { text: icon, cls: 'finance-debt-summary-icon' });
-      header.createEl('span', { text: title, cls: 'finance-debt-summary-title' });
-      const content = card.createDiv('finance-debt-summary-content');
-      content.createEl('div', { text: amount > 0 ? this.ctx.fmt(amount) : '—', cls: 'finance-debt-summary-main' });
+    const countSub = (count: number, profit: number) => {
       const countLabel = count === 1 ? this.tr.depositCount_one : count < PLURAL_THRESHOLD ? this.tr.depositCount_few : this.tr.depositCount_many;
-      content.createEl('div', {
-        text: profit > 0
-          ? `${count} ${countLabel} · ${this.tr.profitLabel}: ${this.ctx.fmt(profit)}`
-          : `${count} ${countLabel}`,
-        cls: 'finance-debt-summary-sub',
-      });
+      return profit > 0 ? `${count} ${countLabel} · ${this.tr.profitLabel}: ${this.ctx.fmt(profit)}` : `${count} ${countLabel}`;
     };
 
-    mkCard(this.tr.activeCards, '💰',
-      sumMoney(activeDeposits.map(d => d.amount)),
-      sumMoney(activeDeposits.map(d => this.getDepositProfit(d))),
-      activeDeposits.length, true);
-    mkCard(this.tr.closedCards, '✅',
-      sumMoney(closedDeposits.map(d => d.amount)),
-      sumMoney(closedDeposits.map(d => this.getDepositProfit(d))),
-      closedDeposits.length, false);
+    renderSummaryCard(summary, {
+      icon: '💰', title: this.tr.activeCards,
+      main: sumMoney(activeDeposits.map(d => d.amount)) > 0 ? this.ctx.fmt(sumMoney(activeDeposits.map(d => d.amount))) : '—',
+      sub: countSub(activeDeposits.length, sumMoney(activeDeposits.map(d => this.getDepositProfit(d)))),
+      mod: 'finance-stat-deposit-active'
+    });
+
+    renderSummaryCard(summary, {
+      icon: '✅', title: this.tr.closedCards,
+      main: sumMoney(closedDeposits.map(d => d.amount)) > 0 ? this.ctx.fmt(sumMoney(closedDeposits.map(d => d.amount))) : '—',
+      sub: countSub(closedDeposits.length, sumMoney(closedDeposits.map(d => this.getDepositProfit(d)))),
+      mod: 'finance-stat-deposit-closed'
+    });
   }
 
   // ── Filters ──────────────────────────────────────────────────────────────
@@ -275,8 +273,7 @@ export class DepositsTab {
         ],
         get: () => f.bankName, set: v => { f.bankName = v; },
       },
-      { kind: 'date', label: this.tr.from, get: () => f.dateFrom, set: v => { f.dateFrom = v; } },
-      { kind: 'date', label: this.tr.to, get: () => f.dateTo, set: v => { f.dateTo = v; } },
+      ...dateRangeControls(f, this.tr),
       {
         kind: 'select', label: this.tr.type,
         options: [
@@ -307,11 +304,11 @@ export class DepositsTab {
     if (f.dateTo) result = result.filter(d => d.startDate <= f.dateTo);
 
     result.sort((a, b) => {
-      let cmp = 0;
-      if (s.field === 'amount') cmp = a.amount - b.amount;
-      else if (s.field === 'bankName') cmp = a.bankName.localeCompare(b.bankName);
-      else cmp = a.startDate.localeCompare(b.startDate);
-      return s.dir === 'asc' ? cmp : -cmp;
+      let av: string | number, bv: string | number;
+      if (s.field === 'amount') { av = a.amount; bv = b.amount; }
+      else if (s.field === 'bankName') { av = a.bankName; bv = b.bankName; }
+      else { av = a.startDate; bv = b.startDate; }
+      return compareValues(av, bv, s.dir);
     });
     return result;
   }
@@ -321,50 +318,33 @@ export class DepositsTab {
   private renderCard(block: HTMLElement, deposit: DepositRecord): void {
     block.addClass(deposit.status === 'active' ? 'finance-row-income' : 'finance-row-expense');
 
-    const header = block.createDiv('finance-record-header');
-    header.createEl('span', {
-      text: '+' + this.ctx.fmt(deposit.amount),
-      cls: 'finance-record-amount finance-amount-income',
-    });
-    header.createEl('span', { text: `${deposit.bankName} · ${this.typeLabel(deposit)}`, cls: 'finance-record-date' });
-
-    const details = block.createDiv('finance-record-details');
-    details.createEl('span', { text: `📊 ${deposit.interestRate}${this.tr.percentPerAnnum}`, cls: 'finance-record-detail' });
+    const details = [];
+    details.push({ label: `📊`, value: `${deposit.interestRate}${this.tr.percentPerAnnum}` });
     const profit = this.getDepositProfit(deposit);
     if (profit > 0) {
-      details.createEl('span', { text: `💰 ${this.tr.depositAccruals}: ${this.ctx.fmt(profit)}`, cls: 'finance-record-detail' });
+      details.push({ label: `💰 ${this.tr.depositAccruals}:`, value: this.ctx.fmt(profit) });
     }
     const endDate = this.calculateDepositEndDate(deposit);
     if (endDate && deposit.status === 'active') {
-      details.createEl('span', { text: `${this.tr.dueBy} ${this.ctx.fmtDate(endDate)}`, cls: 'finance-record-detail' });
+      details.push({ label: this.tr.dueBy, value: fmtDate(endDate) });
     }
 
-    if (deposit.note) {
-      block.createEl('div', { text: deposit.note, cls: 'finance-record-note' });
-    }
+    renderMobileCard(block, {
+      amountText: '+' + this.ctx.fmt(deposit.amount),
+      amountCls: 'finance-amount-income',
+      subtitle: `${deposit.bankName} · ${this.typeLabel(deposit)}`,
+      details,
+      note: deposit.note,
+    });
   }
 
   // ── Accruals panel (expandable) ──────────────────────────────────────────
 
   private renderDepositAccrualsPanel(parent: HTMLElement, deposit: DepositRecord): void {
     const wrapper = parent.createDiv('finance-payments-panel');
-    const today = getTodayStr();
 
     const endDate = this.calculateDepositEndDate(deposit);
-    if (deposit.startDate && endDate && deposit.startDate < endDate) {
-      const totalDays = daysBetweenStr(deposit.startDate, endDate);
-      const elapsedDays = daysBetweenStr(deposit.startDate, today);
-      const progress = Math.min(PERCENT_100, Math.max(0, (elapsedDays / totalDays) * PERCENT_100));
-
-      const progressWrap = wrapper.createDiv('finance-deposit-progress');
-      const progressLabel = progressWrap.createDiv('finance-deposit-progress-label');
-      progressLabel.textContent = `${this.ctx.fmtDate(deposit.startDate)} → ${this.ctx.fmtDate(endDate)} (${Math.round(progress)}%)`;
-
-      const progressBar = progressWrap.createDiv('finance-deposit-progress-bar');
-      const progressFill = progressBar.createDiv('finance-deposit-progress-fill');
-      progressFill.style.setProperty('--ft-progress', `${progress}%`);
-      if (progress >= PERCENT_100) progressFill.addClass('is-complete');
-    }
+    renderProgressBar(wrapper, deposit.startDate, endDate, this.tr, fmtDate.bind(this.ctx));
 
     const renderMovementList = <M extends { date: string; time: string; amount: number; note: string; id: string }>(
       title: string, items: M[], sign: '+' | '−', movCls: string, totalLabel: string,
@@ -380,7 +360,7 @@ export class DepositsTab {
       const body = table.createEl('tbody');
       items.slice().reverse().forEach(item => {
         const tr = body.createEl('tr');
-        tr.createEl('td', { text: this.ctx.fmtDate(item.date, item.time), cls: 'finance-td' });
+        tr.createEl('td', { text: fmtDate(item.date, item.time), cls: 'finance-td' });
         tr.createEl('td', { text: sign + this.ctx.fmt(item.amount), cls: `finance-td ${movCls}` });
         tr.createEl('td', { text: item.note || '—', cls: 'finance-td' });
         const actTd = tr.createEl('td', { cls: 'finance-td' });
@@ -422,28 +402,20 @@ export class DepositsTab {
     }
     page = Math.max(0, Math.min(page, totalPages - 1));
     this.depositAccrualPages.set(deposit.id, page);
-    const start = page * DEPOSIT_ACCRUAL_PAGE_SIZE;
-    const pageAccruals = deposit.accruals.slice(start, start + DEPOSIT_ACCRUAL_PAGE_SIZE);
-
-    const scrollWrapper = wrapper.createDiv('finance-mov-scroll');
-    const movTable = scrollWrapper.createEl('table', { cls: 'finance-mov-table' });
-    const movHead = movTable.createEl('thead').createEl('tr');
-    ['#', this.tr.date, this.tr.sum, this.tr.status].forEach(l => {
-      movHead.createEl('th', { text: l, cls: 'finance-th finance-mov-th' });
-    });
-    const movBody = movTable.createEl('tbody');
-
-    pageAccruals.forEach((a, idx) => {
-      const isPaid = a.status === 'paid' || a.dueDate <= today;
-      const mr = movBody.createEl('tr', { cls: isPaid ? 'finance-payment-paid' : 'finance-payment-pending' });
-      mr.createEl('td', { text: String(start + idx + 1), cls: 'finance-td' });
-      mr.createEl('td', { text: this.ctx.fmtDate(a.dueDate, a.paidDate), cls: 'finance-td' });
-      mr.createEl('td', { text: this.ctx.fmt(a.amount), cls: 'finance-td' });
-      const statusText = isPaid
-        ? (deposit.accrualType === 'capitalization' ? this.tr.accrualIncluded : this.tr.accrualPaidToAccount)
-        : this.tr.pendingStatus;
-      mr.createEl('td', { text: statusText, cls: 'finance-td finance-payment-status' });
-    });
+    renderPaginatedSchedule(
+      wrapper,
+      deposit.accruals,
+      page,
+      DEPOSIT_ACCRUAL_PAGE_SIZE,
+      ['#', this.tr.date, this.tr.sum, this.tr.status],
+      this.ctx,
+      {
+        formatDate: a => fmtDate(a.dueDate, a.paidDate),
+        formatStatus: (_a, isPaid) => isPaid
+          ? (deposit.accrualType === 'capitalization' ? this.tr.accrualIncluded : this.tr.accrualPaidToAccount)
+          : this.tr.pendingStatus,
+      }
+    );
 
     if (totalPages > 1) {
       const pagNav = wrapper.createDiv('finance-pagination-nav finance-panel-pagination');
@@ -457,8 +429,8 @@ export class DepositsTab {
       prev.disabled = page === 0;
       prev.addEventListener('click', () => go(page - 1));
 
-      this.accrualPageRange(page, totalPages).forEach(p => {
-        if (p === -1) { pagNav.createEl('span', { text: '…', cls: 'finance-page-ellipsis' }); return; }
+      pageRange(page, totalPages, this.ctx.isMobile).forEach(p => {
+        if (p === '…') { pagNav.createEl('span', { text: '…', cls: 'finance-page-ellipsis' }); return; }
         const btn = pagNav.createEl('button', {
           text: String(p + 1),
           cls: `finance-page-btn${p === page ? ' active' : ''}`,
@@ -472,17 +444,6 @@ export class DepositsTab {
     }
   }
 
-  private accrualPageRange(cur: number, total: number): number[] {
-    if (total <= 7) return Array.from({ length: total }, (_, i) => i);
-    const radius = this.ctx.isMobile ? 1 : 3;
-    const p: number[] = [0];
-    if (cur > radius + 1) p.push(-1);
-    for (let i = Math.max(1, cur - radius); i <= Math.min(total - 2, cur + radius); i++) p.push(i);
-    if (cur < total - (radius + 2)) p.push(-1);
-    p.push(total - 1);
-    return p;
-  }
-
   // ── Modals ──────────────────────────────────────────────────────────────
 
   private openNewDepositModal(): void {
@@ -491,26 +452,14 @@ export class DepositsTab {
     new DepositModal(this.ctx.app, {
       title: this.tr.newDeposit,
       banks: allBanks,
+      pluginId: this.ctx.pluginId,
       onSave: async (deposit, interestRecords) => {
         await this.ctx.storage.addDeposit(this.ctx.accountId, deposit);
         for (const r of interestRecords) {
           await this.ctx.storage.addRecord(this.ctx.accountId, r);
         }
-        const rec: FinanceRecord = {
-          id: crypto.randomUUID(),
-          createdAt: Date.now(),
-          date: deposit.startDate,
-          time: getTodayTime(),
-          type: 'expense',
-          amount: deposit.amount,
-          category: this.tr.depositDefaultCat,
-          tag: '',
-          payer: deposit.bankName,
-          note: `${this.tr.depositOpenNote} "${deposit.name}"`,
-          attachmentPath: '',
-          linkedId: deposit.id,
-        };
-        await this.ctx.storage.addRecord(this.ctx.accountId, rec);
+        // Opening expense is now created automatically by autoTransactions.ts
+        // to avoid duplication
         await this.reload(this.tr.depositAdded);
       },
     }).open();
@@ -523,6 +472,7 @@ export class DepositsTab {
       title: this.tr.editRecord,
       deposit,
       banks: allBanks,
+      pluginId: this.ctx.pluginId,
       onSave: async (updated) => {
         const accrualFieldsChanged =
           deposit.amount !== updated.amount ||
@@ -534,20 +484,7 @@ export class DepositsTab {
         if (accrualFieldsChanged && updated.status === 'active') {
           // Terms changed: drop mirrored records and the schedule; auto-transactions rebuild both
           const otherRecords = this.ctx.data!.records.filter(r => r.linkedId !== updated.id);
-          otherRecords.push({
-            id: crypto.randomUUID(),
-            createdAt: Date.now(),
-            date: updated.startDate,
-            time: getTodayTime(),
-            type: 'expense',
-            amount: updated.amount,
-            category: this.tr.depositDefaultCat,
-            tag: '',
-            payer: updated.bankName,
-            note: `${this.tr.depositOpenNote} "${updated.name}"`,
-            attachmentPath: '',
-            linkedId: updated.id,
-          });
+          // Opening expense is now created automatically by autoTransactions.ts
           updated.accruals = [];
           await this.ctx.storage.saveAllRecords(this.ctx.accountId, otherRecords);
         }
@@ -562,7 +499,10 @@ export class DepositsTab {
     new ConfirmModal(this.ctx.app, `${this.tr.confirmCloseDeposit}\n${label}`, async () => {
       deposit.status = 'closed';
       await this.ctx.storage.updateDeposit(this.ctx.accountId, deposit);
+
+      // Create refund record when manually closing deposit
       await this.ctx.storage.addRecord(this.ctx.accountId, this.refundRecord(deposit));
+
       await this.reload(this.tr.depositClosed);
     }).open();
   }
@@ -597,7 +537,7 @@ export class DepositsTab {
   }
 
   private confirmDeleteDepositTopUp(deposit: DepositRecord, topUp: DepositTopUp): void {
-    const label = `${deposit.name} · ${this.ctx.fmt(topUp.amount)} · ${this.ctx.fmtDate(topUp.date, topUp.time)}`;
+    const label = `${deposit.name} · ${this.ctx.fmt(topUp.amount)} · ${fmtDate(topUp.date, topUp.time)}`;
     new ConfirmModal(this.ctx.app, `${this.tr.confirmDeleteTopUp}\n${label}`, async () => {
       await this.ctx.storage.deleteDepositTopUp(this.ctx.accountId, deposit.id, topUp.id);
       const linkedRec = this.ctx.data?.records.find(r =>
@@ -624,7 +564,7 @@ export class DepositsTab {
   }
 
   private confirmDeleteDepositWithdrawal(deposit: DepositRecord, withdrawal: DepositWithdrawal): void {
-    const label = `${deposit.name} · ${this.ctx.fmt(withdrawal.amount)} · ${this.ctx.fmtDate(withdrawal.date, withdrawal.time)}`;
+    const label = `${deposit.name} · ${this.ctx.fmt(withdrawal.amount)} · ${fmtDate(withdrawal.date, withdrawal.time)}`;
     new ConfirmModal(this.ctx.app, `${this.tr.confirmDeleteWithdrawal}\n${label}`, async () => {
       await this.ctx.storage.deleteDepositWithdrawal(this.ctx.accountId, deposit.id, withdrawal.id);
       const linkedRec = this.ctx.data?.records.find(r =>

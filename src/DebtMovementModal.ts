@@ -3,7 +3,7 @@ import { getLocaleFromApp, t, Translations } from './i18n';
 import { DebtMovement, DebtMovementType } from './types';
 import { parseAmount, getTodayStr } from './utils';
 import { createAmountInput } from './ui/AmountInput';
-import { createDateTimeField } from './ui/DateField';
+import { buildDateTimeField } from './ui/formHelpers';
 
 export interface DebtMovementOptions {
   title:           string;
@@ -78,11 +78,9 @@ export class DebtMovementModal extends Modal {
     }
 
     // ── Date+Time ────────────────────────────────────────────────────────
-    createDateTimeField(form, {
-      label: this.tr.dateTime,
-      date: this.mov.date,
-      time: this.mov.time,
-      onChange: (d, t) => { this.mov.date = d; this.mov.time = t; },
+    buildDateTimeField(form, this.tr.dateTime, this.mov.date, this.mov.time, this.tr, (d, t) => {
+      this.mov.date = d;
+      this.mov.time = t;
     });
 
     // ── Note — visually distinct ─────────────────────────────────────────

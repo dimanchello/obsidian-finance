@@ -7,6 +7,8 @@ const LABELS = {
   depositInterestNote: 'Начисление по вкладу',
   depositRefundCat: 'Возврат вклада',
   depositRefundNote: 'Закрытие вклада',
+  depositOpeningCat: 'Открытие вклада',
+  depositOpenNote: 'Открытие вклада',
   creditDefaultCat: 'Кредит',
   creditPaymentNote: 'Платёж по кредиту',
 };
@@ -296,6 +298,21 @@ describe('applyAutoTransactions — кредиты', () => {
     const res = applyAutoTransactions(data, mkDeps('2026-06-01'));
     expect(res.credits[0].payments).toEqual([]);
     expect(res.changed.credits).toBe(false);
+  });
+
+  it('перестраивает pending-платежи при смене paymentDay, сохраняя paid', () => {
+    const payments = [
+      { id: 'p1', amount: 9_000, dueDate: '2026-02-15', status: 'paid' as const, paidDate: '2026-02-15' },
+      { id: 'p2', amount: 9_000, dueDate: '2026-03-15', status: 'pending' as const },
+      { id: 'p3', amount: 9_000, dueDate: '2026-04-15', status: 'pending' as const },
+    ];
+    // User changed paymentDay from 15 to 20
+    const data = mkData({ credits: [mkCredit({ payments, paymentDay: 20, startDate: '2026-01-15', termMonths: 3 })] });
+    const res = applyAutoTransactions(data, mkDeps('2026-02-20'));
+
+    expect(res.credits[0].payments[0]).toEqual(payments[0]); // paid untouched
+    const pending = res.credits[0].payments.filter(p => p.status === 'pending');
+    expect(pending.every(p => p.dueDate.endsWith('-20'))).toBe(true);
   });
 });
 

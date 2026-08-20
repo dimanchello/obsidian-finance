@@ -1,12 +1,13 @@
-import { App, Modal, Notice, normalizePath } from 'obsidian';
+import { App } from 'obsidian';
 import { getLocaleFromApp, t, Translations } from './i18n';
-import { FinanceRecord, RecordType, PluginSettings, FOCUS_DELAY_MS, AUTOFILL_BADGE_MS } from './types';
+import { FinanceRecord, RecordType, PluginSettings, AUTOFILL_BADGE_MS } from './types';
 import { parseAmount, getTodayStr, normalizeDateStr, normalizeTimeStr } from './utils';
-import { toDateTimeLocalStr } from './domain/dateMath';
-import { attachAutocomplete } from './ui/Combobox';
 import { createAmountInput, type AmountInputHandle } from './ui/AmountInput';
 import { CalculatorModal } from './CalculatorModal';
 import { buildCalculatorIcon } from './ui/icons';
+import { buildAttachmentField } from './ui/attachmentField';
+import { FinanceBaseModal } from './ui/FinanceBaseModal';
+import { buildDateTimeField, buildComboboxField, buildNoteField, buildButtonRow, validateAmountInput } from './ui/formHelpers';
 
 export interface RecordModalOptions {
   initial:    Partial<FinanceRecord>;
@@ -20,13 +21,10 @@ export interface RecordModalOptions {
   onSave:     (r: FinanceRecord) => void;
 }
 
-// ── modal ─────────────────────────────────────────────────────────────────────
-
-export class RecordModal extends Modal {
-  private tr: Translations;
+export class RecordModal extends FinanceBaseModal {
+  protected tr: Translations;
   private o:   RecordModalOptions;
   private rec: Partial<FinanceRecord>;
-  private uploadInProgress = false;
 
   private amountInput!:      HTMLInputElement;
   private amountHandle!:     AmountInputHandle;
@@ -37,8 +35,6 @@ export class RecordModal extends Modal {
   private payerInput!:        HTMLInputElement;
   private autofillBadge!:     HTMLElement;
   private autofillTimer:      ReturnType<typeof setTimeout> | null = null;
-  private exchangeRateInput?: HTMLInputElement;
-  private exchangeRateWrap?:  HTMLElement;
 
   constructor(app: App, opts: RecordModalOptions) {
     super(app);
@@ -54,30 +50,20 @@ export class RecordModal extends Modal {
   }
 
   override onOpen(): void {
-    const { contentEl } = this;
-    contentEl.empty();
-    contentEl.addClass('finance-modal');
-
     const isEdit = !!this.o.initial.id;
-    contentEl.createEl('h2', {
-      text: isEdit ? '✏️ ' + this.tr.editRecord : '➕ ' + this.tr.newRecord,
-      cls:  'finance-modal-title',
-    });
+    this.openHeader(isEdit ? '✏️ ' + this.tr.editRecord : '➕ ' + this.tr.newRecord);
 
-    // ── Type toggle ──────────────────────────────────────────────────────
-    const typeRow    = contentEl.createDiv('finance-type-row');
+    const typeRow    = this.contentEl.createDiv('finance-type-row');
     this.incomeBtn   = typeRow.createEl('button', { cls: 'finance-type-toggle', text: this.tr.income });
     this.expenseBtn  = typeRow.createEl('button', { cls: 'finance-type-toggle', text: this.tr.expense });
     this.applyType(this.rec.type ?? 'expense');
     this.incomeBtn .addEventListener('click', () => { this.applyType('income');  this.updateAmountColor(); });
     this.expenseBtn.addEventListener('click', () => { this.applyType('expense'); this.updateAmountColor(); });
 
-    const form = contentEl.createDiv('finance-form');
+    const form = this.contentEl.createDiv('finance-form');
 
-    // ── Amount ───────────────────────────────────────────────────────────
     const amtG = form.createDiv('finance-field-group finance-amount-group');
     amtG.createEl('label', { text: this.tr.amountRequired.replace('{currency}', this.o.currency), cls: 'finance-field-label' });
-
     const amtRow = amtG.createDiv('finance-amount-row');
 
     const amountHandle = createAmountInput(amtRow, {
@@ -87,7 +73,6 @@ export class RecordModal extends Modal {
     });
     this.amountInput = amountHandle.input;
     this.amountHandle = amountHandle;
-
     this.updateAmountColor();
 
     const calcIconBtn = amtRow.createEl('button', { cls: 'finance-calc-icon-btn' });
@@ -101,69 +86,18 @@ export class RecordModal extends Modal {
       }, currentValue).open();
     });
 
-
-    // ── Exchange rate — collapsible ─────────────────────────────────────
-    this.exchangeRateWrap = form.createDiv('finance-field-group finance-exrate-group');
-    this.exchangeRateWrap.addClass('is-hidden');
-
-    const erLabelRow = this.exchangeRateWrap.createDiv('finance-exrate-label-row');
-    erLabelRow.createEl('label', { text: this.tr.exchangeRateQuestion.replace('{currency}', this.o.currency), cls: 'finance-field-label' });
-    erLabelRow.createEl('span', { text: '💱', cls: 'finance-exrate-icon' });
-
-    this.exchangeRateInput = this.exchangeRateWrap.createEl('input', {
-      type: 'text',
-      cls:  'finance-input finance-exrate-input',
-    });
-    this.exchangeRateInput.setAttribute('inputmode', 'decimal');
-    this.exchangeRateInput.setAttribute('placeholder', this.tr.exchangeRateExample);
-    this.exchangeRateInput.setAttribute('autocomplete', 'off');
-
-    if (this.rec.exchangeRate && this.rec.exchangeRate > 0) {
-      this.exchangeRateInput.value = String(this.rec.exchangeRate).replace('.', ',');
-      this.exchangeRateWrap.removeClass('is-hidden');
-    }
-
-    this.exchangeRateInput.addEventListener('input', () => {
-      const raw = this.exchangeRateInput!.value.replace(',', '.').replace(/[^\d.]/g, '');
-      this.rec.exchangeRate = parseFloat(raw) || undefined;
-    });
-
-    const erToggle = form.createDiv('finance-exrate-toggle');
-    erToggle.textContent = this.rec.exchangeRate ? this.tr.exchangeRateHide : this.tr.exchangeRateShow;
-    erToggle.addEventListener('click', () => {
-      const wrap = this.exchangeRateWrap!;
-      const willShow = wrap.hasClass('is-hidden');
-      wrap.toggleClass('is-hidden', !willShow);
-      erToggle.textContent = willShow ? this.tr.exchangeRateHide : this.tr.exchangeRateShow;
-      if (willShow) setTimeout(() => this.exchangeRateInput!.focus(), FOCUS_DELAY_MS);
-    });
-
-    // ── Autofill badge ───────────────────────────────────────────────────
     this.autofillBadge = form.createDiv('finance-autofill-badge');
     this.autofillBadge.addClass('is-hidden');
 
-    // ── Grid: date+time / payer / category / tag ──────────────────────
     const grid = form.createDiv('finance-form-grid');
 
-    // Date+Time (single datetime-local picker)
-    const dtG = grid.createDiv('finance-field-group');
-    dtG.createEl('label', { text: this.tr.dateTime, cls: 'finance-field-label' });
-    const dtIn = dtG.createEl('input', { type: 'datetime-local', cls: 'finance-input' });
-    const nowStr = toDateTimeLocalStr(new Date());
-    const normDate = this.rec.date ? normalizeDateStr(this.rec.date) : '';
+    const normDate = this.rec.date ? normalizeDateStr(this.rec.date) : getTodayStr();
     const normTime = this.rec.time ? normalizeTimeStr(this.rec.time) : '';
-    dtIn.value = normDate
-      ? `${normDate}T${normTime || '00:00'}`
-      : nowStr;
-    dtIn.addEventListener('change', () => {
-      if (dtIn.value) {
-        const [d, t] = dtIn.value.slice(0, 16).split('T');
-        this.rec.date = normalizeDateStr(d ?? '');
-        this.rec.time = normalizeTimeStr(t ?? '');
-      }
+    buildDateTimeField(grid, this.tr.dateTime, normDate, normTime, this.tr, (d, t) => {
+      this.rec.date = d;
+      this.rec.time = t;
     });
 
-    // Payer — autofill trigger + internal toggle inline
     this.payerInput = this.buildAutocomplete(
       grid, this.tr.payer, this.rec.payer ?? '', this.o.payers,
       v => { this.rec.payer = v; this.scheduleAutofill('payer', v); },
@@ -174,46 +108,41 @@ export class RecordModal extends Modal {
       },
     );
 
-    // Category — autofill trigger
-    this.categoryInput = this.buildAutocomplete(
-      grid, this.tr.category, this.rec.category ?? '', this.o.categories,
-      v => { this.rec.category = v; this.scheduleAutofill('category', v); },
+    this.categoryInput = buildComboboxField(
+      grid, this.tr.category, this.rec.category ?? '', () => this.o.categories,
+      v => { this.rec.category = v; this.scheduleAutofill('category', v); }
     );
 
-    // Tag
-    this.tagInput = this.buildAutocomplete(
-      grid, this.tr.tag, this.rec.tag ?? '', this.o.tags,
-      v => { this.rec.tag = v; },
+    this.tagInput = buildComboboxField(
+      grid, this.tr.tag, this.rec.tag ?? '', () => this.o.tags,
+      v => { this.rec.tag = v; }
     );
 
-    // ── Note — visually distinct ─────────────────────────────────────────
-    const noteG = form.createDiv('finance-field-group');
-    const noteLabelRow = noteG.createDiv('finance-note-label-row');
-    noteLabelRow.createEl('label', { text: this.tr.note, cls: 'finance-field-label' });
-    noteLabelRow.createEl('span', { text: '📝', cls: 'finance-note-icon' });
+    buildNoteField(form, {
+      label: this.tr.note,
+      icon: '📝',
+      value: this.rec.note ?? '',
+      placeholder: this.tr.notePlaceholder,
+      rows: 3,
+      onChange: v => { this.rec.note = v; }
+    });
 
-    const noteIn = noteG.createEl('textarea', { cls: 'finance-textarea finance-note-field' });
-    noteIn.placeholder = this.tr.notePlaceholder;
-    noteIn.value = this.rec.note ?? '';
-    noteIn.rows  = 3;
-    noteIn.addEventListener('input', () => { this.rec.note = noteIn.value; });
+    buildAttachmentField(form, {
+      app: this.app,
+      pluginId: this.o.pluginId,
+      tr: this.tr,
+      initialPath: this.rec.attachmentPath ?? '',
+      onChange: path => { this.rec.attachmentPath = path; },
+    });
 
-    // ── Attachment ───────────────────────────────────────────────────────
-    this.buildAttachmentField(form);
-
-    // ── Buttons ──────────────────────────────────────────────────────────
-    const btnRow = contentEl.createDiv('finance-modal-btns');
-    btnRow.createEl('button', { text: this.tr.cancel, cls: 'finance-btn-cancel' })
-          .addEventListener('click', () => this.close());
-    btnRow.createEl('button', {
-      text: isEdit ? this.tr.save : this.tr.addBtn,
-      cls:  'finance-btn-save',
-    }).addEventListener('click', () => this.handleSave());
+    buildButtonRow(this.contentEl, this.tr, {
+      isEdit,
+      onSave: () => this.handleSave(),
+      onCancel: () => this.close(),
+    });
 
     setTimeout(() => this.amountInput.focus(), 50);
   }
-
-  // ── type ─────────────────────────────────────────────────────────────────
 
   private applyType(type: RecordType): void {
     this.rec.type = type;
@@ -229,8 +158,6 @@ export class RecordModal extends Modal {
     this.amountInput.classList.toggle('expense-color', this.rec.type === 'expense');
   }
 
-  // ── autocomplete ─────────────────────────────────────────────────────────
-
   private buildAutocomplete(
     parent:   HTMLElement,
     label:    string,
@@ -239,17 +166,9 @@ export class RecordModal extends Modal {
     onChange: (v: string) => void,
     opts?: { withInternalToggle?: boolean; isInternal?: boolean; onToggleInternal?: (v: boolean) => void },
   ): HTMLInputElement {
-    const g = parent.createDiv('finance-field-group');
-    g.createEl('label', { text: label, cls: 'finance-field-label' });
-
-    const wrapper = g.createDiv('finance-combobox');
-    const input   = wrapper.createEl('input', {
-      type: 'text', cls: 'finance-input finance-combobox-input',
-    });
-    input.value = value;
-    input.setAttribute('autocomplete', 'off');
-
+    const input = buildComboboxField(parent, label, value, () => options, onChange);
     if (opts?.withInternalToggle) {
+      const wrapper = input.parentElement!;
       let internalState = opts.isInternal ?? false;
       const intBtn = wrapper.createEl('button', {
         type: 'button',
@@ -263,12 +182,8 @@ export class RecordModal extends Modal {
         intBtn.classList.toggle('is-active', internalState);
       });
     }
-
-    attachAutocomplete(input, { options: () => options, onPick: onChange });
     return input;
   }
-
-  // ── smart autofill ────────────────────────────────────────────────────────
 
   private scheduleAutofill(field: 'category' | 'payer', value: string): void {
     if (this.autofillTimer) clearTimeout(this.autofillTimer);
@@ -307,17 +222,6 @@ export class RecordModal extends Modal {
       filled = true;
     }
 
-    if (match.exchangeRate && (!this.exchangeRateInput?.value)) {
-      if (this.exchangeRateWrap && this.exchangeRateInput) {
-        this.exchangeRateWrap.removeClass('is-hidden');
-        this.exchangeRateInput.value = String(match.exchangeRate).replace('.', ',');
-        this.rec.exchangeRate = match.exchangeRate;
-        const toggle = this.exchangeRateWrap.parentElement?.querySelector('.finance-exrate-toggle');
-        if (toggle) toggle.textContent = this.tr.exchangeRateHide;
-        filled = true;
-      }
-    }
-
     if (filled) {
       this.autofillBadge.removeClass('is-hidden');
       const d = match.date.split('-');
@@ -326,90 +230,10 @@ export class RecordModal extends Modal {
     }
   }
 
-  // ── attachment ────────────────────────────────────────────────────────────
-
-  private buildAttachmentField(form: HTMLElement): void {
-    const g   = form.createDiv('finance-field-group');
-    g.createEl('label', { text: this.tr.attachment, cls: 'finance-field-label' });
-
-    const wrap   = g.createDiv('finance-attach-wrapper');
-    const fi     = wrap.createEl('input', { type: 'file', cls: 'finance-file-input' });
-    fi.accept    = 'image/*,.pdf';
-    const uid    = `ft-${Date.now()}`;
-    fi.id        = uid;
-    const lbl    = wrap.createEl('label', { cls: 'finance-attach-label' });
-    lbl.setAttribute('for', uid);
-    lbl.createEl('span', { text: '📎' });
-    lbl.createEl('span', { text: this.tr.selectFile });
-    const nameEl = wrap.createEl('span', {
-      text: this.rec.attachmentPath
-        ? (this.rec.attachmentPath.split('/').pop() ?? this.rec.attachmentPath)
-        : this.tr.notSelected,
-      cls: 'finance-attach-name',
-    });
-    const preview = g.createDiv('finance-image-preview');
-
-    // Show existing
-    if (this.rec.attachmentPath) {
-      const af = this.app.vault.getAbstractFileByPath(this.rec.attachmentPath);
-      if (af) {
-        const src = this.app.vault.getResourcePath(af as any);
-        if (src) {
-          preview.removeClass('is-hidden');
-          preview.createEl('img', { cls: 'finance-preview-img' }).src = src;
-        }
-      }
-    }
-
-    fi.addEventListener('change', async () => {
-      if (this.uploadInProgress) return;
-      const file = fi.files?.[0];
-      if (!file) return;
-      this.uploadInProgress = true;
-      nameEl.textContent = file.name;
-
-      if (file.type.startsWith('image/')) {
-        const reader = new FileReader();
-        reader.onload = e => {
-          preview.empty(); preview.removeClass('is-hidden');
-          preview.createEl('img', { cls: 'finance-preview-img' }).src = e.target?.result as string;
-        };
-        reader.readAsDataURL(file);
-      }
-
-      try {
-        const vaultCfg = (this.app.vault as any).getConfig('attachmentFolderPath') ?? '/';
-        let folder: string;
-        if (vaultCfg === './') {
-          folder = this.o.pluginId;
-        } else if (vaultCfg === '/') {
-          folder = this.o.pluginId;
-        } else {
-          folder = normalizePath(`${vaultCfg}/${this.o.pluginId}`);
-        }
-        if (!this.app.vault.getAbstractFileByPath(folder))
-          await this.app.vault.createFolder(folder);
-        const dest = normalizePath(
-          `${folder}/${Date.now()}_${file.name.replace(/[<>:"/\\|?*]/g, '_')}`
-        );
-        await this.app.vault.createBinary(dest, await file.arrayBuffer());
-        this.rec.attachmentPath = dest;
-        nameEl.textContent = `✓ ${file.name}`;
-        nameEl.classList.add('finance-attach-ok');
-      } catch { new Notice(this.tr.saveError); }
-      finally { this.uploadInProgress = false; }
-    });
-  }
-
-  // ── save ─────────────────────────────────────────────────────────────────
-
   private handleSave(): void {
-    const amount = parseAmount(this.amountInput.value);
-    if (!amount || amount <= 0) {
-      new Notice(this.tr.invalidAmount);
-      this.amountInput.focus();
-      return;
-    }
+    const amount = validateAmountInput(this.amountInput, this.tr);
+    if (amount === null) return;
+    
     const record: FinanceRecord = {
       id:             this.rec.id             ?? crypto.randomUUID(),
       createdAt:      this.rec.createdAt      ?? Date.now(),
@@ -424,11 +248,8 @@ export class RecordModal extends Modal {
       attachmentPath: this.rec.attachmentPath         ?? '',
       isInternal:     this.rec.isInternal             ?? false,
       linkedId:       this.rec.linkedId             ?? '',
-      exchangeRate:   this.rec.exchangeRate,
     };
     this.o.onSave(record);
     this.close();
   }
-
-  override onClose(): void { this.contentEl.empty(); }
 }

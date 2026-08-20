@@ -1,23 +1,27 @@
-import { App, Modal, Notice } from 'obsidian';
+import { App, Notice } from 'obsidian';
 import { getLocaleFromApp, t, Translations } from './i18n';
-import { CreditRecord, CreditType, ACCRUAL_STEP_MONTHLY, PERCENT_100 } from './types';
+import { CreditRecord, CreditType, PERCENT_100 } from './types';
+import { calculateAnnuityPayment, generateAnnuitySchedule } from './domain/creditCalculations';
 import { fmtAmount, parseAmount, getTodayStr, normalizeDateStr } from './utils';
-import { addMonthsClamped, withDayClamped, parseDateStr } from './domain/dateMath';
-import { round2, sumMoney } from './domain/money';
+import { parseDateStr } from './domain/dateMath';
+import { round2 } from './domain/money';
 import { FieldInfoModal, CREDIT_FIELDS } from './FieldInfoModal';
-import { attachAutocomplete } from './ui/Combobox';
 import { createAmountInput, type AmountInputHandle } from './ui/AmountInput';
+import { buildAttachmentField } from './ui/attachmentField';
+import { FinanceBaseModal } from './ui/FinanceBaseModal';
+import { buildDateField, buildNoteField, buildButtonRow, buildComboboxField, validateAmountInput } from './ui/formHelpers';
 
 export interface CreditModalOptions {
   title:     string;
   credit?:   CreditRecord;
   banks:     string[];
+  pluginId:  string;
   records:   any[]; // FinanceRecord[]
   onSave:    (credit: CreditRecord, updatedRecords: any[]) => void;
 }
 
-export class CreditModal extends Modal {
-  private tr: Translations;
+export class CreditModal extends FinanceBaseModal {
+  protected tr: Translations;
   private o: CreditModalOptions;
   private credit: CreditRecord;
   private amountInput!: HTMLInputElement;
@@ -48,7 +52,7 @@ export class CreditModal extends Modal {
         }
       : {
           id: crypto.randomUUID(),
-          name: 'Кредит',
+          name: this.tr.creditDefaultCat,
           type: 'consumer',
           bankName: '',
           originalAmount: 0,
@@ -73,15 +77,10 @@ export class CreditModal extends Modal {
   }
 
   override onOpen(): void {
-    const { contentEl } = this;
-    contentEl.empty();
-    contentEl.addClass('finance-modal');
+    this.openHeader(this.o.title);
 
-    contentEl.createEl('h2', { text: this.o.title, cls: 'finance-modal-title' });
+    const form = this.contentEl.createDiv('finance-form finance-form-grid finance-form-compact');
 
-    const form = contentEl.createDiv('finance-form finance-form-grid finance-form-compact');
-
-    // === РЯД 1: Название | Банк ===
     const row1 = form.createDiv('finance-form-row finance-full-width');
 
     const nameG = row1.createDiv('finance-field-group');
@@ -90,20 +89,8 @@ export class CreditModal extends Modal {
     nameIn.value = this.credit.name;
     nameIn.addEventListener('input', () => { this.credit.name = nameIn.value; });
 
-    const bankG = row1.createDiv('finance-field-group');
-    bankG.createEl('label', { text: this.tr.bankName + ' *', cls: 'finance-field-label' });
-    const bankWrap = bankG.createDiv('finance-combobox');
-    const bankIn = bankWrap.createEl('input', { type: 'text', cls: 'finance-input finance-combobox-input' });
-    bankIn.value = this.credit.bankName;
-    bankIn.setAttribute('autocomplete', 'off');
+    buildComboboxField(row1, this.tr.bankName + ' *', this.credit.bankName, () => this.o.banks, v => { this.credit.bankName = v; });
 
-    attachAutocomplete(bankIn, {
-      options: () => this.o.banks,
-      onPick: v => { this.credit.bankName = v; },
-      createLabel: q => ` "${q}"`,
-    });
-
-    // === РЯД 2: Стоимость покупки | Процентная ставка ===
     const row2 = form.createDiv('finance-form-row finance-full-width');
 
     const amtG = row2.createDiv('finance-field-group finance-amount-group');
@@ -139,7 +126,6 @@ export class CreditModal extends Modal {
       this.scheduleCalc();
     });
 
-    // === РЯД 2.5: Первоначальный взнос (значение, тип, дата) ===
     const rowDp = form.createDiv('finance-form-row finance-full-width');
 
     const dpValG = rowDp.createDiv('finance-field-group');
@@ -218,15 +204,10 @@ export class CreditModal extends Modal {
       this.credit.downPaymentDate = this.downPaymentDateInput.value ? normalizeDateStr(this.downPaymentDateInput.value) : '';
     });
 
-    // === РЯД 2.6: Инфо-блок Итого сумма кредита ===
     const rowInfo = form.createDiv('finance-form-row finance-full-width finance-row-info');
-
     this.finalAmountDisplay = rowInfo.createDiv('finance-final-amount-info');
-
-
     this.updateCalculatedValues();
 
-    // === РЯД 3: Ежемесячный платёж | Срок ===
     const row3 = form.createDiv('finance-form-row finance-full-width');
 
     const paymentG = row3.createDiv('finance-field-group finance-amount-group');
@@ -245,14 +226,8 @@ export class CreditModal extends Modal {
     this.termInput.addEventListener('change', () => { this.credit.termMonths = parseInt(this.termInput.value) || 12; });
     this.termInput.addEventListener('input', () => this.scheduleCalc());
 
-    // === РЯД 4: Дата начала | Тип кредита ===
     const row4 = form.createDiv('finance-form-row finance-full-width');
-
-    const dateG = row4.createDiv('finance-field-group');
-    dateG.createEl('label', { text: this.tr.startDate, cls: 'finance-field-label' });
-    const dateIn = dateG.createEl('input', { type: 'date', cls: 'finance-input' });
-    dateIn.value = normalizeDateStr(this.credit.startDate);
-    dateIn.addEventListener('change', () => { this.credit.startDate = normalizeDateStr(dateIn.value); });
+    buildDateField(row4, this.tr.startDate, this.credit.startDate, v => { this.credit.startDate = v; });
 
     const typeG = row4.createDiv('finance-field-group');
     typeG.createEl('label', { text: this.tr.creditTypeLabel, cls: 'finance-field-label' });
@@ -266,7 +241,7 @@ export class CreditModal extends Modal {
       const opt = typeSel.createEl('option', { value: t.value, text: t.label });
       if (t.value === this.credit.type) opt.selected = true;
     });
-    // === РЯД 4.2: День платежа ===
+
     const row42 = form.createDiv('finance-form-row finance-full-width');
     const pdG = row42.createDiv('finance-field-group');
     pdG.createEl('label', { text: this.tr.paymentDayLabel, cls: 'finance-field-label' });
@@ -281,7 +256,6 @@ export class CreditModal extends Modal {
       this.credit.paymentDay = (v >= 1 && v <= 31) ? v : defaultDay;
     });
 
-    // === РЯД 4.5: Эскроу (только для ипотеки) ===
     const rowEscrow = form.createDiv('finance-form-row finance-full-width');
     const escrowG = rowEscrow.createDiv('finance-field-group finance-full-width');
     const escrowLabel = escrowG.createEl('label', { cls: 'finance-checkbox-label finance-escrow-label' });
@@ -307,24 +281,38 @@ export class CreditModal extends Modal {
       }
     });
 
-    // === РЯД 5: Примечание (на всю ширину) ===
     const row5 = form.createDiv('finance-form-row finance-full-width');
-    const noteG = row5.createDiv('finance-field-group');
-    noteG.createEl('label', { text: this.tr.note, cls: 'finance-field-label' });
-    const noteIn = noteG.createEl('textarea', { cls: 'finance-textarea finance-note-field' });
-    noteIn.placeholder = this.tr.optional;
-    noteIn.value = this.credit.note;
-    noteIn.rows = 2;
-    noteIn.addEventListener('input', () => { this.credit.note = noteIn.value; });
+    buildNoteField(row5, {
+      label: this.tr.note,
+      value: this.credit.note,
+      placeholder: this.tr.optional,
+      rows: 2,
+      onChange: v => { this.credit.note = v; }
+    });
 
-    const btnRow = contentEl.createDiv('finance-modal-btns');
-    const infoBtn = btnRow.createEl('button', { text: '❓', cls: 'finance-btn-cancel' });
-    infoBtn.addClass('finance-info-btn-left');
-    infoBtn.addEventListener('click', () => new FieldInfoModal(this.app, CREDIT_FIELDS).open());
-    btnRow.createEl('button', { text: this.tr.cancel, cls: 'finance-btn-cancel' })
-      .addEventListener('click', () => this.close());
-    btnRow.createEl('button', { text: this.tr.save, cls: 'finance-btn-save' })
-      .addEventListener('click', () => this.handleSave());
+    const rowAttach = form.createDiv('finance-form-row finance-full-width');
+    buildAttachmentField(rowAttach, {
+      app: this.app,
+      pluginId: this.o.pluginId,
+      tr: this.tr,
+      initialPath: this.credit.attachmentPath ?? '',
+      onChange: path => { this.credit.attachmentPath = path; },
+    });
+
+    buildButtonRow(this.contentEl, this.tr, {
+      onCancel: () => this.close(),
+      onSave: () => this.handleSave(),
+    });
+    
+    // Add info button manually to the btn row
+    const btnRow = this.contentEl.querySelector('.finance-modal-btns');
+    if (btnRow) {
+      const infoBtn = document.createElement('button');
+      infoBtn.textContent = '❓';
+      infoBtn.className = 'finance-btn-cancel finance-info-btn-left';
+      infoBtn.addEventListener('click', () => new FieldInfoModal(this.app, CREDIT_FIELDS).open());
+      btnRow.prepend(infoBtn);
+    }
   }
 
   private scheduleCalc(): void {
@@ -357,28 +345,27 @@ export class CreditModal extends Modal {
     const rate = parseFloat(this.rateInput.value.replace(',', '.')) || 0;
     const term = parseInt(this.termInput.value) || 0;
     if (amount <= 0 || term <= 0) return;
-    const monthlyRate = rate / 100 / ACCRUAL_STEP_MONTHLY;
-    let payment: number;
-    if (monthlyRate > 0) {
-      const factor = Math.pow(1 + monthlyRate, term);
-      payment = amount * (monthlyRate * factor) / (factor - 1);
-    } else {
-      payment = amount / term;
-    }
-    this.paymentHandle.set(round2(payment));
+    const payment = calculateAnnuityPayment(amount, rate, term);
+    this.paymentHandle.set(payment);
   }
 
   private handleSave(): void {
-    const amount = parseAmount(this.amountInput.value);
+    const amount = validateAmountInput(this.amountInput, this.tr);
+    if (amount === null) return;
+    
     this.credit.purchasePrice = amount;
 
     // Validate Down Payment
     const dpVal = this.credit.downPayment ?? 0;
     const dpDate = this.credit.downPaymentDate;
     if (dpVal <= 0) {
-      this.credit.downPaymentDate = '';
+      // Clear amount/value but preserve date if user set one
       this.credit.downPayment = 0;
       this.credit.downPaymentValue = 0;
+      // Only clear date if it was never set
+      if (!dpDate) {
+        this.credit.downPaymentDate = '';
+      }
     } else {
       if (!dpDate) {
         new Notice(this.tr.downPaymentDateRequired);
@@ -399,37 +386,25 @@ export class CreditModal extends Modal {
     }
     this.credit.bankName = this.credit.bankName.trim();
     if (!this.credit.name.trim()) {
-      this.credit.name = 'Кредит';
+      this.credit.name = this.tr.creditDefaultCat;
     }
     this.credit.name = this.credit.name.trim();
 
     if (this.credit.termMonths > 0 && this.credit.monthlyPayment > 0) {
-      const today = getTodayStr();
-      const startDate = normalizeDateStr(this.credit.startDate);
-
-      const kept = this.credit.payments.filter(p => p.status === 'paid');
-      for (const p of kept) p.amount = this.credit.monthlyPayment;
-      this.credit.payments = [...kept];
-
-      for (let i = kept.length + 1; i <= this.credit.termMonths; i++) {
-        const base = addMonthsClamped(startDate, i);
-        const dueDateStr = this.credit.paymentDay !== undefined
-          ? withDayClamped(base, this.credit.paymentDay)
-          : base;
-        const isPast = dueDateStr <= today;
-        this.credit.payments.push({
-          id: crypto.randomUUID(),
-          amount: this.credit.monthlyPayment,
-          dueDate: dueDateStr,
-          status: isPast ? 'paid' : 'pending',
-          paidDate: isPast ? dueDateStr : undefined,
-        });
-      }
+      const scheduleResult = generateAnnuitySchedule({
+        originalAmount: this.credit.originalAmount,
+        interestRate: this.credit.interestRate,
+        termMonths: this.credit.termMonths,
+        monthlyPayment: this.credit.monthlyPayment,
+        startDate: this.credit.startDate,
+        paymentDay: this.credit.paymentDay,
+        existingPayments: this.credit.payments,
+      });
+      this.credit.payments = scheduleResult.payments;
+      this.credit.currentAmount = scheduleResult.currentAmount;
+    } else {
+      this.credit.currentAmount = this.credit.originalAmount;
     }
-
-    const paidSum = sumMoney(this.credit.payments.filter(p => p.status === 'paid').map(p => p.amount));
-    const totalToPay = round2(this.credit.monthlyPayment * this.credit.termMonths);
-    this.credit.currentAmount = Math.max(0, round2(totalToPay - paidSum));
 
     // Manage Down Payment Transaction
     let updatedRecords = [...this.o.records];
@@ -449,7 +424,7 @@ export class CreditModal extends Modal {
             time: '',
             type: 'expense',
             amount: dpVal,
-            category: 'Кредит',
+            category: this.tr.creditDefaultCat,
             tag: '',
             payer: this.credit.bankName,
             note: this.tr.downPaymentNotePrefix + this.credit.name,
@@ -466,7 +441,7 @@ export class CreditModal extends Modal {
           time: '',
           type: 'expense',
           amount: dpVal,
-          category: 'Кредит',
+          category: this.tr.creditDefaultCat,
           tag: '',
           payer: this.credit.bankName,
           note: this.tr.downPaymentNotePrefix + this.credit.name,
@@ -483,6 +458,4 @@ export class CreditModal extends Modal {
     this.o.onSave(this.credit, updatedRecords);
     this.close();
   }
-
-  override onClose(): void { this.contentEl.empty(); }
 }

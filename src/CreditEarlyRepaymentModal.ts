@@ -1,9 +1,10 @@
 import { App, Modal, Notice } from 'obsidian';
 import { getLocaleFromApp, t, Translations } from './i18n';
 import { CreditRecord, CreditPayment } from './types';
+import { calculateRemainingPrincipal } from './domain/creditCalculations';
 import { fmtAmount, parseAmount, getTodayStr, normalizeDateStr } from './utils';
 import { createAmountInput } from './ui/AmountInput';
-import { round2, sumMoney } from './domain/money';
+import { round2 } from './domain/money';
 
 export interface EarlyRepaymentOptions {
   title: string;
@@ -28,9 +29,9 @@ export class CreditEarlyRepaymentModal extends Modal {
     this.credit = { ...opts.credit, payments: [...opts.credit.payments] };
 
     this.pendingPayments = this.credit.payments.filter(p => p.status === 'pending');
-    const paidAmount = this.credit.payments.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0);
-    const totalToPay = this.credit.monthlyPayment * this.credit.termMonths;
-    this.actualRemaining = Math.max(0, totalToPay - paidAmount);
+    this.actualRemaining = this.credit.currentAmount > 0
+      ? this.credit.currentAmount
+      : calculateRemainingPrincipal(this.credit);
   }
 
   override onOpen(): void {
@@ -127,7 +128,11 @@ export class CreditEarlyRepaymentModal extends Modal {
               // Full payment: mark as paid
               payment.status = 'paid';
               payment.paidDate = repaymentDate;
-              if (noteIn.value) payment.note = noteIn.value;
+              if (noteIn.value) {
+                payment.note = payment.note
+                  ? `${payment.note}; ${noteIn.value}`
+                  : noteIn.value;
+              }
               remainingAmount -= payment.amount;
             } else {
               // Partial payment: reduce the amount but keep payment pending
@@ -148,7 +153,7 @@ export class CreditEarlyRepaymentModal extends Modal {
           }
 
           const stillPending = this.credit.payments.filter(p => p.status === 'pending');
-          this.credit.currentAmount = sumMoney(stillPending.map(p => p.amount));
+          this.credit.currentAmount = calculateRemainingPrincipal(this.credit);
           if (this.credit.currentAmount <= 0 || stillPending.length === 0) {
             this.credit.status = 'paid';
           }
@@ -164,8 +169,8 @@ export class CreditEarlyRepaymentModal extends Modal {
           }
 
           const stillPending = this.credit.payments.filter(p => p.status === 'pending');
-          this.credit.currentAmount = sumMoney(stillPending.map(p => p.amount));
-          this.credit.status = stillPending.length === 0 ? 'paid' : 'active';
+          this.credit.currentAmount = calculateRemainingPrincipal(this.credit);
+          this.credit.status = (this.credit.currentAmount <= 0 || stillPending.length === 0) ? 'paid' : 'active';
         }
 
         this.o.onSave(this.credit);

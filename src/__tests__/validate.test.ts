@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  parseRecords, parseDebts, parseCredits, parseDeposits, parseStringList,
+  parseRecords, parseDebts, parseCredits, parseDeposits, parseExchanges, parseStringList,
 } from '../domain/validate';
 
 describe('parseRecords', () => {
@@ -134,6 +134,52 @@ describe('parseDeposits', () => {
   it('termMonths не подменяется на 12 при нуле', () => {
     // Раньше storage делал `if (!d.termMonths) d.termMonths = 12` и маскировал ошибку ввода
     expect(parseDeposits([{ ...valid, termMonths: 0 }])[0].termMonths).toBe(0);
+  });
+
+  it('разбирает вложенные начисления, пополнения и снятия', () => {
+    const full = {
+      ...valid,
+      accruals: [{ id: 'a1', amount: 100, dueDate: '2026-02-01', status: 'paid', paidDate: '2026-02-01' }],
+      topUps: [{ id: 't1', amount: 2000, date: '2026-02-10', time: '12:00', createdAt: 1, note: 'Пополнение' }],
+      withdrawals: [{ id: 'w1', amount: 500, date: '2026-02-15', time: '14:00', createdAt: 2, note: 'Снятие' }],
+    };
+    const [d] = parseDeposits([full]);
+    expect(d.accruals).toHaveLength(1);
+    expect(d.topUps).toHaveLength(1);
+    expect(d.withdrawals).toHaveLength(1);
+    expect(d.topUps[0].amount).toBe(2000);
+    expect(d.withdrawals[0].amount).toBe(500);
+  });
+});
+
+describe('parseExchanges', () => {
+  const valid = {
+    id: 'ex1', createdAt: 1, date: '2026-01-01', time: '12:00', type: 'buy',
+    amountInAccountCurrency: 9000, targetCurrency: 'USD', targetAmount: 100,
+    exchangeRate: 90, provider: 'Банк', category: 'Обмен', fee: 50, note: 'Покупка',
+  };
+
+  it('разбирает валидный обмен валюты', () => {
+    const [ex] = parseExchanges([valid]);
+    expect(ex).toMatchObject({
+      id: 'ex1',
+      type: 'buy',
+      targetCurrency: 'USD',
+      targetAmount: 100,
+      fee: 50,
+    });
+  });
+
+  it('отбрасывает записи без id', () => {
+    expect(parseExchanges([{ ...valid, id: '' }, { ...valid, id: 'ok' }])).toHaveLength(1);
+  });
+
+  it('неизвестный тип становится buy', () => {
+    expect(parseExchanges([{ ...valid, type: 'unknown' }])[0].type).toBe('buy');
+  });
+
+  it('не массив даёт пустой список', () => {
+    expect(parseExchanges(null)).toEqual([]);
   });
 });
 

@@ -1,24 +1,26 @@
-import { App, Modal, Notice } from 'obsidian';
+import { App, Notice } from 'obsidian';
 import { getLocaleFromApp, t, Translations } from './i18n';
 import { DepositRecord, DepositType, DepositAccrualType, FinanceRecord } from './types';
-import { parseAmount, getTodayStr, normalizeDateStr, normalizeTimeStr, parseDate } from './utils';
+import { getTodayStr, normalizeDateStr, normalizeTimeStr, parseDate } from './utils';
 import { FieldInfoModal, DEPOSIT_FIELDS } from './FieldInfoModal';
-import { attachAutocomplete } from './ui/Combobox';
 import { createAmountInput } from './ui/AmountInput';
+import { buildAttachmentField } from './ui/attachmentField';
+import { FinanceBaseModal } from './ui/FinanceBaseModal';
+import { buildDateField, buildNoteField, buildButtonRow, buildComboboxField, buildRateInput, validateAmountInput } from './ui/formHelpers';
 
 export interface DepositModalOptions {
   title:     string;
   deposit?:  DepositRecord;
   banks:     string[];
+  pluginId:  string;
   onSave:    (deposit: DepositRecord, interestRecords: FinanceRecord[]) => void;
 }
 
-export class DepositModal extends Modal {
-  private tr: Translations;
+export class DepositModal extends FinanceBaseModal {
+  protected tr: Translations;
   private o: DepositModalOptions;
   private deposit: DepositRecord;
   private amountInput!: HTMLInputElement;
-  private rateInput!: HTMLInputElement;
 
   constructor(app: App, opts: DepositModalOptions) {
     super(app);
@@ -47,7 +49,7 @@ export class DepositModal extends Modal {
           }
         : {
           id: crypto.randomUUID(),
-          name: 'Вклад',
+          name: this.tr.depositDefaultCat,
           type: 'term',
           bankName: '',
           amount: 0,
@@ -65,13 +67,9 @@ export class DepositModal extends Modal {
   }
 
   override onOpen(): void {
-    const { contentEl } = this;
-    contentEl.empty();
-    contentEl.addClass('finance-modal');
+    this.openHeader(this.o.title);
 
-    contentEl.createEl('h2', { text: this.o.title, cls: 'finance-modal-title' });
-
-    const form = contentEl.createDiv('finance-form finance-form-grid finance-form-compact');
+    const form = this.contentEl.createDiv('finance-form finance-form-grid finance-form-compact');
 
     const row1 = form.createDiv('finance-form-row finance-full-width');
 
@@ -81,18 +79,7 @@ export class DepositModal extends Modal {
     nameIn.value = this.deposit.name;
     nameIn.addEventListener('input', () => { this.deposit.name = nameIn.value; });
 
-    const bankG = row1.createDiv('finance-field-group');
-    bankG.createEl('label', { text: this.tr.bankName, cls: 'finance-field-label' });
-    const bankWrap = bankG.createDiv('finance-combobox');
-    const bankIn = bankWrap.createEl('input', { type: 'text', cls: 'finance-input finance-combobox-input' });
-    bankIn.value = this.deposit.bankName;
-    bankIn.setAttribute('autocomplete', 'off');
-
-    attachAutocomplete(bankIn, {
-      options: () => this.o.banks,
-      onPick: v => { this.deposit.bankName = v; },
-      createLabel: q => `➕ "${q}"`,
-    });
+    buildComboboxField(row1, this.tr.bankName, this.deposit.bankName, () => this.o.banks, v => { this.deposit.bankName = v; });
 
     const row2 = form.createDiv('finance-form-row finance-full-width');
 
@@ -103,32 +90,14 @@ export class DepositModal extends Modal {
       onChange: v => { this.deposit.amount = v; },
     }).input;
 
-    const rateG = row2.createDiv('finance-field-group');
-    rateG.createEl('label', { text: this.tr.interestRate + ' (%)', cls: 'finance-field-label' });
-    this.rateInput = rateG.createEl('input', { type: 'text', cls: 'finance-input' });
-    this.rateInput.setAttribute('inputmode', 'decimal');
-    this.rateInput.setAttribute('placeholder', '0');
-    this.rateInput.setAttribute('autocomplete', 'off');
-    if (this.deposit.interestRate > 0) {
-      this.rateInput.value = String(this.deposit.interestRate);
-    }
-    this.rateInput.addEventListener('input', () => {
-      const rate = parseFloat(this.rateInput.value.replace(',', '.')) || 0;
-      this.deposit.interestRate = rate;
-    });
-    this.rateInput.addEventListener('blur', () => {
-      const rate = parseFloat(this.rateInput.value.replace(',', '.')) || 0;
-      this.deposit.interestRate = rate;
-      this.rateInput.value = rate > 0 ? String(rate) : '';
+    buildRateInput(row2, this.tr.interestRate + ' (%)', this.deposit.interestRate, {
+      onInput: rate => { this.deposit.interestRate = rate; },
+      onBlur: rate => { this.deposit.interestRate = rate; },
     });
 
     const row3 = form.createDiv('finance-form-row finance-full-width');
 
-    const dateG = row3.createDiv('finance-field-group');
-    dateG.createEl('label', { text: this.tr.startDate, cls: 'finance-field-label' });
-    const dateIn = dateG.createEl('input', { type: 'date', cls: 'finance-input' });
-    dateIn.value = normalizeDateStr(this.deposit.startDate);
-    dateIn.addEventListener('change', () => { this.deposit.startDate = normalizeDateStr(dateIn.value); });
+    buildDateField(row3, this.tr.startDate, this.deposit.startDate, v => { this.deposit.startDate = v; });
 
     const termG = row3.createDiv('finance-field-group');
     termG.createEl('label', { text: this.tr.termLabel, cls: 'finance-field-label' });
@@ -171,38 +140,50 @@ export class DepositModal extends Modal {
     });
 
     const row5 = form.createDiv('finance-form-row finance-full-width');
-    const noteG = row5.createDiv('finance-field-group');
-    noteG.createEl('label', { text: this.tr.note, cls: 'finance-field-label' });
-    const noteIn = noteG.createEl('textarea', { cls: 'finance-textarea finance-note-field' });
-    noteIn.placeholder = this.tr.optional;
-    noteIn.value = this.deposit.note;
-    noteIn.rows = 2;
-    noteIn.addEventListener('input', () => { this.deposit.note = noteIn.value; });
+    buildNoteField(row5, {
+      label: this.tr.note,
+      value: this.deposit.note,
+      placeholder: this.tr.optional,
+      rows: 2,
+      onChange: v => { this.deposit.note = v; }
+    });
 
-    const btnRow = contentEl.createDiv('finance-modal-btns');
-    const infoBtn = btnRow.createEl('button', { text: '❓', cls: 'finance-btn-cancel' });
-    infoBtn.addClass('finance-info-btn-left');
-    infoBtn.addEventListener('click', () => new FieldInfoModal(this.app, DEPOSIT_FIELDS).open());
-    btnRow.createEl('button', { text: this.tr.cancel, cls: 'finance-btn-cancel' })
-        .addEventListener('click', () => this.close());
-    btnRow.createEl('button', { text: this.tr.save, cls: 'finance-btn-save' })
-        .addEventListener('click', () => this.handleSave());
+    const rowAttach = form.createDiv('finance-form-row finance-full-width');
+    buildAttachmentField(rowAttach, {
+      app: this.app,
+      pluginId: this.o.pluginId,
+      tr: this.tr,
+      initialPath: this.deposit.attachmentPath ?? '',
+      onChange: path => { this.deposit.attachmentPath = path; },
+    });
+
+    buildButtonRow(this.contentEl, this.tr, {
+      onCancel: () => this.close(),
+      onSave: () => this.handleSave(),
+    });
+    
+    const btnRow = this.contentEl.querySelector('.finance-modal-btns');
+    if (btnRow) {
+      const infoBtn = document.createElement('button');
+      infoBtn.textContent = '❓';
+      infoBtn.className = 'finance-btn-cancel finance-info-btn-left';
+      infoBtn.addEventListener('click', () => new FieldInfoModal(this.app, DEPOSIT_FIELDS).open());
+      btnRow.prepend(infoBtn);
+    }
   }
 
   private handleSave(): void {
-    const amount = parseAmount(this.amountInput.value);
-    if (!amount || amount <= 0) {
-      new Notice(this.tr.invalidAmount);
-      this.amountInput.focus();
-      return;
-    }
+    const amount = validateAmountInput(this.amountInput, this.tr);
+    if (amount === null) return;
+    
     if (!this.deposit.bankName.trim()) {
       new Notice(this.tr.specifyBank);
       return;
     }
     this.deposit.bankName = this.deposit.bankName.trim();
+    
     if (!this.deposit.name.trim()) {
-      this.deposit.name = 'Вклад';
+      this.deposit.name = this.tr.depositDefaultCat;
     }
     this.deposit.name = this.deposit.name.trim();
 
@@ -214,6 +195,4 @@ export class DepositModal extends Modal {
     this.o.onSave(this.deposit, []);
     this.close();
   }
-
-  override onClose(): void { this.contentEl.empty(); }
 }

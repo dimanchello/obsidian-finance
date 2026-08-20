@@ -1,4 +1,5 @@
-import { Notice, TFile } from 'obsidian';
+import { fmtDate } from "../utils";
+import { Notice } from 'obsidian';
 import { ViewContext } from '../context';
 import {
   FinanceRecord,
@@ -14,6 +15,7 @@ import { AnalyticsView, type BarClickAction } from '../AnalyticsView';
 import { noteFilename } from '../utils';
 import { isoWeekRange, daysInMonth } from '../domain/dateMath';
 import { DataTable, DataTableApi, FilterControl } from '../ui/DataTable';
+import { renderMobileCard, dateRangeControls, compareValues } from '../ui/tabHelpers';
 
 type Panel = 'analytics' | 'filters' | 'settings';
 
@@ -39,7 +41,7 @@ export class RecordsTab {
       columns: [
         {
           key: 'date', label: `${this.tr.date} / ${this.tr.time}`,
-          cell: r => ({ text: this.ctx.fmtDate(r.date, r.time), cls: 'finance-td-date' }),
+          cell: r => ({ text: fmtDate(r.date, r.time), cls: 'finance-td-date' }),
         },
         {
           key: 'type', label: this.tr.type,
@@ -67,7 +69,6 @@ export class RecordsTab {
         return cls;
       },
       rowActions: r => [
-        ...(r.attachmentPath ? [{ icon: '📎', title: this.tr.openAttachment, onClick: () => this.openAttachment(r) }] : []),
         { icon: '✏️', title: this.tr.edit, onClick: () => this.openEditModal(r) },
         { icon: '🗑️', title: this.tr.delete, onClick: () => this.confirmDelete(r), cls: 'finance-delete-btn' },
       ],
@@ -238,14 +239,7 @@ export class RecordsTab {
         options: () => [{ value: '', label: this.tr.all }, ...(data?.categories ?? []).map(c => ({ value: c, label: c }))],
         get: () => f.category, set: v => { f.category = v; },
       },
-      {
-        kind: 'date', label: this.tr.from,
-        get: () => f.dateFrom, set: v => { f.dateFrom = v; },
-      },
-      {
-        kind: 'date', label: this.tr.to,
-        get: () => f.dateTo, set: v => { f.dateTo = v; },
-      },
+      ...dateRangeControls(f, this.tr),
       {
         kind: 'searchSelect', label: this.tr.payer,
         options: () => [{ value: '', label: this.tr.all }, ...(data?.payers ?? []).map(p => ({ value: p, label: p }))],
@@ -304,32 +298,33 @@ export class RecordsTab {
     return rows.sort((a, b) => {
       const av = a[sort.field as keyof FinanceRecord] ?? '';
       const bv = b[sort.field as keyof FinanceRecord] ?? '';
-      const cmp = typeof av === 'number' && typeof bv === 'number'
-        ? av - bv
-        : String(av).localeCompare(String(bv), 'ru');
-      return sort.dir === 'asc' ? cmp : -cmp;
+      const cmp = compareValues(av, bv, sort.dir);
+      if (cmp !== 0) return cmp;
+      // При одинаковых датах — дополнительная сортировка по времени
+      if (sort.field === 'date') {
+        const timeCmp = (a.time ?? '').localeCompare(b.time ?? '');
+        return sort.dir === 'asc' ? timeCmp : -timeCmp;
+      }
+      return 0;
     });
   }
 
   // ── Mobile card ──────────────────────────────────────────────────────────
 
   private renderCard(block: HTMLElement, rec: FinanceRecord): void {
-    const header = block.createDiv('finance-record-header');
-    const amount = (rec.type === 'income' ? '+' : '−') + this.ctx.fmt(rec.amount);
-    header.createEl('span', {
-      text: amount,
-      cls: 'finance-record-amount ' + (rec.type === 'income' ? 'finance-amount-income' : 'finance-amount-expense'),
+    const details = [];
+    if (rec.category) details.push({ label: '', value: rec.category });
+    if (rec.tag) details.push({ label: '🏷️', value: rec.tag });
+    if (rec.payer) details.push({ label: '👤', value: rec.payer });
+    if (rec.exchangeRate) details.push({ label: '💱 @', value: String(rec.exchangeRate) });
+
+    renderMobileCard(block, {
+      amountText: (rec.type === 'income' ? '+' : '−') + this.ctx.fmt(rec.amount),
+      amountCls: rec.type === 'income' ? 'finance-amount-income' : 'finance-amount-expense',
+      subtitle: fmtDate(rec.date, rec.time),
+      details,
+      note: rec.note,
     });
-    header.createEl('span', { text: this.ctx.fmtDate(rec.date, rec.time), cls: 'finance-record-date' });
-
-    if (rec.category) block.createEl('div', { text: rec.category, cls: 'finance-record-category' });
-
-    const details = block.createDiv('finance-record-details');
-    if (rec.tag) details.createEl('span', { text: `🏷️ ${rec.tag}`, cls: 'finance-record-detail' });
-    if (rec.payer) details.createEl('span', { text: `👤 ${rec.payer}`, cls: 'finance-record-detail' });
-    if (rec.exchangeRate) details.createEl('span', { text: `💱 @ ${rec.exchangeRate}`, cls: 'finance-record-detail' });
-
-    if (rec.note) block.createEl('div', { text: rec.note, cls: 'finance-record-note' });
   }
 
   // ── Modals ──────────────────────────────────────────────────────────────
@@ -349,18 +344,12 @@ export class RecordsTab {
   }
 
   private confirmDelete(rec: FinanceRecord): void {
-    const label = `${rec.type === 'income' ? '+' : '−'}${this.ctx.fmt(rec.amount)}  ·  ${rec.category || '—'}  ·  ${this.ctx.fmtDate(rec.date, rec.time)}`;
+    const label = `${rec.type === 'income' ? '+' : '−'}${this.ctx.fmt(rec.amount)}  ·  ${rec.category || '—'}  ·  ${fmtDate(rec.date, rec.time)}`;
     new ConfirmModal(this.ctx.app, `${this.tr.confirmDeleteRecord}\n${label}`, async () => {
       await this.ctx.storage.deleteRecord(this.ctx.accountId, rec.id);
       await this.reload();
       new Notice(this.tr.deleted);
     }).open();
-  }
-
-  private openAttachment(rec: FinanceRecord): void {
-    const f = this.ctx.app.vault.getAbstractFileByPath(rec.attachmentPath);
-    if (f instanceof TFile) this.ctx.app.workspace.getLeaf(false).openFile(f);
-    else new Notice(this.tr.fileNotFoundWithPath.replace('{path}', rec.attachmentPath));
   }
 
   private openIEModal(mode: 'export' | 'import'): void {

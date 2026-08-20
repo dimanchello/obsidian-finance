@@ -470,6 +470,129 @@ describe('FinanceStorage', () => {
       let data = await storage.load('test.md');
       expect(data.deposits).toHaveLength(1);
       expect(data.deposits[0].name).toBe('Накопительный');
+
+      // TopUp
+      await storage.addDepositTopUp('test.md', 'dep-1', {
+        id: 'top-1',
+        amount: 2000,
+        date: '2024-02-01',
+        time: '',
+        createdAt: 1,
+        note: '',
+      });
+      data = await storage.load('test.md');
+      expect(data.deposits[0].topUps).toHaveLength(1);
+      expect(data.deposits[0].amount).toBe(7000);
+
+      // Withdrawal
+      await storage.addDepositWithdrawal('test.md', 'dep-1', {
+        id: 'w-1',
+        amount: 1000,
+        date: '2024-03-01',
+        time: '',
+        createdAt: 2,
+        note: '',
+      });
+      data = await storage.load('test.md');
+      expect(data.deposits[0].withdrawals).toHaveLength(1);
+      expect(data.deposits[0].amount).toBe(6000);
+
+      // Delete topUp
+      await storage.deleteDepositTopUp('test.md', 'dep-1', 'top-1');
+      data = await storage.load('test.md');
+      expect(data.deposits[0].topUps).toHaveLength(0);
+      expect(data.deposits[0].amount).toBe(4000);
+
+      // Delete withdrawal
+      await storage.deleteDepositWithdrawal('test.md', 'dep-1', 'w-1');
+      data = await storage.load('test.md');
+      expect(data.deposits[0].withdrawals).toHaveLength(0);
+      expect(data.deposits[0].amount).toBe(5000);
+    });
+  });
+
+  describe('cascade deletion with linked records', () => {
+    it('deleteDebtsWithLinkedRecords deletes debts and all linked records without leaving orphans', async () => {
+      const notePath = 'test-cascade-debts.md';
+      await storage.addRecord(notePath, { id: 'r1', createdAt: 1, date: '2024-01-01', time: '', type: 'expense', amount: 1000, category: 'Долг', tag: '', payer: 'Иван', note: '', attachmentPath: '', linkedId: 'debt-1' });
+      await storage.addRecord(notePath, { id: 'r2', createdAt: 2, date: '2024-01-02', time: '', type: 'income', amount: 500, category: 'Долг', tag: '', payer: 'Иван', note: '', attachmentPath: '', linkedId: 'debt-1' });
+      await storage.addRecord(notePath, { id: 'r3', createdAt: 3, date: '2024-01-03', time: '', type: 'expense', amount: 200, category: 'Еда', tag: '', payer: '', note: '', attachmentPath: '' });
+      await storage.addDebt(notePath, { id: 'debt-1', person: 'Иван', amount: 500, originalAmount: 1000, interestRate: 0, direction: 'lent', date: '2024-01-01', time: '', dueDate: '', createdAt: 1, note: '', movements: [] });
+
+      await storage.deleteDebtsWithLinkedRecords(notePath, ['debt-1']);
+
+      const data = await storage.load(notePath);
+      expect(data.debts).toHaveLength(0);
+      expect(data.records).toHaveLength(1);
+      expect(data.records[0].id).toBe('r3');
+    });
+
+    it('deleteCreditsWithLinkedRecords deletes credits, linked payments, and down payment records', async () => {
+      const notePath = 'test-cascade-credits.md';
+      await storage.addRecord(notePath, { id: 'dp-rec-1', createdAt: 1, date: '2024-01-01', time: '', type: 'expense', amount: 20000, category: 'Кредит', tag: '', payer: 'Банк', note: 'Первоначальный взнос', attachmentPath: '' });
+      await storage.addRecord(notePath, { id: 'pay-1', createdAt: 2, date: '2024-02-01', time: '', type: 'expense', amount: 5000, category: 'Кредит', tag: '', payer: 'Банк', note: 'Платёж', attachmentPath: '', linkedId: 'cr-1' });
+      await storage.addRecord(notePath, { id: 'regular-rec', createdAt: 3, date: '2024-02-02', time: '', type: 'income', amount: 50000, category: 'Зарплата', tag: '', payer: '', note: '', attachmentPath: '' });
+
+      await storage.addCredit(notePath, {
+        id: 'cr-1', name: 'Автокредит', bankName: 'Банк', originalAmount: 100000, currentAmount: 100000, interestRate: 10, termMonths: 12, monthlyPayment: 5000, startDate: '2024-01-01', status: 'active', payments: [], type: 'auto', createdAt: 1, note: '', downPaymentRecordId: 'dp-rec-1', earlyRepaymentOption: null
+      });
+
+      await storage.deleteCreditsWithLinkedRecords(notePath, ['cr-1']);
+
+      const data = await storage.load(notePath);
+      expect(data.credits).toHaveLength(0);
+      expect(data.records).toHaveLength(1);
+      expect(data.records[0].id).toBe('regular-rec');
+    });
+
+    it('deleteDepositsWithLinkedRecords deletes deposits and all linked transactions', async () => {
+      const notePath = 'test-cascade-deposits.md';
+      await storage.addRecord(notePath, { id: 'r-open', createdAt: 1, date: '2024-01-01', time: '', type: 'expense', amount: 100000, category: 'Вклад', tag: '', payer: 'Банк', note: '', attachmentPath: '', linkedId: 'dep-1' });
+      await storage.addRecord(notePath, { id: 'r-int', createdAt: 2, date: '2024-02-01', time: '', type: 'income', amount: 1000, category: 'Проценты', tag: '', payer: 'Банк', note: '', attachmentPath: '', linkedId: 'dep-1' });
+      await storage.addRecord(notePath, { id: 'r-unrelated', createdAt: 3, date: '2024-02-02', time: '', type: 'expense', amount: 300, category: 'Кафе', tag: '', payer: '', note: '', attachmentPath: '' });
+
+      await storage.addDeposit(notePath, {
+        id: 'dep-1', name: 'Вклад', type: 'term', bankName: 'Банк', amount: 100000, interestRate: 12, startDate: '2024-01-01', termMonths: 6, accrualType: 'to_account', status: 'active', accruals: [], topUps: [], withdrawals: [], createdAt: 1, note: ''
+      });
+
+      await storage.deleteDepositsWithLinkedRecords(notePath, ['dep-1']);
+
+      const data = await storage.load(notePath);
+      expect(data.deposits).toHaveLength(0);
+      expect(data.records).toHaveLength(1);
+      expect(data.records[0].id).toBe('r-unrelated');
+    });
+  });
+
+  describe('currency exchanges CRUD', () => {
+    it('adds, updates, and deletes currency exchanges', async () => {
+      const notePath = 'test-exchanges.md';
+      const ex = {
+        id: 'ex-1',
+        createdAt: 1,
+        date: '2024-01-01',
+        time: '',
+        type: 'buy' as const,
+        amountInAccountCurrency: 9000,
+        targetCurrency: 'USD',
+        targetAmount: 100,
+        exchangeRate: 90,
+        provider: 'Сбер',
+        note: '',
+      };
+
+      await storage.addExchange(notePath, ex);
+      let data = await storage.load(notePath);
+      expect(data.exchanges).toHaveLength(1);
+      expect(data.exchanges[0].targetCurrency).toBe('USD');
+
+      await storage.updateExchange(notePath, { ...ex, targetAmount: 150, amountInAccountCurrency: 13500 });
+      data = await storage.load(notePath);
+      expect(data.exchanges[0].targetAmount).toBe(150);
+
+      await storage.deleteExchange(notePath, 'ex-1');
+      data = await storage.load(notePath);
+      expect(data.exchanges).toHaveLength(0);
     });
   });
 });

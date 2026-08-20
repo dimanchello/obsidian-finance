@@ -3,13 +3,15 @@ import {
 } from '../types';
 import { buildCreditSchedule, buildDepositSchedule, type ScheduleDeps } from './schedule';
 import { round2 } from './money';
-import { parseDateStr } from './dateMath';
+import { parseDateStr, withDayClamped } from './dateMath';
 
 export interface AutoTxLabels {
   depositInterestCat: string;
   depositInterestNote: string;
   depositRefundCat: string;
   depositRefundNote: string;
+  depositOpeningCat: string;
+  depositOpenNote: string;
   creditDefaultCat: string;
   creditPaymentNote: string;
 }
@@ -110,9 +112,9 @@ function processDeposit(
       date: deposit.startDate,
       type: 'expense',
       amount: deposit.amount,
-      category: `${deps.labels.depositRefundCat} (открытие)`,
+      category: deps.labels.depositOpeningCat,
       payer: deposit.bankName,
-      note: `Открытие вклада "${deposit.name}"`,
+      note: `${deps.labels.depositOpenNote} "${deposit.name}"`,
       linkedId: deposit.id,
     }, deps);
 
@@ -183,15 +185,23 @@ function processCredit(
     changed = true;
   } else {
     if (credit.paymentDay !== undefined) {
+      const paymentDay = credit.paymentDay; // Capture for type narrowing in callbacks
       const pendingWithWrongDay = payments.filter(p => {
         if (p.status !== 'pending') return false;
         const parsed = parseDateStr(p.dueDate);
-        return parsed !== null && parsed.day !== credit.paymentDay;
+        return parsed !== null && parsed.day !== paymentDay;
       });
       if (pendingWithWrongDay.length > 0) {
-        const paid = payments.filter(p => p.status === 'paid');
-        const rebuilt = buildCreditSchedule(credit, deps);
-        payments = [...paid, ...rebuilt.filter(p => p.status === 'pending')];
+        // Fix only the specific payments with wrong day, preserve manual edits to others
+        payments = payments.map(p => {
+          if (!pendingWithWrongDay.includes(p)) return p;
+          const parsed = parseDateStr(p.dueDate);
+          if (!parsed) return p;
+          return {
+            ...p,
+            dueDate: withDayClamped(p.dueDate, paymentDay),
+          };
+        });
         changed = true;
       }
     }

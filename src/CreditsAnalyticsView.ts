@@ -1,15 +1,22 @@
+import { fmtDate } from "./utils";
 import { ViewContext } from './context';
 import {
   CreditRecord, FinanceRecord, CreditAnalyticsGroupBy,
-  CHART_COLOR_EXPENSE, CHART_SVG_HEIGHT, CHART_SVG_PAD_LEFT, CHART_SVG_PAD_RIGHT,
-  CHART_SVG_PAD_TOP, CHART_SVG_PAD_BOTTOM, CHART_MIN_GROUP_MOBILE, CHART_MIN_GROUP_DESKTOP,
+  CHART_SVG_HEIGHT_COMPACT, CHART_SVG_PAD_LEFT, CHART_SVG_PAD_RIGHT,
+  CHART_SVG_PAD_TOP, CHART_SVG_PAD_BOTTOM_COMPACT, CHART_MIN_GROUP_MOBILE, CHART_MIN_GROUP_DESKTOP,
   CHART_MAX_BAR_W_MOBILE, CHART_MAX_BAR_W_SMALL, CHART_MAX_BAR_W_MED, CHART_MAX_BAR_W_LARGE,
   CHART_BAR_RATIO_MOBILE, CHART_BAR_RATIO_DESKTOP, CHART_BAR_RADIUS,
+  CHART_COLOR_PRINCIPAL, CHART_COLOR_INTEREST, CHART_GRID_DIVISIONS_COMPACT,
   PERCENT_100,
 } from './types';
 import { Translations } from './i18n';
 import { addMonthsClamped } from './domain/dateMath';
 import { round2 } from './domain/money';
+import {
+  calculateRemainingPrincipal,
+  calculateTotalInterestPaid,
+  calculatePaymentBreakdown,
+} from './domain/creditCalculations';
 
 const TOOLTIP_CURSOR_GAP = 12;
 const TOOLTIP_EDGE_GAP = 8;
@@ -58,6 +65,13 @@ function shortMonth(m: number, locale: string): string {
   const d = new Date(2024, m, 1);
   const s = d.toLocaleString(locale, { month: 'short' });
   return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+interface PaymentBarItem {
+  label: string;
+  principal: number;
+  interest: number;
+  total: number;
 }
 
 export class CreditsAnalyticsView {
@@ -165,19 +179,16 @@ export class CreditsAnalyticsView {
   private renderSummaryCards(): void {
     const credits = this.getFilteredCredits();
     const totalBorrowed = credits.reduce((s, c) => s + c.originalAmount, 0);
-    const totalRemaining = credits.filter(c => c.status === 'active').reduce((s, c) => s + c.currentAmount, 0);
-    const totalPaid = credits.reduce((s, c) => s + (c.originalAmount - c.currentAmount), 0);
-    const totalPayments = credits.reduce((s, c) => s + c.payments.filter(p => p.status === 'paid').reduce((ps, p) => ps + p.amount, 0), 0);
-    // Fixed: Interest = Total Payments Made - Principal Repaid
-    // Principal Repaid = Original Amount - Current Remaining
-    const totalInterest = Math.max(0, totalPayments - totalPaid);
+    const totalRemaining = credits.filter(c => c.status === 'active').reduce((s, c) => s + calculateRemainingPrincipal(c), 0);
+    const totalPaidPrincipal = credits.reduce((s, c) => s + (c.originalAmount - calculateRemainingPrincipal(c)), 0);
+    const totalInterest = credits.reduce((s, c) => s + calculateTotalInterestPaid(c), 0);
 
     const wrap = this.el.createDiv('finance-credit-analytics-cards');
     const cards: { label: string; value: string; mod?: string }[] = [
       { label: this.tr.creditTotalBorrowed, value: this.fmt(totalBorrowed) },
       { label: this.tr.creditTotalRemaining, value: this.fmt(totalRemaining), mod: 'expense' },
-      { label: this.tr.creditTotalPaid, value: this.fmt(totalPaid), mod: 'income' },
-      { label: this.tr.creditTotalInterest, value: this.fmt(totalInterest), mod: 'neutral' },
+      { label: this.tr.creditPrincipalPaid, value: this.fmt(totalPaidPrincipal), mod: 'income' },
+      { label: this.tr.creditInterestPaid, value: this.fmt(totalInterest), mod: 'neutral' },
     ];
     cards.forEach(({ label, value, mod }) => {
       const card = wrap.createDiv(`finance-stat-card${mod ? ` finance-stat-${mod}` : ''}`);
@@ -187,17 +198,31 @@ export class CreditsAnalyticsView {
     });
   }
 
-  private buildBarData(): { label: string; value: number }[] {
+  private buildBarData(): PaymentBarItem[] {
     const groupBy = this.state.creditAnalyticsGroupBy ?? 'month';
     const dateFrom = this.state.creditAnalyticsDateFrom ?? '';
     const dateTo = this.state.creditAnalyticsDateTo ?? '';
-    const map = new Map<string, number>();
+    const mapPrincipal = new Map<string, number>();
+    const mapInterest = new Map<string, number>();
 
     this.credits.forEach(c => {
-      c.payments.forEach(p => {
+      let runningPrincipal = c.originalAmount;
+      c.payments.forEach((p, i) => {
         if (p.status !== 'paid') return;
         const d = p.paidDate ?? p.dueDate;
         if (!d) return;
+
+        let principalPart = p.principalPart;
+        let interestPart = p.interestPart;
+
+        if (principalPart === undefined || interestPart === undefined) {
+          const isLast = i === c.payments.length - 1;
+          const breakdown = calculatePaymentBreakdown(runningPrincipal, p.amount, c.interestRate, isLast);
+          principalPart = breakdown.principalPart;
+          interestPart = breakdown.interestPart;
+          runningPrincipal = breakdown.remainingDebt;
+        }
+
         if (dateFrom && d < dateFrom) return;
         if (dateTo && d > dateTo) return;
 
@@ -215,11 +240,24 @@ export class CreditsAnalyticsView {
         } else {
           key = c.bankName || '—';
         }
-        map.set(key, (map.get(key) ?? 0) + p.amount);
+
+        mapPrincipal.set(key, (mapPrincipal.get(key) ?? 0) + principalPart);
+        mapInterest.set(key, (mapInterest.get(key) ?? 0) + interestPart);
       });
     });
 
-    let items = Array.from(map.entries()).map(([label, value]) => ({ label, value }));
+    const allKeys = new Set([...mapPrincipal.keys(), ...mapInterest.keys()]);
+    let items: PaymentBarItem[] = Array.from(allKeys).map(key => {
+      const principal = mapPrincipal.get(key) ?? 0;
+      const interest = mapInterest.get(key) ?? 0;
+      return {
+        label: key,
+        principal: round2(principal),
+        interest: round2(interest),
+        total: round2(principal + interest),
+      };
+    });
+
     if (groupBy === 'month' || groupBy === 'quarter' || groupBy === 'year') {
       items.sort((a, b) => a.label.localeCompare(b.label));
       if (groupBy === 'month') {
@@ -229,7 +267,7 @@ export class CreditsAnalyticsView {
         });
       }
     } else {
-      items.sort((a, b) => b.value - a.value);
+      items.sort((a, b) => b.total - a.total);
     }
     return items;
   }
@@ -248,8 +286,8 @@ export class CreditsAnalyticsView {
     const PL = CHART_SVG_PAD_LEFT, PR = CHART_SVG_PAD_RIGHT;
     const minW = PL + data.length * MIN_GROUP + PR;
     const W = Math.max(minW, containerW);
-    const CH = CHART_SVG_HEIGHT;
-    const PT = CHART_SVG_PAD_TOP, PB = CHART_SVG_PAD_BOTTOM;
+    const CH = CHART_SVG_HEIGHT_COMPACT;
+    const PT = CHART_SVG_PAD_TOP, PB = CHART_SVG_PAD_BOTTOM_COMPACT;
     const chartH = CH - PT - PB;
     const groupW = (W - PL - PR) / data.length;
     const maxBarW = isMobile ? CHART_MAX_BAR_W_MOBILE : (data.length <= 4 ? CHART_MAX_BAR_W_SMALL : data.length <= 8 ? CHART_MAX_BAR_W_MED : CHART_MAX_BAR_W_LARGE);
@@ -257,7 +295,7 @@ export class CreditsAnalyticsView {
     const barW = Math.max(2, Math.min(groupW * barRatio, maxBarW));
 
     let maxVal = 1;
-    data.forEach(d => { maxVal = Math.max(maxVal, d.value); });
+    data.forEach(d => { maxVal = Math.max(maxVal, d.total); });
 
     const { showTip, hideTip } = createChartTooltip();
 
@@ -266,32 +304,69 @@ export class CreditsAnalyticsView {
     root.style.setProperty('--ft-chart-w', `${W}px`);
     root.style.setProperty('--ft-chart-h', `${CH}px`);
 
-    for (let i = 0; i <= 4; i++) {
-      const y = PT + chartH * i / 4;
-      const val = maxVal * (1 - i / 4);
-      const line = svg('line', { x1: PL, y1: y, x2: W - PR, y2: y, stroke: 'var(--background-modifier-border)', 'stroke-width': i === 4 ? 1.5 : 1 });
-      if (i > 0 && i < 4) line.setAttribute('stroke-dasharray', '3 4');
+    const divisions = CHART_GRID_DIVISIONS_COMPACT;
+    for (let i = 0; i <= divisions; i++) {
+      const y = PT + chartH * i / divisions;
+      const val = maxVal * (1 - i / divisions);
+      const line = svg('line', {
+        x1: PL, y1: y, x2: W - PR, y2: y,
+        stroke: 'var(--background-modifier-border)',
+        'stroke-width': i === divisions ? 1.5 : 1,
+      });
+      if (i > 0 && i < divisions) line.setAttribute('stroke-dasharray', '3 4');
       root.appendChild(line);
-      const t = svg('text', { x: PL - 8, y: y + 6, 'text-anchor': 'end', fill: 'var(--text-muted)', 'font-size': 14 });
+      const t = svg('text', { x: PL - 8, y: y + 4, 'text-anchor': 'end', fill: 'var(--text-muted)', 'font-size': 11 });
       t.textContent = fmtShort(val);
       root.appendChild(t);
     }
 
     data.forEach((d, i) => {
       const cx = PL + groupW * i + groupW / 2;
-      if (d.value > 0) {
-        const h = (d.value / maxVal) * chartH;
-        const x = cx - barW / 2;
-        const rect = svg('rect', { x, y: PT + chartH - h, width: barW, height: h, fill: CHART_COLOR_EXPENSE, rx: CHART_BAR_RADIUS });
-        rect.addEventListener('mouseenter', (e) => showTip(e, `${d.label} — ${this.tr.creditTotalPaid.toLowerCase()}: ${this.fmt(d.value)}`));
-        rect.addEventListener('mousemove', (e) => showTip(e, `${d.label} — ${this.tr.creditTotalPaid.toLowerCase()}: ${this.fmt(d.value)}`));
-        rect.addEventListener('mouseleave', hideTip);
-        root.appendChild(rect);
+      const x = cx - barW / 2;
+
+      if (d.total > 0) {
+        const totalH = (d.total / maxVal) * chartH;
+        const interestH = (d.interest / maxVal) * chartH;
+        const principalH = totalH - interestH;
+
+        // Bottom rect: Interest (Red)
+        if (interestH > 0) {
+          const interestY = PT + chartH - interestH;
+          const rectInt = svg('rect', {
+            x, y: interestY, width: barW, height: interestH,
+            fill: CHART_COLOR_INTEREST,
+            rx: principalH > 0 ? 0 : CHART_BAR_RADIUS,
+          });
+          root.appendChild(rectInt);
+        }
+
+        // Top rect: Principal (Purple)
+        if (principalH > 0) {
+          const principalY = PT + chartH - totalH;
+          const rectPrin = svg('rect', {
+            x, y: principalY, width: barW, height: principalH,
+            fill: CHART_COLOR_PRINCIPAL,
+            rx: CHART_BAR_RADIUS,
+          });
+          root.appendChild(rectPrin);
+        }
+
+        // Transparent hit-area rect for tooltip
+        const hitRect = svg('rect', {
+          x, y: PT + chartH - totalH, width: barW, height: totalH,
+          fill: 'transparent',
+        });
+        const tipText = `${d.label}\n${this.tr.creditPrincipal}: ${this.fmt(d.principal)}\n${this.tr.creditInterest}: ${this.fmt(d.interest)}\n${this.tr.sum}: ${this.fmt(d.total)}`;
+        hitRect.addEventListener('mouseenter', e => showTip(e, tipText));
+        hitRect.addEventListener('mousemove', e => showTip(e, tipText));
+        hitRect.addEventListener('mouseleave', hideTip);
+        root.appendChild(hitRect);
       }
-      const lbl = svg('text', { x: cx, y: CH - PB + 20, 'text-anchor': 'middle', fill: 'var(--text-muted)', 'font-size': 12 });
+
+      const lbl = svg('text', { x: cx, y: CH - PB + 16, 'text-anchor': 'middle', fill: 'var(--text-muted)', 'font-size': 11 });
       lbl.textContent = d.label;
       if (data.length > 10) {
-        lbl.setAttribute('transform', `rotate(-30, ${cx}, ${CH - PB + 20})`);
+        lbl.setAttribute('transform', `rotate(-30, ${cx}, ${CH - PB + 16})`);
         lbl.setAttribute('text-anchor', 'end');
       }
       root.appendChild(lbl);
@@ -300,9 +375,22 @@ export class CreditsAnalyticsView {
     const wrap = this.chartEl.createDiv('finance-chart-svg-wrap');
     wrap.appendChild(root);
 
-    // title
-    const title = this.chartEl.createEl('div', { text: this.tr.creditPaymentSchedule, cls: 'finance-analytics-section-title' });
-    wrap.before(title);
+    // Title & Legend
+    const header = this.chartEl.createDiv('finance-chart-header-row');
+    header.createEl('div', { text: this.tr.creditPaymentSchedule, cls: 'finance-analytics-section-title' });
+
+    const legend = header.createDiv('finance-chart-legend');
+    const legPrincipal = legend.createDiv('finance-chart-legend-row');
+    const dotPrin = legPrincipal.createDiv('finance-chart-legend-dot');
+    dotPrin.style.setProperty('--ft-dot-color', CHART_COLOR_PRINCIPAL);
+    legPrincipal.createEl('span', { text: this.tr.creditPrincipal });
+
+    const legInterest = legend.createDiv('finance-chart-legend-row');
+    const dotInt = legInterest.createDiv('finance-chart-legend-dot');
+    dotInt.style.setProperty('--ft-dot-color', CHART_COLOR_INTEREST);
+    legInterest.createEl('span', { text: this.tr.creditInterest });
+
+    wrap.before(header);
   }
 
   private renderProgressList(): void {
@@ -313,8 +401,9 @@ export class CreditsAnalyticsView {
     section.createEl('div', { text: this.tr.creditRepaymentProgress, cls: 'finance-analytics-section-title' });
 
     credits.forEach(c => {
+      const remainingPrincipal = calculateRemainingPrincipal(c);
       const pct = c.originalAmount > 0
-        ? Math.min(PERCENT_100, round2(((c.originalAmount - c.currentAmount) / c.originalAmount) * PERCENT_100))
+        ? Math.min(PERCENT_100, round2(((c.originalAmount - remainingPrincipal) / c.originalAmount) * PERCENT_100))
         : 0;
 
       const endDate = this.safeEndDate(c);
@@ -326,8 +415,8 @@ export class CreditsAnalyticsView {
 
       const sub = item.createDiv('finance-credit-progress-sub');
       sub.createEl('span', { text: c.bankName || '—', cls: 'finance-credit-progress-bank' });
-      if (endDate) sub.createEl('span', { text: this.ctx.fmtDate(endDate), cls: 'finance-credit-progress-date' });
-      sub.createEl('span', { text: this.fmt(c.currentAmount), cls: 'finance-credit-progress-amount' });
+      if (endDate) sub.createEl('span', { text: fmtDate(endDate), cls: 'finance-credit-progress-date' });
+      sub.createEl('span', { text: this.fmt(remainingPrincipal), cls: 'finance-credit-progress-amount' });
 
       const bar = item.createDiv('finance-deposit-progress');
       const fill = bar.createDiv('finance-deposit-progress-fill');

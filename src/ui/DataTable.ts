@@ -43,6 +43,8 @@ export interface TableStateAdapter {
   resetFilter(): void;
   getColumns(): Record<string, boolean>;
   setColumns(cols: Record<string, boolean>): void;
+  getExpandedId?(): string | null;
+  setExpandedId?(id: string | null): void;
 }
 
 export interface ExpandableSpec<T> {
@@ -106,6 +108,7 @@ export class DataTable<T> {
 
   constructor(spec: TableSpec<T>) {
     this.spec = spec;
+    this.expandedId = spec.state.getExpandedId?.() ?? null;
   }
 
   private get ctx(): ViewContext { return this.spec.ctx; }
@@ -267,9 +270,11 @@ export class DataTable<T> {
         si.addEventListener('focus', () => { this.lastFocusedSearch = si; });
         si.addEventListener('blur', () => { this.lastFocusedSearch = null; });
         si.addEventListener('input', () => {
-          control.set(si.value);
           if (this.filterDebounce) clearTimeout(this.filterDebounce);
-          this.filterDebounce = setTimeout(() => apply(), SEARCH_DEBOUNCE_MS);
+          this.filterDebounce = setTimeout(() => {
+            control.set(si.value);
+            apply();
+          }, SEARCH_DEBOUNCE_MS);
         });
         break;
       }
@@ -502,6 +507,8 @@ export class DataTable<T> {
           const t = e.target as HTMLElement;
           if (t.closest('.finance-action-btn')) return;
           this.expandedId = this.expandedId === id ? null : id;
+          this.spec.state.setExpandedId?.(this.expandedId);
+          if (this.spec.state.setExpandedId) this.ctx.saveState();
           this.spec.rerender();
         }));
       }
@@ -574,6 +581,8 @@ export class DataTable<T> {
           const t = e.target as HTMLElement;
           if (t.closest('.finance-action-btn')) return;
           this.expandedId = this.expandedId === id ? null : id;
+          this.spec.state.setExpandedId?.(this.expandedId);
+          if (this.spec.state.setExpandedId) this.ctx.saveState();
           this.spec.rerender();
         });
       }

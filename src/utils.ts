@@ -12,6 +12,10 @@ export function parseAmount(s: string): number {
   return parseFloat(s.replace(/\u00a0|\s/g, '').replace(',', '.')) || 0;
 }
 
+export function parseRate(s: string): number {
+  return parseFloat(s.replace(',', '.')) || 0;
+}
+
 export function fmtDate(d: string, t = ''): string {
   if (!d) return '—';
   const parsed = parseDate(d);
@@ -84,13 +88,6 @@ export function createDateObject(dateStr: string, timeStr = ''): Date {
   return d;
 }
 
-export function getDaysBetween(date1: string, date2: string): number {
-  const d1 = parseDate(date1) ?? new Date();
-  const d2 = parseDate(date2) ?? new Date();
-  d1.setHours(0, 0, 0, 0);
-  d2.setHours(0, 0, 0, 0);
-  return Math.round((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24));
-}
 
 export function getTodayStr(): string {
   const d = new Date();

@@ -110,6 +110,10 @@ export function parseViewState(raw: unknown, pageSize: number): ViewState {
   state.depositAnalyticsGroupBy = oneOf(raw.depositAnalyticsGroupBy, DEPOSIT_ANALYTICS_GROUP_BY, 'month');
   state.depositAnalyticsDateFrom = str(raw.depositAnalyticsDateFrom, '');
   state.depositAnalyticsDateTo = str(raw.depositAnalyticsDateTo, '');
+  
+  if (typeof raw.creditExpandedId === 'string') state.creditExpandedId = raw.creditExpandedId;
+  if (typeof raw.debtExpandedId === 'string') state.debtExpandedId = raw.debtExpandedId;
+  if (typeof raw.depositExpandedId === 'string') state.depositExpandedId = raw.depositExpandedId;
 
   return state;
 }

@@ -108,6 +108,9 @@ export interface ViewState {
   creditsColumns?: Record<string, boolean>;
   depositsColumns?: Record<string, boolean>;
   currencyColumns?: Record<string, boolean>;
+  debtExpandedId?: string;
+  creditExpandedId?: string;
+  depositExpandedId?: string;
   creditActiveTab?:          'list' | 'analytics';
   creditAnalyticsGroupBy?:   CreditAnalyticsGroupBy;
   creditAnalyticsDateFrom?:  string;
@@ -184,10 +187,15 @@ export const CHART_PALETTE = [
 ];
 
 export const CHART_SVG_HEIGHT             = 340;
+export const CHART_SVG_HEIGHT_COMPACT     = 140;
 export const CHART_SVG_PAD_LEFT           = 45;
 export const CHART_SVG_PAD_RIGHT          = 12;
 export const CHART_SVG_PAD_TOP            = 18;
 export const CHART_SVG_PAD_BOTTOM         = 96;
+export const CHART_SVG_PAD_BOTTOM_COMPACT = 28;
+export const CHART_COLOR_PRINCIPAL        = '#6366f1';
+export const CHART_COLOR_INTEREST         = '#ef4444';
+export const CHART_GRID_DIVISIONS_COMPACT = 3;
 export const CHART_MIN_GROUP_MOBILE       = 35;
 export const CHART_MIN_GROUP_DESKTOP      = 60;
 export const CHART_MAX_BAR_W_MOBILE       = 20;
@@ -232,6 +240,9 @@ export interface CreditPayment {
   status: CreditPaymentStatus;
   paidDate?: string | undefined;
   note?: string | undefined;
+  principalPart?: number | undefined;
+  interestPart?: number | undefined;
+  remainingDebt?: number | undefined;
 }
 
 export interface CreditRecord {
@@ -258,6 +269,7 @@ export interface CreditRecord {
   downPaymentDate?: string;
   downPaymentRecordId?: string | undefined;
   isEscrow?: boolean; // funds go to developer via escrow account, not added to balance
+  attachmentPath?: string;
 }
 
 export type DepositType = 'term' | 'demand' | 'savings';
@@ -308,6 +320,7 @@ export interface DepositRecord {
   accruals: DepositAccrual[];
   topUps: DepositTopUp[];
   withdrawals: DepositWithdrawal[];
+  attachmentPath?: string;
 }
 
 export type CurrencyOperationType = 'buy' | 'sell' | 'add' | 'spend';
@@ -327,6 +340,7 @@ export interface CurrencyExchange {
   category?: string;
   fee?: number;
   note: string;
+  attachmentPath?: string;
 }
 
 export interface CurrencyFilterState {

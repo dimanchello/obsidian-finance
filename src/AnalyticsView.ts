@@ -168,10 +168,10 @@ export class AnalyticsView {
       if (dtI.value) {
         const [d, t] = dtI.value.split('T');
         this.dateTo = d ?? '';
-        this.timeTo = t ?? '23:59';
+        this.timeTo = t ?? '00:00';
       } else {
         this.dateTo = '';
-        this.timeTo = '23:59';
+        this.timeTo = '00:00';
       }
       this.redrawChart();
     });

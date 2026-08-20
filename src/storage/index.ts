@@ -434,6 +434,31 @@ export class FinanceStorage {
     return this.state.load(this.vault, this.files, accountId);
   }
 
+  // ── Deletion with Linked Records ───────────────────────────────────────────
+
+  async deleteDebtsWithLinkedRecords(accountId: string, debtIds: string[]): Promise<void> {
+    await this.deleteDebtsBatch(accountId, debtIds);
+    const data = await this.load(accountId);
+    const filtered = data.records.filter(r => !r.linkedId || !debtIds.includes(r.linkedId));
+    await this.saveAllRecords(accountId, filtered);
+  }
+
+  async deleteCreditsWithLinkedRecords(accountId: string, creditIds: string[]): Promise<void> {
+    const dataBefore = await this.load(accountId);
+    const dpIds = new Set(dataBefore.credits.filter(c => creditIds.includes(c.id) && c.downPaymentRecordId).map(c => c.downPaymentRecordId!));
+    await this.deleteCreditsBatch(accountId, creditIds);
+    const dataAfter = await this.load(accountId);
+    const filtered = dataAfter.records.filter(r => (!r.linkedId || !creditIds.includes(r.linkedId)) && !dpIds.has(r.id));
+    await this.saveAllRecords(accountId, filtered);
+  }
+
+  async deleteDepositsWithLinkedRecords(accountId: string, depositIds: string[]): Promise<void> {
+    await this.deleteDepositsBatch(accountId, depositIds);
+    const data = await this.load(accountId);
+    const filtered = data.records.filter(r => !r.linkedId || !depositIds.includes(r.linkedId));
+    await this.saveAllRecords(accountId, filtered);
+  }
+
   // ── Utility ───────────────────────────────────────────────────────────────
 
   invalidate(accountId: string): void {

@@ -1,3 +1,4 @@
+import { fmtDate } from "../utils";
 import { Notice } from 'obsidian';
 import { ViewContext } from '../context';
 import {
@@ -14,6 +15,7 @@ export class CurrencyTab {
   private ctx: ViewContext;
   private el: HTMLElement;
   private table: DataTable<CurrencyExchange>;
+  private openPanel: 'analytics' | 'filters' | null = null;
   onUpdate: (() => void) | null = null;
   
   private get tr() { return this.ctx.tr; }
@@ -28,7 +30,7 @@ export class CurrencyTab {
       itemId: e => e.id,
       hasAnyItems: () => (this.ctx.data?.exchanges.length ?? 0) > 0,
       columns: [
-        { key: 'date', label: this.tr.date, cell: e => ({ text: this.ctx.fmtDate(e.date, e.time) }) },
+        { key: 'date', label: this.tr.date, cell: e => ({ text: fmtDate(e.date, e.time) }) },
         { key: 'type', label: this.tr.type, cell: e => ({ text: this.typeLabel(e.type), cls: this.typeCls(e.type) }) },
         { key: 'currency', label: this.tr.currency, cell: e => ({ text: e.targetCurrency }) },
         { key: 'amount', label: `${this.tr.sum} (${this.ctx.data?.currency ?? ''})`, cell: e => ({ text: e.type === 'add' ? '—' : this.ctx.fmt(e.amountInAccountCurrency), cls: 'finance-amount-cell' }) },
@@ -65,27 +67,28 @@ export class CurrencyTab {
       },
       renderStats: host => this.ctx.renderRecordsStats(host),
       renderPanels: host => {
-        if ((this.ctx.state.currencyActiveTab ?? 'list') === 'analytics') {
+        if (this.openPanel === 'analytics') {
           const panel = host.createDiv('finance-analytics-panel');
           this.renderCurrencyCards(panel);
-          return { hideTable: true, hideEmptyState: true };
         }
-        return {};
       },
       ownToolbar: (toolbar, api) => {
         toolbar.removeClass('finance-debt-toolbar');
         toolbar.addClass('finance-currency-toolbar-container');
 
         const row2 = toolbar.createDiv('finance-debt-toolbar');
-        const open = (this.ctx.state.currencyActiveTab ?? 'list') === 'analytics';
+        const openAnalytics = this.openPanel === 'analytics';
         const toggleBtn = row2.createEl('button', {
-          cls: `finance-analytics-toggle-btn${open ? ' active' : ''}`,
-          text: `📈 ${this.tr.analytics} ${open ? '▲' : '▼'}`,
+          cls: `finance-analytics-toggle-btn${openAnalytics ? ' active' : ''}`,
+          text: `📈 ${this.tr.analytics} ${openAnalytics ? '▲' : '▼'}`,
         });
         toggleBtn.addEventListener('click', () => {
-          this.ctx.state.currencyActiveTab = open ? 'list' : 'analytics';
-          if (!open) api.closeFilters();
-          this.ctx.saveState();
+          if (this.openPanel === 'analytics') {
+            this.openPanel = null;
+          } else {
+            this.openPanel = 'analytics';
+            if (api.filtersOpen) api.toggleFilters();
+          }
           this.render();
         });
 
@@ -93,7 +96,12 @@ export class CurrencyTab {
           cls: `finance-analytics-toggle-btn${api.filtersOpen ? ' active' : ''}`,
           text: `🔍 ${this.tr.filters} ${api.filtersOpen ? '▲' : '▼'}`,
         });
-        filtBtn.addEventListener('click', () => api.toggleFilters());
+        filtBtn.addEventListener('click', () => {
+          if (!api.filtersOpen && this.openPanel === 'analytics') {
+            this.openPanel = null;
+          }
+          api.toggleFilters();
+        });
 
         if (this.ctx.isMobile) {
           const bulkToggleBtn = row2.createEl('button', {
@@ -139,10 +147,8 @@ export class CurrencyTab {
       confirmBulkDeleteText: count => this.tr.confirmDeleteSelectedExchanges?.replace('{count}', String(count)) ?? this.tr.confirmDeleteSelectedRecords?.replace('{count}', String(count)),
       onFilterChange: () => {},
       onFiltersToggle: () => {
-        if (this.ctx.state.currencyActiveTab === 'analytics') {
-          this.ctx.state.currencyActiveTab = 'list';
-          this.ctx.saveState();
-          this.render();
+        if (this.openPanel === 'analytics') {
+          this.openPanel = null;
         }
       },
       rerender: () => this.render(),
@@ -319,7 +325,7 @@ export class CurrencyTab {
       text: `${sign}${this.ctx.fmt(e.targetAmount)} ${e.targetCurrency}`,
       cls: `finance-record-amount ${(e.type === 'buy' || e.type === 'add') ? 'finance-amount-income' : 'finance-amount-expense'}`,
     });
-    header.createEl('span', { text: this.ctx.fmtDate(e.date, e.time), cls: 'finance-record-date' });
+    header.createEl('span', { text: fmtDate(e.date, e.time), cls: 'finance-record-date' });
     
     const details = block.createDiv('finance-record-details');
     details.createEl('span', { text: this.typeLabel(e.type), cls: 'finance-record-detail' });
@@ -339,11 +345,13 @@ export class CurrencyTab {
       currencies: this.ctx.settings.customCurrencies,
       accountCurrency: this.ctx.data!.currency,
       tr: this.ctx.tr,
+      pluginId: this.ctx.pluginId,
       onSave: async (exchange) => {
         if (initial) {
           await this.ctx.storage.updateExchange(this.ctx.accountId, exchange);
           
           if (initial.type === exchange.type && exchange.type !== 'add') {
+            // Same type: just update the existing linked record
             const linked = this.ctx.data!.records.find(r => r.linkedId === exchange.id);
             if (linked) {
               linked.type = exchange.type === 'sell' ? 'income' : 'expense';
@@ -357,6 +365,9 @@ export class CurrencyTab {
               await this.ctx.storage.updateRecord(this.ctx.accountId, linked);
             }
           } else {
+            // Type changed: delete old record and create new one
+            // NOTE: This doesn't validate balance for the new transaction type.
+            // Changing 'spend' to 'buy' or vice versa can create balance issues.
             const linked = this.ctx.data!.records.find(r => r.linkedId === exchange.id);
             if (linked) {
               await this.ctx.storage.deleteRecord(this.ctx.accountId, linked.id);
@@ -414,7 +425,7 @@ export class CurrencyTab {
       attachmentPath: '',
       linkedId: exchange.id,
       exchangeRate: exchange.exchangeRate,
-      isInternal: false,
+      isInternal: true,
     };
   }
   

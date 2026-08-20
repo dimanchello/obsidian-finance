@@ -1,16 +1,19 @@
+import { fmtDate } from "../utils";
 import { Notice } from 'obsidian';
 import { ViewContext } from '../context';
 import {
   DebtRecord, DebtMovement, FinanceRecord, RecordType,
-  DebtSortField, PLURAL_THRESHOLD, PERCENT_100,
+  DebtSortField, PLURAL_THRESHOLD,
   DEFAULT_DEBT_FILTER,
 } from '../types';
 import { DebtModal } from '../DebtModal';
 import { DebtMovementModal } from '../DebtMovementModal';
 import { ConfirmModal } from '../ConfirmModal';
-import { round2, sumMoney } from '../domain/money';
+import { sumMoney } from '../domain/money';
 import { getTodayTime } from '../utils';
 import { DataTable, FilterControl } from '../ui/DataTable';
+import { renderMobileCard, renderSummaryCard, compareValues, dateRangeControls } from '../ui/tabHelpers';
+import { getDebtOriginal, getDebtWithInterest, getDebtRemaining, isDebtPaidOff } from '../domain/debtCalculations';
 
 export class DebtsTab {
   private ctx: ViewContext;
@@ -41,11 +44,11 @@ export class DebtsTab {
         {
           key: 'original', label: this.tr.sum,
           cell: d => {
-            const original = this.getDebtOriginal(d);
+            const original = getDebtOriginal(d);
             const hasInterest = d.interestRate > 0;
             return {
               text: hasInterest
-                ? `${this.ctx.fmt(original)} → ${this.ctx.fmt(this.getDebtWithInterest(d))} (${d.interestRate}%)`
+                ? `${this.ctx.fmt(original)} → ${this.ctx.fmt(getDebtWithInterest(d))} (${d.interestRate}%)`
                 : this.ctx.fmt(original),
               cls: 'finance-amount-cell',
             };
@@ -54,23 +57,23 @@ export class DebtsTab {
         {
           key: 'remaining', label: this.tr.remaining,
           cell: d => {
-            const remaining = this.getDebtRemaining(d);
+            const remaining = getDebtRemaining(d);
             return {
               text: remaining > 0 ? this.ctx.fmt(remaining) : '—',
               cls: remaining > 0 ? 'finance-amount-cell finance-amount-remaining' : 'finance-amount-cell',
             };
           },
         },
-        { key: 'date', label: this.tr.dateCreated, cell: d => ({ text: this.ctx.fmtDate(d.date) }) },
+        { key: 'date', label: this.tr.dateCreated, cell: d => ({ text: fmtDate(d.date) }) },
         {
           key: 'dueDate', label: this.tr.dueDate,
-          cell: d => ({ text: d.dueDate ? this.ctx.fmtDate(d.dueDate) : '—', cls: d.dueDate ? 'finance-due-date' : '' }),
+          cell: d => ({ text: d.dueDate ? fmtDate(d.dueDate) : '—', cls: d.dueDate ? 'finance-due-date' : '' }),
         },
       ],
       rowCls: d => [
         'finance-debt-row',
         d.direction === 'lent' ? 'finance-debt-lent' : 'finance-debt-borrowed',
-        this.isDebtPaidOff(d) ? 'finance-debt-paid' : 'finance-debt-unpaid',
+        isDebtPaidOff(d) ? 'finance-debt-paid' : 'finance-debt-unpaid',
       ],
       rowActions: d => [
         { icon: '💰', title: this.tr.repay, onClick: () => this.openRepayModal(d) },
@@ -97,20 +100,17 @@ export class DebtsTab {
         getSort: () => this.ctx.state.debtSort ?? { field: 'date', dir: 'desc' },
         setSort: s => { this.ctx.state.debtSort = s as { field: DebtSortField; dir: 'asc' | 'desc' }; },
         resetFilter: () => { this.ctx.state.debtFilter = { ...DEFAULT_DEBT_FILTER }; },
-        getColumns: () => (this.ctx.state.debtsColumns ??= {}),
-        setColumns: c => { this.ctx.state.debtsColumns = c; },
+        getColumns: () => this.ctx.state.debtsColumns ?? {},
+        setColumns: cols => { this.ctx.state.debtsColumns = cols; },
+        getExpandedId: () => this.ctx.state.debtExpandedId ?? null,
+        setExpandedId: id => { if (id === null) delete this.ctx.state.debtExpandedId; else this.ctx.state.debtExpandedId = id; }
       },
       renderStats: host => this.renderStats(host),
       emptyState: { icon: '💳', title: this.tr.noDebts, subtitle: this.tr.addNewDebt },
       emptyFiltered: { icon: '🔍', title: this.tr.noDebtsFiltered, subtitle: this.tr.tryChangeFilters },
       onBulkDelete: async ids => {
-        const idSet = new Set(ids);
-        await this.ctx.storage.deleteDebtsBatch(this.ctx.accountId, ids);
-        const otherRecords = this.ctx.data!.records.filter(r => !r.linkedId || !idSet.has(r.linkedId));
-        await this.ctx.storage.saveAllRecords(this.ctx.accountId, otherRecords);
-        this.ctx.data = await this.ctx.storage.load(this.ctx.accountId);
-        this.onUpdate?.();
-        new Notice(this.tr.deleted);
+        await this.ctx.storage.deleteDebtsWithLinkedRecords(this.ctx.accountId, ids);
+        await this.reload(this.tr.deleted);
       },
       confirmBulkDeleteText: count => this.tr.confirmDeleteSelectedDebts.replace('{count}', String(count)),
       onFilterChange: () => {},
@@ -139,29 +139,7 @@ export class DebtsTab {
     this.render();
   }
 
-  // ── Derived amounts (business helpers, intentionally tab-local) ─────────
-
-  private getDebtRepaid(debt: DebtRecord): number {
-    return sumMoney(debt.movements.filter(m => m.type === 'repay').map(m => m.amount));
-  }
-
-  private getDebtOriginal(debt: DebtRecord): number {
-    return sumMoney(debt.movements.filter(m => m.type === 'borrow').map(m => m.amount));
-  }
-
-  private getDebtWithInterest(debt: DebtRecord): number {
-    const original = this.getDebtOriginal(debt);
-    if (debt.interestRate <= 0) return original;
-    return round2(original + (original * debt.interestRate / PERCENT_100));
-  }
-
-  private getDebtRemaining(debt: DebtRecord): number {
-    return Math.max(0, round2(this.getDebtWithInterest(debt) - this.getDebtRepaid(debt)));
-  }
-
-  private isDebtPaidOff(debt: DebtRecord): boolean {
-    return this.getDebtRemaining(debt) <= 0;
-  }
+  // Helpers removed, using src/domain/debtCalculations.ts instead
 
   // ── Stats: records stats + lent/borrowed summary ────────────────────────
 
@@ -171,30 +149,26 @@ export class DebtsTab {
     const allDebts = this.ctx.data?.debts ?? [];
     const summary = host.createDiv('finance-stats-container finance-stats-two-cols');
 
-    const mkDebtCard = (title: string, icon: string, remaining: number, count: number, isLent: boolean) => {
-      const card = summary.createDiv(`finance-stat-card finance-stat-${isLent ? 'lent-summary' : 'borrowed-summary'}`);
-      const header = card.createDiv('finance-debt-summary-header');
-      header.createEl('span', { text: icon, cls: 'finance-debt-summary-icon' });
-      header.createEl('span', { text: title, cls: 'finance-debt-summary-title' });
-
-      const content = card.createDiv('finance-debt-summary-content');
-      content.createEl('div', {
-        text: remaining > 0 ? this.ctx.fmt(remaining) : '—',
-        cls: 'finance-debt-summary-main',
-      });
-      content.createEl('div', {
-        text: `${count} ${count === 1 ? this.tr.debtCount_one : count < PLURAL_THRESHOLD ? this.tr.debtCount_few : this.tr.debtCount_many}`,
-        cls: 'finance-debt-summary-sub',
-      });
-    };
-
     const lentDebts = allDebts.filter(d => d.direction === 'lent');
     const borrowedDebts = allDebts.filter(d => d.direction !== 'lent');
     const remainingOf = (debts: DebtRecord[]) =>
-      sumMoney(debts.map(d => this.getDebtRemaining(d)));
+      sumMoney(debts.map(d => getDebtRemaining(d)));
 
-    mkDebtCard(this.tr.lent, '💸', remainingOf(lentDebts), lentDebts.length, true);
-    mkDebtCard(this.tr.borrowed, '💳', remainingOf(borrowedDebts), borrowedDebts.length, false);
+    const countSub = (count: number) => `${count} ${count === 1 ? this.tr.debtCount_one : count < PLURAL_THRESHOLD ? this.tr.debtCount_few : this.tr.debtCount_many}`;
+
+    renderSummaryCard(summary, {
+      icon: '💸', title: this.tr.lent,
+      main: remainingOf(lentDebts) > 0 ? this.ctx.fmt(remainingOf(lentDebts)) : '—',
+      sub: countSub(lentDebts.length),
+      mod: 'finance-stat-lent-summary'
+    });
+
+    renderSummaryCard(summary, {
+      icon: '💳', title: this.tr.borrowed,
+      main: remainingOf(borrowedDebts) > 0 ? this.ctx.fmt(remainingOf(borrowedDebts)) : '—',
+      sub: countSub(borrowedDebts.length),
+      mod: 'finance-stat-borrowed-summary'
+    });
   }
 
   // ── Filters ──────────────────────────────────────────────────────────────
@@ -224,8 +198,7 @@ export class DebtsTab {
         ],
         get: () => f.direction, set: v => { f.direction = v as typeof f.direction; },
       },
-      { kind: 'date', label: this.tr.from, get: () => f.dateFrom, set: v => { f.dateFrom = v; } },
-      { kind: 'date', label: this.tr.to, get: () => f.dateTo, set: v => { f.dateTo = v; } },
+      ...dateRangeControls(f, this.tr),
       {
         kind: 'searchSelect', label: this.tr.person,
         options: () => [
@@ -244,8 +217,8 @@ export class DebtsTab {
     const q = f.search.toLowerCase();
 
     const rows = this.ctx.data.debts.filter(d => {
-      if (f.status === 'paid' && !this.isDebtPaidOff(d)) return false;
-      if (f.status === 'unpaid' && this.isDebtPaidOff(d)) return false;
+      if (f.status === 'paid' && !isDebtPaidOff(d)) return false;
+      if (f.status === 'unpaid' && isDebtPaidOff(d)) return false;
       if (f.direction !== 'all' && d.direction !== f.direction) return false;
       if (f.dateFrom && d.date < f.dateFrom) return false;
       if (f.dateTo && d.date > f.dateTo) return false;
@@ -260,14 +233,11 @@ export class DebtsTab {
     return rows.sort((a, b) => {
       let av: string | number, bv: string | number;
       switch (s.field) {
-        case 'amount': av = this.getDebtRemaining(a); bv = this.getDebtRemaining(b); break;
+        case 'amount': av = getDebtRemaining(a); bv = getDebtRemaining(b); break;
         case 'person': av = a.person; bv = b.person; break;
         default: av = a.date; bv = b.date;
       }
-      const cmp = typeof av === 'number' && typeof bv === 'number'
-        ? av - bv
-        : String(av).localeCompare(String(bv), 'ru');
-      return s.dir === 'asc' ? cmp : -cmp;
+      return compareValues(av, bv, s.dir);
     });
   }
 
@@ -292,7 +262,7 @@ export class DebtsTab {
         text: (m.type === 'borrow' ? '−' : '+') + this.ctx.fmt(m.amount),
         cls: `finance-td finance-td-mov-${m.type}`,
       });
-      mr.createEl('td', { text: this.ctx.fmtDate(m.date, m.time), cls: 'finance-td' });
+      mr.createEl('td', { text: fmtDate(m.date, m.time), cls: 'finance-td' });
       mr.createEl('td', { text: m.note || '—', cls: 'finance-td' });
       const atd = mr.createEl('td', { cls: 'finance-td finance-actions-td' });
       const mkBtn = (icon: string, title: string, onClick: () => void, extra = '') => {
@@ -311,41 +281,27 @@ export class DebtsTab {
   private renderCard(block: HTMLElement, debt: DebtRecord): void {
     block.addClass(debt.direction === 'lent' ? 'finance-row-income' : 'finance-row-expense');
     
-    const remaining = this.getDebtRemaining(debt);
-    
-    const header = block.createDiv('finance-record-header');
-    header.createEl('span', {
-      text: this.ctx.fmt(remaining),
-      cls: 'finance-record-amount ' + (debt.direction === 'lent' ? 'finance-amount-income' : 'finance-amount-expense'),
-    });
-    header.createEl('span', {
-      text: `${debt.person || '—'} · ${debt.direction === 'lent' ? this.tr.lent : this.tr.borrowed}`,
-      cls: 'finance-record-date',
-    });
-
-    const details = block.createDiv('finance-record-details');
-    const original = this.getDebtOriginal(debt);
-    const withInterest = this.getDebtWithInterest(debt);
+    const remaining = getDebtRemaining(debt);
+    const original = getDebtOriginal(debt);
+    const withInterest = getDebtWithInterest(debt);
     const hasInterest = debt.interestRate > 0;
 
-    details.createEl('span', { 
-      text: `💰 ${hasInterest ? this.tr.withInterest : this.tr.sum}: ${hasInterest ? `${this.ctx.fmt(original)} → ${this.ctx.fmt(withInterest)}` : this.ctx.fmt(original)}`,
-      cls: 'finance-record-detail' 
+    const details = [];
+    details.push({
+      label: `💰 ${hasInterest ? this.tr.withInterest : this.tr.sum}:`,
+      value: hasInterest ? `${this.ctx.fmt(original)} → ${this.ctx.fmt(withInterest)}` : this.ctx.fmt(original),
     });
+    if (remaining > 0) details.push({ label: `📉 ${this.tr.remaining}:`, value: this.ctx.fmt(remaining) });
+    if (debt.dueDate) details.push({ label: `📅 ${this.tr.dueBy}`, value: fmtDate(debt.dueDate) });
+    if (hasInterest) details.push({ label: `📊`, value: `${debt.interestRate}%` });
 
-    if (remaining > 0) {
-      details.createEl('span', { text: `📉 ${this.tr.remaining}: ${this.ctx.fmt(remaining)}`, cls: 'finance-record-detail' });
-    }
-
-    if (debt.dueDate) {
-      details.createEl('span', { text: `📅 ${this.tr.dueBy} ${this.ctx.fmtDate(debt.dueDate)}`, cls: 'finance-record-detail' });
-    }
-    if (hasInterest) {
-      details.createEl('span', { text: `📊 ${debt.interestRate}%`, cls: 'finance-record-detail' });
-    }
-    if (debt.note) {
-      block.createEl('div', { text: debt.note, cls: 'finance-record-note' });
-    }
+    renderMobileCard(block, {
+      amountText: this.ctx.fmt(remaining),
+      amountCls: debt.direction === 'lent' ? 'finance-amount-income' : 'finance-amount-expense',
+      subtitle: `${debt.person || '—'} · ${debt.direction === 'lent' ? this.tr.lent : this.tr.borrowed}`,
+      details,
+      note: debt.note,
+    });
   }
 
   // ── Reload + mirrored record helpers ─────────────────────────────────────
@@ -423,7 +379,7 @@ export class DebtsTab {
     new DebtMovementModal(this.ctx.app, {
       title: `${this.tr.repaymentAct} — ${debt.person}`,
       type: 'repay',
-      remainingAmount: this.getDebtRemaining(debt),
+      remainingAmount: getDebtRemaining(debt),
       currency: this.ctx.currency,
       onSave: async mov => {
         await this.ctx.storage.addDebtMovement(this.ctx.accountId, debt.id, mov);
@@ -474,7 +430,7 @@ export class DebtsTab {
   }
 
   private confirmDeleteMovement(debt: DebtRecord, mov: DebtMovement): void {
-    const label = `${mov.type === 'borrow' ? '−' : '+'}${this.ctx.fmt(mov.amount)}  ·  ${this.ctx.fmtDate(mov.date, mov.time)}`;
+    const label = `${mov.type === 'borrow' ? '−' : '+'}${this.ctx.fmt(mov.amount)}  ·  ${fmtDate(mov.date, mov.time)}`;
     new ConfirmModal(this.ctx.app, `${this.tr.confirmDeleteMovement}\n${label}`, async () => {
       await this.ctx.storage.deleteDebtMovement(this.ctx.accountId, debt.id, mov.id);
 
@@ -488,11 +444,9 @@ export class DebtsTab {
   }
 
   private confirmDeleteDebt(debt: DebtRecord): void {
-    const label = `${debt.person} · ${this.ctx.fmt(debt.amount)} · ${this.ctx.fmtDate(debt.date, debt.time)}`;
+    const label = `${debt.person} · ${this.ctx.fmt(debt.amount)} · ${fmtDate(debt.date, debt.time)}`;
     new ConfirmModal(this.ctx.app, `${this.tr.confirmDeleteDebt}\n${label}`, async () => {
-      await this.ctx.storage.deleteDebt(this.ctx.accountId, debt.id);
-      const otherRecords = this.ctx.data!.records.filter(r => r.linkedId !== debt.id);
-      await this.ctx.storage.saveAllRecords(this.ctx.accountId, otherRecords);
+      await this.ctx.storage.deleteDebtsWithLinkedRecords(this.ctx.accountId, [debt.id]);
       await this.reload(this.tr.debtDeleted);
     }).open();
   }
