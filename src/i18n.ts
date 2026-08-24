@@ -556,6 +556,19 @@ export interface Translations {
   fetchingRates: string;
   rateFromAPI: string;
   rateAPIError: string;
+  // Overview tab
+  overview: string;
+  overviewNetBalance: string;
+  overviewAssets: string;
+  overviewLiabilities: string;
+  overviewCreditBurden: string;
+  overviewUpcomingPayments: string;
+  overviewNoIncome: string;
+  overviewBurdenWarn: string;
+  overviewBurdenDanger: string;
+  overviewNoBurden: string;
+  overviewNoPayments: string;
+  overviewNext30Days: string;
 }
 
 const ru: Translations = {
@@ -1103,6 +1116,19 @@ const ru: Translations = {
   fetchingRates: 'Загрузка курсов...',
   rateFromAPI: 'Курс от {date}',
   rateAPIError: 'Не удалось загрузить курс',
+  // Overview tab
+  overview: 'Обзор',
+  overviewNetBalance: 'Чистая стоимость',
+  overviewAssets: 'Активы',
+  overviewLiabilities: 'Обязательства',
+  overviewCreditBurden: 'Кредитная нагрузка',
+  overviewUpcomingPayments: 'Ближайшие платежи',
+  overviewNoIncome: 'Нет данных о доходах',
+  overviewBurdenWarn: 'Высокая нагрузка',
+  overviewBurdenDanger: 'Критическая нагрузка',
+  overviewNoBurden: 'Нет активных кредитов',
+  overviewNoPayments: 'Нет предстоящих платежей',
+  overviewNext30Days: 'на ближайшие 30 дней',
 };
 
 const en: Translations = {
@@ -1650,6 +1676,19 @@ const en: Translations = {
   fetchingRates: 'Fetching rates...',
   rateFromAPI: 'Rate from {date}',
   rateAPIError: 'Failed to fetch rate',
+  // Overview tab
+  overview: 'Overview',
+  overviewNetBalance: 'Net Worth',
+  overviewAssets: 'Assets',
+  overviewLiabilities: 'Liabilities',
+  overviewCreditBurden: 'Credit Burden',
+  overviewUpcomingPayments: 'Upcoming Payments',
+  overviewNoIncome: 'No income data',
+  overviewBurdenWarn: 'High burden',
+  overviewBurdenDanger: 'Critical burden',
+  overviewNoBurden: 'No active credits',
+  overviewNoPayments: 'No upcoming payments',
+  overviewNext30Days: 'for the next 30 days',
 };
 
 const translations: Record<Locale, Translations> = { ru, en };
