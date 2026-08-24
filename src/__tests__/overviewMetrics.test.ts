@@ -181,20 +181,20 @@ describe('calcCreditBurdenOverTime', () => {
 describe('calcAssetsLiabilitiesOverTime', () => {
   it('рассчитывает активы и обязательства по месяцам', () => {
     const deposits = [
-      deposit({ status: 'active', startDate: '2026-01-01', balance: 50000 }),
+      deposit({ status: 'active', startDate: '2026-01-01', amount: 50000 }),
     ];
     const exchanges: CurrencyExchange[] = [];
     const credits = [
       credit({
         startDate: '2026-01-15',
-        amount: 100000,
+        originalAmount: 100000,
         payments: [
           { id: 'p1', amount: 5000, dueDate: '2026-02-15', status: 'paid', principalPart: 4000, interestPart: 1000 },
         ]
       }),
     ];
     const debts = [
-      debt({ direction: 'borrowed', dateCreated: '2026-02-01', amount: 5000 }),
+      debt({ direction: 'borrowed', date: '2026-02-01', amount: 5000 }),
     ];
 
     const result = calcAssetsLiabilitiesOverTime(deposits, exchanges, credits, debts, '2026-03-01', 3);
