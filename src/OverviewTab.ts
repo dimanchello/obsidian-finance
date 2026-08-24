@@ -6,7 +6,9 @@ import {
   calcCreditBurden,
   calcUpcomingPayments,
   groupRecordsByMonth,
+  calcCreditBurdenOverTime,
   MonthGroup,
+  CreditBurdenMonth,
 } from './domain/overviewMetrics';
 import { toDateStr } from './domain/dateMath';
 
@@ -59,6 +61,7 @@ export class OverviewTab {
     // Charts
     const chartsWrap = this.el.createDiv('finance-overview-charts');
     this.renderMoneyFlowChart(chartsWrap);
+    this.renderCreditBurdenChart(chartsWrap);
   }
 
   private renderMoneyFlowChart(parent: HTMLElement): void {
@@ -173,6 +176,125 @@ export class OverviewTab {
       fill: 'none'
     });
     svg.appendChild(netLine);
+
+    chartWrap.appendChild(svg);
+  }
+
+  private renderCreditBurdenChart(parent: HTMLElement): void {
+    const { data, tr } = this.ctx;
+    if (!data) return;
+
+    const chartWrap = parent.createDiv('finance-chart-wrap');
+    chartWrap.createEl('h3', { text: tr.overviewCreditBurdenChart, cls: 'finance-chart-title' });
+
+    const today = toDateStr(new Date());
+    const burdenData = calcCreditBurdenOverTime(data.credits, data.records, today, 6);
+
+    if (burdenData.length === 0 || burdenData.every(d => d.total === 0)) {
+      chartWrap.createEl('p', { text: tr.noChartData, cls: 'finance-no-data' });
+      return;
+    }
+
+    const maxValue = Math.max(...burdenData.map(d => d.total));
+    const chartWidth = chartWrap.offsetWidth || 800;
+    const plotWidth = chartWidth - CHART_PAD_LEFT - CHART_PAD_RIGHT;
+    const plotHeight = CHART_HEIGHT - CHART_PAD_TOP - CHART_PAD_BOTTOM;
+
+    const barWidth = Math.min(60, plotWidth / burdenData.length - 20);
+    const spacing = plotWidth / burdenData.length;
+
+    const svg = this.svg('svg', {
+      width: chartWidth,
+      height: CHART_HEIGHT,
+      class: 'finance-chart-svg'
+    });
+
+    // Y-axis grid
+    const yTicks = 5;
+    for (let i = 0; i <= yTicks; i++) {
+      const y = CHART_PAD_TOP + plotHeight * (1 - i / yTicks);
+      const line = this.svg('line', {
+        x1: CHART_PAD_LEFT,
+        y1: y,
+        x2: CHART_PAD_LEFT + plotWidth,
+        y2: y,
+        stroke: 'var(--background-modifier-border)',
+        'stroke-width': 1,
+        'stroke-dasharray': '2,2'
+      });
+      svg.appendChild(line);
+
+      const label = this.svg('text', {
+        x: CHART_PAD_LEFT - 10,
+        y: y + 4,
+        'text-anchor': 'end',
+        fill: 'var(--text-muted)',
+        'font-size': '11px'
+      });
+      label.textContent = this.fmtShort((maxValue * i) / yTicks);
+      svg.appendChild(label);
+    }
+
+    // Stacked bars and burden line
+    const burdenPoints: { x: number; y: number }[] = [];
+
+    burdenData.forEach((d: CreditBurdenMonth, i: number) => {
+      const x = CHART_PAD_LEFT + i * spacing + (spacing - barWidth) / 2;
+
+      // Principal bar (bottom)
+      const principalHeight = (d.principal / maxValue) * plotHeight;
+      const principalBar = this.svg('rect', {
+        x: x,
+        y: CHART_PAD_TOP + plotHeight - principalHeight,
+        width: barWidth,
+        height: principalHeight,
+        fill: 'var(--color-blue)',
+        rx: 4
+      });
+      svg.appendChild(principalBar);
+
+      // Interest bar (top, stacked)
+      const interestHeight = (d.interest / maxValue) * plotHeight;
+      const interestBar = this.svg('rect', {
+        x: x,
+        y: CHART_PAD_TOP + plotHeight - principalHeight - interestHeight,
+        width: barWidth,
+        height: interestHeight,
+        fill: 'var(--color-orange)',
+        rx: 4
+      });
+      svg.appendChild(interestBar);
+
+      // Burden percentage point (for line)
+      if (d.burdenPercent !== null) {
+        const burdenY = CHART_PAD_TOP + plotHeight - (d.burdenPercent / 100) * plotHeight;
+        burdenPoints.push({ x: x + barWidth / 2, y: burdenY });
+      }
+
+      // X-axis label
+      const label = this.svg('text', {
+        x: x + barWidth / 2,
+        y: CHART_HEIGHT - 10,
+        'text-anchor': 'middle',
+        fill: 'var(--text-muted)',
+        'font-size': '11px'
+      });
+      label.textContent = d.label.slice(5); // MM only
+      svg.appendChild(label);
+    });
+
+    // Burden % line
+    if (burdenPoints.length > 1) {
+      const pathD = burdenPoints.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+      const burdenLine = this.svg('path', {
+        d: pathD,
+        stroke: 'var(--text-accent)',
+        'stroke-width': 2,
+        fill: 'none',
+        'stroke-dasharray': '4,4'
+      });
+      svg.appendChild(burdenLine);
+    }
 
     chartWrap.appendChild(svg);
   }

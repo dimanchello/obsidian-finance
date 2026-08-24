@@ -147,3 +147,60 @@ export function groupRecordsByMonth(records: FinanceRecord[]): MonthGroup[] {
     net: income - expense,
   }));
 }
+
+export interface CreditBurdenMonth {
+  label: string;
+  principal: number;
+  interest: number;
+  total: number;
+  burdenPercent: number | null;
+}
+
+/**
+ * Calculate monthly credit burden breakdown over last N months
+ */
+export function calcCreditBurdenOverTime(
+  credits: CreditRecord[],
+  records: FinanceRecord[],
+  asOfDate: string,
+  months: number = OVERVIEW_BURDEN_MONTHS
+): CreditBurdenMonth[] {
+  const result: CreditBurdenMonth[] = [];
+
+  for (let i = months - 1; i >= 0; i--) {
+    const monthStart = addMonthsClamped(asOfDate, -i);
+    const monthEnd = addMonthsClamped(monthStart, 1);
+    const label = monthStart.slice(0, 7); // YYYY-MM
+
+    // Calculate monthly income for this month
+    const monthIncome = records
+      .filter(r => r.type === 'income' && !r.isInternal && r.date >= monthStart && r.date < monthEnd)
+      .reduce((s, r) => s + r.amount, 0);
+
+    // Calculate credit payments for this month
+    let principal = 0;
+    let interest = 0;
+
+    credits.filter(c => c.status === 'active').forEach(c => {
+      c.payments
+        .filter(p => p.status === 'paid' && p.dueDate >= monthStart && p.dueDate < monthEnd)
+        .forEach(p => {
+          principal += p.principalPart ?? 0;
+          interest += p.interestPart ?? 0;
+        });
+    });
+
+    const total = principal + interest;
+    const burdenPercent = monthIncome > 0 ? (total / monthIncome) * 100 : null;
+
+    result.push({
+      label,
+      principal,
+      interest,
+      total,
+      burdenPercent,
+    });
+  }
+
+  return result;
+}

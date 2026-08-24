@@ -3,7 +3,7 @@ import type { FinanceRecord, DebtRecord, CreditRecord, DepositRecord, CurrencyEx
 import {
   calcNetBalance, calcAssets, calcLiabilities,
   calcCreditBurden, calcUpcomingPayments,
-  groupRecordsByMonth,
+  groupRecordsByMonth, calcCreditBurdenOverTime,
 } from '../domain/overviewMetrics';
 
 function rec(overrides: Partial<FinanceRecord> = {}): FinanceRecord {
@@ -132,5 +132,47 @@ describe('groupRecordsByMonth', () => {
   });
   it('пустой массив → пустой результат', () => {
     expect(groupRecordsByMonth([])).toEqual([]);
+  });
+});
+
+describe('calcCreditBurdenOverTime', () => {
+  it('рассчитывает нагрузку по месяцам', () => {
+    const credits = [
+      credit({
+        payments: [
+          { id: 'p1', amount: 5000, dueDate: '2026-05-15', status: 'paid', principalPart: 4000, interestPart: 1000 },
+          { id: 'p2', amount: 5000, dueDate: '2026-06-15', status: 'paid', principalPart: 4100, interestPart: 900 },
+        ]
+      })
+    ];
+    const incomeRecords = [
+      rec({ date: '2026-05-10', amount: 10000 }),
+      rec({ date: '2026-06-10', amount: 10000 }),
+    ];
+    const result = calcCreditBurdenOverTime(credits, incomeRecords, '2026-07-01', 3);
+    expect(result).toHaveLength(3);
+
+    // Май: платёж 4000+1000=5000, доход 10000 → 50%
+    const may = result.find(r => r.label === '2026-05');
+    expect(may?.principal).toBe(4000);
+    expect(may?.interest).toBe(1000);
+    expect(may?.total).toBe(5000);
+    expect(may?.burdenPercent).toBe(50);
+
+    // Июнь: платёж 4100+900=5000, доход 10000 → 50%
+    const jun = result.find(r => r.label === '2026-06');
+    expect(jun?.principal).toBe(4100);
+    expect(jun?.interest).toBe(900);
+    expect(jun?.burdenPercent).toBe(50);
+  });
+
+  it('нет дохода → burdenPercent = null', () => {
+    const credits = [
+      credit({
+        payments: [{ id: 'p1', amount: 5000, dueDate: '2026-05-15', status: 'paid', principalPart: 4000, interestPart: 1000 }]
+      })
+    ];
+    const result = calcCreditBurdenOverTime(credits, [], '2026-05-31', 1);
+    expect(result[0].burdenPercent).toBeNull();
   });
 });

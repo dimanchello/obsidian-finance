@@ -561,6 +561,7 @@ export interface Translations {
   overviewCreditBurden: string;
   overviewUpcomingPayments: string;
   overviewMoneyFlow: string;
+  overviewCreditBurdenChart: string;
 }
 
 const ru: Translations = {
@@ -1113,6 +1114,7 @@ const ru: Translations = {
   overviewCreditBurden: 'Кредитная нагрузка',
   overviewUpcomingPayments: 'Предстоящие платежи',
   overviewMoneyFlow: 'Денежный поток',
+  overviewCreditBurdenChart: 'Динамика кредитной нагрузки',
 };
 
 const en: Translations = {
@@ -1665,6 +1667,7 @@ const en: Translations = {
   overviewCreditBurden: 'Credit Burden',
   overviewUpcomingPayments: 'Upcoming Payments',
   overviewMoneyFlow: 'Money Flow',
+  overviewCreditBurdenChart: 'Credit Burden Dynamics',
 };
 
 const translations: Record<Locale, Translations> = { ru, en };
