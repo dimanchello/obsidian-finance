@@ -8,6 +8,7 @@ import { noteFilename, getTodayStr } from './utils';
 import { applyAutoTransactions, type AutoTxDeps } from './domain/autoTransactions';
 import { RecordModal } from './RecordModal';
 import { ViewContext } from './context';
+import { OverviewTab } from './tabs/OverviewTab';
 import { RecordsTab } from './tabs/RecordsTab';
 import { DebtsTab } from './tabs/DebtsTab';
 import { CreditsTab } from './tabs/CreditsTab';
@@ -24,7 +25,7 @@ export class AccountView extends MarkdownRenderChild {
   private pluginId: string;
   private ctx:      ViewContext;
 
-  private mode:     'records' | 'debts' | 'credits' | 'deposits' | 'currency' = 'records';
+  private mode:     'overview' | 'records' | 'debts' | 'credits' | 'deposits' | 'currency' = 'overview';
   private isMobile = false;
   private isCheckingAutoTransactions = false;
   private autoTxTimer: ReturnType<typeof setInterval> | null = null;
@@ -118,7 +119,7 @@ export class AccountView extends MarkdownRenderChild {
       item.createEl('span', { text: label });
       if (this.mode !== targetMode) {
         item.addEventListener('click', () => {
-          this.mode = targetMode as 'records' | 'debts' | 'credits' | 'deposits' | 'currency';
+          this.mode = targetMode as 'overview' | 'records' | 'debts' | 'credits' | 'deposits' | 'currency';
           this.updateHeaderButtons();
           this.renderBodyContent();
           dropdown.addClass('is-hidden');
@@ -130,6 +131,7 @@ export class AccountView extends MarkdownRenderChild {
       e.stopPropagation();
       if (dropdown.hasClass('is-hidden')) {
         dropdown.empty();
+        mkDropdownItem('📊', this.ctx.tr.overview, 'overview');
         mkDropdownItem('📄', this.ctx.tr.records, 'records');
         mkDropdownItem('💳', this.ctx.tr.debts, 'debts');
         mkDropdownItem('🏦', this.ctx.tr.credits, 'credits');
@@ -148,7 +150,7 @@ export class AccountView extends MarkdownRenderChild {
   private updateHeaderButtons(): void {
     const moreBtn = this.root.querySelector<HTMLElement>('.finance-more-btn');
     if (moreBtn) {
-      const isActive = this.mode === 'debts' || this.mode === 'credits' || this.mode === 'deposits' || this.mode === 'currency';
+      const isActive = this.mode === 'overview' || this.mode === 'debts' || this.mode === 'credits' || this.mode === 'deposits' || this.mode === 'currency';
       moreBtn.toggleClass('is-active-mode', isActive);
     }
   }
@@ -162,7 +164,9 @@ export class AccountView extends MarkdownRenderChild {
       this.actionsContainer.empty();
     }
 
-    if (this.mode === 'debts') {
+    if (this.mode === 'overview') {
+      this.renderOverviewTab(body);
+    } else if (this.mode === 'debts') {
       this.renderDebtsTab(body);
     } else if (this.mode === 'credits') {
       this.renderCreditsTab(body);
@@ -173,6 +177,10 @@ export class AccountView extends MarkdownRenderChild {
     } else {
       this.renderRecordsTab(body);
     }
+  }
+
+  private renderOverviewTab(body: HTMLElement): void {
+    new OverviewTab(this.ctx).render(body);
   }
 
   private renderRecordsTab(body: HTMLElement): void {
