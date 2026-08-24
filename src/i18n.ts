@@ -569,6 +569,15 @@ export interface Translations {
   overviewNoBurden: string;
   overviewNoPayments: string;
   overviewNext30Days: string;
+  overviewPeriodWeek: string;
+  overviewPeriodMonth: string;
+  overviewPeriodQuarter: string;
+  overviewPeriodYear: string;
+  overviewPeriodAll: string;
+  overviewIncomeExpenseTrend: string;
+  overviewCategoryBreakdown: string;
+  overviewNoDebts: string;
+  overviewNoCredits: string;
 }
 
 const ru: Translations = {
@@ -1129,6 +1138,15 @@ const ru: Translations = {
   overviewNoBurden: 'Нет активных кредитов',
   overviewNoPayments: 'Нет предстоящих платежей',
   overviewNext30Days: 'на ближайшие 30 дней',
+  overviewPeriodWeek: 'Неделя',
+  overviewPeriodMonth: 'Месяц',
+  overviewPeriodQuarter: 'Квартал',
+  overviewPeriodYear: 'Год',
+  overviewPeriodAll: 'Всё время',
+  overviewIncomeExpenseTrend: 'Динамика доходов и расходов',
+  overviewCategoryBreakdown: 'Распределение по категориям',
+  overviewNoDebts: 'Нет активных долгов',
+  overviewNoCredits: 'Нет активных кредитов',
 };
 
 const en: Translations = {
@@ -1689,6 +1707,15 @@ const en: Translations = {
   overviewNoBurden: 'No active credits',
   overviewNoPayments: 'No upcoming payments',
   overviewNext30Days: 'for the next 30 days',
+  overviewPeriodWeek: 'Week',
+  overviewPeriodMonth: 'Month',
+  overviewPeriodQuarter: 'Quarter',
+  overviewPeriodYear: 'Year',
+  overviewPeriodAll: 'All Time',
+  overviewIncomeExpenseTrend: 'Income & Expense Trend',
+  overviewCategoryBreakdown: 'Category Breakdown',
+  overviewNoDebts: 'No active debts',
+  overviewNoCredits: 'No active credits',
 };
 
 const translations: Record<Locale, Translations> = { ru, en };
