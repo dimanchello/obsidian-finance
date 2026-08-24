@@ -556,6 +556,10 @@ export interface Translations {
   fetchingRates: string;
   rateFromAPI: string;
   rateAPIError: string;
+  overviewAssets: string;
+  overviewLiabilities: string;
+  overviewCreditBurden: string;
+  overviewUpcomingPayments: string;
 }
 
 const ru: Translations = {
@@ -1103,6 +1107,10 @@ const ru: Translations = {
   fetchingRates: 'Загрузка курсов...',
   rateFromAPI: 'Курс от {date}',
   rateAPIError: 'Не удалось загрузить курс',
+  overviewAssets: 'Активы',
+  overviewLiabilities: 'Обязательства',
+  overviewCreditBurden: 'Кредитная нагрузка',
+  overviewUpcomingPayments: 'Предстоящие платежи',
 };
 
 const en: Translations = {
@@ -1650,6 +1658,10 @@ const en: Translations = {
   fetchingRates: 'Fetching rates...',
   rateFromAPI: 'Rate from {date}',
   rateAPIError: 'Failed to fetch rate',
+  overviewAssets: 'Assets',
+  overviewLiabilities: 'Liabilities',
+  overviewCreditBurden: 'Credit Burden',
+  overviewUpcomingPayments: 'Upcoming Payments',
 };
 
 const translations: Record<Locale, Translations> = { ru, en };
