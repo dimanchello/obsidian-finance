@@ -112,3 +112,38 @@ export function calcUpcomingPayments(
 
   return creditPayments + debtPayments;
 }
+
+export interface MonthGroup {
+  label: string;
+  income: number;
+  expense: number;
+  net: number;
+}
+
+/**
+ * Group records by month (YYYY-MM) for chart display
+ */
+export function groupRecordsByMonth(records: FinanceRecord[]): MonthGroup[] {
+  const map = new Map<string, { income: number; expense: number }>();
+
+  records.forEach(r => {
+    if (r.isInternal) return;
+    const key = r.date.slice(0, 7); // YYYY-MM
+    const existing = map.get(key) ?? { income: 0, expense: 0 };
+    if (r.type === 'income') {
+      existing.income += r.amount;
+    } else {
+      existing.expense += r.amount;
+    }
+    map.set(key, existing);
+  });
+
+  const sorted = Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+
+  return sorted.map(([key, { income, expense }]) => ({
+    label: key,
+    income,
+    expense,
+    net: income - expense,
+  }));
+}

@@ -560,6 +560,7 @@ export interface Translations {
   overviewLiabilities: string;
   overviewCreditBurden: string;
   overviewUpcomingPayments: string;
+  overviewMoneyFlow: string;
 }
 
 const ru: Translations = {
@@ -1111,6 +1112,7 @@ const ru: Translations = {
   overviewLiabilities: 'Обязательства',
   overviewCreditBurden: 'Кредитная нагрузка',
   overviewUpcomingPayments: 'Предстоящие платежи',
+  overviewMoneyFlow: 'Денежный поток',
 };
 
 const en: Translations = {
@@ -1662,6 +1664,7 @@ const en: Translations = {
   overviewLiabilities: 'Liabilities',
   overviewCreditBurden: 'Credit Burden',
   overviewUpcomingPayments: 'Upcoming Payments',
+  overviewMoneyFlow: 'Money Flow',
 };
 
 const translations: Record<Locale, Translations> = { ru, en };

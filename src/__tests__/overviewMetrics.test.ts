@@ -3,6 +3,7 @@ import type { FinanceRecord, DebtRecord, CreditRecord, DepositRecord, CurrencyEx
 import {
   calcNetBalance, calcAssets, calcLiabilities,
   calcCreditBurden, calcUpcomingPayments,
+  groupRecordsByMonth,
 } from '../domain/overviewMetrics';
 
 function rec(overrides: Partial<FinanceRecord> = {}): FinanceRecord {
@@ -105,5 +106,31 @@ describe('calcUpcomingPayments', () => {
   it('долг с dueDate в диапазоне', () => {
     const d = debt({ direction: 'borrowed', dueDate: '2026-09-01' });
     expect(calcUpcomingPayments([], [d], '2026-08-21')).toBe(1000);
+  });
+});
+
+describe('groupRecordsByMonth', () => {
+  it('группирует записи по месяцам', () => {
+    const records = [
+      rec({ date: '2026-01-15', type: 'income', amount: 1000 }),
+      rec({ date: '2026-01-20', type: 'expense', amount: 400 }),
+      rec({ date: '2026-02-10', type: 'income', amount: 2000 }),
+    ];
+    const groups = groupRecordsByMonth(records);
+    expect(groups).toHaveLength(2);
+    expect(groups[0]).toEqual({ label: '2026-01', income: 1000, expense: 400, net: 600 });
+    expect(groups[1]).toEqual({ label: '2026-02', income: 2000, expense: 0, net: 2000 });
+  });
+  it('isInternal игнорируется', () => {
+    const records = [
+      rec({ date: '2026-01-15', type: 'income', amount: 1000 }),
+      rec({ date: '2026-01-20', type: 'expense', amount: 400, isInternal: true }),
+    ];
+    const groups = groupRecordsByMonth(records);
+    expect(groups).toHaveLength(1);
+    expect(groups[0]).toEqual({ label: '2026-01', income: 1000, expense: 0, net: 1000 });
+  });
+  it('пустой массив → пустой результат', () => {
+    expect(groupRecordsByMonth([])).toEqual([]);
   });
 });
