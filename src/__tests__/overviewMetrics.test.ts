@@ -1,0 +1,107 @@
+import { describe, it, expect } from 'vitest';
+import type { FinanceRecord, DebtRecord, CreditRecord, DepositRecord, CurrencyExchange } from '../types';
+import {
+  calcNetBalance, calcAssets, calcLiabilities,
+  calcCreditBurden, calcUpcomingPayments,
+} from '../domain/overviewMetrics';
+
+function rec(overrides: Partial<FinanceRecord> = {}): FinanceRecord {
+  return { id: 'r1', createdAt: 0, date: '2026-01-15', time: '',
+    type: 'income', amount: 1000, category: '', tag: '', payer: '',
+    note: '', attachmentPath: '', ...overrides };
+}
+function debt(overrides: Partial<DebtRecord> = {}): DebtRecord {
+  return { id: 'd1', person: 'А', amount: 1000, originalAmount: 1000,
+    interestRate: 0, direction: 'lent', date: '2026-01-01', time: '',
+    dueDate: '2027-01-01', createdAt: 0, note: '',
+    movements: [{ id: 'm1', type: 'borrow', amount: 1000,
+      date: '2026-01-01', time: '', createdAt: 0, note: '' }],
+    ...overrides };
+}
+function credit(overrides: Partial<CreditRecord> = {}): CreditRecord {
+  return { id: 'c1', name: '', type: 'consumer', bankName: '', originalAmount: 100000,
+    currentAmount: 100000, interestRate: 10, monthlyPayment: 5000, termMonths: 24,
+    startDate: '2025-01-01', createdAt: 0, note: '', status: 'active',
+    earlyRepaymentOption: null, payments: [], ...overrides };
+}
+function deposit(overrides: Partial<DepositRecord> = {}): DepositRecord {
+  return { id: 'dep1', name: '', type: 'term', bankName: '', amount: 50000,
+    interestRate: 8, startDate: '2026-01-01', termMonths: 12, accrualType: 'to_account',
+    createdAt: 0, note: '', status: 'active', accruals: [], topUps: [], withdrawals: [],
+    ...overrides };
+}
+function exchange(overrides: Partial<CurrencyExchange> = {}): CurrencyExchange {
+  return { id: 'e1', createdAt: 0, date: '2026-01-01', time: '',
+    type: 'buy', amountInAccountCurrency: 9500, targetCurrency: 'USD',
+    targetAmount: 100, exchangeRate: 95, provider: '', note: '', ...overrides };
+}
+
+describe('calcNetBalance', () => {
+  it('доход минус расход', () => {
+    expect(calcNetBalance([rec({ type: 'income', amount: 1000 }), rec({ type: 'expense', amount: 400 })])).toBe(600);
+  });
+  it('isInternal игнорируется', () => {
+    expect(calcNetBalance([rec({ amount: 1000 }), rec({ type: 'expense', amount: 200, isInternal: true })])).toBe(1000);
+  });
+  it('пустой массив → 0', () => { expect(calcNetBalance([])).toBe(0); });
+});
+
+describe('calcAssets', () => {
+  it('сумма депозита + валюта + одолженный долг', () => {
+    const result = calcAssets(
+      [deposit({ amount: 50000 })],
+      [exchange({ targetAmount: 100, exchangeRate: 95, type: 'buy' })],
+      [debt({ direction: 'lent' })],
+    );
+    expect(result).toBe(50000 + 100 * 95 + 1000);
+  });
+  it('закрытый депозит не считается', () => {
+    expect(calcAssets([deposit({ status: 'closed' })], [], [])).toBe(0);
+  });
+  it('долг borrowed не входит в активы', () => {
+    expect(calcAssets([], [], [debt({ direction: 'borrowed' })])).toBe(0);
+  });
+});
+
+describe('calcLiabilities', () => {
+  it('остаток по кредиту + взятый долг', () => {
+    const c = credit({ payments: [] }); // все 100000 остаток
+    const d = debt({ direction: 'borrowed' });
+    expect(calcLiabilities([c], [d])).toBe(100000 + 1000);
+  });
+  it('погашенный кредит не считается', () => {
+    expect(calcLiabilities([credit({ status: 'paid' })], [])).toBe(0);
+  });
+});
+
+describe('calcCreditBurden', () => {
+  it('нет дохода → null', () => {
+    expect(calcCreditBurden([credit({ monthlyPayment: 5000 })], [], '2026-08-21')).toBeNull();
+  });
+  it('нагрузка = платёж / средний доход * 100', () => {
+    const incomeRecords = [
+      rec({ date: '2026-05-10', amount: 10000 }),
+      rec({ date: '2026-06-10', amount: 10000 }),
+      rec({ date: '2026-07-10', amount: 10000 }),
+    ];
+    // monthlyBurden=5000, avgIncome=10000 → 50%
+    expect(calcCreditBurden([credit({ monthlyPayment: 5000 })], incomeRecords, '2026-08-21')).toBe(50);
+  });
+});
+
+describe('calcUpcomingPayments', () => {
+  it('платёж кредита в пределах 30 дней', () => {
+    const c = credit({ payments: [{ id: 'p1', amount: 5000, dueDate: '2026-09-01',
+      status: 'pending' }] });
+    expect(calcUpcomingPayments([c], [], '2026-08-21')).toBe(5000);
+  });
+  it('просроченный платёж (в прошлом) не включается', () => {
+    const c = credit({ payments: [{ id: 'p1', amount: 5000, dueDate: '2026-07-01',
+      status: 'pending' }] });
+    expect(calcUpcomingPayments([c], [], '2026-08-21')).toBe(0);
+  });
+  it('долг с dueDate в диапазоне', () => {
+    const d = debt({ direction: 'borrowed', dueDate: '2026-09-01' });
+    expect(calcUpcomingPayments([], [d], '2026-08-21')).toBe(1000);
+  });
+});
