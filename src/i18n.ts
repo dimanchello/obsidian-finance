@@ -562,6 +562,7 @@ export interface Translations {
   overviewUpcomingPayments: string;
   overviewMoneyFlow: string;
   overviewCreditBurdenChart: string;
+  overviewAssetLiabilityTrend: string;
 }
 
 const ru: Translations = {
@@ -1115,6 +1116,7 @@ const ru: Translations = {
   overviewUpcomingPayments: 'Предстоящие платежи',
   overviewMoneyFlow: 'Денежный поток',
   overviewCreditBurdenChart: 'Динамика кредитной нагрузки',
+  overviewAssetLiabilityTrend: 'Динамика активов и обязательств',
 };
 
 const en: Translations = {
@@ -1668,6 +1670,7 @@ const en: Translations = {
   overviewUpcomingPayments: 'Upcoming Payments',
   overviewMoneyFlow: 'Money Flow',
   overviewCreditBurdenChart: 'Credit Burden Dynamics',
+  overviewAssetLiabilityTrend: 'Assets & Liabilities Trend',
 };
 
 const translations: Record<Locale, Translations> = { ru, en };

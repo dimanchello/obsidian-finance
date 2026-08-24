@@ -204,3 +204,59 @@ export function calcCreditBurdenOverTime(
 
   return result;
 }
+
+export interface AssetLiabilityMonth {
+  label: string;
+  assets: number;
+  liabilities: number;
+  net: number;
+}
+
+/**
+ * Calculate assets and liabilities trend over last N months
+ */
+export function calcAssetsLiabilitiesOverTime(
+  deposits: DepositRecord[],
+  exchanges: CurrencyExchange[],
+  credits: CreditRecord[],
+  debts: DebtRecord[],
+  asOfDate: string,
+  months = 6
+): AssetLiabilityMonth[] {
+  const result: AssetLiabilityMonth[] = [];
+
+  for (let i = months - 1; i >= 0; i--) {
+    const monthDate = addMonthsClamped(asOfDate, -i);
+    const label = monthDate.slice(0, 7); // YYYY-MM
+
+    // Assets: active deposits + currency + lent debts at that point in time
+    const assets = calcAssets(
+      deposits.filter(d => d.status === 'active' && d.startDate <= monthDate),
+      exchanges.filter(e => e.date <= monthDate),
+      debts.filter(d => d.direction === 'lent' && d.date <= monthDate)
+    );
+
+    // Liabilities: active credits (remaining principal) + borrowed debts
+    const activeCreditsPrincipal = credits
+      .filter(c => c.status === 'active' && c.startDate <= monthDate)
+      .reduce((sum, c) => {
+        const remaining = calculateRemainingPrincipal(c);
+        return sum + remaining;
+      }, 0);
+
+    const borrowedDebts = debts
+      .filter(d => d.direction === 'borrowed' && d.date <= monthDate)
+      .reduce((s, d) => s + d.amount, 0);
+
+    const liabilities = activeCreditsPrincipal + borrowedDebts;
+
+    result.push({
+      label,
+      assets,
+      liabilities,
+      net: assets - liabilities,
+    });
+  }
+
+  return result;
+}

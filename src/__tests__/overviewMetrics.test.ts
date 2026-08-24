@@ -4,6 +4,7 @@ import {
   calcNetBalance, calcAssets, calcLiabilities,
   calcCreditBurden, calcUpcomingPayments,
   groupRecordsByMonth, calcCreditBurdenOverTime,
+  calcAssetsLiabilitiesOverTime,
 } from '../domain/overviewMetrics';
 
 function rec(overrides: Partial<FinanceRecord> = {}): FinanceRecord {
@@ -174,5 +175,38 @@ describe('calcCreditBurdenOverTime', () => {
     ];
     const result = calcCreditBurdenOverTime(credits, [], '2026-05-31', 1);
     expect(result[0].burdenPercent).toBeNull();
+  });
+});
+
+describe('calcAssetsLiabilitiesOverTime', () => {
+  it('рассчитывает активы и обязательства по месяцам', () => {
+    const deposits = [
+      deposit({ status: 'active', startDate: '2026-01-01', balance: 50000 }),
+    ];
+    const exchanges: CurrencyExchange[] = [];
+    const credits = [
+      credit({
+        startDate: '2026-01-15',
+        amount: 100000,
+        payments: [
+          { id: 'p1', amount: 5000, dueDate: '2026-02-15', status: 'paid', principalPart: 4000, interestPart: 1000 },
+        ]
+      }),
+    ];
+    const debts = [
+      debt({ direction: 'borrowed', dateCreated: '2026-02-01', amount: 5000 }),
+    ];
+
+    const result = calcAssetsLiabilitiesOverTime(deposits, exchanges, credits, debts, '2026-03-01', 3);
+    expect(result).toHaveLength(3);
+    expect(result[0].label).toBe('2026-01');
+    expect(result[1].label).toBe('2026-02');
+    expect(result[2].label).toBe('2026-03');
+
+    // Январь: deposits 50k
+    expect(result[0].assets).toBe(50000);
+
+    // Февраль: после платежа кредита + долг
+    expect(result[1].liabilities).toBeGreaterThan(90000); // ~96k credit + 5k debt
   });
 });

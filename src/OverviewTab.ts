@@ -7,8 +7,10 @@ import {
   calcUpcomingPayments,
   groupRecordsByMonth,
   calcCreditBurdenOverTime,
+  calcAssetsLiabilitiesOverTime,
   MonthGroup,
   CreditBurdenMonth,
+  AssetLiabilityMonth,
 } from './domain/overviewMetrics';
 import { toDateStr } from './domain/dateMath';
 
@@ -62,6 +64,7 @@ export class OverviewTab {
     const chartsWrap = this.el.createDiv('finance-overview-charts');
     this.renderMoneyFlowChart(chartsWrap);
     this.renderCreditBurdenChart(chartsWrap);
+    this.renderAssetLiabilityChart(chartsWrap);
   }
 
   private renderMoneyFlowChart(parent: HTMLElement): void {
@@ -295,6 +298,119 @@ export class OverviewTab {
       });
       svg.appendChild(burdenLine);
     }
+
+    chartWrap.appendChild(svg);
+  }
+
+  private renderAssetLiabilityChart(parent: HTMLElement): void {
+    const { data, tr } = this.ctx;
+    if (!data) return;
+
+    const chartWrap = parent.createDiv('finance-chart-wrap');
+    chartWrap.createEl('h3', { text: tr.overviewAssetLiabilityTrend, cls: 'finance-chart-title' });
+
+    const today = toDateStr(new Date());
+    const trendData = calcAssetsLiabilitiesOverTime(
+      data.deposits,
+      data.exchanges,
+      data.credits,
+      data.debts,
+      today,
+      6
+    );
+
+    if (trendData.length === 0) {
+      chartWrap.createEl('p', { text: tr.noChartData, cls: 'finance-no-data' });
+      return;
+    }
+
+    const maxValue = Math.max(...trendData.map(d => Math.max(d.assets, d.liabilities)));
+    const chartWidth = chartWrap.offsetWidth || 800;
+    const plotWidth = chartWidth - CHART_PAD_LEFT - CHART_PAD_RIGHT;
+    const plotHeight = CHART_HEIGHT - CHART_PAD_TOP - CHART_PAD_BOTTOM;
+
+    const svg = this.svg('svg', {
+      width: chartWidth,
+      height: CHART_HEIGHT,
+      class: 'finance-chart-svg'
+    });
+
+    // Y-axis grid
+    const yTicks = 5;
+    for (let i = 0; i <= yTicks; i++) {
+      const y = CHART_PAD_TOP + plotHeight * (1 - i / yTicks);
+      const line = this.svg('line', {
+        x1: CHART_PAD_LEFT,
+        y1: y,
+        x2: CHART_PAD_LEFT + plotWidth,
+        y2: y,
+        stroke: 'var(--background-modifier-border)',
+        'stroke-width': 1,
+        'stroke-dasharray': '2,2'
+      });
+      svg.appendChild(line);
+
+      const label = this.svg('text', {
+        x: CHART_PAD_LEFT - 10,
+        y: y + 4,
+        'text-anchor': 'end',
+        fill: 'var(--text-muted)',
+        'font-size': '11px'
+      });
+      label.textContent = this.fmtShort((maxValue * i) / yTicks);
+      svg.appendChild(label);
+    }
+
+    // Build area paths
+    const xStep = plotWidth / (trendData.length - 1);
+    const assetsPoints: string[] = [];
+    const liabilitiesPoints: string[] = [];
+
+    trendData.forEach((d: AssetLiabilityMonth, i: number) => {
+      const x = CHART_PAD_LEFT + i * xStep;
+      const assetsY = CHART_PAD_TOP + plotHeight - (d.assets / maxValue) * plotHeight;
+      const liabilitiesY = CHART_PAD_TOP + plotHeight - (d.liabilities / maxValue) * plotHeight;
+
+      assetsPoints.push(`${i === 0 ? 'M' : 'L'} ${x} ${assetsY}`);
+      liabilitiesPoints.push(`${i === 0 ? 'M' : 'L'} ${x} ${liabilitiesY}`);
+
+      // X-axis label
+      const label = this.svg('text', {
+        x: x,
+        y: CHART_HEIGHT - 10,
+        'text-anchor': 'middle',
+        fill: 'var(--text-muted)',
+        'font-size': '11px'
+      });
+      label.textContent = d.label.slice(5); // MM only
+      svg.appendChild(label);
+    });
+
+    // Close area paths
+    const lastX = CHART_PAD_LEFT + (trendData.length - 1) * xStep;
+    const bottomY = CHART_PAD_TOP + plotHeight;
+    assetsPoints.push(`L ${lastX} ${bottomY}`, `L ${CHART_PAD_LEFT} ${bottomY}`, 'Z');
+    liabilitiesPoints.push(`L ${lastX} ${bottomY}`, `L ${CHART_PAD_LEFT} ${bottomY}`, 'Z');
+
+    // Assets area (green)
+    const assetsPath = this.svg('path', {
+      d: assetsPoints.join(' '),
+      fill: 'var(--color-green)',
+      'fill-opacity': '0.2',
+      stroke: 'var(--color-green)',
+      'stroke-width': 2
+    });
+    svg.appendChild(assetsPath);
+
+    // Liabilities area (red)
+    const liabilitiesPath = this.svg('path', {
+      d: liabilitiesPoints.join(' '),
+      fill: 'var(--color-red)',
+      'fill-opacity': '0.2',
+      stroke: 'var(--color-red)',
+      'stroke-width': 2
+    });
+    svg.appendChild(liabilitiesPath);
 
     chartWrap.appendChild(svg);
   }
