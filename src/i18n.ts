@@ -69,6 +69,7 @@ export interface Translations {
   sortAmount: string;
   sortCategory: string;
   sortPerson: string;
+  overview: string;
   records: string;
   noRecords: string;
   noRecordsFilter: string;
@@ -627,6 +628,7 @@ const ru: Translations = {
   sortAmount: 'Сумма',
   sortCategory: 'Категория',
   sortPerson: 'Кому',
+  overview: 'Обзор',
   records: 'Записи',
   noRecords: 'Записей не найдено',
   noRecordsFilter: 'Нажмите «Доход» или «Расход»',
@@ -1181,6 +1183,7 @@ const en: Translations = {
   sortAmount: 'Amount',
   sortCategory: 'Category',
   sortPerson: 'Person',
+  overview: 'Overview',
   records: 'Records',
   noRecords: 'No records found',
   noRecordsFilter: 'Click "Income" or "Expense"',
