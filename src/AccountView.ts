@@ -8,6 +8,7 @@ import { noteFilename, getTodayStr } from './utils';
 import { applyAutoTransactions, type AutoTxDeps } from './domain/autoTransactions';
 import { RecordModal } from './RecordModal';
 import { ViewContext } from './context';
+import { OverviewTab } from './tabs/OverviewTab';
 import { RecordsTab } from './tabs/RecordsTab';
 import { DebtsTab } from './tabs/DebtsTab';
 import { CreditsTab } from './tabs/CreditsTab';
@@ -24,7 +25,7 @@ export class AccountView extends MarkdownRenderChild {
   private pluginId: string;
   private ctx:      ViewContext;
 
-  private mode:     'records' | 'debts' | 'credits' | 'deposits' | 'currency' = 'records';
+  private mode:     'overview' | 'records' | 'debts' | 'credits' | 'deposits' | 'currency' = 'records';
   private isMobile = false;
   private isCheckingAutoTransactions = false;
   private autoTxTimer: ReturnType<typeof setInterval> | null = null;
@@ -118,7 +119,7 @@ export class AccountView extends MarkdownRenderChild {
       item.createEl('span', { text: label });
       if (this.mode !== targetMode) {
         item.addEventListener('click', () => {
-          this.mode = targetMode as 'records' | 'debts' | 'credits' | 'deposits' | 'currency';
+          this.mode = targetMode as 'overview' | 'records' | 'debts' | 'credits' | 'deposits' | 'currency';
           this.updateHeaderButtons();
           this.renderBodyContent();
           dropdown.addClass('is-hidden');
@@ -136,6 +137,7 @@ export class AccountView extends MarkdownRenderChild {
         mkDropdownItem('📈', this.ctx.tr.deposits, 'deposits');
         mkDropdownItem('💱', this.ctx.tr.currencyExchange, 'currency');
         dropdown.createDiv('finance-dropdown-separator');
+        mkDropdownItem('📊', this.ctx.tr.overview, 'overview');
         dropdown.removeClass('is-hidden');
       } else {
         dropdown.addClass('is-hidden');
@@ -148,7 +150,7 @@ export class AccountView extends MarkdownRenderChild {
   private updateHeaderButtons(): void {
     const moreBtn = this.root.querySelector<HTMLElement>('.finance-more-btn');
     if (moreBtn) {
-      const isActive = this.mode === 'debts' || this.mode === 'credits' || this.mode === 'deposits' || this.mode === 'currency';
+      const isActive = this.mode === 'overview' || this.mode === 'debts' || this.mode === 'credits' || this.mode === 'deposits' || this.mode === 'currency';
       moreBtn.toggleClass('is-active-mode', isActive);
     }
   }
@@ -157,12 +159,11 @@ export class AccountView extends MarkdownRenderChild {
     const body = this.root.querySelector<HTMLElement>('.finance-body');
     if (!body) return;
     body.empty();
+    if (this.actionsContainer) this.actionsContainer.empty();
 
-    if (this.actionsContainer) {
-      this.actionsContainer.empty();
-    }
-
-    if (this.mode === 'debts') {
+    if (this.mode === 'overview') {
+      new OverviewTab(body, this.ctx).render();
+    } else if (this.mode === 'debts') {
       this.renderDebtsTab(body);
     } else if (this.mode === 'credits') {
       this.renderCreditsTab(body);
