@@ -3539,29 +3539,184 @@
   .finance-overview-tab {
     gap: 12px;
   }
+
+  /* KPI cards: 2 columns on mobile, stack on very small screens */
   .finance-overview-cards {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
+    margin-bottom: 12px;
   }
+
+  /* Stat cards: make text smaller but readable */
+  .finance-stat-card {
+    padding: 10px 12px;
+  }
+
+  .finance-stat-icon {
+    font-size: 1.4em;
+  }
+
+  .finance-stat-label {
+    font-size: 0.7em;
+  }
+
+  .finance-stat-value {
+    font-size: 0.95em;
+  }
+
+  /* Filter bar: stack vertically */
   .finance-overview-filter-bar {
     flex-direction: column;
     align-items: stretch;
     gap: 10px;
     padding: 10px;
   }
+
   .finance-overview-presets {
     justify-content: flex-start;
   }
+
   .finance-overview-preset-btn {
     padding: 6px 10px;
     font-size: .75em;
   }
+
   .finance-overview-date-range {
     margin-left: 0;
     width: 100%;
     justify-content: space-between;
+    flex-wrap: wrap;
   }
+
+  .finance-overview-date-range .finance-filter-group {
+    flex: 1;
+    min-width: 140px;
+  }
+
+  /* Chart wraps: reduce padding */
+  .finance-chart-wrap {
+    padding: 10px 12px;
+  }
+
+  .finance-chart-title {
+    font-size: 0.88em;
+    margin-bottom: 8px;
+  }
+
+  /* Chart legend: smaller on mobile */
+  .finance-chart-legend {
+    gap: 8px;
+  }
+
+  .finance-chart-legend-item {
+    font-size: 0.75em;
+  }
+
+  /* Chart controls: stack if needed */
+  .finance-chart-controls {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  /* Breakdown list: reduce height, improve spacing */
   .finance-breakdown-list {
     max-height: 220px;
+  }
+
+  .finance-breakdown-item {
+    padding: 8px 10px;
+    gap: 5px;
+  }
+
+  .finance-breakdown-item-name {
+    font-size: 0.82em;
+  }
+
+  .finance-breakdown-item-net {
+    font-size: 0.8em;
+  }
+
+  .finance-breakdown-bar-row {
+    font-size: 0.74em;
+    gap: 6px;
+  }
+
+  .finance-breakdown-bar-label {
+    min-width: 48px;
+  }
+
+  .finance-breakdown-bar-amount {
+    font-size: 0.9em;
+  }
+
+  /* Deposit overview cards: full width grid on mobile already handled at 600px */
+  .finance-deposit-overview-card {
+    padding: 8px 10px;
+  }
+
+  .finance-deposit-overview-header {
+    gap: 6px;
+  }
+
+  .finance-deposit-overview-name {
+    font-size: 0.85em;
+  }
+
+  .finance-deposit-overview-badges {
+    gap: 4px;
+    flex-wrap: wrap;
+  }
+
+  .finance-deposit-badge {
+    font-size: 0.68em;
+    padding: 2px 5px;
+  }
+
+  .finance-deposit-overview-body-row {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .finance-deposit-stat-col {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .finance-deposit-stat-col:first-child,
+  .finance-deposit-stat-col:nth-child(2),
+  .finance-deposit-stat-col:last-child {
+    align-items: center;
+    text-align: left;
+  }
+
+  .finance-deposit-stat-lbl {
+    font-size: 0.7em;
+  }
+
+  .finance-deposit-stat-val {
+    font-size: 0.8em;
+  }
+}
+
+/* Extra small screens: single column KPI cards */
+@media (max-width: 360px) {
+  .finance-overview-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .finance-stat-card {
+    flex-direction: row;
+    align-items: center;
+    padding: 12px;
+  }
+
+  .finance-stat-icon {
+    font-size: 1.8em;
+    margin-right: 8px;
+  }
+
+  .finance-stat-info {
+    flex: 1;
   }
 }
