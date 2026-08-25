@@ -1,4 +1,4 @@
-import { ViewContext } from './context';
+import { ViewContext } from '../context';
 import {
   calcNetBalance,
   calcAssets,
@@ -11,8 +11,8 @@ import {
   MonthGroup,
   CreditBurdenMonth,
   AssetLiabilityMonth,
-} from './domain/overviewMetrics';
-import { toDateStr } from './domain/dateMath';
+} from '../domain/overviewMetrics';
+import { toDateStr } from '../domain/dateMath';
 
 const CHART_HEIGHT = 300;
 const CHART_PAD_LEFT = 60;
