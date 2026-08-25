@@ -25,7 +25,7 @@ export class AccountView extends MarkdownRenderChild {
   private pluginId: string;
   private ctx:      ViewContext;
 
-  private mode:     'overview' | 'records' | 'debts' | 'credits' | 'deposits' | 'currency' = 'records';
+  private mode:     'overview' | 'records' | 'debts' | 'credits' | 'deposits' | 'currency' = 'overview';
   private isMobile = false;
   private isCheckingAutoTransactions = false;
   private autoTxTimer: ReturnType<typeof setInterval> | null = null;
@@ -174,6 +174,10 @@ export class AccountView extends MarkdownRenderChild {
     } else {
       this.renderRecordsTab(body);
     }
+  }
+
+  private renderOverviewTab(body: HTMLElement): void {
+    new OverviewTab(this.ctx).render(body);
   }
 
   private renderRecordsTab(body: HTMLElement): void {

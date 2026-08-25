@@ -232,6 +232,10 @@ export const OVERVIEW_BURDEN_WARN   = 30;
 export const OVERVIEW_BURDEN_DANGER = 50;
 export const CURRENCY_ROUNDING_PRECISION = 100;      // 2 decimal places
 export const EXCHANGE_RATE_PRECISION = 10000;        // 4 decimal places
+export const OVERVIEW_UPCOMING_DAYS = 30;
+export const OVERVIEW_BURDEN_MONTHS = 3;
+export const OVERVIEW_BURDEN_WARN   = 30;
+export const OVERVIEW_BURDEN_DANGER = 50;
 
 export type CreditType = 'consumer' | 'auto' | 'mortgage';
 export type CreditStatus = 'active' | 'paid';

@@ -69,7 +69,6 @@ export interface Translations {
   sortAmount: string;
   sortCategory: string;
   sortPerson: string;
-  overview: string;
   records: string;
   noRecords: string;
   noRecordsFilter: string;
@@ -557,13 +556,28 @@ export interface Translations {
   fetchingRates: string;
   rateFromAPI: string;
   rateAPIError: string;
+  // Overview tab
+  overview: string;
+  overviewNetBalance: string;
   overviewAssets: string;
   overviewLiabilities: string;
   overviewCreditBurden: string;
   overviewUpcomingPayments: string;
-  overviewMoneyFlow: string;
-  overviewCreditBurdenChart: string;
-  overviewAssetLiabilityTrend: string;
+  overviewNoIncome: string;
+  overviewBurdenWarn: string;
+  overviewBurdenDanger: string;
+  overviewNoBurden: string;
+  overviewNoPayments: string;
+  overviewNext30Days: string;
+  overviewPeriodWeek: string;
+  overviewPeriodMonth: string;
+  overviewPeriodQuarter: string;
+  overviewPeriodYear: string;
+  overviewPeriodAll: string;
+  overviewIncomeExpenseTrend: string;
+  overviewCategoryBreakdown: string;
+  overviewNoDebts: string;
+  overviewNoCredits: string;
 }
 
 const ru: Translations = {
@@ -628,7 +642,6 @@ const ru: Translations = {
   sortAmount: 'Сумма',
   sortCategory: 'Категория',
   sortPerson: 'Кому',
-  overview: 'Обзор',
   records: 'Записи',
   noRecords: 'Записей не найдено',
   noRecordsFilter: 'Нажмите «Доход» или «Расход»',
@@ -1112,13 +1125,28 @@ const ru: Translations = {
   fetchingRates: 'Загрузка курсов...',
   rateFromAPI: 'Курс от {date}',
   rateAPIError: 'Не удалось загрузить курс',
+  // Overview tab
+  overview: 'Обзор',
+  overviewNetBalance: 'Чистая стоимость',
   overviewAssets: 'Активы',
   overviewLiabilities: 'Обязательства',
   overviewCreditBurden: 'Кредитная нагрузка',
-  overviewUpcomingPayments: 'Предстоящие платежи',
-  overviewMoneyFlow: 'Денежный поток',
-  overviewCreditBurdenChart: 'Динамика кредитной нагрузки',
-  overviewAssetLiabilityTrend: 'Динамика активов и обязательств',
+  overviewUpcomingPayments: 'Ближайшие платежи',
+  overviewNoIncome: 'Нет данных о доходах',
+  overviewBurdenWarn: 'Высокая нагрузка',
+  overviewBurdenDanger: 'Критическая нагрузка',
+  overviewNoBurden: 'Нет активных кредитов',
+  overviewNoPayments: 'Нет предстоящих платежей',
+  overviewNext30Days: 'на ближайшие 30 дней',
+  overviewPeriodWeek: 'Неделя',
+  overviewPeriodMonth: 'Месяц',
+  overviewPeriodQuarter: 'Квартал',
+  overviewPeriodYear: 'Год',
+  overviewPeriodAll: 'Всё время',
+  overviewIncomeExpenseTrend: 'Динамика доходов и расходов',
+  overviewCategoryBreakdown: 'Распределение по категориям',
+  overviewNoDebts: 'Нет активных долгов',
+  overviewNoCredits: 'Нет активных кредитов',
 };
 
 const en: Translations = {
@@ -1183,7 +1211,6 @@ const en: Translations = {
   sortAmount: 'Amount',
   sortCategory: 'Category',
   sortPerson: 'Person',
-  overview: 'Overview',
   records: 'Records',
   noRecords: 'No records found',
   noRecordsFilter: 'Click "Income" or "Expense"',
@@ -1667,13 +1694,28 @@ const en: Translations = {
   fetchingRates: 'Fetching rates...',
   rateFromAPI: 'Rate from {date}',
   rateAPIError: 'Failed to fetch rate',
+  // Overview tab
+  overview: 'Overview',
+  overviewNetBalance: 'Net Worth',
   overviewAssets: 'Assets',
   overviewLiabilities: 'Liabilities',
   overviewCreditBurden: 'Credit Burden',
   overviewUpcomingPayments: 'Upcoming Payments',
-  overviewMoneyFlow: 'Money Flow',
-  overviewCreditBurdenChart: 'Credit Burden Dynamics',
-  overviewAssetLiabilityTrend: 'Assets & Liabilities Trend',
+  overviewNoIncome: 'No income data',
+  overviewBurdenWarn: 'High burden',
+  overviewBurdenDanger: 'Critical burden',
+  overviewNoBurden: 'No active credits',
+  overviewNoPayments: 'No upcoming payments',
+  overviewNext30Days: 'for the next 30 days',
+  overviewPeriodWeek: 'Week',
+  overviewPeriodMonth: 'Month',
+  overviewPeriodQuarter: 'Quarter',
+  overviewPeriodYear: 'Year',
+  overviewPeriodAll: 'All Time',
+  overviewIncomeExpenseTrend: 'Income & Expense Trend',
+  overviewCategoryBreakdown: 'Category Breakdown',
+  overviewNoDebts: 'No active debts',
+  overviewNoCredits: 'No active credits',
 };
 
 const translations: Record<Locale, Translations> = { ru, en };
