@@ -87,6 +87,7 @@ export interface DebtFilterState {
 
 export type CreditAnalyticsGroupBy  = 'month' | 'quarter' | 'year' | 'type' | 'bank';
 export type DepositAnalyticsGroupBy = 'month' | 'quarter' | 'year' | 'type' | 'bank';
+export type OverviewGroupBy = 'category' | 'tag' | 'payer' | 'year' | 'month' | 'week';
 
 export interface ViewState {
   sort: SortState; filter: FilterState; page: number; pageSize: number;
@@ -119,6 +120,9 @@ export interface ViewState {
   depositAnalyticsGroupBy?:  DepositAnalyticsGroupBy;
   depositAnalyticsDateFrom?: string;
   depositAnalyticsDateTo?:   string;
+  overviewDateFrom?:         string;
+  overviewDateTo?:           string;
+  overviewGroupBy?:          OverviewGroupBy;
 }
 
 export interface PluginSettings {
@@ -230,12 +234,31 @@ export const OVERVIEW_UPCOMING_DAYS = 30;
 export const OVERVIEW_BURDEN_MONTHS = 3;
 export const OVERVIEW_BURDEN_WARN   = 30;
 export const OVERVIEW_BURDEN_DANGER = 50;
+export const OVERVIEW_PRESET_MONTHS_3 = 3;
+export const OVERVIEW_PRESET_MONTHS_6 = 6;
+export const OVERVIEW_TREND_MONTHS = 6;
+export const OVERVIEW_CHART_HEIGHT = 240;
+export const OVERVIEW_CHART_PAD_LEFT = 50;
+export const OVERVIEW_CHART_PAD_RIGHT = 16;
+export const OVERVIEW_CHART_PAD_TOP = 16;
+export const OVERVIEW_CHART_PAD_BOTTOM = 42;
+export const OVERVIEW_LABEL_OFFSET_Y = 18;
+export const OVERVIEW_BAR_GAP = 6;
+export const OVERVIEW_GROUP_GAP = 18;
+export const OVERVIEW_MIN_GROUP_W = 56;
+export const OVERVIEW_MIN_GROUP_W_MOBILE = 44;
+export const OVERVIEW_Y_TICKS = 4;
+export const OVERVIEW_MIN_BAR_PCT = 2;
+export const OVERVIEW_MAX_BAR_W = 40;
+export const OVERVIEW_BAR_SPACING_PAD = 16;
+export const OVERVIEW_BAR_RADIUS = 3;
+export const OVERVIEW_LINE_STROKE_W = 2;
+export const OVERVIEW_POINT_RADIUS = 4;
+export const OVERVIEW_POINT_RADIUS_HOVER = 6;
+export const OVERVIEW_SAVINGS_BENCHMARK = 20;
+export const OVERVIEW_INPUT_DEBOUNCE_MS = 600;
 export const CURRENCY_ROUNDING_PRECISION = 100;      // 2 decimal places
 export const EXCHANGE_RATE_PRECISION = 10000;        // 4 decimal places
-export const OVERVIEW_UPCOMING_DAYS = 30;
-export const OVERVIEW_BURDEN_MONTHS = 3;
-export const OVERVIEW_BURDEN_WARN   = 30;
-export const OVERVIEW_BURDEN_DANGER = 50;
 
 export type CreditType = 'consumer' | 'auto' | 'mortgage';
 export type CreditStatus = 'active' | 'paid';

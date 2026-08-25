@@ -21,13 +21,39 @@ export function shortMonth(m: number, locale: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
+let sharedTooltipEl: HTMLDivElement | null = null;
+let clickListenerAttached = false;
+
+function getOrCreateTooltipEl(): HTMLDivElement {
+  if (!sharedTooltipEl || !document.body.contains(sharedTooltipEl)) {
+    sharedTooltipEl = document.createElement('div');
+    sharedTooltipEl.className = 'finance-bar-tooltip';
+    document.body.appendChild(sharedTooltipEl);
+  }
+  if (!clickListenerAttached) {
+    clickListenerAttached = true;
+    window.addEventListener(
+      'click',
+      () => {
+        sharedTooltipEl?.classList.remove('is-visible');
+      },
+      { capture: true }
+    );
+  }
+  return sharedTooltipEl;
+}
+
 export function createChartTooltip(): {
   showTip: (e: MouseEvent, text: string) => void;
   hideTip: () => void;
+  destroy: () => void;
 } {
-  const tooltip = document.createElement('div');
-  tooltip.className = 'finance-bar-tooltip';
-  document.body.appendChild(tooltip);
+  const tooltip = getOrCreateTooltipEl();
+
+  const hide = () => {
+    tooltip.classList.remove('is-visible');
+  };
+
   return {
     showTip: (e: MouseEvent, text: string) => {
       tooltip.textContent = text;
@@ -43,6 +69,7 @@ export function createChartTooltip(): {
       tooltip.style.setProperty('--ft-tip-left', `${left}px`);
       tooltip.style.setProperty('--ft-tip-top', `${top}px`);
     },
-    hideTip: () => { tooltip.classList.remove('is-visible'); },
+    hideTip: hide,
+    destroy: hide,
   };
 }

@@ -156,13 +156,14 @@ export class AccountView extends MarkdownRenderChild {
   }
 
   private renderBodyContent(): void {
+    document.querySelectorAll('.finance-bar-tooltip').forEach(el => el.classList.remove('is-visible'));
     const body = this.root.querySelector<HTMLElement>('.finance-body');
     if (!body) return;
     body.empty();
     if (this.actionsContainer) this.actionsContainer.empty();
 
     if (this.mode === 'overview') {
-      new OverviewTab(body, this.ctx).render();
+      this.renderOverviewTab(body);
     } else if (this.mode === 'debts') {
       this.renderDebtsTab(body);
     } else if (this.mode === 'credits') {
@@ -177,7 +178,13 @@ export class AccountView extends MarkdownRenderChild {
   }
 
   private renderOverviewTab(body: HTMLElement): void {
-    new OverviewTab(this.ctx).render(body);
+    const tab = new OverviewTab(body, this.ctx);
+    tab.onNavigate = (targetMode) => {
+      this.mode = targetMode;
+      this.updateHeaderButtons();
+      this.renderBodyContent();
+    };
+    tab.render();
   }
 
   private renderRecordsTab(body: HTMLElement): void {

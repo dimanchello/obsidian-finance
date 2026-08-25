@@ -1,7 +1,7 @@
 import {
   SortDir, ViewState,
   DEFAULT_FILTER, DEFAULT_SORT, DEFAULT_DEBT_FILTER, DEFAULT_CREDIT_FILTER, DEFAULT_DEPOSIT_FILTER,
-  CreditAnalyticsGroupBy, DepositAnalyticsGroupBy,
+  CreditAnalyticsGroupBy, DepositAnalyticsGroupBy, OverviewGroupBy,
 } from '../types';
 
 function isObject(v: unknown): v is Record<string, unknown> {
@@ -62,6 +62,9 @@ export function defaultViewState(pageSize: number): ViewState {
     depositAnalyticsGroupBy: 'month',
     depositAnalyticsDateFrom: '',
     depositAnalyticsDateTo: '',
+    overviewDateFrom: '',
+    overviewDateTo: '',
+    overviewGroupBy: 'category',
   };
 }
 
@@ -101,6 +104,7 @@ export function parseViewState(raw: unknown, pageSize: number): ViewState {
 
   const CREDIT_ANALYTICS_GROUP_BY: readonly CreditAnalyticsGroupBy[] = ['month', 'quarter', 'year', 'type', 'bank'];
   const DEPOSIT_ANALYTICS_GROUP_BY: readonly DepositAnalyticsGroupBy[] = ['month', 'quarter', 'year', 'type', 'bank'];
+  const OVERVIEW_GROUP_BY: readonly OverviewGroupBy[] = ['category', 'tag', 'payer'];
 
   state.creditActiveTab = oneOf(raw.creditActiveTab, ['list', 'analytics'] as const, 'list');
   state.creditAnalyticsGroupBy = oneOf(raw.creditAnalyticsGroupBy, CREDIT_ANALYTICS_GROUP_BY, 'month');
@@ -110,6 +114,9 @@ export function parseViewState(raw: unknown, pageSize: number): ViewState {
   state.depositAnalyticsGroupBy = oneOf(raw.depositAnalyticsGroupBy, DEPOSIT_ANALYTICS_GROUP_BY, 'month');
   state.depositAnalyticsDateFrom = str(raw.depositAnalyticsDateFrom, '');
   state.depositAnalyticsDateTo = str(raw.depositAnalyticsDateTo, '');
+  state.overviewDateFrom = str(raw.overviewDateFrom, '');
+  state.overviewDateTo = str(raw.overviewDateTo, '');
+  state.overviewGroupBy = oneOf(raw.overviewGroupBy, OVERVIEW_GROUP_BY, 'category');
   
   if (typeof raw.creditExpandedId === 'string') state.creditExpandedId = raw.creditExpandedId;
   if (typeof raw.debtExpandedId === 'string') state.debtExpandedId = raw.debtExpandedId;

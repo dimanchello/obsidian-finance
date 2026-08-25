@@ -80,6 +80,7 @@ export interface Translations {
   pieChart: string;
   groupBy: string;
   byCategory: string;
+  byTag: string;
   byPayer: string;
   byWeek: string;
   byMonth: string;
@@ -571,13 +572,28 @@ export interface Translations {
   overviewNext30Days: string;
   overviewPeriodWeek: string;
   overviewPeriodMonth: string;
+  overviewPeriod3Months: string;
+  overviewPeriod6Months: string;
   overviewPeriodQuarter: string;
   overviewPeriodYear: string;
   overviewPeriodAll: string;
   overviewIncomeExpenseTrend: string;
   overviewCategoryBreakdown: string;
+  overviewBreakdown: string;
   overviewNoDebts: string;
   overviewNoCredits: string;
+  overviewMoneyFlow: string;
+  overviewCreditBurdenChart: string;
+  overviewAssetLiabilityTrend: string;
+  overviewSavingsRate: string;
+  overviewSavingsRateChart: string;
+  overviewDebtsSummary: string;
+  overviewDebtsLent: string;
+  overviewDebtsBorrowed: string;
+  overviewNetDebt: string;
+  savingsTarget: string;
+  savingsModerate: string;
+  savingsDeficit: string;
 }
 
 const ru: Translations = {
@@ -926,6 +942,7 @@ const ru: Translations = {
   pieChart: '◕ Пирог',
   groupBy: 'Группировка:',
   byCategory: 'По категории',
+  byTag: 'По тегу',
   byPayer: 'По плательщику',
   byWeek: 'По неделе',
   byMonth: 'По месяцу',
@@ -1140,13 +1157,28 @@ const ru: Translations = {
   overviewNext30Days: 'на ближайшие 30 дней',
   overviewPeriodWeek: 'Неделя',
   overviewPeriodMonth: 'Месяц',
+  overviewPeriod3Months: '3 месяца',
+  overviewPeriod6Months: '6 месяцев',
   overviewPeriodQuarter: 'Квартал',
   overviewPeriodYear: 'Год',
   overviewPeriodAll: 'Всё время',
   overviewIncomeExpenseTrend: 'Динамика доходов и расходов',
   overviewCategoryBreakdown: 'Распределение по категориям',
+  overviewBreakdown: 'Распределение операций',
   overviewNoDebts: 'Нет активных долгов',
   overviewNoCredits: 'Нет активных кредитов',
+  overviewMoneyFlow: 'Денежный поток',
+  overviewCreditBurdenChart: 'Кредитная нагрузка',
+  overviewAssetLiabilityTrend: 'Динамика активов и обязательств',
+  overviewSavingsRate: 'Норма сбережений',
+  overviewSavingsRateChart: 'Норма сбережений (%)',
+  overviewDebtsSummary: 'Взаиморасчеты по долгам',
+  overviewDebtsLent: 'Мне должны',
+  overviewDebtsBorrowed: 'Я должен',
+  overviewNetDebt: 'Сальдо долгов',
+  savingsTarget: '≥ 20% (цель)',
+  savingsModerate: '0–20% (ниже нормы)',
+  savingsDeficit: '< 0% (дефицит)',
 };
 
 const en: Translations = {
@@ -1495,6 +1527,7 @@ const en: Translations = {
   pieChart: '◕ Pie',
   groupBy: 'Group by:',
   byCategory: 'By category',
+  byTag: 'By tag',
   byPayer: 'By payer',
   byWeek: 'By week',
   byMonth: 'By month',
@@ -1709,13 +1742,28 @@ const en: Translations = {
   overviewNext30Days: 'for the next 30 days',
   overviewPeriodWeek: 'Week',
   overviewPeriodMonth: 'Month',
+  overviewPeriod3Months: '3 Months',
+  overviewPeriod6Months: '6 Months',
   overviewPeriodQuarter: 'Quarter',
   overviewPeriodYear: 'Year',
   overviewPeriodAll: 'All Time',
   overviewIncomeExpenseTrend: 'Income & Expense Trend',
   overviewCategoryBreakdown: 'Category Breakdown',
+  overviewBreakdown: 'Transaction Breakdown',
   overviewNoDebts: 'No active debts',
   overviewNoCredits: 'No active credits',
+  overviewMoneyFlow: 'Cash Flow',
+  overviewCreditBurdenChart: 'Credit Burden',
+  overviewAssetLiabilityTrend: 'Assets & Liabilities Trend',
+  overviewSavingsRate: 'Savings rate',
+  overviewSavingsRateChart: 'Savings rate (%)',
+  overviewDebtsSummary: 'Debt Balances',
+  overviewDebtsLent: 'Lent to others',
+  overviewDebtsBorrowed: 'Borrowed from others',
+  overviewNetDebt: 'Net debt',
+  savingsTarget: '≥ 20% (target)',
+  savingsModerate: '0–20% (below target)',
+  savingsDeficit: '< 0% (deficit)',
 };
 
 const translations: Record<Locale, Translations> = { ru, en };

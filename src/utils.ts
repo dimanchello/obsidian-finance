@@ -1,3 +1,5 @@
+import { addMonthsClamped } from './domain/dateMath';
+
 export function fmtAmount(raw: string): string {
   const clean = raw.replace(/[^\d.,]/g, '');
   const dotPos = clean.search(/[.,]/);
@@ -96,4 +98,19 @@ export function getTodayStr(): string {
 
 export function getTodayTime(): string {
   return new Date().toTimeString().slice(0, 5);
+}
+
+export function shiftMonths(months: number, baseDate?: string): string;
+export function shiftMonths(baseDate: string, months: number): string;
+export function shiftMonths(a: string | number, b?: string | number): string {
+  let dateStr: string;
+  let months: number;
+  if (typeof a === 'number') {
+    months = a;
+    dateStr = typeof b === 'string' ? b : getTodayStr();
+  } else {
+    dateStr = a;
+    months = typeof b === 'number' ? b : 0;
+  }
+  return addMonthsClamped(dateStr, months);
 }

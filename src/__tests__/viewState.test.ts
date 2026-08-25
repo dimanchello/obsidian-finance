@@ -59,5 +59,14 @@ describe('parseViewState', () => {
     expect(parseViewState({ pageSize: NaN }, 25).pageSize).toBe(25);
   });
 
-
+  it('сохраняет настройки вкладки обзора', () => {
+    const s = parseViewState({
+      overviewDateFrom: '2026-01-01',
+      overviewDateTo: '2026-06-30',
+      overviewGroupBy: 'tag',
+    }, 25);
+    expect(s.overviewDateFrom).toBe('2026-01-01');
+    expect(s.overviewDateTo).toBe('2026-06-30');
+    expect(s.overviewGroupBy).toBe('tag');
+  });
 });

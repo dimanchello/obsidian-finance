@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getTodayStr, fmtAmount, parseAmount, parseDate, normalizeDateStr, normalizeTimeStr, createDateObject, fmtDate } from '../utils';
+import { getTodayStr, fmtAmount, parseAmount, parseDate, normalizeDateStr, normalizeTimeStr, createDateObject, fmtDate, shiftMonths } from '../utils';
 import { DAYS_IN_YEAR, ACCRUAL_STEP_MONTHLY } from '../types';
 
 
@@ -172,6 +172,25 @@ describe('Date/Time Unified Helpers', () => {
 
     it('formats YYYY-MM-DD with time', () => {
       expect(fmtDate('2026-07-12', '20:15')).toBe('12.07.2026\u00a020:15');
+    });
+  });
+
+  describe('shiftMonths', () => {
+    it('сдвигает месяцы назад с переданной датой', () => {
+      expect(shiftMonths('2026-08-25', -3)).toBe('2026-05-25');
+      expect(shiftMonths('2026-08-25', -6)).toBe('2026-02-25');
+    });
+
+    it('сдвигает месяцы вперед', () => {
+      expect(shiftMonths('2026-01-15', 2)).toBe('2026-03-15');
+    });
+
+    it('поддерживает вызов с числом первым аргументом', () => {
+      expect(shiftMonths(-3, '2026-08-25')).toBe('2026-05-25');
+    });
+
+    it('клампит конец месяца корректно', () => {
+      expect(shiftMonths('2026-05-31', -1)).toBe('2026-04-30');
     });
   });
 });

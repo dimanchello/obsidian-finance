@@ -1,7 +1,15 @@
-import type { FinanceRecord, DebtRecord, CreditRecord, DepositRecord, CurrencyExchange } from '../types';
+import type {
+  FinanceRecord,
+  DebtRecord,
+  CreditRecord,
+  DepositRecord,
+  CurrencyExchange,
+  OverviewGroupBy,
+} from '../types';
 import { OVERVIEW_UPCOMING_DAYS, OVERVIEW_BURDEN_MONTHS } from '../types';
 import { addMonthsClamped, parseDateStr } from './dateMath';
-import { calculateRemainingPrincipal } from './creditCalculations';
+import { calculateRemainingPrincipal, calculatePaymentBreakdown } from './creditCalculations';
+import { getTodayStr } from '../utils';
 
 function addDays(dateStr: string, days: number): string {
   const parsed = parseDateStr(dateStr);
@@ -12,6 +20,58 @@ function addDays(dateStr: string, days: number): string {
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
+}
+
+export function getISOWeekString(dateStr: string): string {
+  const parsed = parseDateStr(dateStr);
+  if (!parsed) return dateStr;
+  const d = new Date(Date.UTC(parsed.year, parsed.month - 1, parsed.day));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  const weekNo = Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+  return `${d.getUTCFullYear()}-W${String(weekNo).padStart(2, '0')}`;
+}
+
+export function resolveMonthRange(
+  dateFrom?: string,
+  dateTo?: string,
+  asOfDate: string = getTodayStr(),
+  defaultMonths = 6
+): string[] {
+  let startMonth: string;
+  let endMonth: string;
+
+  if (dateFrom && dateTo) {
+    startMonth = dateFrom.slice(0, 7);
+    endMonth = dateTo.slice(0, 7);
+  } else if (dateFrom) {
+    startMonth = dateFrom.slice(0, 7);
+    endMonth = asOfDate.slice(0, 7);
+  } else if (dateTo) {
+    endMonth = dateTo.slice(0, 7);
+    startMonth = addMonthsClamped(`${endMonth}-01`, -(defaultMonths - 1)).slice(0, 7);
+  } else {
+    endMonth = asOfDate.slice(0, 7);
+    startMonth = addMonthsClamped(`${endMonth}-01`, -(defaultMonths - 1)).slice(0, 7);
+  }
+
+  if (startMonth > endMonth) {
+    const tmp = startMonth;
+    startMonth = endMonth;
+    endMonth = tmp;
+  }
+
+  const result: string[] = [];
+  let curr = `${startMonth}-01`;
+  const end = `${endMonth}-01`;
+
+  while (curr <= end) {
+    result.push(curr.slice(0, 7));
+    curr = addMonthsClamped(curr, 1);
+  }
+
+  return result;
 }
 
 /**
@@ -25,7 +85,7 @@ export function calcNetBalance(records: FinanceRecord[]): number {
 }
 
 /**
- * Assets = active deposits + currency holdings (targetAmount * exchangeRate) + lent debts
+ * Total assets = sum of active deposit amounts + positive currency balances + lent debts (money others owe me)
  */
 export function calcAssets(
   deposits: DepositRecord[],
@@ -36,35 +96,43 @@ export function calcAssets(
     .filter(d => d.status === 'active')
     .reduce((s, d) => s + d.amount, 0);
 
-  const currencySum = exchanges.reduce((s, e) => {
-    return s + e.targetAmount * e.exchangeRate;
+  const exchangeSum = exchanges.reduce((s, e) => {
+    const rate = typeof e.exchangeRate === 'number' ? e.exchangeRate : 1;
+    const targetAmt = typeof e.targetAmount === 'number' ? e.targetAmount : 0;
+    const val = targetAmt > 0 ? targetAmt * rate : 0;
+    return s + val;
   }, 0);
 
-  const debtSum = debts
+  const lentDebts = debts
     .filter(d => d.direction === 'lent')
     .reduce((s, d) => s + d.amount, 0);
 
-  return depositSum + currencySum + debtSum;
+  return depositSum + exchangeSum + lentDebts;
 }
 
 /**
- * Liabilities = active credits remaining + borrowed debts
+ * Total liabilities = sum of active credits remaining principal + borrowed debts (money I owe others)
  */
-export function calcLiabilities(credits: CreditRecord[], debts: DebtRecord[]): number {
-  const creditSum = credits
+export function calcLiabilities(
+  credits: CreditRecord[],
+  debts: DebtRecord[],
+): number {
+  const creditPrincipal = credits
     .filter(c => c.status === 'active')
-    .reduce((s, c) => s + calculateRemainingPrincipal(c), 0);
+    .reduce((sum, c) => {
+      const remaining = calculateRemainingPrincipal(c);
+      return sum + remaining;
+    }, 0);
 
-  const debtSum = debts
+  const borrowedDebts = debts
     .filter(d => d.direction === 'borrowed')
     .reduce((s, d) => s + d.amount, 0);
 
-  return creditSum + debtSum;
+  return creditPrincipal + borrowedDebts;
 }
 
 /**
- * Credit burden = (sum of monthly payments / average monthly income) * 100
- * Returns null if no income in last N months.
+ * Credit burden % = (monthly payments on active credits / avg monthly income over last 3 months) * 100
  */
 export function calcCreditBurden(
   credits: CreditRecord[],
@@ -79,7 +147,6 @@ export function calcCreditBurden(
   if (relevantIncome.length === 0) return null;
 
   const totalIncome = relevantIncome.reduce((s, r) => s + r.amount, 0);
-  // Точно 3 месяца даже если записей меньше
   const avgMonthlyIncome = totalIncome / OVERVIEW_BURDEN_MONTHS;
 
   const monthlyBurden = credits
@@ -157,52 +224,90 @@ export interface CreditBurdenMonth {
 }
 
 /**
- * Calculate monthly credit burden breakdown over last N months
+ * Calculate monthly credit burden breakdown over date range or last N months
  */
 export function calcCreditBurdenOverTime(
   credits: CreditRecord[],
   records: FinanceRecord[],
-  asOfDate: string,
-  months: number = OVERVIEW_BURDEN_MONTHS
+  dateFromOrAsOfDate?: string,
+  dateToOrMonths?: string | number,
+  asOfDate: string = getTodayStr(),
+  defaultMonths: number = OVERVIEW_BURDEN_MONTHS
 ): CreditBurdenMonth[] {
-  const result: CreditBurdenMonth[] = [];
+  let monthsList: string[];
 
-  for (let i = months - 1; i >= 0; i--) {
-    const monthStart = addMonthsClamped(asOfDate, -i);
+  if (typeof dateToOrMonths === 'number') {
+    monthsList = resolveMonthRange(
+      undefined,
+      undefined,
+      dateFromOrAsOfDate ?? asOfDate,
+      dateToOrMonths
+    );
+  } else {
+    monthsList = resolveMonthRange(
+      dateFromOrAsOfDate,
+      dateToOrMonths,
+      asOfDate,
+      defaultMonths
+    );
+  }
+
+  return monthsList.map(month => {
+    const monthStart = `${month}-01`;
     const monthEnd = addMonthsClamped(monthStart, 1);
-    const label = monthStart.slice(0, 7); // YYYY-MM
+    const label = month;
 
-    // Calculate monthly income for this month
     const monthIncome = records
       .filter(r => r.type === 'income' && !r.isInternal && r.date >= monthStart && r.date < monthEnd)
       .reduce((s, r) => s + r.amount, 0);
 
-    // Calculate credit payments for this month
     let principal = 0;
     let interest = 0;
 
     credits.filter(c => c.status === 'active').forEach(c => {
-      c.payments
-        .filter(p => p.status === 'paid' && p.dueDate >= monthStart && p.dueDate < monthEnd)
-        .forEach(p => {
-          principal += p.principalPart ?? 0;
-          interest += p.interestPart ?? 0;
+      const monthPayments = (c.payments ?? []).filter(
+        p => (p.dueDate >= monthStart && p.dueDate < monthEnd) ||
+             (p.paidDate && p.paidDate >= monthStart && p.paidDate < monthEnd)
+      );
+
+      if (monthPayments.length > 0) {
+        monthPayments.forEach(p => {
+          let pPart = p.principalPart;
+          let iPart = p.interestPart;
+          if (pPart === undefined || iPart === undefined) {
+            const breakdown = calculatePaymentBreakdown(
+              c.currentAmount ?? c.originalAmount,
+              p.amount,
+              c.interestRate
+            );
+            pPart = breakdown.principalPart;
+            iPart = breakdown.interestPart;
+          }
+          principal += pPart ?? 0;
+          interest += iPart ?? 0;
         });
+      } else if (c.startDate < monthEnd && c.monthlyPayment > 0) {
+        const breakdown = calculatePaymentBreakdown(
+          c.currentAmount ?? c.originalAmount,
+          c.monthlyPayment,
+          c.interestRate
+        );
+        principal += breakdown.principalPart;
+        interest += breakdown.interestPart;
+      }
     });
 
     const total = principal + interest;
     const burdenPercent = monthIncome > 0 ? (total / monthIncome) * 100 : null;
 
-    result.push({
+    return {
       label,
       principal,
       interest,
       total,
       burdenPercent,
-    });
-  }
-
-  return result;
+    };
+  });
 }
 
 export interface AssetLiabilityMonth {
@@ -213,50 +318,223 @@ export interface AssetLiabilityMonth {
 }
 
 /**
- * Calculate assets and liabilities trend over last N months
+ * Calculate assets and liabilities trend over date range or last N months
  */
 export function calcAssetsLiabilitiesOverTime(
   deposits: DepositRecord[],
   exchanges: CurrencyExchange[],
   credits: CreditRecord[],
   debts: DebtRecord[],
-  asOfDate: string,
-  months = 6
+  dateFromOrAsOfDate?: string,
+  dateToOrMonths?: string | number,
+  asOfDate: string = getTodayStr(),
+  defaultMonths = 6
 ): AssetLiabilityMonth[] {
-  const result: AssetLiabilityMonth[] = [];
+  let monthsList: string[];
 
-  for (let i = months - 1; i >= 0; i--) {
-    const monthDate = addMonthsClamped(asOfDate, -i);
-    const label = monthDate.slice(0, 7); // YYYY-MM
+  if (typeof dateToOrMonths === 'number') {
+    monthsList = resolveMonthRange(
+      undefined,
+      undefined,
+      dateFromOrAsOfDate ?? asOfDate,
+      dateToOrMonths
+    );
+  } else {
+    monthsList = resolveMonthRange(
+      dateFromOrAsOfDate,
+      dateToOrMonths,
+      asOfDate,
+      defaultMonths
+    );
+  }
 
-    // Assets: active deposits + currency + lent debts at that point in time
+  const today = getTodayStr();
+
+  return monthsList.map(month => {
+    const monthStart = `${month}-01`;
+    const label = month;
+    const checkDate = month === today.slice(0, 7) ? today : monthStart;
+
     const assets = calcAssets(
-      deposits.filter(d => d.status === 'active' && d.startDate <= monthDate),
-      exchanges.filter(e => e.date <= monthDate),
-      debts.filter(d => d.direction === 'lent' && d.date <= monthDate)
+      deposits.filter(d => d.status === 'active' && d.startDate <= checkDate),
+      exchanges.filter(e => e.date <= checkDate),
+      debts.filter(d => d.direction === 'lent' && d.date <= checkDate)
     );
 
-    // Liabilities: active credits (remaining principal) + borrowed debts
     const activeCreditsPrincipal = credits
-      .filter(c => c.status === 'active' && c.startDate <= monthDate)
+      .filter(c => c.status === 'active' && c.startDate <= checkDate)
       .reduce((sum, c) => {
         const remaining = calculateRemainingPrincipal(c);
         return sum + remaining;
       }, 0);
 
     const borrowedDebts = debts
-      .filter(d => d.direction === 'borrowed' && d.date <= monthDate)
+      .filter(d => d.direction === 'borrowed' && d.date <= checkDate)
       .reduce((s, d) => s + d.amount, 0);
 
     const liabilities = activeCreditsPrincipal + borrowedDebts;
 
-    result.push({
+    return {
       label,
       assets,
       liabilities,
       net: assets - liabilities,
+    };
+  });
+}
+
+export interface SavingsRateMonth {
+  label: string;
+  income: number;
+  expense: number;
+  savings: number;
+  savingsRate: number; // in percent
+}
+
+/**
+ * Calculate monthly savings rate (%) = (income - expense) / income * 100
+ */
+export function calcSavingsRateOverTime(
+  records: FinanceRecord[],
+  dateFrom?: string,
+  dateTo?: string,
+  asOfDate: string = getTodayStr(),
+  defaultMonths = 6
+): SavingsRateMonth[] {
+  const monthsList = resolveMonthRange(dateFrom, dateTo, asOfDate, defaultMonths);
+
+  return monthsList.map(month => {
+    const monthStart = `${month}-01`;
+    const monthEnd = addMonthsClamped(monthStart, 1);
+
+    const monthRecords = records.filter(
+      r => !r.isInternal && r.date >= monthStart && r.date < monthEnd
+    );
+    const income = monthRecords
+      .filter(r => r.type === 'income')
+      .reduce((s, r) => s + r.amount, 0);
+    const expense = monthRecords
+      .filter(r => r.type === 'expense')
+      .reduce((s, r) => s + r.amount, 0);
+
+    const savings = income - expense;
+    const savingsRate = income > 0 ? (savings / income) * 100 : 0;
+
+    return {
+      label: month,
+      income,
+      expense,
+      savings,
+      savingsRate,
+    };
+  });
+}
+
+export interface DebtBreakdownItem {
+  person: string;
+  lent: number;       // мне должны
+  borrowed: number;   // я должен
+  net: number;        // lent - borrowed
+}
+
+/**
+ * Aggregates debts per person
+ */
+export function calcDebtsBreakdown(debts: DebtRecord[]): DebtBreakdownItem[] {
+  const map = new Map<string, { lent: number; borrowed: number }>();
+
+  debts.forEach(d => {
+    const person = d.person.trim() || '—';
+    const cur = map.get(person) ?? { lent: 0, borrowed: 0 };
+    if (d.direction === 'lent') {
+      cur.lent += d.amount;
+    } else {
+      cur.borrowed += d.amount;
+    }
+    map.set(person, cur);
+  });
+
+  const result: DebtBreakdownItem[] = [];
+  map.forEach((val, person) => {
+    result.push({
+      person,
+      lent: val.lent,
+      borrowed: val.borrowed,
+      net: val.lent - val.borrowed,
     });
+  });
+
+  return result.sort((a, b) => Math.abs(b.net) - Math.abs(a.net) || a.person.localeCompare(b.person));
+}
+
+export function filterRecordsByDateRange(
+  records: FinanceRecord[],
+  dateFrom?: string,
+  dateTo?: string,
+): FinanceRecord[] {
+  return records.filter(r => {
+    if (dateFrom && r.date < dateFrom) return false;
+    if (dateTo && r.date > dateTo) return false;
+    return true;
+  });
+}
+
+export interface BreakdownItem {
+  key: string;
+  income: number;
+  expense: number;
+  net: number;
+  total: number;
+}
+
+export function calcGroupBreakdown(
+  records: FinanceRecord[],
+  groupBy: OverviewGroupBy,
+  emptyLabel = '—',
+): BreakdownItem[] {
+  const map = new Map<string, { income: number; expense: number }>();
+
+  records.forEach(r => {
+    if (r.isInternal) return;
+    let key = '';
+    if (groupBy === 'category') {
+      key = r.category.trim();
+    } else if (groupBy === 'tag') {
+      key = r.tag.trim();
+    } else if (groupBy === 'payer') {
+      key = r.payer.trim();
+    } else if (groupBy === 'year') {
+      key = r.date ? r.date.slice(0, 4) : emptyLabel;
+    } else if (groupBy === 'month') {
+      key = r.date ? r.date.slice(0, 7) : emptyLabel;
+    } else if (groupBy === 'week') {
+      key = r.date ? getISOWeekString(r.date) : emptyLabel;
+    }
+    if (!key) key = emptyLabel;
+
+    const existing = map.get(key) ?? { income: 0, expense: 0 };
+    if (r.type === 'income') {
+      existing.income += r.amount;
+    } else {
+      existing.expense += r.amount;
+    }
+    map.set(key, existing);
+  });
+
+  const items: BreakdownItem[] = [];
+  map.forEach(({ income, expense }, key) => {
+    items.push({
+      key,
+      income,
+      expense,
+      net: income - expense,
+      total: income + expense,
+    });
+  });
+
+  if (groupBy === 'year' || groupBy === 'month' || groupBy === 'week') {
+    return items.sort((a, b) => b.key.localeCompare(a.key));
   }
 
-  return result;
+  return items.sort((a, b) => b.total - a.total || a.key.localeCompare(b.key));
 }

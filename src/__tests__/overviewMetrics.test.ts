@@ -4,7 +4,9 @@ import {
   calcNetBalance, calcAssets, calcLiabilities,
   calcCreditBurden, calcUpcomingPayments,
   groupRecordsByMonth, calcCreditBurdenOverTime,
-  calcAssetsLiabilitiesOverTime,
+  calcAssetsLiabilitiesOverTime, filterRecordsByDateRange,
+  calcGroupBreakdown, calcSavingsRateOverTime,
+  calcDebtsBreakdown,
 } from '../domain/overviewMetrics';
 
 function rec(overrides: Partial<FinanceRecord> = {}): FinanceRecord {
@@ -208,5 +210,172 @@ describe('calcAssetsLiabilitiesOverTime', () => {
 
     // Февраль: после платежа кредита + долг
     expect(result[1].liabilities).toBeGreaterThan(90000); // ~96k credit + 5k debt
+  });
+});
+
+describe('filterRecordsByDateRange', () => {
+  const records = [
+    rec({ id: '1', date: '2026-01-10' }),
+    rec({ id: '2', date: '2026-02-15' }),
+    rec({ id: '3', date: '2026-03-20' }),
+  ];
+
+  it('фильтрует по dateFrom и dateTo', () => {
+    const res = filterRecordsByDateRange(records, '2026-02-01', '2026-02-28');
+    expect(res).toHaveLength(1);
+    expect(res[0].id).toBe('2');
+  });
+
+  it('фильтрует только по dateFrom', () => {
+    const res = filterRecordsByDateRange(records, '2026-02-01');
+    expect(res).toHaveLength(2);
+    expect(res.map(r => r.id)).toEqual(['2', '3']);
+  });
+
+  it('фильтрует только по dateTo', () => {
+    const res = filterRecordsByDateRange(records, undefined, '2026-02-01');
+    expect(res).toHaveLength(1);
+    expect(res[0].id).toBe('1');
+  });
+
+  it('без фильтра возвращает все записи', () => {
+    const res = filterRecordsByDateRange(records);
+    expect(res).toHaveLength(3);
+  });
+});
+
+describe('calcGroupBreakdown', () => {
+  const records = [
+    rec({ type: 'expense', category: 'Еда', tag: 'дом', payer: 'Иван', amount: 500 }),
+    rec({ type: 'expense', category: 'Еда', tag: 'работа', payer: 'Иван', amount: 300 }),
+    rec({ type: 'income', category: 'Зарплата', tag: 'работа', payer: 'ООО', amount: 5000 }),
+    rec({ type: 'expense', category: 'Транспорт', tag: 'город', payer: 'Мария', amount: 200 }),
+    rec({ type: 'expense', category: '', tag: '', payer: '', amount: 100 }),
+    rec({ type: 'expense', category: 'Еда', amount: 1000, isInternal: true }),
+  ];
+
+  it('группирует по category и сортирует по total desc', () => {
+    const breakdown = calcGroupBreakdown(records, 'category', 'Без категории');
+    expect(breakdown[0]).toEqual({ key: 'Зарплата', income: 5000, expense: 0, net: 5000, total: 5000 });
+    expect(breakdown[1]).toEqual({ key: 'Еда', income: 0, expense: 800, net: -800, total: 800 });
+    expect(breakdown[2]).toEqual({ key: 'Транспорт', income: 0, expense: 200, net: -200, total: 200 });
+    expect(breakdown[3]).toEqual({ key: 'Без категории', income: 0, expense: 100, net: -100, total: 100 });
+  });
+
+  it('группирует по tag', () => {
+    const breakdown = calcGroupBreakdown(records, 'tag', 'Без тега');
+    const work = breakdown.find(b => b.key === 'работа');
+    expect(work).toEqual({ key: 'работа', income: 5000, expense: 300, net: 4700, total: 5300 });
+  });
+
+  it('группирует по payer', () => {
+    const breakdown = calcGroupBreakdown(records, 'payer', 'Без плательщика');
+    const ivan = breakdown.find(b => b.key === 'Иван');
+    expect(ivan).toEqual({ key: 'Иван', income: 0, expense: 800, net: -800, total: 800 });
+  });
+
+  it('игнорирует isInternal записи', () => {
+    const breakdown = calcGroupBreakdown(records, 'category');
+    const food = breakdown.find(b => b.key === 'Еда');
+    expect(food?.expense).toBe(800);
+  });
+
+  it('группирует по year', () => {
+    const dateRecords = [
+      rec({ date: '2024-05-10', type: 'income', amount: 3000 }),
+      rec({ date: '2025-06-15', type: 'expense', amount: 1000 }),
+      rec({ date: '2025-08-20', type: 'income', amount: 2000 }),
+    ];
+    const breakdown = calcGroupBreakdown(dateRecords, 'year');
+    expect(breakdown).toHaveLength(2);
+    expect(breakdown[0].key).toBe('2025');
+    expect(breakdown[0].income).toBe(2000);
+    expect(breakdown[0].expense).toBe(1000);
+    expect(breakdown[1].key).toBe('2024');
+  });
+
+  it('группирует по month', () => {
+    const dateRecords = [
+      rec({ date: '2026-01-10', type: 'income', amount: 3000 }),
+      rec({ date: '2026-02-15', type: 'expense', amount: 1000 }),
+    ];
+    const breakdown = calcGroupBreakdown(dateRecords, 'month');
+    expect(breakdown).toHaveLength(2);
+    expect(breakdown[0].key).toBe('2026-02');
+    expect(breakdown[1].key).toBe('2026-01');
+  });
+
+  it('группирует по week', () => {
+    const dateRecords = [
+      rec({ date: '2026-08-25', type: 'expense', amount: 500 }),
+    ];
+    const breakdown = calcGroupBreakdown(dateRecords, 'week');
+    expect(breakdown).toHaveLength(1);
+    expect(breakdown[0].key).toContain('2026-W');
+  });
+});
+
+describe('calcSavingsRateOverTime', () => {
+  it('нулевой доход даёт 0% savings rate, не -100%', () => {
+    const records = [rec({ date: '2026-01-15', type: 'expense', amount: 500 })];
+    const result = calcSavingsRateOverTime(records, '2026-01-01', '2026-01-31', '2026-08-25', 1);
+    expect(result).toHaveLength(1);
+    expect(result[0].income).toBe(0);
+    expect(result[0].expense).toBe(500);
+    expect(result[0].savingsRate).toBe(0);
+  });
+
+  it('положительный доход и расход даёт корректный процент', () => {
+    const records = [
+      rec({ date: '2026-01-15', type: 'income', amount: 1000 }),
+      rec({ date: '2026-01-20', type: 'expense', amount: 600 }),
+    ];
+    const result = calcSavingsRateOverTime(records, '2026-01-01', '2026-01-31', '2026-08-25', 1);
+    expect(result).toHaveLength(1);
+    expect(result[0].income).toBe(1000);
+    expect(result[0].expense).toBe(600);
+    expect(result[0].savings).toBe(400);
+    expect(result[0].savingsRate).toBe(40);
+  });
+
+  it('рассчитывает норму сбережений по месяцам', () => {
+    const records = [
+      rec({ date: '2026-01-10', type: 'income', amount: 10000 }),
+      rec({ date: '2026-01-20', type: 'expense', amount: 6000 }),
+      rec({ date: '2026-02-10', type: 'income', amount: 10000 }),
+      rec({ date: '2026-02-20', type: 'expense', amount: 12000 }),
+    ];
+
+    const result = calcSavingsRateOverTime(records, '2026-01-01', '2026-02-28');
+    expect(result).toHaveLength(2);
+    expect(result[0].label).toBe('2026-01');
+    expect(result[0].savings).toBe(4000);
+    expect(result[0].savingsRate).toBe(40);
+
+    expect(result[1].label).toBe('2026-02');
+    expect(result[1].savings).toBe(-2000);
+    expect(result[1].savingsRate).toBe(-20);
+  });
+});
+
+describe('calcDebtsBreakdown', () => {
+  it('агрегирует долги по людям', () => {
+    const debts = [
+      debt({ person: 'Иван', amount: 5000, direction: 'lent' }),
+      debt({ person: 'Иван', amount: 2000, direction: 'borrowed' }),
+      debt({ person: 'Анна', amount: 3000, direction: 'borrowed' }),
+    ];
+
+    const breakdown = calcDebtsBreakdown(debts);
+    expect(breakdown).toHaveLength(2);
+    const ivan = breakdown.find(b => b.person === 'Иван');
+    expect(ivan?.lent).toBe(5000);
+    expect(ivan?.borrowed).toBe(2000);
+    expect(ivan?.net).toBe(3000);
+
+    const anna = breakdown.find(b => b.person === 'Анна');
+    expect(anna?.lent).toBe(0);
+    expect(anna?.borrowed).toBe(3000);
+    expect(anna?.net).toBe(-3000);
   });
 });
