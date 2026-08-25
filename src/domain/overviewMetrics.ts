@@ -6,9 +6,10 @@ import type {
   CurrencyExchange,
   OverviewGroupBy,
 } from '../types';
-import { OVERVIEW_UPCOMING_DAYS, OVERVIEW_BURDEN_MONTHS } from '../types';
+import { OVERVIEW_UPCOMING_DAYS, OVERVIEW_BURDEN_MONTHS, OVERVIEW_TREND_MONTHS } from '../types';
 import { addMonthsClamped, parseDateStr } from './dateMath';
 import { calculateRemainingPrincipal, calculatePaymentBreakdown } from './creditCalculations';
+import { getDebtRepaid, getDebtWithInterest } from './debtCalculations';
 import { getTodayStr } from '../utils';
 
 function addDays(dateStr: string, days: number): string {
@@ -432,34 +433,81 @@ export function calcSavingsRateOverTime(
 
 export interface DebtBreakdownItem {
   person: string;
-  lent: number;       // мне должны
-  borrowed: number;   // я должен
+  lent: number;       // мне должны (текущий остаток)
+  lentTotal: number;  // начальная сумма долга
+  lentRepaid: number; // сколько уже возвращено
+  lentRepaidPct: number; // % возврата (0–100)
+  borrowed: number;   // я должен (текущий остаток)
+  borrowedTotal: number; // начальная сумма
+  borrowedRepaid: number; // сколько уже выплачено
+  borrowedRepaidPct: number; // % возврата (0–100)
   net: number;        // lent - borrowed
 }
 
 /**
- * Aggregates debts per person
+ * Aggregates debts per person with repayment progress
  */
 export function calcDebtsBreakdown(debts: DebtRecord[]): DebtBreakdownItem[] {
-  const map = new Map<string, { lent: number; borrowed: number }>();
+  const map = new Map<
+    string,
+    {
+      lent: number;
+      lentTotal: number;
+      lentRepaid: number;
+      borrowed: number;
+      borrowedTotal: number;
+      borrowedRepaid: number;
+    }
+  >();
 
   debts.forEach(d => {
     const person = d.person.trim() || '—';
-    const cur = map.get(person) ?? { lent: 0, borrowed: 0 };
+    const cur = map.get(person) ?? {
+      lent: 0,
+      lentTotal: 0,
+      lentRepaid: 0,
+      borrowed: 0,
+      borrowedTotal: 0,
+      borrowedRepaid: 0,
+    };
+
+    const repaid = getDebtRepaid(d);
+    const withInterest = getDebtWithInterest(d);
+    const total = withInterest > 0 ? withInterest : (d.originalAmount || d.amount);
+
     if (d.direction === 'lent') {
       cur.lent += d.amount;
+      cur.lentTotal += total;
+      cur.lentRepaid += repaid;
     } else {
       cur.borrowed += d.amount;
+      cur.borrowedTotal += total;
+      cur.borrowedRepaid += repaid;
     }
     map.set(person, cur);
   });
 
   const result: DebtBreakdownItem[] = [];
   map.forEach((val, person) => {
+    const lentRepaidPct =
+      val.lentTotal > 0
+        ? Math.min(100, Math.max(0, Math.round((val.lentRepaid / val.lentTotal) * 100)))
+        : 0;
+    const borrowedRepaidPct =
+      val.borrowedTotal > 0
+        ? Math.min(100, Math.max(0, Math.round((val.borrowedRepaid / val.borrowedTotal) * 100)))
+        : 0;
+
     result.push({
       person,
       lent: val.lent,
+      lentTotal: val.lentTotal,
+      lentRepaid: val.lentRepaid,
+      lentRepaidPct,
       borrowed: val.borrowed,
+      borrowedTotal: val.borrowedTotal,
+      borrowedRepaid: val.borrowedRepaid,
+      borrowedRepaidPct,
       net: val.lent - val.borrowed,
     });
   });
@@ -538,3 +586,243 @@ export function calcGroupBreakdown(
 
   return items.sort((a, b) => b.total - a.total || a.key.localeCompare(b.key));
 }
+
+export interface DepositInterestSegment {
+  depositId: string;
+  depositName: string;
+  bankName: string;
+  amount: number;
+  status: 'paid' | 'pending';
+}
+
+export interface DepositInterestMonth {
+  monthKey: string;
+  label: string;
+  paidInterest: number;
+  pendingInterest: number;
+  total: number;
+  cumulativeTotal: number;
+  segments: DepositInterestSegment[];
+}
+
+export function resolveDepositMonthRange(
+  deposits: DepositRecord[],
+  dateFrom?: string,
+  dateTo?: string,
+  asOfDate: string = getTodayStr(),
+  defaultMonths = OVERVIEW_TREND_MONTHS
+): string[] {
+  let startMonth: string;
+  let endMonth: string;
+
+  const allAccrualDates: string[] = [];
+  deposits.forEach(d => {
+    (d.accruals ?? []).forEach(a => {
+      if (a.paidDate) allAccrualDates.push(a.paidDate);
+      if (a.dueDate) allAccrualDates.push(a.dueDate);
+    });
+  });
+  allAccrualDates.sort();
+
+  const earliest = allAccrualDates[0];
+  const latest = allAccrualDates[allAccrualDates.length - 1];
+  const earliestAccrual = earliest ? earliest.slice(0, 7) : '';
+  const latestAccrual = latest ? latest.slice(0, 7) : '';
+  const asOfCurMonth = asOfDate.slice(0, 7);
+  const halfMonths = Math.floor(defaultMonths / 2);
+
+  if (dateFrom && dateTo) {
+    startMonth = dateFrom.slice(0, 7);
+    endMonth = dateTo.slice(0, 7);
+  } else if (dateFrom) {
+    startMonth = dateFrom.slice(0, 7);
+    const fallbackEnd = addMonthsClamped(`${asOfCurMonth}-01`, halfMonths).slice(0, 7);
+    endMonth = latestAccrual && latestAccrual > asOfCurMonth ? latestAccrual : fallbackEnd;
+  } else if (dateTo) {
+    endMonth = dateTo.slice(0, 7);
+    const fallbackStart = addMonthsClamped(`${asOfCurMonth}-01`, -halfMonths).slice(0, 7);
+    startMonth = earliestAccrual && earliestAccrual < asOfCurMonth ? earliestAccrual : fallbackStart;
+  } else {
+    const fallbackStart = addMonthsClamped(`${asOfCurMonth}-01`, -halfMonths).slice(0, 7);
+    const fallbackEnd = addMonthsClamped(`${asOfCurMonth}-01`, halfMonths).slice(0, 7);
+    startMonth = earliestAccrual && earliestAccrual < fallbackStart ? earliestAccrual : fallbackStart;
+    endMonth = latestAccrual && latestAccrual > fallbackEnd ? latestAccrual : fallbackEnd;
+  }
+
+  if (startMonth > endMonth) {
+    const tmp = startMonth;
+    startMonth = endMonth;
+    endMonth = tmp;
+  }
+
+  const result: string[] = [];
+  let curr = `${startMonth}-01`;
+  const end = `${endMonth}-01`;
+
+  while (curr <= end) {
+    result.push(curr.slice(0, 7));
+    curr = addMonthsClamped(curr, 1);
+  }
+
+  return result;
+}
+
+export function calcDepositInterestOverTime(
+  deposits: DepositRecord[],
+  dateFromOrAsOfDate?: string,
+  dateToOrMonths?: string | number,
+  asOfDate: string = getTodayStr(),
+  defaultMonths: number = OVERVIEW_TREND_MONTHS
+): DepositInterestMonth[] {
+  let monthsList: string[];
+
+  if (typeof dateToOrMonths === 'number') {
+    monthsList = resolveDepositMonthRange(
+      deposits,
+      undefined,
+      undefined,
+      dateFromOrAsOfDate ?? asOfDate,
+      dateToOrMonths
+    );
+  } else {
+    monthsList = resolveDepositMonthRange(
+      deposits,
+      dateFromOrAsOfDate,
+      dateToOrMonths,
+      asOfDate,
+      defaultMonths
+    );
+  }
+
+  let runningCumulative = 0;
+
+  return monthsList.map(month => {
+    const monthStart = `${month}-01`;
+    const monthEnd = addMonthsClamped(monthStart, 1);
+    const label = month;
+
+    let paidInterest = 0;
+    let pendingInterest = 0;
+    const segments: DepositInterestSegment[] = [];
+
+    deposits.forEach(d => {
+      (d.accruals ?? []).forEach(a => {
+        const accrualDate = a.dueDate;
+        if (accrualDate >= monthStart && accrualDate < monthEnd) {
+          if (a.status === 'paid') {
+            paidInterest += a.amount;
+          } else {
+            pendingInterest += a.amount;
+          }
+          segments.push({
+            depositId: d.id,
+            depositName: d.name || d.bankName || '—',
+            bankName: d.bankName || '—',
+            amount: a.amount,
+            status: a.status,
+          });
+        }
+      });
+    });
+
+    const monthTotal = paidInterest + pendingInterest;
+    runningCumulative += monthTotal;
+
+    return {
+      monthKey: month,
+      label,
+      paidInterest,
+      pendingInterest,
+      total: monthTotal,
+      cumulativeTotal: runningCumulative,
+      segments,
+    };
+  });
+}
+
+export interface ActiveDepositProgress {
+  id: string;
+  name: string;
+  bankName: string;
+  amount: number;
+  interestRate: number;
+  startDate: string;
+  endDate: string;
+  isDemand: boolean;
+  accrualType: 'to_account' | 'capitalization';
+  progressPercent: number;
+  accruedProfit: number;
+  totalEstimatedReturn: number;
+  remainingDays: number | null;
+  nextAccrualDate: string | null;
+  nextAccrualAmount: number | null;
+}
+
+export function calcActiveDepositsProgress(
+  deposits: DepositRecord[],
+  asOfDate: string = getTodayStr()
+): ActiveDepositProgress[] {
+  const active = deposits.filter(d => d.status === 'active');
+  const nowMs = new Date(asOfDate).getTime();
+
+  return active.map(d => {
+    const isDemand = d.type === 'demand' || !d.termMonths || d.termMonths <= 0;
+    let endDate = '';
+    let progressPercent = 100;
+    let remainingDays: number | null = null;
+
+    if (!isDemand && d.startDate) {
+      try {
+        endDate = addMonthsClamped(d.startDate, d.termMonths);
+        const startMs = new Date(d.startDate).getTime();
+        const endMs = new Date(endDate).getTime();
+        const totalMs = endMs - startMs;
+        if (totalMs > 0) {
+          progressPercent = Math.min(100, Math.max(0, ((nowMs - startMs) / totalMs) * 100));
+        }
+        const diffDays = Math.ceil((endMs - nowMs) / (1000 * 60 * 60 * 24));
+        remainingDays = Math.max(0, diffDays);
+      } catch {
+        endDate = '';
+        progressPercent = 100;
+        remainingDays = null;
+      }
+    }
+
+    const paidProfit = (d.accruals ?? [])
+      .filter(a => a.status === 'paid')
+      .reduce((s, a) => s + a.amount, 0);
+
+    const totalProfit = (d.accruals ?? []).reduce((s, a) => s + a.amount, 0);
+    const accruedProfit = paidProfit;
+    const totalEstimatedReturn = d.amount + totalProfit;
+
+    const pendingAccruals = (d.accruals ?? [])
+      .filter(a => a.status === 'pending' && a.dueDate >= asOfDate)
+      .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+
+    const nextAccrual = pendingAccruals[0];
+    const nextAccrualDate = nextAccrual ? nextAccrual.dueDate : null;
+    const nextAccrualAmount = nextAccrual ? nextAccrual.amount : null;
+
+    return {
+      id: d.id,
+      name: d.name || d.bankName || '—',
+      bankName: d.bankName || '—',
+      amount: d.amount,
+      interestRate: d.interestRate,
+      startDate: d.startDate,
+      endDate,
+      isDemand,
+      accrualType: d.accrualType ?? 'to_account',
+      progressPercent,
+      accruedProfit,
+      totalEstimatedReturn,
+      remainingDays,
+      nextAccrualDate,
+      nextAccrualAmount,
+    };
+  });
+}
+
+

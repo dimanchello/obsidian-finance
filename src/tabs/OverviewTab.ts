@@ -29,6 +29,7 @@ import {
   OVERVIEW_SAVINGS_BENCHMARK,
   OVERVIEW_INPUT_DEBOUNCE_MS,
   PERCENT_100,
+  CHART_PALETTE,
 } from '../types';
 import {
   calcNetBalance,
@@ -43,13 +44,17 @@ import {
   calcDebtsBreakdown,
   filterRecordsByDateRange,
   calcGroupBreakdown,
+  calcDepositInterestOverTime,
+  calcActiveDepositsProgress,
   MonthGroup,
   CreditBurdenMonth,
   AssetLiabilityMonth,
   SavingsRateMonth,
+  DepositInterestMonth,
+  ActiveDepositProgress,
 } from '../domain/overviewMetrics';
 import { createChartTooltip, fmtShort, svg } from '../ui/chartHelpers';
-import { shiftMonths, getTodayStr } from '../utils';
+import { shiftMonths, getTodayStr, fmtDate } from '../utils';
 import { isoWeekRange, daysInMonth } from '../domain/dateMath';
 
 export class OverviewTab {
@@ -143,6 +148,7 @@ export class OverviewTab {
     this.renderCreditBurdenChart(chartsWrap, today);
     this.renderAssetLiabilityChart(chartsWrap, today);
     this.renderDebtsBreakdownChart(chartsWrap, data.debts);
+    this.renderDepositsOverviewSection(chartsWrap, today);
   }
 
   private renderFilterBar(): void {
@@ -437,6 +443,7 @@ export class OverviewTab {
         stroke: 'var(--text-accent)',
         'stroke-width': OVERVIEW_LINE_STROKE_W,
         fill: 'none',
+        'stroke-dasharray': '4,4',
       });
       svg_el.appendChild(netLine);
     }
@@ -1067,7 +1074,6 @@ export class OverviewTab {
     }
 
     const breakdown = calcDebtsBreakdown(activeDebts);
-    const maxVal = Math.max(...breakdown.map(b => Math.max(b.lent, b.borrowed))) || 1;
     const list = chartWrap.createDiv('finance-breakdown-list');
 
     breakdown.forEach(item => {
@@ -1111,11 +1117,14 @@ export class OverviewTab {
         row.createDiv({ text: `↑ ${tr.overviewDebtsLent}`, cls: 'finance-breakdown-bar-label' });
         const track = row.createDiv('finance-breakdown-bar-track');
         const fill = track.createDiv('finance-breakdown-bar-fill income');
-        const pct = Math.max(OVERVIEW_MIN_BAR_PCT, (item.lent / maxVal) * PERCENT_100);
+
+        const maxLent = Math.max(...breakdown.map(b => b.lent));
+        const pct = maxLent > 0 ? (item.lent / maxLent) * 100 : 0;
         fill.style.width = `${pct}%`;
         row.createDiv({ text: `+${this.fmt(item.lent)}`, cls: 'finance-breakdown-bar-amount income' });
 
-        const tipText = `${item.person}\n${tr.overviewDebtsLent}: ${this.fmt(item.lent)}`;
+        const repaidPct = item.lentRepaidPct;
+        const tipText = `${item.person}\n${tr.overviewDebtsLent}: ${this.fmt(item.lent)}\n${tr.overviewDebtsRepaid}: ${this.fmt(item.lentRepaid)} (${repaidPct}%)`;
         row.addEventListener('mouseenter', e => this.tooltip.showTip(e, tipText));
         row.addEventListener('mousemove', e => this.tooltip.showTip(e, tipText));
         row.addEventListener('mouseleave', () => this.tooltip.hideTip());
@@ -1126,15 +1135,286 @@ export class OverviewTab {
         row.createDiv({ text: `↓ ${tr.overviewDebtsBorrowed}`, cls: 'finance-breakdown-bar-label' });
         const track = row.createDiv('finance-breakdown-bar-track');
         const fill = track.createDiv('finance-breakdown-bar-fill expense');
-        const pct = Math.max(OVERVIEW_MIN_BAR_PCT, (item.borrowed / maxVal) * PERCENT_100);
+
+        const maxBorrowed = Math.max(...breakdown.map(b => b.borrowed));
+        const pct = maxBorrowed > 0 ? (item.borrowed / maxBorrowed) * 100 : 0;
         fill.style.width = `${pct}%`;
         row.createDiv({ text: `-${this.fmt(item.borrowed)}`, cls: 'finance-breakdown-bar-amount expense' });
 
-        const tipText = `${item.person}\n${tr.overviewDebtsBorrowed}: ${this.fmt(item.borrowed)}`;
+        const repaidPct = item.borrowedRepaidPct;
+        const tipText = `${item.person}\n${tr.overviewDebtsBorrowed}: ${this.fmt(item.borrowed)}\n${tr.overviewDebtsPaid}: ${this.fmt(item.borrowedRepaid)} (${repaidPct}%)`;
         row.addEventListener('mouseenter', e => this.tooltip.showTip(e, tipText));
         row.addEventListener('mousemove', e => this.tooltip.showTip(e, tipText));
         row.addEventListener('mouseleave', () => this.tooltip.hideTip());
       }
+    });
+  }
+
+  private renderDepositsOverviewSection(parent: HTMLElement, today: string): void {
+    const { data, tr } = this.ctx;
+    if (!data) return;
+
+    const chartWrap = parent.createDiv('finance-chart-wrap finance-chart-wrap-full');
+    chartWrap.createEl('h3', { text: tr.overviewDepositsSummary, cls: 'finance-chart-title' });
+
+    const deposits = data.deposits ?? [];
+    if (deposits.length === 0) {
+      chartWrap.createEl('p', { text: tr.overviewNoDeposits, cls: 'finance-no-data' });
+      return;
+    }
+
+    const depositColorMap = new Map<string, string>();
+    deposits.forEach((d, idx) => {
+      const color = CHART_PALETTE[idx % CHART_PALETTE.length] ?? 'var(--color-green)';
+      depositColorMap.set(d.id, color);
+    });
+
+    const interestData = calcDepositInterestOverTime(
+      deposits,
+      this.state.overviewDateFrom,
+      this.state.overviewDateTo,
+      today,
+      OVERVIEW_TREND_MONTHS
+    );
+
+    const hasInterestData = interestData.length > 0 && interestData.some(d => d.total > 0);
+
+    if (hasInterestData) {
+      const legend = chartWrap.createDiv('finance-chart-legend');
+
+      deposits.forEach(d => {
+        const color = depositColorMap.get(d.id) ?? 'var(--color-green)';
+        const item = legend.createDiv('finance-chart-legend-item');
+        const dot = item.createSpan({ cls: 'finance-chart-legend-dot' });
+        dot.style.background = color;
+        item.createSpan({ text: d.name || d.bankName || '—' });
+      });
+
+      const itemCumulative = legend.createDiv('finance-chart-legend-item');
+      const dotCum = itemCumulative.createSpan({ cls: 'finance-chart-legend-dot' });
+      dotCum.style.background = 'var(--color-green)';
+      itemCumulative.createSpan({ text: tr.overviewDepositCumulativeProfit });
+
+      const maxMonthlyValue = Math.max(...interestData.map(d => d.total));
+      const maxCumulativeValue = Math.max(...interestData.map(d => d.cumulativeTotal)) || 1;
+
+      const minGroupW = this.ctx.isMobile ? OVERVIEW_MIN_GROUP_W_MOBILE : OVERVIEW_MIN_GROUP_W;
+      const containerWidth = chartWrap.clientWidth || 400;
+      const calculatedWidth = OVERVIEW_CHART_PAD_LEFT + interestData.length * minGroupW + OVERVIEW_CHART_PAD_RIGHT;
+      const chartWidth = Math.max(containerWidth, calculatedWidth);
+
+      const plotWidth = chartWidth - OVERVIEW_CHART_PAD_LEFT - OVERVIEW_CHART_PAD_RIGHT;
+      const plotHeight = OVERVIEW_CHART_HEIGHT - OVERVIEW_CHART_PAD_TOP - OVERVIEW_CHART_PAD_BOTTOM;
+
+      const spacing = plotWidth / interestData.length;
+      const barWidth = Math.min(OVERVIEW_MAX_BAR_W, Math.max(4, spacing - OVERVIEW_BAR_SPACING_PAD));
+
+      const scrollWrap = chartWrap.createDiv('finance-overview-chart-scroll');
+      const svg_el = svg('svg', {
+        width: chartWidth,
+        height: OVERVIEW_CHART_HEIGHT,
+        viewBox: `0 0 ${chartWidth} ${OVERVIEW_CHART_HEIGHT}`,
+        class: 'finance-chart-svg',
+      });
+
+      const baselineY = OVERVIEW_CHART_PAD_TOP + plotHeight;
+
+      for (let i = 0; i <= OVERVIEW_Y_TICKS; i++) {
+        const y = OVERVIEW_CHART_PAD_TOP + plotHeight * (1 - i / OVERVIEW_Y_TICKS);
+        const line = svg('line', {
+          x1: OVERVIEW_CHART_PAD_LEFT,
+          y1: y,
+          x2: OVERVIEW_CHART_PAD_LEFT + plotWidth,
+          y2: y,
+          stroke: 'var(--background-modifier-border)',
+          'stroke-width': 1,
+          'stroke-dasharray': '2,2',
+        });
+        svg_el.appendChild(line);
+
+        const label = svg('text', {
+          x: OVERVIEW_CHART_PAD_LEFT - 8,
+          y: y + 4,
+          'text-anchor': 'end',
+          fill: 'var(--text-muted)',
+          'font-size': '11px',
+        });
+        label.textContent = fmtShort((maxMonthlyValue * i) / OVERVIEW_Y_TICKS);
+        svg_el.appendChild(label);
+      }
+
+      const cumulativePoints: { x: number; y: number; item: DepositInterestMonth }[] = [];
+
+      interestData.forEach((d: DepositInterestMonth, i: number) => {
+        const x = OVERVIEW_CHART_PAD_LEFT + i * spacing + (spacing - barWidth) / 2;
+        const cx = x + barWidth / 2;
+
+        let accumulatedHeight = 0;
+
+        d.segments.forEach(seg => {
+          if (seg.amount <= 0) return;
+          const segHeight = maxMonthlyValue > 0 ? (seg.amount / maxMonthlyValue) * plotHeight : 0;
+          const segY = baselineY - accumulatedHeight - segHeight;
+          const segColor = depositColorMap.get(seg.depositId) ?? 'var(--color-green)';
+          const isPending = seg.status === 'pending';
+
+          const rect = svg('rect', {
+            x: x,
+            y: segY,
+            width: Math.max(1, barWidth),
+            height: Math.max(1, segHeight),
+            fill: segColor,
+            opacity: isPending ? 0.55 : 1,
+            stroke: isPending ? segColor : 'none',
+            'stroke-width': isPending ? 1 : 0,
+            'stroke-dasharray': isPending ? '2,2' : '',
+            rx: OVERVIEW_BAR_RADIUS,
+            class: 'finance-chart-bar-hover',
+          });
+
+          const statusLabel = isPending ? tr.overviewDepositPending : tr.overviewDepositAccrued;
+          const tipText = `${seg.depositName} (${seg.bankName})\n${statusLabel}: ${this.fmt(seg.amount)}\n${d.label}`;
+          rect.addEventListener('mouseenter', e => this.tooltip.showTip(e, tipText));
+          rect.addEventListener('mousemove', e => this.tooltip.showTip(e, tipText));
+          rect.addEventListener('mouseleave', () => this.tooltip.hideTip());
+          svg_el.appendChild(rect);
+
+          accumulatedHeight += segHeight;
+        });
+
+        if (d.cumulativeTotal > 0 && maxCumulativeValue > 0) {
+          const cumY = baselineY - Math.min(plotHeight, (d.cumulativeTotal / maxMonthlyValue) * plotHeight);
+          cumulativePoints.push({ x: cx, y: cumY, item: d });
+        }
+
+        const label = svg('text', {
+          x: cx,
+          y: baselineY + OVERVIEW_LABEL_OFFSET_Y,
+          'text-anchor': 'middle',
+          fill: 'var(--text-muted)',
+          'font-size': '11px',
+        });
+        label.textContent = d.label.slice(5);
+        svg_el.appendChild(label);
+      });
+
+      if (cumulativePoints.length > 1) {
+        const pathD = cumulativePoints.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+        const cumLine = svg('path', {
+          d: pathD,
+          stroke: 'var(--color-green)',
+          'stroke-width': OVERVIEW_LINE_STROKE_W,
+          fill: 'none',
+          'stroke-dasharray': '4,4',
+        });
+        svg_el.appendChild(cumLine);
+      }
+
+      cumulativePoints.forEach(p => {
+        const point = svg('circle', {
+          cx: p.x,
+          cy: p.y,
+          r: OVERVIEW_POINT_RADIUS,
+          fill: 'var(--color-green)',
+          class: 'finance-chart-point',
+        });
+        const tipText = `${p.item.label}\n${tr.overviewDepositCumulativeProfit}: ${this.fmt(p.item.cumulativeTotal)}`;
+        point.addEventListener('mouseenter', e => {
+          point.setAttribute('r', String(OVERVIEW_POINT_RADIUS_HOVER));
+          this.tooltip.showTip(e, tipText);
+        });
+        point.addEventListener('mousemove', e => this.tooltip.showTip(e, tipText));
+        point.addEventListener('mouseleave', () => {
+          point.setAttribute('r', String(OVERVIEW_POINT_RADIUS));
+          this.tooltip.hideTip();
+        });
+        svg_el.appendChild(point);
+      });
+
+      scrollWrap.appendChild(svg_el);
+    }
+
+    const activeDeposits = calcActiveDepositsProgress(deposits, today);
+    const section = chartWrap.createDiv('finance-deposits-overview-section');
+
+    if (activeDeposits.length === 0) {
+      section.createEl('p', { text: tr.overviewNoActiveDeposits, cls: 'finance-no-data' });
+      return;
+    }
+
+    const grid = section.createDiv('finance-deposits-overview-grid');
+
+    activeDeposits.forEach((dep: ActiveDepositProgress) => {
+      const card = grid.createDiv('finance-deposit-overview-card is-clickable');
+      card.title = `${tr.deposits} → ${dep.name}`;
+
+      card.addEventListener('click', () => {
+        this.tooltip.hideTip();
+        this.ctx.state.depositExpandedId = dep.id;
+        this.ctx.state.depositPage = 0;
+        this.ctx.saveState();
+        this.onNavigate?.('deposits');
+      });
+
+      const depositColor = depositColorMap.get(dep.id) ?? 'var(--color-green)';
+
+      const header = card.createDiv('finance-deposit-overview-header');
+      const nameWrap = header.createDiv('finance-deposit-overview-name-wrap');
+
+      const dot = nameWrap.createSpan({ cls: 'finance-deposit-overview-dot' });
+      dot.style.background = depositColor;
+
+      const nameEl = nameWrap.createDiv('finance-deposit-overview-name');
+      nameEl.textContent = dep.name;
+      nameEl.title = dep.name;
+
+      if (dep.bankName && dep.bankName !== '—') {
+        const bankEl = nameWrap.createDiv('finance-deposit-overview-bank');
+        bankEl.textContent = dep.bankName;
+      }
+
+      const badges = header.createDiv('finance-deposit-overview-badges');
+      const accrualTypeBadge = badges.createDiv('finance-deposit-badge accrual-type');
+      accrualTypeBadge.textContent =
+        dep.accrualType === 'capitalization'
+          ? tr.overviewDepositCapitalization
+          : tr.overviewDepositToAccount;
+
+      const remainingBadge = badges.createDiv('finance-deposit-badge remaining');
+      if (dep.isDemand) {
+        remainingBadge.textContent = tr.overviewDepositDemand;
+      } else if (dep.remainingDays !== null) {
+        remainingBadge.textContent = `⏳ ${tr.overviewDepositRemainingDays} ${dep.remainingDays} ${tr.overviewDaysShort}`;
+      } else {
+        remainingBadge.textContent = '—';
+      }
+
+      const bodyRow = card.createDiv('finance-deposit-overview-body-row');
+
+      const col1 = bodyRow.createDiv('finance-deposit-stat-col');
+      col1.createDiv({ text: tr.overviewDepositBodyAmount, cls: 'finance-deposit-stat-lbl' });
+      const val1 = col1.createDiv('finance-deposit-stat-val');
+      val1.createSpan({ text: this.fmt(dep.amount) });
+      val1.createSpan({ text: ` (${dep.interestRate}%)`, cls: 'finance-deposit-rate-tag' });
+
+      const col2 = bodyRow.createDiv('finance-deposit-stat-col');
+      col2.createDiv({ text: tr.overviewDepositNextPayout, cls: 'finance-deposit-stat-lbl' });
+      const val2 = col2.createDiv('finance-deposit-stat-val success');
+      if (dep.nextAccrualDate) {
+        val2.textContent = `${fmtDate(dep.nextAccrualDate)} · +${this.fmt(dep.nextAccrualAmount ?? 0)}`;
+      } else {
+        val2.textContent = '—';
+      }
+
+      const col3 = bodyRow.createDiv('finance-deposit-stat-col');
+      col3.createDiv({ text: tr.overviewDepositTotalReturn, cls: 'finance-deposit-stat-lbl' });
+      const val3 = col3.createDiv('finance-deposit-stat-val bold');
+      val3.textContent = this.fmt(dep.totalEstimatedReturn);
+
+      const progressWrap = card.createDiv('finance-deposit-progress');
+      const fill = progressWrap.createDiv('finance-deposit-progress-fill');
+      fill.style.width = `${dep.progressPercent}%`;
+      fill.style.background = depositColor;
     });
   }
 

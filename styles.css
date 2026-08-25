@@ -3356,6 +3356,176 @@
 .finance-breakdown-bar-amount.income { color: #16a34a; }
 .finance-breakdown-bar-amount.expense { color: #dc2626; }
 
+/* Full-width chart card */
+.finance-chart-wrap-full {
+  grid-column: 1 / -1;
+  padding: 12px 14px;
+}
+
+/* Deposits overview section */
+.finance-deposits-overview-section {
+  margin-top: 8px;
+  border-top: 1px solid var(--ft-border);
+  padding-top: 8px;
+}
+
+.finance-deposits-overview-title {
+  font-size: 0.85em;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.finance-deposits-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+@media (max-width: 600px) {
+  .finance-deposits-overview-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.finance-deposit-overview-card {
+  background: var(--background-primary);
+  border: 1px solid var(--ft-border);
+  border-radius: var(--ft-radius);
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+
+.finance-deposit-overview-card.is-clickable {
+  cursor: pointer;
+}
+
+.finance-deposit-overview-card.is-clickable:hover {
+  border-color: var(--text-accent);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.finance-deposit-overview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.finance-deposit-overview-name-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.finance-deposit-overview-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.finance-deposit-overview-name {
+  font-weight: 600;
+  font-size: 0.9em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.finance-deposit-overview-bank {
+  font-size: 0.75em;
+  color: var(--text-muted);
+  background: var(--background-secondary);
+  padding: 2px 6px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.finance-deposit-overview-badges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.finance-deposit-badge {
+  font-size: 0.72em;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--background-secondary);
+  color: var(--text-muted);
+}
+
+.finance-deposit-badge.remaining {
+  background: rgba(var(--color-blue-rgb, 59, 130, 246), 0.12);
+  color: var(--color-blue, #3b82f6);
+  font-weight: 600;
+}
+
+.finance-deposit-overview-body-row {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: flex-start;
+  gap: 8px;
+  padding-top: 2px;
+}
+
+.finance-deposit-stat-col {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.finance-deposit-stat-col:first-child {
+  align-items: flex-start;
+  text-align: left;
+}
+
+.finance-deposit-stat-col:nth-child(2) {
+  align-items: center;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.finance-deposit-stat-col:last-child {
+  align-items: flex-end;
+  text-align: right;
+}
+
+.finance-deposit-stat-lbl {
+  font-size: 0.72em;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.finance-deposit-stat-val {
+  font-size: 0.84em;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.finance-deposit-stat-val.success {
+  color: #16a34a;
+}
+
+.finance-deposit-stat-val.bold {
+  color: var(--text-normal);
+}
+
+.finance-deposit-rate-tag {
+  color: var(--text-accent);
+  font-size: 0.9em;
+  font-weight: normal;
+}
+
 @media (max-width: 768px) {
   .finance-overview-cards {
     grid-template-columns: repeat(3, minmax(0, 1fr));

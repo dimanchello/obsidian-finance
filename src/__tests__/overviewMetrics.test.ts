@@ -6,7 +6,8 @@ import {
   groupRecordsByMonth, calcCreditBurdenOverTime,
   calcAssetsLiabilitiesOverTime, filterRecordsByDateRange,
   calcGroupBreakdown, calcSavingsRateOverTime,
-  calcDebtsBreakdown,
+  calcDebtsBreakdown, calcDepositInterestOverTime,
+  calcActiveDepositsProgress,
 } from '../domain/overviewMetrics';
 
 function rec(overrides: Partial<FinanceRecord> = {}): FinanceRecord {
@@ -359,9 +360,18 @@ describe('calcSavingsRateOverTime', () => {
 });
 
 describe('calcDebtsBreakdown', () => {
-  it('агрегирует долги по людям', () => {
+  it('агрегирует долги по людям и рассчитывает прогресс возврата', () => {
     const debts = [
-      debt({ person: 'Иван', amount: 5000, direction: 'lent' }),
+      debt({
+        person: 'Иван',
+        amount: 5000,
+        direction: 'lent',
+        originalAmount: 6000,
+        movements: [
+          { id: 'm1', type: 'borrow', amount: 6000, date: '2026-01-01', time: '', createdAt: 1, note: '' },
+          { id: 'm2', type: 'repay', amount: 1000, date: '2026-02-01', time: '', createdAt: 2, note: '' },
+        ],
+      }),
       debt({ person: 'Иван', amount: 2000, direction: 'borrowed' }),
       debt({ person: 'Анна', amount: 3000, direction: 'borrowed' }),
     ];
@@ -370,6 +380,9 @@ describe('calcDebtsBreakdown', () => {
     expect(breakdown).toHaveLength(2);
     const ivan = breakdown.find(b => b.person === 'Иван');
     expect(ivan?.lent).toBe(5000);
+    expect(ivan?.lentRepaid).toBe(1000);
+    expect(ivan?.lentTotal).toBe(6000);
+    expect(ivan?.lentRepaidPct).toBe(17);
     expect(ivan?.borrowed).toBe(2000);
     expect(ivan?.net).toBe(3000);
 
@@ -379,3 +392,130 @@ describe('calcDebtsBreakdown', () => {
     expect(anna?.net).toBe(-3000);
   });
 });
+
+describe('calcDepositInterestOverTime', () => {
+  it('агрегирует выплаченные и плановые проценты по месяцам', () => {
+    const deposits = [
+      deposit({
+        accruals: [
+          { id: 'a1', amount: 500, dueDate: '2026-01-15', status: 'paid', paidDate: '2026-01-15' },
+          { id: 'a2', amount: 600, dueDate: '2026-02-15', status: 'pending' },
+          { id: 'a3', amount: 400, dueDate: '2026-02-20', status: 'paid', paidDate: '2026-02-20' },
+        ],
+      }),
+    ];
+
+    const result = calcDepositInterestOverTime(deposits, '2026-01-01', '2026-02-28');
+    expect(result).toHaveLength(2);
+    expect(result[0].monthKey).toBe('2026-01');
+    expect(result[0].paidInterest).toBe(500);
+    expect(result[0].pendingInterest).toBe(0);
+    expect(result[0].total).toBe(500);
+
+    expect(result[1].monthKey).toBe('2026-02');
+    expect(result[1].paidInterest).toBe(400);
+    expect(result[1].pendingInterest).toBe(600);
+    expect(result[1].total).toBe(1000);
+  });
+
+  it('возвращает нули для месяцев без начислений', () => {
+    const result = calcDepositInterestOverTime([], '2026-01-01', '2026-01-31');
+    expect(result).toHaveLength(1);
+    expect(result[0].paidInterest).toBe(0);
+    expect(result[0].pendingInterest).toBe(0);
+    expect(result[0].total).toBe(0);
+  });
+
+  it('включает будущие месяцы с плановыми начислениями при отсутствии фильтра по датам', () => {
+    const deposits = [
+      deposit({
+        accruals: [
+          { id: 'a1', amount: 500, dueDate: '2026-07-15', status: 'paid', paidDate: '2026-07-15' },
+          { id: 'a2', amount: 500, dueDate: '2026-08-15', status: 'paid', paidDate: '2026-08-15' },
+          { id: 'a3', amount: 500, dueDate: '2026-09-15', status: 'pending' },
+          { id: 'a4', amount: 500, dueDate: '2026-10-15', status: 'pending' },
+          { id: 'a5', amount: 500, dueDate: '2026-11-15', status: 'pending' },
+        ],
+      }),
+    ];
+
+    const result = calcDepositInterestOverTime(deposits, '', '', '2026-08-25');
+    const months = result.map(r => r.monthKey);
+    expect(months).toContain('2026-07');
+    expect(months).toContain('2026-08');
+    expect(months).toContain('2026-09');
+    expect(months).toContain('2026-10');
+    expect(months).toContain('2026-11');
+
+    const nov = result.find(r => r.monthKey === '2026-11');
+    expect(nov?.pendingInterest).toBe(500);
+    expect(nov?.paidInterest).toBe(0);
+    expect(nov?.cumulativeTotal).toBe(2500);
+    expect(nov?.segments).toHaveLength(1);
+    expect(nov?.segments[0].amount).toBe(500);
+    expect(nov?.segments[0].status).toBe('pending');
+  });
+});
+
+describe('calcActiveDepositsProgress', () => {
+  it('рассчитывает прогресс срока, дату окончания и прибыль для активных вкладов', () => {
+    const deposits = [
+      deposit({
+        id: 'dep1',
+        name: 'Накопительный',
+        bankName: 'Сбер',
+        amount: 100000,
+        interestRate: 16,
+        startDate: '2026-01-01',
+        termMonths: 12,
+        status: 'active',
+        accrualType: 'capitalization',
+        accruals: [
+          { id: 'a1', amount: 1300, dueDate: '2026-02-01', status: 'paid', paidDate: '2026-02-01' },
+          { id: 'a2', amount: 1300, dueDate: '2026-08-01', status: 'pending' },
+        ],
+      }),
+      deposit({
+        id: 'dep2',
+        status: 'closed',
+      }),
+    ];
+
+    const result = calcActiveDepositsProgress(deposits, '2026-07-01');
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe('dep1');
+    expect(result[0].name).toBe('Накопительный');
+    expect(result[0].bankName).toBe('Сбер');
+    expect(result[0].amount).toBe(100000);
+    expect(result[0].interestRate).toBe(16);
+    expect(result[0].endDate).toBe('2027-01-01');
+    expect(result[0].isDemand).toBe(false);
+    expect(result[0].accrualType).toBe('capitalization');
+    expect(result[0].progressPercent).toBeGreaterThan(45);
+    expect(result[0].progressPercent).toBeLessThan(55);
+    expect(result[0].accruedProfit).toBe(1300);
+    expect(result[0].totalEstimatedReturn).toBe(102600);
+    expect(result[0].remainingDays).toBeGreaterThan(180);
+    expect(result[0].nextAccrualDate).toBe('2026-08-01');
+    expect(result[0].nextAccrualAmount).toBe(1300);
+  });
+
+  it('корректно обрабатывает бессрочные вклады (до востребования)', () => {
+    const deposits = [
+      deposit({
+        id: 'dep_demand',
+        type: 'demand',
+        termMonths: 0,
+        status: 'active',
+      }),
+    ];
+
+    const result = calcActiveDepositsProgress(deposits, '2026-06-01');
+    expect(result).toHaveLength(1);
+    expect(result[0].isDemand).toBe(true);
+    expect(result[0].endDate).toBe('');
+    expect(result[0].progressPercent).toBe(100);
+    expect(result[0].remainingDays).toBeNull();
+  });
+});
+

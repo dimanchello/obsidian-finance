@@ -594,6 +594,23 @@ export interface Translations {
   savingsTarget: string;
   savingsModerate: string;
   savingsDeficit: string;
+  overviewDepositsSummary: string;
+  overviewNoDeposits: string;
+  overviewNoActiveDeposits: string;
+  overviewDepositDemand: string;
+  overviewDepositAccrued: string;
+  overviewDepositPending: string;
+  overviewDepositTerm: string;
+  overviewDepositRemainingDays: string;
+  overviewDepositNextPayout: string;
+  overviewDepositTotalReturn: string;
+  overviewDepositCapitalization: string;
+  overviewDepositToAccount: string;
+  overviewDepositCumulativeProfit: string;
+  overviewDepositBodyAmount: string;
+  overviewDebtsRepaid: string;
+  overviewDebtsPaid: string;
+  overviewDaysShort: string;
 }
 
 const ru: Translations = {
@@ -1179,6 +1196,23 @@ const ru: Translations = {
   savingsTarget: '≥ 20% (цель)',
   savingsModerate: '0–20% (ниже нормы)',
   savingsDeficit: '< 0% (дефицит)',
+  overviewDepositsSummary: 'Вклады и доходность',
+  overviewNoDeposits: 'Нет данных о вкладах',
+  overviewNoActiveDeposits: 'Нет активных вкладов',
+  overviewDepositDemand: 'До востребования',
+  overviewDepositAccrued: 'Начислено',
+  overviewDepositPending: 'Ожидается',
+  overviewDepositTerm: 'Срок',
+  overviewDepositRemainingDays: 'Осталось',
+  overviewDepositNextPayout: 'След. выплата',
+  overviewDepositTotalReturn: 'К возврату',
+  overviewDepositCapitalization: 'Капитализация',
+  overviewDepositToAccount: 'На счёт',
+  overviewDepositCumulativeProfit: 'Накопленный доход',
+  overviewDepositBodyAmount: 'Тело вклада',
+  overviewDebtsRepaid: 'Возвращено',
+  overviewDebtsPaid: 'Выплачено',
+  overviewDaysShort: 'дн.',
 };
 
 const en: Translations = {
@@ -1764,6 +1798,23 @@ const en: Translations = {
   savingsTarget: '≥ 20% (target)',
   savingsModerate: '0–20% (below target)',
   savingsDeficit: '< 0% (deficit)',
+  overviewDepositsSummary: 'Deposits & Yield',
+  overviewNoDeposits: 'No deposit data',
+  overviewNoActiveDeposits: 'No active deposits',
+  overviewDepositDemand: 'On demand',
+  overviewDepositAccrued: 'Accrued',
+  overviewDepositPending: 'Expected',
+  overviewDepositTerm: 'Term',
+  overviewDepositRemainingDays: 'Remaining',
+  overviewDepositNextPayout: 'Next payout',
+  overviewDepositTotalReturn: 'Total return',
+  overviewDepositCapitalization: 'Capitalization',
+  overviewDepositToAccount: 'To account',
+  overviewDepositCumulativeProfit: 'Cumulative profit',
+  overviewDepositBodyAmount: 'Principal',
+  overviewDebtsRepaid: 'Repaid',
+  overviewDebtsPaid: 'Paid off',
+  overviewDaysShort: 'd',
 };
 
 const translations: Record<Locale, Translations> = { ru, en };
