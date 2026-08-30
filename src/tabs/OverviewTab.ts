@@ -14,8 +14,6 @@ import {
   OVERVIEW_CHART_PAD_TOP,
   OVERVIEW_CHART_PAD_BOTTOM,
   OVERVIEW_LABEL_OFFSET_Y,
-  OVERVIEW_BAR_GAP,
-  OVERVIEW_GROUP_GAP,
   OVERVIEW_MIN_GROUP_W,
   OVERVIEW_MIN_GROUP_W_MOBILE,
   OVERVIEW_Y_TICKS,
@@ -37,18 +35,12 @@ import {
   calcLiabilities,
   calcCreditBurden,
   calcUpcomingPayments,
-  groupRecordsByMonth,
-  calcCreditBurdenOverTime,
-  calcAssetsLiabilitiesOverTime,
   calcSavingsRateOverTime,
   calcDebtsBreakdown,
   filterRecordsByDateRange,
   calcGroupBreakdown,
   calcDepositInterestOverTime,
   calcActiveDepositsProgress,
-  MonthGroup,
-  CreditBurdenMonth,
-  AssetLiabilityMonth,
   SavingsRateMonth,
   DepositInterestMonth,
   ActiveDepositProgress,
@@ -56,12 +48,20 @@ import {
 import { createChartTooltip, fmtShort, svg } from '../ui/chartHelpers';
 import { shiftMonths, getTodayStr, fmtDate } from '../utils';
 import { isoWeekRange, daysInMonth } from '../domain/dateMath';
+import { MoneyFlowChart } from '../ui/charts/MoneyFlowChart';
+import { AssetsChart } from '../ui/charts/AssetsChart';
+import { BurdenChart } from '../ui/charts/BurdenChart';
 
 export class OverviewTab {
   private el: HTMLElement;
   private ctx: ViewContext;
   private tooltip = createChartTooltip();
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+  // Chart components
+  private moneyFlowChart: MoneyFlowChart;
+  private assetsChart: AssetsChart;
+  private burdenChart: BurdenChart;
 
   public onNavigate?: (mode: 'records' | 'debts' | 'credits' | 'deposits' | 'currency') => void;
 
@@ -74,6 +74,9 @@ export class OverviewTab {
   constructor(el: HTMLElement, ctx: ViewContext) {
     this.el = el;
     this.ctx = ctx;
+    this.moneyFlowChart = new MoneyFlowChart(ctx);
+    this.assetsChart = new AssetsChart(ctx);
+    this.burdenChart = new BurdenChart(ctx);
   }
 
   private debouncedRenderBody(): void {
@@ -142,11 +145,11 @@ export class OverviewTab {
     this.renderKpiCards(filteredRecords, today);
 
     const chartsWrap = this.bodyEl.createDiv('finance-overview-charts');
-    this.renderMoneyFlowChart(chartsWrap, filteredRecords);
+    this.moneyFlowChart.render(chartsWrap, filteredRecords);
     this.renderBreakdownChart(chartsWrap, filteredRecords);
     this.renderSavingsRateChart(chartsWrap, data.records, today);
-    this.renderCreditBurdenChart(chartsWrap, today);
-    this.renderAssetLiabilityChart(chartsWrap, today);
+    this.burdenChart.render(chartsWrap, data.credits, data.records, this.state.overviewDateFrom, this.state.overviewDateTo, today);
+    this.assetsChart.render(chartsWrap, data.deposits, data.exchanges, data.credits, data.debts, this.state.overviewDateFrom, this.state.overviewDateTo, today);
     this.renderDebtsBreakdownChart(chartsWrap, data.debts);
     this.renderDepositsOverviewSection(chartsWrap, today);
   }
@@ -313,163 +316,6 @@ export class OverviewTab {
       upcoming > 0 ? 'expense' : 'neutral',
       '📅'
     );
-  }
-
-  private renderMoneyFlowChart(parent: HTMLElement, records: FinanceRecord[]): void {
-    const { tr } = this.ctx;
-
-    const chartWrap = parent.createDiv('finance-chart-wrap');
-    chartWrap.createEl('h3', { text: tr.overviewMoneyFlow, cls: 'finance-chart-title' });
-
-    const groups = groupRecordsByMonth(records);
-    if (groups.length === 0) {
-      chartWrap.createEl('p', { text: tr.noChartData, cls: 'finance-no-data' });
-      return;
-    }
-
-    const maxValue = Math.max(
-      ...groups.map((g: MonthGroup) => Math.max(g.income, g.expense))
-    );
-
-    const minGroupW = this.ctx.isMobile ? OVERVIEW_MIN_GROUP_W_MOBILE : OVERVIEW_MIN_GROUP_W;
-    const containerWidth = chartWrap.clientWidth || 400;
-    const calculatedWidth = OVERVIEW_CHART_PAD_LEFT + groups.length * minGroupW + OVERVIEW_CHART_PAD_RIGHT;
-    const chartWidth = Math.max(containerWidth, calculatedWidth);
-
-    const plotWidth = chartWidth - OVERVIEW_CHART_PAD_LEFT - OVERVIEW_CHART_PAD_RIGHT;
-    const plotHeight = OVERVIEW_CHART_HEIGHT - OVERVIEW_CHART_PAD_TOP - OVERVIEW_CHART_PAD_BOTTOM;
-
-    const groupWidth = plotWidth / groups.length;
-    const rawBarWidth = (groupWidth - OVERVIEW_GROUP_GAP - OVERVIEW_BAR_GAP) / 2;
-    const barWidth = Math.min(OVERVIEW_MAX_BAR_W, Math.max(2, rawBarWidth));
-
-    const scrollWrap = chartWrap.createDiv('finance-overview-chart-scroll');
-    const svg_el = svg('svg', {
-      width: chartWidth,
-      height: OVERVIEW_CHART_HEIGHT,
-      viewBox: `0 0 ${chartWidth} ${OVERVIEW_CHART_HEIGHT}`,
-      class: 'finance-chart-svg',
-    });
-
-    const baselineY = OVERVIEW_CHART_PAD_TOP + plotHeight;
-
-    for (let i = 0; i <= OVERVIEW_Y_TICKS; i++) {
-      const y = OVERVIEW_CHART_PAD_TOP + plotHeight * (1 - i / OVERVIEW_Y_TICKS);
-      const line = svg('line', {
-        x1: OVERVIEW_CHART_PAD_LEFT,
-        y1: y,
-        x2: OVERVIEW_CHART_PAD_LEFT + plotWidth,
-        y2: y,
-        stroke: 'var(--background-modifier-border)',
-        'stroke-width': 1,
-        'stroke-dasharray': '2,2',
-      });
-      svg_el.appendChild(line);
-
-      const label = svg('text', {
-        x: OVERVIEW_CHART_PAD_LEFT - 8,
-        y: y + 4,
-        'text-anchor': 'end',
-        fill: 'var(--text-muted)',
-        'font-size': '11px',
-      });
-      label.textContent = fmtShort((maxValue * i) / OVERVIEW_Y_TICKS);
-      svg_el.appendChild(label);
-    }
-
-    const netPoints: { x: number; y: number; group: MonthGroup }[] = [];
-
-    groups.forEach((g: MonthGroup, i: number) => {
-      const cx = OVERVIEW_CHART_PAD_LEFT + i * groupWidth + groupWidth / 2;
-
-      if (g.income > 0) {
-        const incomeHeight = maxValue > 0 ? (g.income / maxValue) * plotHeight : 0;
-        const incomeBar = svg('rect', {
-          x: cx - barWidth - OVERVIEW_BAR_GAP / 2,
-          y: baselineY - incomeHeight,
-          width: barWidth,
-          height: incomeHeight,
-          fill: 'var(--color-green)',
-          rx: OVERVIEW_BAR_RADIUS,
-          class: 'finance-chart-bar-hover',
-        });
-        const tipText = `${g.label}\n${tr.income}: ${this.fmt(g.income)}`;
-        incomeBar.addEventListener('mouseenter', e => this.tooltip.showTip(e, tipText));
-        incomeBar.addEventListener('mousemove', e => this.tooltip.showTip(e, tipText));
-        incomeBar.addEventListener('mouseleave', () => this.tooltip.hideTip());
-        svg_el.appendChild(incomeBar);
-      }
-
-      if (g.expense > 0) {
-        const expenseHeight = maxValue > 0 ? (g.expense / maxValue) * plotHeight : 0;
-        const expenseBar = svg('rect', {
-          x: cx + OVERVIEW_BAR_GAP / 2,
-          y: baselineY - expenseHeight,
-          width: barWidth,
-          height: expenseHeight,
-          fill: 'var(--color-red)',
-          rx: OVERVIEW_BAR_RADIUS,
-          class: 'finance-chart-bar-hover',
-        });
-        const tipText = `${g.label}\n${tr.expense}: ${this.fmt(g.expense)}`;
-        expenseBar.addEventListener('mouseenter', e => this.tooltip.showTip(e, tipText));
-        expenseBar.addEventListener('mousemove', e => this.tooltip.showTip(e, tipText));
-        expenseBar.addEventListener('mouseleave', () => this.tooltip.hideTip());
-        svg_el.appendChild(expenseBar);
-      }
-
-      const net = g.income - g.expense;
-      const netY =
-        maxValue > 0
-          ? baselineY - Math.max(0, (net / maxValue) * plotHeight)
-          : baselineY;
-      netPoints.push({ x: cx, y: netY, group: g });
-
-      const label = svg('text', {
-        x: cx,
-        y: baselineY + OVERVIEW_LABEL_OFFSET_Y,
-        'text-anchor': 'middle',
-        fill: 'var(--text-muted)',
-        'font-size': '11px',
-      });
-      label.textContent = g.label;
-      svg_el.appendChild(label);
-    });
-
-    if (netPoints.length > 1) {
-      const pathD = netPoints.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
-      const netLine = svg('path', {
-        d: pathD,
-        stroke: 'var(--text-accent)',
-        'stroke-width': OVERVIEW_LINE_STROKE_W,
-        fill: 'none',
-        'stroke-dasharray': '4,4',
-      });
-      svg_el.appendChild(netLine);
-    }
-
-    netPoints.forEach(p => {
-      const point = svg('circle', {
-        cx: p.x,
-        cy: p.y,
-        r: OVERVIEW_POINT_RADIUS,
-        fill: 'var(--text-accent)',
-        class: 'finance-chart-point',
-      });
-      const tipText = `${p.group.label}\n${tr.balance}: ${(p.group.net >= 0 ? '+' : '') + this.fmt(p.group.net)}`;
-      point.addEventListener('mouseenter', e => {
-        point.setAttribute('r', String(OVERVIEW_POINT_RADIUS_HOVER));
-        this.tooltip.showTip(e, tipText);
-      });
-      point.addEventListener('mousemove', e => this.tooltip.showTip(e, tipText));
-      point.addEventListener('mouseleave', () => {
-        point.setAttribute('r', String(OVERVIEW_POINT_RADIUS));
-        this.tooltip.hideTip();
-      });
-      svg_el.appendChild(point);
-    });
-
-    scrollWrap.appendChild(svg_el);
   }
 
   private renderBreakdownChart(parent: HTMLElement, records: FinanceRecord[]): void {
@@ -729,333 +575,6 @@ export class OverviewTab {
       });
       label.textContent = d.label.slice(5);
       svg_el.appendChild(label);
-    });
-
-    scrollWrap.appendChild(svg_el);
-  }
-
-  private renderCreditBurdenChart(parent: HTMLElement, today: string): void {
-    const { data, tr } = this.ctx;
-    if (!data) return;
-
-    const chartWrap = parent.createDiv('finance-chart-wrap');
-    chartWrap.createEl('h3', { text: tr.overviewCreditBurdenChart, cls: 'finance-chart-title' });
-
-    const burdenData = calcCreditBurdenOverTime(
-      data.credits,
-      data.records,
-      this.state.overviewDateFrom,
-      this.state.overviewDateTo,
-      today,
-      OVERVIEW_TREND_MONTHS
-    );
-
-    if (burdenData.length === 0 || burdenData.every(d => d.total === 0)) {
-      chartWrap.createEl('p', { text: tr.noChartData, cls: 'finance-no-data' });
-      return;
-    }
-
-    const maxValue = Math.max(...burdenData.map(d => d.total));
-    const minGroupW = this.ctx.isMobile ? OVERVIEW_MIN_GROUP_W_MOBILE : OVERVIEW_MIN_GROUP_W;
-    const containerWidth = chartWrap.clientWidth || 400;
-    const calculatedWidth = OVERVIEW_CHART_PAD_LEFT + burdenData.length * minGroupW + OVERVIEW_CHART_PAD_RIGHT;
-    const chartWidth = Math.max(containerWidth, calculatedWidth);
-
-    const plotWidth = chartWidth - OVERVIEW_CHART_PAD_LEFT - OVERVIEW_CHART_PAD_RIGHT;
-    const plotHeight = OVERVIEW_CHART_HEIGHT - OVERVIEW_CHART_PAD_TOP - OVERVIEW_CHART_PAD_BOTTOM;
-
-    const spacing = plotWidth / burdenData.length;
-    const barWidth = Math.min(OVERVIEW_MAX_BAR_W, Math.max(4, spacing - OVERVIEW_BAR_SPACING_PAD));
-
-    const scrollWrap = chartWrap.createDiv('finance-overview-chart-scroll');
-    const svg_el = svg('svg', {
-      width: chartWidth,
-      height: OVERVIEW_CHART_HEIGHT,
-      viewBox: `0 0 ${chartWidth} ${OVERVIEW_CHART_HEIGHT}`,
-      class: 'finance-chart-svg',
-    });
-
-    const baselineY = OVERVIEW_CHART_PAD_TOP + plotHeight;
-
-    for (let i = 0; i <= OVERVIEW_Y_TICKS; i++) {
-      const y = OVERVIEW_CHART_PAD_TOP + plotHeight * (1 - i / OVERVIEW_Y_TICKS);
-      const line = svg('line', {
-        x1: OVERVIEW_CHART_PAD_LEFT,
-        y1: y,
-        x2: OVERVIEW_CHART_PAD_LEFT + plotWidth,
-        y2: y,
-        stroke: 'var(--background-modifier-border)',
-        'stroke-width': 1,
-        'stroke-dasharray': '2,2',
-      });
-      svg_el.appendChild(line);
-
-      const label = svg('text', {
-        x: OVERVIEW_CHART_PAD_LEFT - 8,
-        y: y + 4,
-        'text-anchor': 'end',
-        fill: 'var(--text-muted)',
-        'font-size': '11px',
-      });
-      label.textContent = fmtShort((maxValue * i) / OVERVIEW_Y_TICKS);
-      svg_el.appendChild(label);
-    }
-
-    const burdenPoints: { x: number; y: number; item: CreditBurdenMonth }[] = [];
-
-    burdenData.forEach((d: CreditBurdenMonth, i: number) => {
-      const x = OVERVIEW_CHART_PAD_LEFT + i * spacing + (spacing - barWidth) / 2;
-
-      if (d.principal > 0) {
-        const principalHeight = maxValue > 0 ? (d.principal / maxValue) * plotHeight : 0;
-        const principalBar = svg('rect', {
-          x: x,
-          y: baselineY - principalHeight,
-          width: Math.max(1, barWidth),
-          height: principalHeight,
-          fill: 'var(--color-blue)',
-          rx: OVERVIEW_BAR_RADIUS,
-          class: 'finance-chart-bar-hover',
-        });
-        const tipText = `${d.label}\n${tr.creditPrincipal ?? 'Основной долг'}: ${this.fmt(d.principal)}`;
-        principalBar.addEventListener('mouseenter', e => this.tooltip.showTip(e, tipText));
-        principalBar.addEventListener('mousemove', e => this.tooltip.showTip(e, tipText));
-        principalBar.addEventListener('mouseleave', () => this.tooltip.hideTip());
-        svg_el.appendChild(principalBar);
-      }
-
-      if (d.interest > 0) {
-        const principalHeight = maxValue > 0 ? (d.principal / maxValue) * plotHeight : 0;
-        const interestHeight = maxValue > 0 ? (d.interest / maxValue) * plotHeight : 0;
-        const interestBar = svg('rect', {
-          x: x,
-          y: baselineY - principalHeight - interestHeight,
-          width: Math.max(1, barWidth),
-          height: interestHeight,
-          fill: 'var(--color-orange)',
-          rx: OVERVIEW_BAR_RADIUS,
-          class: 'finance-chart-bar-hover',
-        });
-        const tipText = `${d.label}\n${tr.creditInterest ?? 'Проценты'}: ${this.fmt(d.interest)}`;
-        interestBar.addEventListener('mouseenter', e => this.tooltip.showTip(e, tipText));
-        interestBar.addEventListener('mousemove', e => this.tooltip.showTip(e, tipText));
-        interestBar.addEventListener('mouseleave', () => this.tooltip.hideTip());
-        svg_el.appendChild(interestBar);
-      }
-
-      if (d.burdenPercent !== null) {
-        const burdenY = baselineY - Math.min(plotHeight, Math.max(0, (d.burdenPercent / PERCENT_100) * plotHeight));
-        burdenPoints.push({ x: x + barWidth / 2, y: burdenY, item: d });
-      }
-
-      const label = svg('text', {
-        x: x + barWidth / 2,
-        y: baselineY + OVERVIEW_LABEL_OFFSET_Y,
-        'text-anchor': 'middle',
-        fill: 'var(--text-muted)',
-        'font-size': '11px',
-      });
-      label.textContent = d.label.slice(5);
-      svg_el.appendChild(label);
-    });
-
-    if (burdenPoints.length > 1) {
-      const pathD = burdenPoints.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
-      const burdenLine = svg('path', {
-        d: pathD,
-        stroke: 'var(--text-accent)',
-        'stroke-width': OVERVIEW_LINE_STROKE_W,
-        fill: 'none',
-        'stroke-dasharray': '4,4',
-      });
-      svg_el.appendChild(burdenLine);
-    }
-
-    burdenPoints.forEach(p => {
-      const point = svg('circle', {
-        cx: p.x,
-        cy: p.y,
-        r: OVERVIEW_POINT_RADIUS,
-        fill: 'var(--text-accent)',
-        class: 'finance-chart-point',
-      });
-      const tipText = `${p.item.label}\n${tr.overviewCreditBurden}: ${p.item.burdenPercent !== null ? p.item.burdenPercent.toFixed(1) + '%' : '—'}\n${tr.total}: ${this.fmt(p.item.total)}`;
-      point.addEventListener('mouseenter', e => {
-        point.setAttribute('r', String(OVERVIEW_POINT_RADIUS_HOVER));
-        this.tooltip.showTip(e, tipText);
-      });
-      point.addEventListener('mousemove', e => this.tooltip.showTip(e, tipText));
-      point.addEventListener('mouseleave', () => {
-        point.setAttribute('r', String(OVERVIEW_POINT_RADIUS));
-        this.tooltip.hideTip();
-      });
-      svg_el.appendChild(point);
-    });
-
-    scrollWrap.appendChild(svg_el);
-  }
-
-  private renderAssetLiabilityChart(parent: HTMLElement, today: string): void {
-    const { data, tr } = this.ctx;
-    if (!data) return;
-
-    const chartWrap = parent.createDiv('finance-chart-wrap');
-    chartWrap.createEl('h3', { text: tr.overviewAssetLiabilityTrend, cls: 'finance-chart-title' });
-
-    const trendData = calcAssetsLiabilitiesOverTime(
-      data.deposits,
-      data.exchanges,
-      data.credits,
-      data.debts,
-      this.state.overviewDateFrom,
-      this.state.overviewDateTo,
-      today,
-      OVERVIEW_TREND_MONTHS
-    );
-
-    if (trendData.length === 0) {
-      chartWrap.createEl('p', { text: tr.noChartData, cls: 'finance-no-data' });
-      return;
-    }
-
-    const maxValue = Math.max(...trendData.map(d => Math.max(d.assets, d.liabilities)));
-    const minGroupW = this.ctx.isMobile ? OVERVIEW_MIN_GROUP_W_MOBILE : OVERVIEW_MIN_GROUP_W;
-    const containerWidth = chartWrap.clientWidth || 400;
-    const calculatedWidth = OVERVIEW_CHART_PAD_LEFT + trendData.length * minGroupW + OVERVIEW_CHART_PAD_RIGHT;
-    const chartWidth = Math.max(containerWidth, calculatedWidth);
-
-    const plotWidth = chartWidth - OVERVIEW_CHART_PAD_LEFT - OVERVIEW_CHART_PAD_RIGHT;
-    const plotHeight = OVERVIEW_CHART_HEIGHT - OVERVIEW_CHART_PAD_TOP - OVERVIEW_CHART_PAD_BOTTOM;
-
-    const scrollWrap = chartWrap.createDiv('finance-overview-chart-scroll');
-    const svg_el = svg('svg', {
-      width: chartWidth,
-      height: OVERVIEW_CHART_HEIGHT,
-      viewBox: `0 0 ${chartWidth} ${OVERVIEW_CHART_HEIGHT}`,
-      class: 'finance-chart-svg',
-    });
-
-    const baselineY = OVERVIEW_CHART_PAD_TOP + plotHeight;
-
-    for (let i = 0; i <= OVERVIEW_Y_TICKS; i++) {
-      const y = OVERVIEW_CHART_PAD_TOP + plotHeight * (1 - i / OVERVIEW_Y_TICKS);
-      const line = svg('line', {
-        x1: OVERVIEW_CHART_PAD_LEFT,
-        y1: y,
-        x2: OVERVIEW_CHART_PAD_LEFT + plotWidth,
-        y2: y,
-        stroke: 'var(--background-modifier-border)',
-        'stroke-width': 1,
-        'stroke-dasharray': '2,2',
-      });
-      svg_el.appendChild(line);
-
-      const label = svg('text', {
-        x: OVERVIEW_CHART_PAD_LEFT - 8,
-        y: y + 4,
-        'text-anchor': 'end',
-        fill: 'var(--text-muted)',
-        'font-size': '11px',
-      });
-      label.textContent = fmtShort((maxValue * i) / OVERVIEW_Y_TICKS);
-      svg_el.appendChild(label);
-    }
-
-    const xStep = plotWidth / Math.max(1, trendData.length - 1);
-    const assetsPoints: string[] = [];
-    const liabilitiesPoints: string[] = [];
-    const assetPointCoords: { x: number; y: number; item: AssetLiabilityMonth }[] = [];
-    const liabilityPointCoords: { x: number; y: number; item: AssetLiabilityMonth }[] = [];
-
-    trendData.forEach((d: AssetLiabilityMonth, i: number) => {
-      const x = OVERVIEW_CHART_PAD_LEFT + i * xStep;
-      const assetsY =
-        maxValue > 0 ? baselineY - Math.min(plotHeight, Math.max(0, (d.assets / maxValue) * plotHeight)) : baselineY;
-      const liabilitiesY =
-        maxValue > 0
-          ? baselineY - Math.min(plotHeight, Math.max(0, (d.liabilities / maxValue) * plotHeight))
-          : baselineY;
-
-      assetsPoints.push(`${i === 0 ? 'M' : 'L'} ${x} ${assetsY}`);
-      liabilitiesPoints.push(`${i === 0 ? 'M' : 'L'} ${x} ${liabilitiesY}`);
-      assetPointCoords.push({ x, y: assetsY, item: d });
-      liabilityPointCoords.push({ x, y: liabilitiesY, item: d });
-
-      const label = svg('text', {
-        x: x,
-        y: baselineY + OVERVIEW_LABEL_OFFSET_Y,
-        'text-anchor': 'middle',
-        fill: 'var(--text-muted)',
-        'font-size': '11px',
-      });
-      label.textContent = d.label.slice(5);
-      svg_el.appendChild(label);
-    });
-
-    const lastX = OVERVIEW_CHART_PAD_LEFT + (trendData.length - 1) * xStep;
-    const bottomY = baselineY;
-
-    const assetsAreaPoints = [...assetsPoints, `L ${lastX} ${bottomY}`, `L ${OVERVIEW_CHART_PAD_LEFT} ${bottomY}`, 'Z'];
-    const liabilitiesAreaPoints = [...liabilitiesPoints, `L ${lastX} ${bottomY}`, `L ${OVERVIEW_CHART_PAD_LEFT} ${bottomY}`, 'Z'];
-
-    const assetsPath = svg('path', {
-      d: assetsAreaPoints.join(' '),
-      fill: 'var(--color-green)',
-      'fill-opacity': '0.15',
-      stroke: 'var(--color-green)',
-      'stroke-width': OVERVIEW_LINE_STROKE_W,
-    });
-    svg_el.appendChild(assetsPath);
-
-    const liabilitiesPath = svg('path', {
-      d: liabilitiesAreaPoints.join(' '),
-      fill: 'var(--color-red)',
-      'fill-opacity': '0.15',
-      stroke: 'var(--color-red)',
-      'stroke-width': OVERVIEW_LINE_STROKE_W,
-    });
-    svg_el.appendChild(liabilitiesPath);
-
-    assetPointCoords.forEach(p => {
-      const point = svg('circle', {
-        cx: p.x,
-        cy: p.y,
-        r: OVERVIEW_POINT_RADIUS,
-        fill: 'var(--color-green)',
-        class: 'finance-chart-point',
-      });
-      const tipText = `${p.item.label}\n${tr.overviewAssets}: ${this.fmt(p.item.assets)}`;
-      point.addEventListener('mouseenter', e => {
-        point.setAttribute('r', String(OVERVIEW_POINT_RADIUS_HOVER));
-        this.tooltip.showTip(e, tipText);
-      });
-      point.addEventListener('mousemove', e => this.tooltip.showTip(e, tipText));
-      point.addEventListener('mouseleave', () => {
-        point.setAttribute('r', String(OVERVIEW_POINT_RADIUS));
-        this.tooltip.hideTip();
-      });
-      svg_el.appendChild(point);
-    });
-
-    liabilityPointCoords.forEach(p => {
-      const point = svg('circle', {
-        cx: p.x,
-        cy: p.y,
-        r: OVERVIEW_POINT_RADIUS,
-        fill: 'var(--color-red)',
-        class: 'finance-chart-point',
-      });
-      const tipText = `${p.item.label}\n${tr.overviewLiabilities}: ${this.fmt(p.item.liabilities)}`;
-      point.addEventListener('mouseenter', e => {
-        point.setAttribute('r', String(OVERVIEW_POINT_RADIUS_HOVER));
-        this.tooltip.showTip(e, tipText);
-      });
-      point.addEventListener('mousemove', e => this.tooltip.showTip(e, tipText));
-      point.addEventListener('mouseleave', () => {
-        point.setAttribute('r', String(OVERVIEW_POINT_RADIUS));
-        this.tooltip.hideTip();
-      });
-      svg_el.appendChild(point);
     });
 
     scrollWrap.appendChild(svg_el);
