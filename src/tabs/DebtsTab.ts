@@ -2,7 +2,7 @@ import { fmtDate } from "../utils";
 import { Notice } from 'obsidian';
 import { ViewContext } from '../context';
 import {
-  DebtRecord, DebtMovement, FinanceRecord, RecordType,
+  DebtRecord, DebtMovement,
   DebtSortField, PLURAL_THRESHOLD,
   DEFAULT_DEBT_FILTER,
 } from '../types';
@@ -10,15 +10,16 @@ import { DebtModal } from '../DebtModal';
 import { DebtMovementModal } from '../DebtMovementModal';
 import { ConfirmModal } from '../ConfirmModal';
 import { sumMoney } from '../domain/money';
-import { getTodayTime } from '../utils';
 import { DataTable, FilterControl } from '../ui/DataTable';
 import { renderMobileCard, renderSummaryCard, compareValues, dateRangeControls } from '../ui/tabHelpers';
 import { getDebtOriginal, getDebtWithInterest, getDebtRemaining, isDebtPaidOff } from '../domain/debtCalculations';
+import { AccountCommands } from '../domain/AccountCommands';
 
 export class DebtsTab {
   private ctx: ViewContext;
   private el: HTMLElement;
   private table: DataTable<DebtRecord>;
+  private commands: AccountCommands;
   onUpdate: (() => void) | null = null;
 
   private get tr() { return this.ctx.tr; }
@@ -26,6 +27,7 @@ export class DebtsTab {
   constructor(ctx: ViewContext, el: HTMLElement) {
     this.ctx = ctx;
     this.el = el;
+    this.commands = new AccountCommands(ctx.storage, ctx.accountId);
 
     this.table = new DataTable<DebtRecord>({
       ctx,
@@ -109,7 +111,7 @@ export class DebtsTab {
       emptyState: { icon: '💳', title: this.tr.noDebts, subtitle: this.tr.addNewDebt },
       emptyFiltered: { icon: '🔍', title: this.tr.noDebtsFiltered, subtitle: this.tr.tryChangeFilters },
       onBulkDelete: async ids => {
-        await this.ctx.storage.deleteDebtsWithLinkedRecords(this.ctx.accountId, ids);
+        await this.commands.deleteDebts(ids);
         await this.reload(this.tr.deleted);
       },
       confirmBulkDeleteText: count => this.tr.confirmDeleteSelectedDebts.replace('{count}', String(count)),
@@ -304,30 +306,12 @@ export class DebtsTab {
     });
   }
 
-  // ── Reload + mirrored record helpers ─────────────────────────────────────
+  // ── Reload helper ────────────────────────────────────────────────────────
 
   private async reload(notice: string): Promise<void> {
     this.ctx.data = await this.ctx.storage.load(this.ctx.accountId);
     this.onUpdate?.();
     new Notice(notice);
-  }
-
-  private mirrorRecord(debt: DebtRecord, mov: { id: string; date: string; time: string; amount: number }, type: RecordType, note: string): FinanceRecord {
-    return {
-      id: crypto.randomUUID(),
-      createdAt: Date.now(),
-      date: mov.date,
-      time: mov.time || getTodayTime(),
-      type,
-      amount: mov.amount,
-      category: this.tr.debtDefaultCat,
-      tag: '',
-      payer: debt.person,
-      note,
-      attachmentPath: '',
-      linkedId: debt.id,
-      linkedMovementId: mov.id,
-    };
   }
 
   // ── Modals ──────────────────────────────────────────────────────────────
@@ -338,7 +322,6 @@ export class DebtsTab {
       title: this.tr.addNewDebt,
       allPersons: this.ctx.data.payers,
       onSave: async debt => {
-        const note = debt.direction === 'lent' ? this.tr.lentGiven : this.tr.borrowedTaken;
         const initialMovement: DebtMovement = {
           id: crypto.randomUUID(),
           type: 'borrow',
@@ -346,16 +329,14 @@ export class DebtsTab {
           date: debt.date,
           time: debt.time,
           createdAt: debt.createdAt,
-          note,
+          note: debt.direction === 'lent' ? this.tr.lentGiven : this.tr.borrowedTaken,
         };
-        debt.movements = [initialMovement];
-        await this.ctx.storage.addDebt(this.ctx.accountId, debt);
-
-        const recType: RecordType = debt.direction === 'lent' ? 'expense' : 'income';
-        const recNote = debt.direction === 'lent'
-          ? `${this.tr.debtLentNote}: ${debt.person}`
-          : `${this.tr.debtBorrowedNote}: ${debt.person}`;
-        await this.ctx.storage.addRecord(this.ctx.accountId, this.mirrorRecord(debt, initialMovement, recType, recNote));
+        await this.commands.addDebt(
+          debt,
+          initialMovement,
+          this.tr.debtDefaultCat,
+          { lentNote: this.tr.debtLentNote, borrowedNote: this.tr.debtBorrowedNote }
+        );
         await this.reload(this.tr.debtAdded);
       },
     }).open();
@@ -382,10 +363,12 @@ export class DebtsTab {
       remainingAmount: getDebtRemaining(debt),
       currency: this.ctx.currency,
       onSave: async mov => {
-        await this.ctx.storage.addDebtMovement(this.ctx.accountId, debt.id, mov);
-        const recType: RecordType = debt.direction === 'lent' ? 'income' : 'expense';
-        await this.ctx.storage.addRecord(this.ctx.accountId,
-          this.mirrorRecord(debt, mov, recType, `${this.tr.debtRepayNote}: ${debt.person}`));
+        await this.commands.addDebtMovement(
+          debt.id,
+          mov,
+          this.tr.debtDefaultCat,
+          `${this.tr.debtRepayNote}: ${debt.person}`
+        );
         await this.reload(this.tr.repaymentRecorded);
       },
     }).open();
@@ -396,10 +379,12 @@ export class DebtsTab {
       title: `${this.tr.borrowMore} — ${debt.person}`,
       type: 'borrow',
       onSave: async mov => {
-        await this.ctx.storage.addDebtMovement(this.ctx.accountId, debt.id, mov);
-        const recType: RecordType = debt.direction === 'lent' ? 'expense' : 'income';
-        await this.ctx.storage.addRecord(this.ctx.accountId,
-          this.mirrorRecord(debt, mov, recType, `${this.tr.debtBorrowMoreNote}: ${debt.person}`));
+        await this.commands.addDebtMovement(
+          debt.id,
+          mov,
+          this.tr.debtDefaultCat,
+          `${this.tr.debtBorrowMoreNote}: ${debt.person}`
+        );
         await this.reload(this.tr.debtAmountIncreased);
       },
     }).open();
@@ -412,18 +397,7 @@ export class DebtsTab {
       movement: mov,
       currency: this.ctx.currency,
       onSave: async updated => {
-        const oldDate = mov.date;
-        const oldAmount = mov.amount;
-        await this.ctx.storage.updateDebtMovement(this.ctx.accountId, debt.id, updated);
-
-        const linkedRec = this.ctx.data?.records.find(r =>
-          r.linkedId === debt.id && (r.linkedMovementId === mov.id || (r.date === oldDate && r.amount === oldAmount)));
-        if (linkedRec) {
-          linkedRec.date = updated.date;
-          linkedRec.amount = updated.amount;
-          linkedRec.time = updated.time || '';
-          await this.ctx.storage.updateRecord(this.ctx.accountId, linkedRec);
-        }
+        await this.commands.updateDebtMovement(debt.id, mov, updated);
         await this.reload(this.tr.debtUpdated);
       },
     }).open();
@@ -432,13 +406,7 @@ export class DebtsTab {
   private confirmDeleteMovement(debt: DebtRecord, mov: DebtMovement): void {
     const label = `${mov.type === 'borrow' ? '−' : '+'}${this.ctx.fmt(mov.amount)}  ·  ${fmtDate(mov.date, mov.time)}`;
     new ConfirmModal(this.ctx.app, `${this.tr.confirmDeleteMovement}\n${label}`, async () => {
-      await this.ctx.storage.deleteDebtMovement(this.ctx.accountId, debt.id, mov.id);
-
-      const linkedRec = this.ctx.data?.records.find(r =>
-        r.linkedId === debt.id && (r.linkedMovementId === mov.id || (r.date === mov.date && r.amount === mov.amount)));
-      if (linkedRec) {
-        await this.ctx.storage.deleteRecord(this.ctx.accountId, linkedRec.id);
-      }
+      await this.commands.deleteDebtMovement(debt.id, mov.id, mov.date, mov.amount);
       await this.reload(this.tr.debtDeleted);
     }).open();
   }
@@ -446,7 +414,7 @@ export class DebtsTab {
   private confirmDeleteDebt(debt: DebtRecord): void {
     const label = `${debt.person} · ${this.ctx.fmt(debt.amount)} · ${fmtDate(debt.date, debt.time)}`;
     new ConfirmModal(this.ctx.app, `${this.tr.confirmDeleteDebt}\n${label}`, async () => {
-      await this.ctx.storage.deleteDebtsWithLinkedRecords(this.ctx.accountId, [debt.id]);
+      await this.commands.deleteDebt(debt.id);
       await this.reload(this.tr.debtDeleted);
     }).open();
   }

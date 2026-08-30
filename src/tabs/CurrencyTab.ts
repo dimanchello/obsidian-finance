@@ -2,7 +2,7 @@ import { fmtDate } from "../utils";
 import { Notice } from 'obsidian';
 import { ViewContext } from '../context';
 import {
-  CurrencyExchange, CurrencyOperationType, FinanceRecord,
+  CurrencyExchange, CurrencyOperationType,
   CurrencySortField, DEFAULT_CURRENCY_FILTER, SortDir,
 } from '../types';
 import { CurrencyExchangeModal } from '../modals/CurrencyExchangeModal';
@@ -10,19 +10,22 @@ import { ConfirmModal } from '../ConfirmModal';
 import { getCurrencyBalances } from '../domain/currencyBalance';
 import { DataTable, FilterControl } from '../ui/DataTable';
 import { fmt } from '../utils';
+import { AccountCommands } from '../domain/AccountCommands';
 
 export class CurrencyTab {
   private ctx: ViewContext;
   private el: HTMLElement;
   private table: DataTable<CurrencyExchange>;
+  private commands: AccountCommands;
   private openPanel: 'analytics' | 'filters' | null = null;
   onUpdate: (() => void) | null = null;
-  
+
   private get tr() { return this.ctx.tr; }
 
   constructor(ctx: ViewContext, el: HTMLElement) {
     this.ctx = ctx;
     this.el = el;
+    this.commands = new AccountCommands(ctx.storage, ctx.accountId);
     
     this.table = new DataTable<CurrencyExchange>({
       ctx,
@@ -134,14 +137,7 @@ export class CurrencyTab {
       emptyState: { icon: '💱', title: this.tr.noRecords, subtitle: this.tr.newCurrencyExchange },
       emptyFiltered: { icon: '🔍', title: this.tr.noRecordsFilter, subtitle: this.tr.tryChangeFilters },
       onBulkDelete: async ids => {
-        const exchanges = (this.ctx.data?.exchanges ?? []).filter(e => ids.includes(e.id));
-        for (const ex of exchanges) {
-          await this.ctx.storage.deleteExchange(this.ctx.accountId, ex.id);
-          const linked = this.ctx.data!.records.find(r => r.linkedId === ex.id);
-          if (linked) {
-            await this.ctx.storage.deleteRecord(this.ctx.accountId, linked.id);
-          }
-        }
+        await this.commands.deleteExchanges(ids);
         await this.reload(this.tr.deleted);
       },
       confirmBulkDeleteText: count => this.tr.confirmDeleteSelectedExchanges?.replace('{count}', String(count)) ?? this.tr.confirmDeleteSelectedRecords?.replace('{count}', String(count)),
@@ -349,7 +345,7 @@ export class CurrencyTab {
       onSave: async (exchange) => {
         if (initial) {
           await this.ctx.storage.updateExchange(this.ctx.accountId, exchange);
-          
+
           if (initial.type === exchange.type && exchange.type !== 'add') {
             // Same type: just update the existing linked record
             const linked = this.ctx.data!.records.find(r => r.linkedId === exchange.id);
@@ -366,8 +362,6 @@ export class CurrencyTab {
             }
           } else {
             // Type changed: delete old record and create new one
-            // NOTE: This doesn't validate balance for the new transaction type.
-            // Changing 'spend' to 'buy' or vice versa can create balance issues.
             const linked = this.ctx.data!.records.find(r => r.linkedId === exchange.id);
             if (linked) {
               await this.ctx.storage.deleteRecord(this.ctx.accountId, linked.id);
@@ -400,7 +394,7 @@ export class CurrencyTab {
     return noteStr;
   }
 
-  private createFinanceRecordForExchange(exchange: CurrencyExchange): FinanceRecord {
+  private createFinanceRecordForExchange(exchange: CurrencyExchange) {
     const isExpense = exchange.type === 'buy' || exchange.type === 'spend';
     const { tr } = this.ctx;
 
@@ -416,7 +410,7 @@ export class CurrencyTab {
       createdAt: Date.now(),
       date: exchange.date,
       time: exchange.time,
-      type: isExpense ? 'expense' : 'income',
+      type: isExpense ? 'expense' as const : 'income' as const,
       amount: exchange.amountInAccountCurrency,
       category: catStr,
       tag: '',
@@ -428,14 +422,10 @@ export class CurrencyTab {
       isInternal: true,
     };
   }
-  
+
   private confirmDeleteExchange(exchange: CurrencyExchange): void {
     new ConfirmModal(this.ctx.app, this.tr.confirmDeleteSelectedExchanges?.replace('{count}', '1') ?? this.tr.confirmDeleteSelectedRecords?.replace('{count}', '1'), async () => {
-      await this.ctx.storage.deleteExchange(this.ctx.accountId, exchange.id);
-      const linked = this.ctx.data!.records.find(r => r.linkedId === exchange.id);
-      if (linked) {
-        await this.ctx.storage.deleteRecord(this.ctx.accountId, linked.id);
-      }
+      await this.commands.deleteExchange(exchange.id);
       await this.reload(this.tr.deleted);
     }).open();
   }

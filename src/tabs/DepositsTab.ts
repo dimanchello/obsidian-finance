@@ -2,7 +2,7 @@ import { fmtDate } from "../utils";
 import { Notice } from 'obsidian';
 import { ViewContext } from '../context';
 import {
-  DepositRecord, DepositTopUp, DepositWithdrawal, FinanceRecord,
+  DepositRecord, DepositTopUp, DepositWithdrawal,
   DepositSortField, PLURAL_THRESHOLD,
   DEFAULT_DEPOSIT_FILTER, DEPOSIT_ACCRUAL_PAGE_SIZE,
 } from '../types';
@@ -10,17 +10,18 @@ import { DepositModal } from '../DepositModal';
 import { DepositTopUpModal } from '../DepositTopUpModal';
 import { DepositWithdrawalModal } from '../DepositWithdrawalModal';
 import { ConfirmModal } from '../ConfirmModal';
-import { getTodayStr, getTodayTime } from '../utils';
 import { addMonthsClamped } from '../domain/dateMath';
 import { sumMoney } from '../domain/money';
 import { DataTable, FilterControl } from '../ui/DataTable';
 import { DepositsAnalyticsView } from '../DepositsAnalyticsView';
 import { renderMobileCard, renderSummaryCard, renderProgressBar, renderPaginatedSchedule, pageRange, dateRangeControls, compareValues } from '../ui/tabHelpers';
+import { AccountCommands } from '../domain/AccountCommands';
 
 export class DepositsTab {
   private ctx: ViewContext;
   private el: HTMLElement;
   private table: DataTable<DepositRecord>;
+  private commands: AccountCommands;
   private depositAccrualPages = new Map<string, number>();
   onUpdate: (() => void) | null = null;
 
@@ -29,6 +30,7 @@ export class DepositsTab {
   constructor(ctx: ViewContext, el: HTMLElement) {
     this.ctx = ctx;
     this.el = el;
+    this.commands = new AccountCommands(ctx.storage, ctx.accountId);
 
     this.table = new DataTable<DepositRecord>({
       ctx,
@@ -118,19 +120,7 @@ export class DepositsTab {
       emptyState: { icon: '📈', title: this.tr.noDeposits, subtitle: this.tr.addNewDebt },
       emptyFiltered: { icon: '🔍', title: this.tr.noDepositsFiltered, subtitle: this.tr.tryChangeFilters },
       onBulkDelete: async ids => {
-        const idSet = new Set(ids);
-        const depositsToDelete = (this.ctx.data?.deposits ?? []).filter(d => idSet.has(d.id));
-        await this.ctx.storage.deleteDepositsBatch(this.ctx.accountId, ids);
-
-        const otherRecords = this.ctx.data!.records.filter(r => !r.linkedId || !idSet.has(r.linkedId));
-        for (const deposit of depositsToDelete) {
-          if (deposit.status === 'active') {
-            const refund = this.refundRecord(deposit);
-            delete refund.linkedId;
-            otherRecords.push(refund);
-          }
-        }
-        await this.ctx.storage.saveAllRecords(this.ctx.accountId, otherRecords);
+        await this.commands.deleteDeposits(ids, this.tr.depositDefaultCat, this.tr.depositRefundNote);
         await this.reload(this.tr.deleted);
       },
       confirmBulkDeleteText: count => this.tr.confirmDeleteSelectedDeposits.replace('{count}', String(count)),
@@ -198,23 +188,6 @@ export class DepositsTab {
     } catch {
       return '';
     }
-  }
-
-  private refundRecord(deposit: DepositRecord): FinanceRecord {
-    return {
-      id: crypto.randomUUID(),
-      createdAt: Date.now(),
-      date: getTodayStr(),
-      time: getTodayTime(),
-      type: 'income',
-      amount: deposit.amount,
-      category: this.tr.depositRefundCat,
-      tag: '',
-      payer: deposit.bankName,
-      note: `${this.tr.depositRefundNote} "${deposit.name}"`,
-      attachmentPath: '',
-      linkedId: deposit.id,
-    };
   }
 
   // ── Stats ────────────────────────────────────────────────────────────────
@@ -497,12 +470,7 @@ export class DepositsTab {
   private confirmCloseDeposit(deposit: DepositRecord): void {
     const label = `${deposit.name} · ${this.ctx.fmt(deposit.amount)}`;
     new ConfirmModal(this.ctx.app, `${this.tr.confirmCloseDeposit}\n${label}`, async () => {
-      deposit.status = 'closed';
-      await this.ctx.storage.updateDeposit(this.ctx.accountId, deposit);
-
-      // Create refund record when manually closing deposit
-      await this.ctx.storage.addRecord(this.ctx.accountId, this.refundRecord(deposit));
-
+      await this.commands.closeDeposit(deposit, this.tr.depositDefaultCat, this.tr.depositRefundNote);
       await this.reload(this.tr.depositClosed);
     }).open();
   }
@@ -513,14 +481,7 @@ export class DepositsTab {
       ? `\n\n${this.tr.closeDepositRefund.replace('{amount}', this.ctx.fmt(deposit.amount))}`
       : '';
     new ConfirmModal(this.ctx.app, `${this.tr.confirmDeleteDeposit}${refundNote}\n\n${label}`, async () => {
-      await this.ctx.storage.deleteDeposit(this.ctx.accountId, deposit.id);
-      const otherRecords = this.ctx.data!.records.filter(r => r.linkedId !== deposit.id);
-      if (deposit.status === 'active') {
-        const refund = this.refundRecord(deposit);
-        delete refund.linkedId;
-        otherRecords.push(refund);
-      }
-      await this.ctx.storage.saveAllRecords(this.ctx.accountId, otherRecords);
+      await this.commands.deleteDeposit(deposit.id, this.tr.depositDefaultCat, this.tr.depositRefundNote);
       await this.reload(this.tr.depositDeleted);
     }).open();
   }
@@ -530,7 +491,12 @@ export class DepositsTab {
       title: `💰 ${this.tr.topUp} — ${deposit.name}`,
       deposit,
       onSave: async topUp => {
-        await this.ctx.storage.addDepositTopUp(this.ctx.accountId, deposit.id, topUp);
+        await this.commands.addDepositTopUp(
+          deposit.id,
+          topUp,
+          this.tr.depositDefaultCat,
+          this.tr.depositTopUpNote
+        );
         await this.reload(this.tr.depositUpdated);
       },
     }).open();
@@ -539,12 +505,7 @@ export class DepositsTab {
   private confirmDeleteDepositTopUp(deposit: DepositRecord, topUp: DepositTopUp): void {
     const label = `${deposit.name} · ${this.ctx.fmt(topUp.amount)} · ${fmtDate(topUp.date, topUp.time)}`;
     new ConfirmModal(this.ctx.app, `${this.tr.confirmDeleteTopUp}\n${label}`, async () => {
-      await this.ctx.storage.deleteDepositTopUp(this.ctx.accountId, deposit.id, topUp.id);
-      const linkedRec = this.ctx.data?.records.find(r =>
-        r.linkedId === deposit.id && r.date === topUp.date && r.amount === topUp.amount && r.type === 'expense');
-      if (linkedRec) {
-        await this.ctx.storage.deleteRecord(this.ctx.accountId, linkedRec.id);
-      }
+      await this.commands.deleteDepositTopUp(deposit.id, topUp.id, topUp.date, topUp.amount);
       await this.reload(this.tr.deleted);
     }).open();
   }
@@ -557,7 +518,12 @@ export class DepositsTab {
       maxAmount: Math.max(0, deposit.amount - alreadyWithdrawn),
       currency: this.ctx.currency,
       onSave: async withdrawal => {
-        await this.ctx.storage.addDepositWithdrawal(this.ctx.accountId, deposit.id, withdrawal);
+        await this.commands.addDepositWithdrawal(
+          deposit.id,
+          withdrawal,
+          this.tr.depositDefaultCat,
+          this.tr.depositWithdrawNote
+        );
         await this.reload(this.tr.depositUpdated);
       },
     }).open();
@@ -566,12 +532,7 @@ export class DepositsTab {
   private confirmDeleteDepositWithdrawal(deposit: DepositRecord, withdrawal: DepositWithdrawal): void {
     const label = `${deposit.name} · ${this.ctx.fmt(withdrawal.amount)} · ${fmtDate(withdrawal.date, withdrawal.time)}`;
     new ConfirmModal(this.ctx.app, `${this.tr.confirmDeleteWithdrawal}\n${label}`, async () => {
-      await this.ctx.storage.deleteDepositWithdrawal(this.ctx.accountId, deposit.id, withdrawal.id);
-      const linkedRec = this.ctx.data?.records.find(r =>
-        r.linkedId === deposit.id && r.date === withdrawal.date && r.amount === withdrawal.amount && r.type === 'income');
-      if (linkedRec) {
-        await this.ctx.storage.deleteRecord(this.ctx.accountId, linkedRec.id);
-      }
+      await this.commands.deleteDepositWithdrawal(deposit.id, withdrawal.id, withdrawal.date, withdrawal.amount);
       await this.reload(this.tr.deleted);
     }).open();
   }

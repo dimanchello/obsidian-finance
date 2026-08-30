@@ -2,7 +2,7 @@ import { fmtDate } from "../utils";
 import { Notice } from 'obsidian';
 import { ViewContext } from '../context';
 import {
-  CreditRecord, FinanceRecord,
+  CreditRecord,
   CreditSortField, PLURAL_THRESHOLD,
   DEFAULT_CREDIT_FILTER, CREDIT_PAYMENT_PAGE_SIZE,
 } from '../types';
@@ -10,18 +10,19 @@ import { CreditModal } from '../CreditModal';
 import { CreditPaymentModal } from '../CreditPaymentModal';
 import { CreditEarlyRepaymentModal } from '../CreditEarlyRepaymentModal';
 import { ConfirmModal } from '../ConfirmModal';
-import { getTodayTime } from '../utils';
 import { addMonthsClamped } from '../domain/dateMath';
 import { sumMoney } from '../domain/money';
 import { calculatePaymentBreakdown, calculateRemainingPrincipal } from '../domain/creditCalculations';
 import { DataTable, FilterControl } from '../ui/DataTable';
 import { CreditsAnalyticsView } from '../CreditsAnalyticsView';
 import { renderMobileCard, renderSummaryCard, renderProgressBar, renderPaginatedSchedule, pageRange, dateRangeControls, compareValues } from '../ui/tabHelpers';
+import { AccountCommands } from '../domain/AccountCommands';
 
 export class CreditsTab {
   private ctx: ViewContext;
   private el: HTMLElement;
   private table: DataTable<CreditRecord>;
+  private commands: AccountCommands;
   private creditPaymentPages = new Map<string, number>();
 
   private get tr() { return this.ctx.tr; }
@@ -29,6 +30,7 @@ export class CreditsTab {
   constructor(ctx: ViewContext, el: HTMLElement) {
     this.ctx = ctx;
     this.el = el;
+    this.commands = new AccountCommands(ctx.storage, ctx.accountId);
 
     this.table = new DataTable<CreditRecord>({
       ctx,
@@ -109,7 +111,7 @@ export class CreditsTab {
       emptyState: { icon: '🏦', title: this.tr.noCredits, subtitle: this.tr.addNewDebt },
       emptyFiltered: { icon: '🔍', title: this.tr.noCreditsFiltered, subtitle: this.tr.tryChangeFilters },
       onBulkDelete: async ids => {
-        await this.ctx.storage.deleteCreditsWithLinkedRecords(this.ctx.accountId, ids);
+        await this.commands.deleteCredits(ids);
         await this.reload(this.tr.deleted);
       },
       confirmBulkDeleteText: count => this.tr.confirmDeleteSelectedCredits.replace('{count}', String(count)),
@@ -363,44 +365,12 @@ export class CreditsTab {
       banks: allBanks,
       pluginId: this.ctx.pluginId,
       records: [...this.ctx.data.records],
-      onSave: async (credit, updatedRecords) => {
-        await this.ctx.storage.addCredit(this.ctx.accountId, credit);
-        const nowTime = getTodayTime();
-        if (!credit.isEscrow && credit.type !== 'mortgage') {
-          updatedRecords.push({
-            id: crypto.randomUUID(),
-            createdAt: Date.now(),
-            date: credit.startDate,
-            time: nowTime,
-            type: 'income',
-            amount: credit.originalAmount,
-            category: this.tr.creditDefaultCat,
-            tag: '',
-            payer: credit.bankName,
-            note: `${this.tr.creditReceiptNote} "${credit.name}"`,
-            attachmentPath: '',
-            linkedId: credit.id,
-          });
-        }
-        for (const payment of credit.payments) {
-          if (payment.status === 'paid') {
-            updatedRecords.push({
-              id: crypto.randomUUID(),
-              createdAt: Date.now(),
-              date: payment.dueDate,
-              time: nowTime,
-              type: 'expense',
-              amount: payment.amount,
-              category: this.tr.creditDefaultCat,
-              tag: '',
-              payer: credit.bankName,
-              note: `${this.tr.creditPaymentNote} "${credit.name}"`,
-              attachmentPath: '',
-              linkedId: credit.id,
-            });
-          }
-        }
-        await this.ctx.storage.saveAllRecords(this.ctx.accountId, updatedRecords);
+      onSave: async (credit) => {
+        await this.commands.addCredit(
+          credit,
+          this.tr.creditDefaultCat,
+          { receiptNote: this.tr.creditReceiptNote, paymentNote: this.tr.creditPaymentNote }
+        );
         await this.reload(this.tr.creditAdded);
       },
     }).open();
@@ -415,64 +385,12 @@ export class CreditsTab {
       banks: allBanks,
       pluginId: this.ctx.pluginId,
       records: [...this.ctx.data.records],
-      onSave: async (updated, updatedRecords) => {
-        await this.ctx.storage.updateCredit(this.ctx.accountId, updated);
-        const nowTime = getTodayTime();
-
-        // Полный пересчёт: удаляем все автогенерированные записи для этого кредита.
-        // Записи с isInternal === false добавлены вручную пользователем (через кнопку «платёж»)
-        // — их сохраняем. Сохраняем также запись первоначального взноса.
-        updatedRecords = updatedRecords.filter(r =>
-          r.linkedId !== updated.id ||
-          r.id === updated.downPaymentRecordId ||
-          r.isInternal === false,
+      onSave: async (updated) => {
+        await this.commands.updateCredit(
+          updated,
+          this.tr.creditDefaultCat,
+          { receiptNote: this.tr.creditReceiptNote, paymentNote: this.tr.creditPaymentNote }
         );
-
-        // Доходная запись (получение кредита) — не создаём для ипотеки и эскроу
-        if (!updated.isEscrow && updated.type !== 'mortgage') {
-          updatedRecords.push({
-            id: crypto.randomUUID(),
-            createdAt: Date.now(),
-            date: updated.startDate,
-            time: nowTime,
-            type: 'income',
-            amount: updated.originalAmount,
-            category: this.tr.creditDefaultCat,
-            tag: '',
-            payer: updated.bankName,
-            note: `${this.tr.creditReceiptNote} "${updated.name}"`,
-            attachmentPath: '',
-            linkedId: updated.id,
-          });
-        }
-
-        // Расходные записи для оплаченных платежей — пропускаем те, для которых
-        // уже есть вручную добавленная запись с той же датой.
-        const manualExpenseDates = new Set(
-          updatedRecords
-            .filter(r => r.linkedId === updated.id && r.isInternal === false && r.type === 'expense')
-            .map(r => (r as FinanceRecord).date),
-        );
-        for (const payment of updated.payments) {
-          if (payment.status !== 'paid') continue;
-          if (manualExpenseDates.has(payment.dueDate)) continue;
-          updatedRecords.push({
-            id: crypto.randomUUID(),
-            createdAt: Date.now(),
-            date: payment.dueDate,
-            time: nowTime,
-            type: 'expense',
-            amount: payment.amount,
-            category: this.tr.creditDefaultCat,
-            tag: '',
-            payer: updated.bankName,
-            note: `${this.tr.creditPaymentNote} "${updated.name}"`,
-            attachmentPath: '',
-            linkedId: updated.id,
-          });
-        }
-
-        await this.ctx.storage.saveAllRecords(this.ctx.accountId, updatedRecords);
         await this.reload(this.tr.creditUpdated);
       },
     }).open();
@@ -491,24 +409,12 @@ export class CreditsTab {
         const updatedCredit = { ...credit, payments: [...credit.payments, payment] };
         updatedCredit.currentAmount = calculateRemainingPrincipal(updatedCredit);
         if (updatedCredit.currentAmount <= 0) updatedCredit.status = 'paid';
-        await this.ctx.storage.updateCredit(this.ctx.accountId, updatedCredit);
 
-        const rec: FinanceRecord = {
-          id: crypto.randomUUID(),
-          createdAt: Date.now(),
-          date: payment.dueDate,
-          time: '',
-          type: 'expense',
-          amount: payment.amount,
-          category: this.tr.creditDefaultCat,
-          tag: '',
-          payer: updatedCredit.bankName,
-          note: `${this.tr.creditPaymentNote} "${updatedCredit.name}"`,
-          attachmentPath: '',
-          isInternal: false,
-          linkedId: updatedCredit.id,
-        };
-        await this.ctx.storage.addRecord(this.ctx.accountId, rec);
+        await this.commands.updateCredit(
+          updatedCredit,
+          this.tr.creditDefaultCat,
+          { receiptNote: this.tr.creditReceiptNote, paymentNote: this.tr.creditPaymentNote }
+        );
         await this.reload(this.tr.creditPaymentRecorded);
       },
     }).open();
@@ -520,7 +426,11 @@ export class CreditsTab {
       credit,
       currency: this.ctx.currency,
       onSave: async updated => {
-        await this.ctx.storage.updateCredit(this.ctx.accountId, updated);
+        await this.commands.updateCredit(
+          updated,
+          this.tr.creditDefaultCat,
+          { receiptNote: this.tr.creditReceiptNote, paymentNote: this.tr.creditPaymentNote }
+        );
         await this.reload(this.tr.creditPaymentRecorded);
       },
     }).open();
@@ -529,7 +439,7 @@ export class CreditsTab {
   private confirmDeleteCredit(credit: CreditRecord): void {
     const label = `${credit.name} · ${this.ctx.fmt(credit.currentAmount)}`;
     new ConfirmModal(this.ctx.app, `${this.tr.confirmDeleteCredit}\n${label}`, async () => {
-      await this.ctx.storage.deleteCreditsWithLinkedRecords(this.ctx.accountId, [credit.id]);
+      await this.commands.deleteCredit(credit.id);
       await this.reload(this.tr.creditDeleted);
     }).open();
   }
