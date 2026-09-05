@@ -54,6 +54,14 @@ export abstract class EntityModal<T> extends FinanceBaseModal {
   protected abstract getTitle(): string;
 
   /**
+   * Override to label the save button with something other than save/add
+   * (e.g. "Пополнить", "Снять").
+   */
+  protected getSaveLabel(): string | undefined {
+    return undefined;
+  }
+
+  /**
    * Override to build form fields inside the form container
    */
   protected abstract buildForm(form: HTMLElement): void;
@@ -80,6 +88,7 @@ export abstract class EntityModal<T> extends FinanceBaseModal {
       onSave: () => this.handleSave(),
       onCancel: () => this.close(),
       isEdit: this.isEdit,
+      ...(this.getSaveLabel() !== undefined ? { saveText: this.getSaveLabel()! } : {}),
     });
 
     this.saveBtn = btnRow.querySelector('.finance-btn-save')!;

@@ -1,13 +1,14 @@
 import { App, MarkdownRenderChild, Notice, Platform } from 'obsidian';
 import { FinanceStorage } from './storage';
 import {
-  AccountData, PluginSettings,
-  MOBILE_BREAKPOINT, AUTO_TX_INTERVAL_MS,
+  AccountData, PluginSettings, MOBILE_BREAKPOINT,
 } from './types';
-import { noteFilename, getTodayStr } from './utils';
+import { getTodayStr } from './utils';
 import { applyAutoTransactions, type AutoTxDeps } from './domain/autoTransactions';
 import { RecordModal } from './RecordModal';
 import { ViewContext } from './context';
+import { AccountHeader, type AccountMode } from './AccountHeader';
+import { AutoTxScheduler } from './AutoTxScheduler';
 import { OverviewTab } from './tabs/OverviewTab';
 import { RecordsTab } from './tabs/RecordsTab';
 import { DebtsTab } from './tabs/DebtsTab';
@@ -19,26 +20,51 @@ export class AccountView extends MarkdownRenderChild {
   private app:      App;
   private root:     HTMLElement;
   private accountId: string;
-  private notePath: string;
   private storage:  FinanceStorage;
   private settings: PluginSettings;
   private pluginId: string;
   private ctx:      ViewContext;
+  private header:   AccountHeader;
+  private scheduler: AutoTxScheduler;
 
-  private mode:     'overview' | 'records' | 'debts' | 'credits' | 'deposits' | 'currency' = 'overview';
+  private mode: AccountMode = 'overview';
   private isMobile = false;
   private isCheckingAutoTransactions = false;
-  private autoTxTimer: ReturnType<typeof setInterval> | null = null;
-  private actionsContainer!: HTMLElement;
 
   constructor(
     app: App, root: HTMLElement, accountId: string, notePath: string,
     storage: FinanceStorage, settings: PluginSettings, pluginId: string,
   ) {
     super(root);
-    this.app = app; this.root = root; this.accountId = accountId; this.notePath = notePath;
+    this.app = app; this.root = root; this.accountId = accountId;
     this.storage = storage; this.settings = settings; this.pluginId = pluginId;
     this.ctx = new ViewContext(app, storage, accountId, pluginId, settings, root);
+
+    this.scheduler = new AutoTxScheduler(() => { void this.refreshAndRender(); });
+
+    this.header = new AccountHeader(root, {
+      ctx: this.ctx,
+      notePath,
+      settings,
+      getMode: () => this.mode,
+      onModeChange: mode => {
+        this.mode = mode;
+        this.header.updateButtons();
+        this.renderBodyContent();
+      },
+      onRename: async name => {
+        await this.storage.updateMeta(this.accountId, { name });
+        if (this.data) this.data.name = name;
+      },
+      onCurrencyChange: async currency => {
+        if (!this.data) return;
+        this.data.currency = currency;
+        await this.storage.updateMeta(this.accountId, { currency });
+      },
+      registerDomEvent: (el, type, cb) => {
+        this.registerDomEvent(el, type, cb);
+      },
+    });
   }
 
   private get data(): AccountData | null {
@@ -57,7 +83,7 @@ export class AccountView extends MarkdownRenderChild {
 
     await this.ctx.loadStateFromFile();
 
-    this.renderHeader();
+    this.header.render();
 
     this.root.createDiv('finance-body');
 
@@ -67,92 +93,13 @@ export class AccountView extends MarkdownRenderChild {
 
     // Advancing schedules is an event, not part of drawing: once on open, then hourly.
     await this.checkAutoTransactions();
-    this.startAutoTxTimer();
+    this.scheduler.start();
 
     this.renderBodyContent();
   }
 
   override onunload(): void {
-    this.stopAutoTxTimer();
-  }
-
-  private startAutoTxTimer(): void {
-    this.stopAutoTxTimer();
-    this.autoTxTimer = setInterval(() => {
-      void this.refreshAndRender();
-    }, AUTO_TX_INTERVAL_MS);
-  }
-
-  private stopAutoTxTimer(): void {
-    if (this.autoTxTimer !== null) {
-      clearInterval(this.autoTxTimer);
-      this.autoTxTimer = null;
-    }
-  }
-
-  private renderHeader(): void {
-    const header = this.root.createDiv('finance-header');
-    const left   = header.createDiv('finance-header-left');
-
-    const rawName = this.data?.name;
-    const displayName = rawName?.trim() ? rawName : noteFilename(this.notePath);
-    const nameEl     = left.createEl('h2', { text: displayName, cls: 'finance-title' });
-    nameEl.title     = this.ctx.tr.clickToRename;
-    nameEl.addEventListener('click', () => this.startNameEdit(nameEl));
-
-    const curWrap = left.createDiv('finance-currency-badge');
-    curWrap.title = this.ctx.tr.changeCurrency;
-    this.renderCurrencyBadge(curWrap);
-
-    const right  = header.createDiv('finance-header-right');
-    this.actionsContainer = right.createDiv('finance-header-actions');
-
-    const moreWrap = right.createDiv('finance-more-dropdown');
-    const moreBtn = moreWrap.createEl('button', { cls: 'finance-add-btn finance-more-btn', text: '•••' });
-
-    const dropdown = moreWrap.createDiv('finance-dropdown-menu');
-    dropdown.addClass('is-hidden');
-
-    const mkDropdownItem = (icon: string, label: string, targetMode: string) => {
-      const item = dropdown.createDiv(`finance-dropdown-item${this.mode === targetMode ? ' active' : ''}`);
-      item.createEl('span', { text: icon, cls: 'btn-icon' });
-      item.createEl('span', { text: label });
-      if (this.mode !== targetMode) {
-        item.addEventListener('click', () => {
-          this.mode = targetMode as 'overview' | 'records' | 'debts' | 'credits' | 'deposits' | 'currency';
-          this.updateHeaderButtons();
-          this.renderBodyContent();
-          dropdown.addClass('is-hidden');
-        });
-      }
-    };
-
-    moreBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      if (dropdown.hasClass('is-hidden')) {
-        dropdown.empty();
-        mkDropdownItem('📄', this.ctx.tr.records, 'records');
-        mkDropdownItem('💳', this.ctx.tr.debts, 'debts');
-        mkDropdownItem('🏦', this.ctx.tr.credits, 'credits');
-        mkDropdownItem('📈', this.ctx.tr.deposits, 'deposits');
-        mkDropdownItem('💱', this.ctx.tr.currencyExchange, 'currency');
-        dropdown.createDiv('finance-dropdown-separator');
-        mkDropdownItem('📊', this.ctx.tr.overview, 'overview');
-        dropdown.removeClass('is-hidden');
-      } else {
-        dropdown.addClass('is-hidden');
-      }
-    });
-
-    this.registerDomEvent(document, 'click', () => { dropdown.addClass('is-hidden'); });
-  }
-
-  private updateHeaderButtons(): void {
-    const moreBtn = this.root.querySelector<HTMLElement>('.finance-more-btn');
-    if (moreBtn) {
-      const isActive = this.mode === 'overview' || this.mode === 'debts' || this.mode === 'credits' || this.mode === 'deposits' || this.mode === 'currency';
-      moreBtn.toggleClass('is-active-mode', isActive);
-    }
+    this.scheduler.stop();
   }
 
   private renderBodyContent(): void {
@@ -160,7 +107,7 @@ export class AccountView extends MarkdownRenderChild {
     const body = this.root.querySelector<HTMLElement>('.finance-body');
     if (!body) return;
     body.empty();
-    if (this.actionsContainer) this.actionsContainer.empty();
+    this.header.actionsContainer?.empty();
 
     if (this.mode === 'overview') {
       this.renderOverviewTab(body);
@@ -179,23 +126,25 @@ export class AccountView extends MarkdownRenderChild {
 
   private renderOverviewTab(body: HTMLElement): void {
     const tab = new OverviewTab(body, this.ctx);
-    tab.onNavigate = (targetMode) => {
+    tab.onNavigate = targetMode => {
       this.mode = targetMode;
-      this.updateHeaderButtons();
+      this.header.updateButtons();
       this.renderBodyContent();
     };
     tab.render();
   }
 
   private renderRecordsTab(body: HTMLElement): void {
-    const incBtn = this.actionsContainer.createEl('button', { cls: 'finance-add-btn finance-income-btn' });
+    const actions = this.header.actionsContainer;
+
+    const incBtn = actions.createEl('button', { cls: 'finance-add-btn finance-income-btn' });
     incBtn.createEl('span', { text: '↑', cls: 'btn-icon' });
     incBtn.createEl('span', { text: this.ctx.tr.typeIncome });
-    
-    const expBtn = this.actionsContainer.createEl('button', { cls: 'finance-add-btn finance-expense-btn' });
+
+    const expBtn = actions.createEl('button', { cls: 'finance-add-btn finance-expense-btn' });
     expBtn.createEl('span', { text: '↓', cls: 'btn-icon' });
     expBtn.createEl('span', { text: this.ctx.tr.typeExpense });
-    
+
     incBtn.addEventListener('click', () => { this.mode = 'records'; this.renderBodyContent(); this.openAddModal('income'); });
     expBtn.addEventListener('click', () => { this.mode = 'records'; this.renderBodyContent(); this.openAddModal('expense'); });
 
@@ -205,27 +154,27 @@ export class AccountView extends MarkdownRenderChild {
   private renderDebtsTab(body: HTMLElement): void {
     const tab = new DebtsTab(this.ctx, body);
     tab.onUpdate = () => this.refreshAndRender();
-    tab.renderHeaderActions?.(this.actionsContainer);
+    tab.renderHeaderActions?.(this.header.actionsContainer);
     tab.render();
   }
 
   private renderCreditsTab(body: HTMLElement): void {
     const tab = new CreditsTab(this.ctx, body);
-    tab.renderHeaderActions?.(this.actionsContainer);
+    tab.renderHeaderActions?.(this.header.actionsContainer);
     tab.render();
   }
 
   private renderDepositsTab(body: HTMLElement): void {
     const tab = new DepositsTab(this.ctx, body);
     tab.onUpdate = () => this.refreshAndRender();
-    tab.renderHeaderActions?.(this.actionsContainer);
+    tab.renderHeaderActions?.(this.header.actionsContainer);
     tab.render();
   }
 
   private renderCurrencyTab(body: HTMLElement): void {
     const tab = new CurrencyTab(this.ctx, body);
     tab.onUpdate = () => this.refreshAndRender();
-    tab.renderHeaderActions?.(this.actionsContainer);
+    tab.renderHeaderActions?.(this.header.actionsContainer);
     tab.render();
   }
 
@@ -233,76 +182,6 @@ export class AccountView extends MarkdownRenderChild {
     this.ctx.data = await this.storage.load(this.accountId);
     await this.checkAutoTransactions();
     this.renderBodyContent();
-  }
-
-  private startNameEdit(el: HTMLElement): void {
-    const current = el.textContent || '';
-    el.contentEditable = 'true';
-    el.addClass('finance-title-editing');
-    el.focus();
-
-    const range = document.createRange();
-    range.selectNodeContents(el);
-    const sel = window.getSelection();
-    sel?.removeAllRanges();
-    sel?.addRange(range);
-
-    const finish = async () => {
-      el.contentEditable = 'false';
-      el.removeClass('finance-title-editing');
-      const val = el.textContent?.trim() || current;
-      if (val !== current && this.data) {
-        await this.storage.updateMeta(this.accountId, { name: val });
-        this.data.name = val;
-      }
-      el.textContent = val;
-    };
-
-    el.addEventListener('blur', finish, { once: true });
-    el.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') { e.preventDefault(); el.blur(); }
-      if (e.key === 'Escape') { el.textContent = current; el.blur(); }
-    });
-  }
-
-  private renderCurrencyBadge(wrap: HTMLElement): void {
-    const cur = this.ctx.currency;
-    wrap.empty();
-
-    const applyCurrency = async (newCur: string) => {
-      if (newCur !== cur && this.data) {
-        this.data.currency = newCur;
-        await this.storage.updateMeta(this.accountId, { currency: newCur });
-      }
-      this.renderCurrencyBadge(wrap);
-    };
-
-    const badge = wrap.createEl('span', { text: cur, cls: 'finance-cur-badge' });
-
-    badge.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const existing = wrap.querySelector('.finance-cur-popup');
-      if (existing) { existing.remove(); return; }
-
-      const popup = wrap.createDiv('finance-cur-popup');
-
-      const currencies = this.settings.customCurrencies;
-      currencies.forEach(c => {
-        const btn = popup.createEl('button', { text: c, cls: 'finance-cur-option' });
-        if (c === cur) btn.addClass('active');
-        btn.addEventListener('click', (ev) => {
-          ev.stopPropagation();
-          applyCurrency(c);
-        });
-      });
-
-      const close = (ev: MouseEvent) => {
-        if (!popup.contains(ev.target as Node)) popup.remove();
-      };
-      // registerDomEvent, not addEventListener: the popup can be removed by a
-      // re-render before any click lands, and the listener would outlive it.
-      window.setTimeout(() => this.registerDomEvent(document, 'click', close), 0);
-    });
   }
 
   private applyAccentColor(color: string): void {
@@ -330,7 +209,6 @@ export class AccountView extends MarkdownRenderChild {
       },
     }).open();
   }
-
 
   private async checkAutoTransactions(): Promise<void> {
     const data = this.data;

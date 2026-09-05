@@ -410,4 +410,260 @@ describe('AccountCommands', () => {
       expect(data.records.length).toBe(0);
     });
   });
+
+  describe('Missing Coverage: Debt Movement Updates', () => {
+    it('updateDebtMovement изменяет сумму и дату движения и зеркальной записи', async () => {
+      const debt: DebtRecord = {
+        id: 'debt-1', person: 'Alice', amount: 500, originalAmount: 500,
+        interestRate: 0, direction: 'borrowed', date: '2026-01-01', time: '10:00',
+        dueDate: '', createdAt: Date.now(), note: '', movements: [
+          { id: 'mov-1', type: 'borrow', amount: 500, date: '2026-01-01', time: '10:00', createdAt: Date.now(), note: '' },
+          { id: 'mov-2', type: 'repay', amount: 100, date: '2026-02-01', time: '12:00', createdAt: Date.now(), note: '' },
+        ],
+      };
+      await storage.addDebt(accountId, debt);
+      await storage.addRecord(accountId, {
+        id: 'rec-2', createdAt: Date.now(), date: '2026-02-01', time: '12:00',
+        type: 'expense', amount: 100, category: 'Repay', linkedId: 'debt-1',
+        linkedMovementId: 'mov-2', tag: '', payer: '', note: '', attachmentPath: '', isInternal: false,
+      });
+
+      const oldMovement = debt.movements[1];
+      await commands.updateDebtMovement('debt-1', oldMovement, {
+        id: 'mov-2', type: 'repay', amount: 200, date: '2026-02-05', time: '15:00',
+        createdAt: Date.now(), note: 'Увеличено',
+      });
+
+      const data = await storage.load(accountId);
+      const updated = data.debts[0].movements.find(m => m.id === 'mov-2');
+      expect(updated?.amount).toBe(200);
+      expect(updated?.date).toBe('2026-02-05');
+      expect(updated?.note).toBe('Увеличено');
+
+      const rec = data.records.find(r => r.linkedMovementId === 'mov-2');
+      expect(rec?.amount).toBe(200);
+      expect(rec?.date).toBe('2026-02-05');
+    });
+
+    it('deleteDebtMovement удаляет движение и его зеркальную запись', async () => {
+      const debt: DebtRecord = {
+        id: 'debt-1', person: 'Bob', amount: 300, originalAmount: 500,
+        interestRate: 0, direction: 'lent', date: '2026-01-01', time: '10:00',
+        dueDate: '', createdAt: Date.now(), note: '', movements: [
+          { id: 'mov-1', type: 'borrow', amount: 500, date: '2026-01-01', time: '10:00', createdAt: Date.now(), note: '' },
+          { id: 'mov-2', type: 'repay', amount: 200, date: '2026-02-01', time: '12:00', createdAt: Date.now(), note: '' },
+        ],
+      };
+      await storage.addDebt(accountId, debt);
+      await storage.addRecord(accountId, {
+        id: 'rec-2', createdAt: Date.now(), date: '2026-02-01', time: '12:00',
+        type: 'income', amount: 200, category: 'Repay', linkedId: 'debt-1',
+        linkedMovementId: 'mov-2', tag: '', payer: '', note: '', attachmentPath: '', isInternal: false,
+      });
+
+      await commands.deleteDebtMovement('debt-1', 'mov-2', '2026-02-01', 200);
+
+      const data = await storage.load(accountId);
+      expect(data.debts[0].movements.length).toBe(1);
+      expect(data.debts[0].movements.find(m => m.id === 'mov-2')).toBeUndefined();
+      expect(data.records.find(r => r.linkedMovementId === 'mov-2')).toBeUndefined();
+    });
+  });
+
+  describe('Missing Coverage: Credit Updates', () => {
+    it('updateCredit изменяет данные кредита', async () => {
+      const credit: CreditRecord = {
+        id: 'cr-1', name: 'Car Loan', originalAmount: 500_000, interestRate: 10,
+        termMonths: 36, startDate: '2026-01-01', monthlyPayment: 16_000, currentAmount: 500_000,
+        status: 'active', createdAt: Date.now(), note: '', payments: [], bankName: 'TestBank',
+        type: 'consumer', earlyRepaymentOption: null,
+      };
+      await storage.addCredit(accountId, credit);
+
+      await commands.updateCredit(
+        { ...credit, name: 'Renamed Loan', interestRate: 12, note: 'Updated note' },
+        'Credit',
+        { receiptNote: 'Receipt for {name}', paymentNote: 'Payment for {name}' }
+      );
+
+      const data = await storage.load(accountId);
+      expect(data.credits[0].name).toBe('Renamed Loan');
+      expect(data.credits[0].interestRate).toBe(12);
+      expect(data.credits[0].note).toBe('Updated note');
+    });
+  });
+
+  describe('Missing Coverage: Batch Deletes', () => {
+    it('deleteDebts удаляет несколько долгов и их записи', async () => {
+      await storage.addDebt(accountId, {
+        id: 'd1', person: 'A', amount: 100, originalAmount: 100, interestRate: 0,
+        direction: 'borrowed', date: '2026-01-01', time: '10:00', dueDate: '',
+        createdAt: Date.now(), note: '', movements: [],
+      });
+      await storage.addDebt(accountId, {
+        id: 'd2', person: 'B', amount: 200, originalAmount: 200, interestRate: 0,
+        direction: 'lent', date: '2026-01-02', time: '10:00', dueDate: '',
+        createdAt: Date.now(), note: '', movements: [],
+      });
+      await storage.addRecord(accountId, {
+        id: 'r1', createdAt: Date.now(), date: '2026-01-01', time: '10:00',
+        type: 'income', amount: 100, category: 'Debt', linkedId: 'd1',
+        tag: '', payer: '', note: '', attachmentPath: '', isInternal: false,
+      });
+      await storage.addRecord(accountId, {
+        id: 'r2', createdAt: Date.now(), date: '2026-01-02', time: '10:00',
+        type: 'expense', amount: 200, category: 'Debt', linkedId: 'd2',
+        tag: '', payer: '', note: '', attachmentPath: '', isInternal: false,
+      });
+
+      await commands.deleteDebts(['d1', 'd2']);
+
+      const data = await storage.load(accountId);
+      expect(data.debts.length).toBe(0);
+      expect(data.records.length).toBe(0);
+    });
+
+    it('deleteCredits удаляет несколько кредитов и их записи', async () => {
+      await storage.addCredit(accountId, {
+        id: 'c1', name: 'Loan 1', originalAmount: 100_000, interestRate: 10,
+        termMonths: 12, startDate: '2026-01-01', monthlyPayment: 8_800, currentAmount: 100_000,
+        status: 'active', createdAt: Date.now(), note: '', payments: [], bankName: 'Bank1',
+        type: 'consumer', earlyRepaymentOption: null,
+      });
+      await storage.addCredit(accountId, {
+        id: 'c2', name: 'Loan 2', originalAmount: 200_000, interestRate: 12,
+        termMonths: 24, startDate: '2026-01-01', monthlyPayment: 9_400, currentAmount: 200_000,
+        status: 'active', createdAt: Date.now(), note: '', payments: [], bankName: 'Bank2',
+        type: 'consumer', earlyRepaymentOption: null,
+      });
+      await storage.addRecord(accountId, {
+        id: 'r1', createdAt: Date.now(), date: '2026-01-01', time: '10:00',
+        type: 'income', amount: 100_000, category: 'Credit', linkedId: 'c1',
+        tag: '', payer: '', note: '', attachmentPath: '', isInternal: false,
+      });
+      await storage.addRecord(accountId, {
+        id: 'r2', createdAt: Date.now(), date: '2026-01-01', time: '10:00',
+        type: 'income', amount: 200_000, category: 'Credit', linkedId: 'c2',
+        tag: '', payer: '', note: '', attachmentPath: '', isInternal: false,
+      });
+
+      await commands.deleteCredits(['c1', 'c2']);
+
+      const data = await storage.load(accountId);
+      expect(data.credits.length).toBe(0);
+      expect(data.records.length).toBe(0);
+    });
+
+    it('deleteDeposits удаляет несколько вкладов и создаёт возвраты для активных', async () => {
+      await storage.addDeposit(accountId, {
+        id: 'dep1', name: 'Deposit 1', type: 'term', bankName: 'Bank1', amount: 50_000,
+        interestRate: 8, startDate: '2026-01-01', termMonths: 12, accrualType: 'to_account',
+        createdAt: Date.now(), note: '', status: 'active', accruals: [], topUps: [], withdrawals: [],
+      });
+      await storage.addDeposit(accountId, {
+        id: 'dep2', name: 'Deposit 2', type: 'savings', bankName: 'Bank2', amount: 0,
+        interestRate: 6, startDate: '2026-01-01', termMonths: 12, accrualType: 'to_account',
+        createdAt: Date.now(), note: '', status: 'closed', accruals: [], topUps: [], withdrawals: [],
+      });
+      await storage.addRecord(accountId, {
+        id: 'r1', createdAt: Date.now(), date: '2026-01-01', time: '10:00',
+        type: 'expense', amount: 50_000, category: 'Deposit', linkedId: 'dep1',
+        tag: '', payer: '', note: '', attachmentPath: '', isInternal: false,
+      });
+
+      await commands.deleteDeposits(['dep1', 'dep2'], 'Deposit', 'Deposit refund');
+
+      const data = await storage.load(accountId);
+      expect(data.deposits.length).toBe(0);
+      // dep1 был активный → создастся возврат; dep2 закрыт → нет
+      const refunds = data.records.filter(r => r.category === 'Deposit' && r.type === 'income');
+      expect(refunds.length).toBe(1);
+      expect(refunds[0].amount).toBe(50_000);
+    });
+  });
+
+  describe('Missing Coverage: Deposit Top-ups and Withdrawals', () => {
+    it('addDepositTopUp увеличивает сумму вклада и создаёт запись', async () => {
+      await storage.addDeposit(accountId, {
+        id: 'dep1', name: 'Savings', type: 'savings', bankName: 'Bank', amount: 100_000,
+        interestRate: 5, startDate: '2026-01-01', termMonths: 12, accrualType: 'to_account',
+        createdAt: Date.now(), note: '', status: 'active', accruals: [], topUps: [], withdrawals: [],
+      });
+
+      await commands.addDepositTopUp('dep1', {
+        id: 'top-1', amount: 20_000, date: '2026-02-01', time: '12:00',
+        createdAt: Date.now(), note: 'Bonus',
+      }, 'Deposit', 'Top-up to Savings');
+
+      const data = await storage.load(accountId);
+      expect(data.deposits[0].amount).toBe(120_000);
+      expect(data.deposits[0].topUps.length).toBe(1);
+
+      const rec = data.records.find(r => r.linkedId === 'dep1' && r.type === 'expense');
+      expect(rec?.amount).toBe(20_000);
+    });
+
+    it('deleteDepositTopUp откатывает пополнение и удаляет запись', async () => {
+      await storage.addDeposit(accountId, {
+        id: 'dep1', name: 'Savings', type: 'savings', bankName: 'Bank', amount: 120_000,
+        interestRate: 5, startDate: '2026-01-01', termMonths: 12, accrualType: 'to_account',
+        createdAt: Date.now(), note: '', status: 'active', accruals: [],
+        topUps: [{ id: 'top-1', amount: 20_000, date: '2026-02-01', time: '12:00', createdAt: Date.now(), note: '' }],
+        withdrawals: [],
+      });
+      await storage.addRecord(accountId, {
+        id: 'rec-top', createdAt: Date.now(), date: '2026-02-01', time: '12:00',
+        type: 'expense', amount: 20_000, category: 'Deposit', linkedId: 'dep1',
+        tag: '', payer: '', note: '', attachmentPath: '', isInternal: false,
+      });
+
+      await commands.deleteDepositTopUp('dep1', 'top-1', '2026-02-01', 20_000);
+
+      const data = await storage.load(accountId);
+      expect(data.deposits[0].amount).toBe(100_000);
+      expect(data.deposits[0].topUps.length).toBe(0);
+      expect(data.records.find(r => r.linkedId === 'dep1' && r.date === '2026-02-01')).toBeUndefined();
+    });
+
+    it('addDepositWithdrawal уменьшает сумму вклада и создаёт запись', async () => {
+      await storage.addDeposit(accountId, {
+        id: 'dep1', name: 'Savings', type: 'savings', bankName: 'Bank', amount: 100_000,
+        interestRate: 5, startDate: '2026-01-01', termMonths: 12, accrualType: 'to_account',
+        createdAt: Date.now(), note: '', status: 'active', accruals: [], topUps: [], withdrawals: [],
+      });
+
+      await commands.addDepositWithdrawal('dep1', {
+        id: 'wd-1', amount: 15_000, date: '2026-03-01', time: '14:00',
+        createdAt: Date.now(), note: 'Emergency',
+      }, 'Deposit', 'Withdrawal from Savings');
+
+      const data = await storage.load(accountId);
+      expect(data.deposits[0].amount).toBe(85_000);
+      expect(data.deposits[0].withdrawals.length).toBe(1);
+
+      const rec = data.records.find(r => r.linkedId === 'dep1' && r.type === 'income');
+      expect(rec?.amount).toBe(15_000);
+    });
+
+    it('deleteDepositWithdrawal возвращает снятую сумму и удаляет запись', async () => {
+      await storage.addDeposit(accountId, {
+        id: 'dep1', name: 'Savings', type: 'savings', bankName: 'Bank', amount: 85_000,
+        interestRate: 5, startDate: '2026-01-01', termMonths: 12, accrualType: 'to_account',
+        createdAt: Date.now(), note: '', status: 'active', accruals: [], topUps: [],
+        withdrawals: [{ id: 'wd-1', amount: 15_000, date: '2026-03-01', time: '14:00', createdAt: Date.now(), note: '' }],
+      });
+      await storage.addRecord(accountId, {
+        id: 'rec-wd', createdAt: Date.now(), date: '2026-03-01', time: '14:00',
+        type: 'income', amount: 15_000, category: 'Deposit', linkedId: 'dep1',
+        tag: '', payer: '', note: '', attachmentPath: '', isInternal: false,
+      });
+
+      await commands.deleteDepositWithdrawal('dep1', 'wd-1', '2026-03-01', 15_000);
+
+      const data = await storage.load(accountId);
+      expect(data.deposits[0].amount).toBe(100_000);
+      expect(data.deposits[0].withdrawals.length).toBe(0);
+      expect(data.records.find(r => r.linkedId === 'dep1' && r.date === '2026-03-01')).toBeUndefined();
+    });
+  });
 });

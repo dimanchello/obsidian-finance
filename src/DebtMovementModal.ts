@@ -1,8 +1,8 @@
-import { App, Modal, Notice } from 'obsidian';
-import { getLocaleFromApp, t, Translations } from './i18n';
+import { App } from 'obsidian';
 import { DebtMovement, DebtMovementType } from './types';
 import { parseAmount, getTodayStr } from './utils';
 import { createAmountInput } from './ui/AmountInput';
+import { EntityModal } from './ui/EntityModal';
 import { buildDateTimeField } from './ui/formHelpers';
 
 export interface DebtMovementOptions {
@@ -14,45 +14,34 @@ export interface DebtMovementOptions {
   onSave:          (m: DebtMovement) => void;
 }
 
-export class DebtMovementModal extends Modal {
-  private tr: Translations;
+export class DebtMovementModal extends EntityModal<DebtMovement> {
   private o: DebtMovementOptions;
-  private mov: DebtMovement;
   private amountInput!: HTMLInputElement;
 
   constructor(app: App, opts: DebtMovementOptions) {
-    super(app);
-    this.tr = t(getLocaleFromApp(app));
+    super(app, {
+      entity: opts.movement
+        ? { ...opts.movement }
+        : {
+            id: crypto.randomUUID(),
+            type: opts.type,
+            amount: 0,
+            date: getTodayStr(),
+            time: new Date().toTimeString().slice(0, 5),
+            createdAt: Date.now(),
+            note: '',
+          },
+      isEdit: !!opts.movement,
+      onSave: opts.onSave,
+    });
     this.o = opts;
-    if (opts.movement) {
-      this.mov = { ...opts.movement };
-    } else {
-      const nowStr = getTodayStr();
-      const timeStr = new Date().toTimeString().slice(0, 5);
-      this.mov = {
-        id: crypto.randomUUID(),
-        type: opts.type,
-        amount: 0,
-        date: nowStr,
-        time: timeStr,
-        createdAt: Date.now(),
-        note: '',
-      };
-    }
   }
 
-  override onOpen(): void {
-    const { contentEl } = this;
-    contentEl.empty();
-    contentEl.addClass('finance-modal');
+  protected getTitle(): string { return this.o.title; }
 
-    contentEl.createEl('h2', {
-      text: this.o.title,
-      cls: 'finance-modal-title',
-    });
+  protected override getSaveLabel(): string { return this.tr.save; }
 
-    const form = contentEl.createDiv('finance-form');
-
+  protected buildForm(form: HTMLElement): void {
     // ── Amount ───────────────────────────────────────────────────────────
     const amtG = form.createDiv('finance-field-group finance-amount-group');
     const labelText = this.o.type === 'borrow'
@@ -61,26 +50,25 @@ export class DebtMovementModal extends Modal {
     amtG.createEl('label', { text: labelText, cls: 'finance-field-label' });
 
     const amountHandle = createAmountInput(amtG, {
-      value: this.mov.amount,
-      onChange: v => { this.mov.amount = v; },
+      value: this.entity.amount,
+      onChange: v => { this.entity.amount = v; },
     });
     this.amountInput = amountHandle.input;
 
     // ── Full repayment link (only for repay type) ────────────────────────
-    if (this.o.type === 'repay' && this.o.remainingAmount && this.o.remainingAmount > 0) {
+    const remaining = this.o.remainingAmount;
+    if (this.o.type === 'repay' && remaining !== undefined && remaining > 0) {
       const cur = this.o.currency ?? '';
-      const formatted = this.o.remainingAmount.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const formatted = remaining.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       const link = amtG.createEl('span', { cls: 'finance-fill-remaining-link' });
       link.textContent = `→ ${formatted} ${cur}`;
-      link.addEventListener('click', () => {
-        amountHandle.set(this.o.remainingAmount!);
-      });
+      link.addEventListener('click', () => { amountHandle.set(remaining); });
     }
 
     // ── Date+Time ────────────────────────────────────────────────────────
-    buildDateTimeField(form, this.tr.dateTime, this.mov.date, this.mov.time, this.tr, (d, t) => {
-      this.mov.date = d;
-      this.mov.time = t;
+    buildDateTimeField(form, this.tr.dateTime, this.entity.date, this.entity.time, this.tr, (d, t) => {
+      this.entity.date = d;
+      this.entity.time = t;
     });
 
     // ── Note — visually distinct ─────────────────────────────────────────
@@ -90,31 +78,20 @@ export class DebtMovementModal extends Modal {
     noteLabelRow.createEl('span', { text: '📝', cls: 'finance-note-icon' });
     const noteIn = noteG.createEl('textarea', { cls: 'finance-textarea finance-note-field' });
     noteIn.placeholder = this.tr.debtNotePlaceholder;
-    noteIn.value = this.mov.note;
+    noteIn.value = this.entity.note;
     noteIn.rows = 2;
-    noteIn.addEventListener('input', () => { this.mov.note = noteIn.value; });
-
-    // ── Buttons ──────────────────────────────────────────────────────────
-    const btnRow = contentEl.createDiv('finance-modal-btns');
-    btnRow.createEl('button', { text: this.tr.cancel, cls: 'finance-btn-cancel' })
-      .addEventListener('click', () => this.close());
-    btnRow.createEl('button', { text: this.tr.save, cls: 'finance-btn-save' })
-      .addEventListener('click', () => this.handleSave());
-
-    setTimeout(() => this.amountInput.focus(), 50);
+    noteIn.addEventListener('input', () => { this.entity.note = noteIn.value; });
   }
 
-  private handleSave(): void {
+  protected validate(): string | null {
     const amount = parseAmount(this.amountInput.value);
-    this.mov.amount = amount;
-    if (!amount || amount <= 0) {
-      new Notice(this.tr.invalidAmount);
-      this.amountInput.focus();
-      return;
-    }
-    this.o.onSave(this.mov);
-    this.close();
+    if (!amount || amount <= 0) return this.tr.invalidAmount;
+    return null;
   }
 
-  override onClose(): void { this.contentEl.empty(); }
+  protected collectData(): DebtMovement {
+    return { ...this.entity, amount: parseAmount(this.amountInput.value) };
+  }
+
+  protected override onFormReady(): void { this.amountInput.focus(); }
 }

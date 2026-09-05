@@ -2,6 +2,20 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Codebase navigation
+
+Before investigating a task, read `CODEBASE.md`.
+
+Use `CODEBASE.md` to identify the relevant subsystem, modules and symbols before searching the repository.
+
+Do not scan the entire `src/` directory unless the task genuinely requires it.
+
+After identifying relevant symbols, use TypeScript/LSP symbol navigation where available to find definitions, references and implementations.
+
+Only read source files that are relevant to the current task.
+
+`CODEBASE.md` is a navigation index, not a source of truth. If it conflicts with the source code, trust the source code and update `CODEBASE.md` if appropriate.
+
 ## Commands
 
 ```bash
@@ -21,46 +35,56 @@ Install into a vault: copy the contents of `dist/` into `<vault>/.obsidian/plugi
 
 ## Architecture
 
+See `CODEBASE.md` for detailed architecture map, module dependencies, and symbol index.
+
 ### Entry and rendering flow
 
-`main.ts` registers a markdown code-block processor for the ` ```finance-account ` language. Every code block in every note instantiates its own `AccountView`, keyed by `ctx.sourcePath` — **the note path is the account identity**. There is no central account list; one note = one account.
+`main.ts` registers a markdown code-block processor for the ` ```finance-account ` language. Every code block instantiates its own `AccountView`. **AccountId is minted once per block and stored in the note** as an `id: <12-hex>` line inside the block body (`domain/accountId.ts`). Note path is NOT identity — it's tracked in `meta.sourcePath` for diagnostics only.
 
 ```
 main.ts (Plugin)
-  └── FinanceStorage          — singleton, shared by all views
-  └── AccountView             — one per code block; header, tab switching, auto-transactions
-        └── ViewContext       — shared mutable bag: app, storage, data, state, locale, tr, isMobile
-              ├── RecordsTab  — income/expense table, filters, analytics, import/export
-              ├── DebtsTab
-              ├── CreditsTab
-              └── DepositsTab
+  ├── FinanceStorage (singleton, shared by all views)
+  │    ├── VaultAdapter
+  │    ├── AccountFiles (path calculations)
+  │    └── FileStore<T> × 7 (meta, records, debts, credits, deposits, exchanges, state)
+  └── AccountView (one per code block)
+       ├── ViewContext (shared context: app, storage, data, state, locale, tr, isMobile)
+       ├── AccountHeader (title, currency badge, tab dropdown)
+       ├── AutoTxScheduler (hourly auto-transaction checks)
+       └── Tabs (stateless, recreated on each render)
+            ├── OverviewTab
+            ├── RecordsTab
+            ├── DebtsTab
+            ├── CreditsTab
+            ├── DepositsTab
+            └── CurrencyTab
 ```
 
-`ViewContext` (`src/context.ts`) is the only thing tabs receive. It owns `data` (the loaded `AccountData`), `state` (`ViewState`: sorts/filters/pagination/column visibility), the resolved translations `tr`, and formatting helpers `fmt`/`fmtDate`. Tabs never touch `AccountView` directly; `DebtsTab` and `DepositsTab` expose an `onUpdate` callback that `AccountView` wires to `refreshAndRender()`.
+`ViewContext` (`src/context.ts`) is the only thing tabs receive. It owns `data` (the loaded `AccountData`), `state` (`ViewState`: sorts/filters/pagination/column visibility), the resolved translations `tr`, and formatting helpers `fmt`/`fmtDate`. Tabs expose `onUpdate` callback that `AccountView` wires to `refreshAndRender()`.
 
 Tab instances are recreated on every `renderBodyContent()` — tabs must be stateless across renders except for what lives in `ctx.state`.
 
 ### Storage layout
 
-`FinanceStorage` (`src/storage.ts`) writes one folder per account under `.obsidian/plugins/<pluginId>/accounts/<folder>/`, split into `meta.json`, `records.json`, `debts.json`, `credits.json`, `deposits.json`, `state.json`. Each file type has its own in-memory cache Map + dirty Set; writes are debounced 500ms via a single shared timer and flushed by `flushDirty()`. `main.ts` `onunload()` awaits `storage.flush()` — losing that call loses unsaved data.
+`FinanceStorage` (`src/storage/index.ts`) writes one folder per account under `.obsidian/plugins/<pluginId>/accounts/<accountId>/`, split into `meta.json`, `records.json`, `debts.json`, `credits.json`, `deposits.json`, `exchanges.json`, `state.json`. Each file type has its own `FileStore<T>` (cache + dirty Set); writes are debounced 500ms via shared `FlushScheduler`. `main.ts` `onunload()` awaits `storage.flush()` — losing that call loses unsaved data.
 
-Folder name = last two path segments of the note joined with `_`, sanitized. Because that collapses distinct notes into the same name, `meta.json` carries a `sourcePath` field; on collision `ensureNoteFolder` allocates `<base>_1`, `_2`, … and records it in the in-memory `folderOverrides` map. **`folderOverrides` is not persisted** — it is rebuilt on each session by re-detecting the collision.
+**AccountId is a 12-hex-char slice of a UUID** (`newAccountId()`), written into the block body as `id: <12-hex>` on first render and validated against `/^[0-9a-f]{12}$/`. Folder name = accountId. `meta.sourcePath` tracks where the note was last seen (for diagnostics/orphan detection).
 
-`load()` runs two migrations before reading: `migrateLegacy()` (single `<note>.json` → split flat files → per-folder files) and `migrateToShortFolder()` (full-path folder name → two-segment name). Field-level backfill for older schemas happens in the individual `loadX()` methods (e.g. `d.direction ??= 'borrowed'`, `c.payments ??= []`). `DATA_VERSION` is 4.
+Field-level backfill for older schemas happens in parsers (e.g. `d.direction ??= 'borrowed'`, `c.payments ??= []`). `DATA_VERSION` is 1 (storage layer was refactored, version reset).
 
-Note renames are handled by a vault `rename` event in `main.ts`: it moves the storage folder via `storage.renameAccount()` and re-keys the localStorage view-state entry.
+Note renames: plugin listens to vault `rename` event, updates `meta.sourcePath` (accountId stays the same).
 
-### View state is persisted twice
+### View state persistence
 
-`ctx.saveState()` writes to **both** `localStorage` (`ft-view:<pluginId>:<notePath>`) and `state.json` in the account folder. `loadState()` reads localStorage synchronously in the `ViewContext` constructor; `AccountView.render()` then awaits `loadStateFromFile()` which merges `state.json` over it. Both writes force `page: 0`. When adding a new state field, add a `??=` default in `loadState()` — old persisted blobs will be missing it.
+`ctx.saveState()` writes to `state.json` in the account folder. **`state.json` is the single source of truth** — no localStorage fallback. `AccountView.render()` awaits `ctx.loadStateFromFile()` during initialization. Both writes force `page: 0`. When adding a new state field, add a `??=` default in `src/domain/viewState.ts:parseViewState()` — old persisted blobs will be missing it.
 
-### Derived records (`linkedId`)
+### Linked records (`linkedId`)
 
-Debts, credits, and deposits do not have separate ledgers — they **materialize `FinanceRecord`s into `records`** and tag them with `linkedId = <debt|credit|deposit>.id`. Deleting or editing a credit/deposit/debt means finding and rewriting those mirrored records (see `CreditsTab.ts:1147`, `DebtsTab.ts:1074`, `DepositsTab.ts:1061`). Any change to how these entities work must keep the mirrored records in sync, or balances drift.
+Debts, credits, and deposits do NOT have separate ledgers — they **materialize `FinanceRecord`s into `records`** and tag them with `linkedId = <entity>.id`. Use `AccountCommands` layer (`src/domain/AccountCommands.ts`) to maintain atomicity: entity + linked records are updated together. Direct storage calls from tabs were eliminated (62 → 0).
 
-`AccountView.checkAutoTransactions()` is the engine for this: it runs on every `render()` and `refreshAndRender()`, generates the full accrual/payment schedule the first time a deposit or credit is seen, marks past-due items paid, and pushes the corresponding income/expense records. It guards against duplicates by scanning for an existing record with the same `linkedId` + `date` + `type`. It is re-entrancy-guarded by `isCheckingAutoTransactions` but is **not** date-cached, so it re-runs on every render.
+`AccountView.checkAutoTransactions()` runs on every `render()` and hourly via `AutoTxScheduler`. It delegates to `applyAutoTransactions()` (`src/domain/autoTransactions.ts`), which generates schedules for deposits/credits, marks past-due items paid, and materializes income/expense records. Idempotent via `RecordMirror` (composite key: `${linkedId}|${date}|${type}|${category}`). Re-entrancy-guarded by `isCheckingAutoTransactions`.
 
-`isInternal` records are excluded from income/expense stats but still count toward the balance (`context.ts:130`, `RecordsTab.ts:153`).
+`isInternal` records are excluded from income/expense stats but still count toward the balance (`context.ts:86`).
 
 ### i18n
 
@@ -73,12 +97,60 @@ Debts, credits, and deposits do not have separate ledgers — they **materialize
 ## Conventions
 
 - **User-facing strings are Russian/English via i18n only** — never hardcode UI text. Internal identifiers are English camelCase.
-- **No magic numbers.** Numeric literals other than 0/1/-1/2 go into `src/types.ts` as `UPPER_SNAKE_CASE` constants (`MOBILE_BREAKPOINT`, `SEARCH_DEBOUNCE_MS`, `DAYS_IN_YEAR`, …).
-- **Mobile is mandatory.** Detection is `Platform.isMobile || window.innerWidth <= MOBILE_BREAKPOINT`, computed once at render (not reactive to resize). Tables need a card/block fallback; no horizontal scroll.
+- **No magic numbers.** Numeric literals other than 0/1/-1/2 go into `src/types.ts` or `src/constants.ts` as `UPPER_SNAKE_CASE` constants (`MOBILE_BREAKPOINT`, `SEARCH_DEBOUNCE_MS`, `DAYS_IN_YEAR`, …).
+- **Mobile is mandatory.** Detection is `Platform.isMobile || window.innerWidth <= MOBILE_BREAKPOINT`, computed once at render (not reactive to resize). Tables need a card/block fallback via `DataTable` component; no horizontal scroll.
 - Dates are `YYYY-MM-DD` strings and times are `HH:MM` (or `''`) — never `Date` objects in stored data. Normalize with `normalizeDateStr`/`normalizeTimeStr` from `src/utils.ts`; compare dates as strings.
 - Shared formatting lives in `src/utils.ts`; do not duplicate it in modals.
 - ESLint runs `strict-type-checked` + `stylistic-type-checked`. `prefer-nullish-coalescing`, `prefer-optional-chain`, and `consistent-type-definitions: interface` are errors.
-- Tests cover business logic only (utils, types, i18n, storage CRUD/migrations) — not DOM or modal rendering. `vitest.config.ts` aliases the `obsidian` module to `src/__tests__/mock-obsidian.ts`, so anything imported from `obsidian` must be stubbed there before it can be tested.
+- Tests cover business logic only (utils, domain modules, storage CRUD/migrations) — not DOM or modal rendering. `vitest.config.ts` aliases the `obsidian` module to `src/__tests__/mock-obsidian.ts`, so anything imported from `obsidian` must be stubbed there before it can be tested.
 - `README.md` (Russian) and `README.en.md` (English) must both be updated when features or installation change.
 
-`AGENTS.md` contains a longer-form version of these conventions plus a feature roadmap; parts of its file inventory and line counts are out of date, so trust the source tree over it.
+**Current codebase stats:**
+- ~71 source files (excluding tests)
+- ~15,600 lines of TypeScript
+- 7 storage files per account (meta, records, debts, credits, deposits, exchanges, state)
+- 6 tabs (Overview, Records, Debts, Credits, Deposits, Currency)
+- 15+ modals for CRUD operations
+
+See `AGENTS.md` for historical conventions (some are outdated; trust `CLAUDE.md` and `CODEBASE.md` over `AGENTS.md`).
+
+## Development Workflow
+
+### For New Features or Significant Changes
+
+1. **Planning phase** — use `/obsidian-finance-plan` skill:
+   - Read `CODEBASE.md` and `CLAUDE.md`
+   - Analyze architecture impact
+   - Create implementation plan file
+   - Get user approval
+
+2. **Implementation phase** — use `/obsidian-finance-implement` skill:
+   - Follow the plan
+   - Read only relevant source files
+   - Follow architecture patterns
+   - Verify at each step (lint, build, test)
+
+3. **Documentation sync** — use `/obsidian-finance-sync-docs` skill:
+   - Update `CODEBASE.md` with new modules/flows/symbols
+   - Keep concise and navigation-focused
+   - Update README if user-visible changes
+
+### For Bug Fixes or Minor Changes
+
+1. Read `CODEBASE.md` to locate relevant code
+2. Fix the issue following conventions
+3. Verify: `npm run lint && npm run build && npm test`
+4. Update `CODEBASE.md` only if architecture changed
+
+### Verification is Mandatory
+
+After ANY code change:
+
+```bash
+npm run lint   # Must exit 0 errors (warnings OK for no-explicit-any)
+npm run build  # Must compile cleanly (tsc + esbuild)
+npm test       # All tests must pass
+```
+
+If any step fails, the task is not complete.
+

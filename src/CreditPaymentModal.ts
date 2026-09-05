@@ -1,8 +1,9 @@
-import { App, Modal, Notice } from 'obsidian';
-import { getLocaleFromApp, t, Translations } from './i18n';
+import { App } from 'obsidian';
 import { CreditPayment, CreditRecord } from './types';
 import { parseAmount, getTodayStr, normalizeDateStr } from './utils';
 import { createAmountInput } from './ui/AmountInput';
+import { EntityModal } from './ui/EntityModal';
+import { buildDateField, buildNoteField } from './ui/formHelpers';
 
 export interface CreditPaymentOptions {
   title: string;
@@ -10,69 +11,64 @@ export interface CreditPaymentOptions {
   onSave: (payment: CreditPayment) => void;
 }
 
-export class CreditPaymentModal extends Modal {
-  private tr: Translations;
+export class CreditPaymentModal extends EntityModal<CreditPayment> {
   private o: CreditPaymentOptions;
   private amountInput!: HTMLInputElement;
 
   constructor(app: App, opts: CreditPaymentOptions) {
-    super(app);
-    this.tr = t(getLocaleFromApp(app));
+    super(app, {
+      entity: {
+        id: crypto.randomUUID(),
+        amount: opts.credit.monthlyPayment,
+        dueDate: getTodayStr(),
+        status: 'paid',
+        paidDate: getTodayStr(),
+        note: '',
+      },
+      isEdit: false,
+      onSave: opts.onSave,
+    });
     this.o = opts;
   }
 
-  override onOpen(): void {
-    const { contentEl } = this;
-    contentEl.empty();
-    contentEl.addClass('finance-modal');
+  protected getTitle(): string { return this.o.title; }
 
-    contentEl.createEl('h2', { text: this.o.title, cls: 'finance-modal-title' });
-
-    const form = contentEl.createDiv('finance-form');
-
-    const dateG = form.createDiv('finance-field-group');
-    dateG.createEl('label', { text: this.tr.paymentDateLabel, cls: 'finance-field-label' });
-    const dateIn = dateG.createEl('input', { type: 'date', cls: 'finance-input' });
-    const today = getTodayStr();
-    dateIn.value = today;
+  protected buildForm(form: HTMLElement): void {
+    buildDateField(form, this.tr.paymentDateLabel, this.entity.dueDate, v => {
+      this.entity.dueDate = v;
+    });
 
     const amtG = form.createDiv('finance-field-group finance-amount-group');
     amtG.createEl('label', { text: this.tr.sum, cls: 'finance-field-label' });
-
     this.amountInput = createAmountInput(amtG, {
       value: this.o.credit.monthlyPayment,
-      onChange: () => {},
+      onChange: () => { /* read on save */ },
     }).input;
 
-    const noteG = form.createDiv('finance-field-group');
-    noteG.createEl('label', { text: this.tr.note, cls: 'finance-field-label' });
-    const noteIn = noteG.createEl('textarea', { cls: 'finance-textarea finance-note-field' });
-    noteIn.placeholder = this.tr.optional;
-    noteIn.rows = 2;
-
-    const btnRow = contentEl.createDiv('finance-modal-btns');
-    btnRow.createEl('button', { text: this.tr.cancel, cls: 'finance-btn-cancel' })
-      .addEventListener('click', () => this.close());
-    btnRow.createEl('button', { text: this.tr.addBtn, cls: 'finance-btn-save' })
-      .addEventListener('click', () => {
-        const amount = parseAmount(this.amountInput.value);
-        if (!amount || amount <= 0) {
-          new Notice(this.tr.invalidAmount);
-          this.amountInput.focus();
-          return;
-        }
-        const payment: CreditPayment = {
-          id: crypto.randomUUID(),
-          amount,
-          dueDate: normalizeDateStr(dateIn.value),
-          status: 'paid',
-          paidDate: normalizeDateStr(dateIn.value),
-          note: noteIn.value,
-        };
-        this.o.onSave(payment);
-        this.close();
-      });
+    buildNoteField(form, {
+      label: this.tr.note,
+      value: this.entity.note ?? '',
+      placeholder: this.tr.optional,
+      rows: 2,
+      onChange: v => { this.entity.note = v; },
+    });
   }
 
-  override onClose(): void { this.contentEl.empty(); }
+  protected validate(): string | null {
+    const amount = parseAmount(this.amountInput.value);
+    if (!amount || amount <= 0) return this.tr.invalidAmount;
+    return null;
+  }
+
+  protected collectData(): CreditPayment {
+    const date = normalizeDateStr(this.entity.dueDate);
+    return {
+      ...this.entity,
+      amount: parseAmount(this.amountInput.value),
+      dueDate: date,
+      paidDate: date,
+    };
+  }
+
+  protected override onFormReady(): void { this.amountInput.focus(); }
 }

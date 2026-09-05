@@ -1,12 +1,31 @@
-import { vi } from 'vitest';
+// Mock localStorage for Node.js test environment
+class LocalStorageMock {
+  private store = new Map<string, string>();
 
-vi.mock('obsidian', () => ({
-  normalizePath: (path: string) => path.replace(/[\\/:"*?<>|]/g, '_'),
-  Notice: vi.fn(),
-  Platform: { isMobile: false },
-  TFile: class TFile {},
-  App: class {},
-  Plugin: class {},
-  PluginSettingTab: class {},
-  Setting: class {},
-}));
+  getItem(key: string): string | null {
+    return this.store.get(key) ?? null;
+  }
+
+  setItem(key: string, value: string): void {
+    this.store.set(key, value);
+  }
+
+  removeItem(key: string): void {
+    this.store.delete(key);
+  }
+
+  clear(): void {
+    this.store.clear();
+  }
+
+  get length(): number {
+    return this.store.size;
+  }
+
+  key(index: number): string | null {
+    const keys = Array.from(this.store.keys());
+    return keys[index] ?? null;
+  }
+}
+
+global.localStorage = new LocalStorageMock() as Storage;
