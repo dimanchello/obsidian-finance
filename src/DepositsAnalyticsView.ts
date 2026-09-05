@@ -4,6 +4,7 @@ import { DepositRecord, PERCENT_100 } from './types';
 import { Translations } from './i18n';
 import { addMonthsClamped, toDateStr } from './domain/dateMath';
 import { round2 } from './domain/money';
+import { DepositStatus, PaymentStatus } from './constants';
 
 export class DepositsAnalyticsView {
   private el: HTMLElement;
@@ -71,10 +72,10 @@ export class DepositsAnalyticsView {
 
   private renderSummaryCards(): void {
     const deposits = this.getFilteredDeposits();
-    const active = deposits.filter(d => d.status === 'active');
+    const active = deposits.filter(d => d.status === DepositStatus.ACTIVE);
     const totalBalance = active.reduce((s, d) => s + d.amount, 0);
     const totalAccrued = deposits.reduce((s, d) =>
-      s + d.accruals.filter(a => a.status === 'paid').reduce((ps, a) => ps + a.amount, 0), 0);
+      s + d.accruals.filter(a => a.status === PaymentStatus.PAID).reduce((ps, a) => ps + a.amount, 0), 0);
 
     const projectedIncome = deposits.reduce((s, d) =>
       s + d.accruals.reduce((ps, a) => ps + a.amount, 0), 0);
@@ -99,7 +100,7 @@ export class DepositsAnalyticsView {
   }
 
   private renderActiveDepositsList(): void {
-    const deposits = this.getFilteredDeposits().filter(d => d.status === 'active');
+    const deposits = this.getFilteredDeposits().filter(d => d.status === DepositStatus.ACTIVE);
     if (!deposits.length) return;
 
     const section = this.el.createDiv('finance-credit-progress-list');

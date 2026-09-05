@@ -10,6 +10,7 @@ import { createAmountInput, type AmountInputHandle } from './ui/AmountInput';
 import { buildAttachmentField } from './ui/attachmentField';
 import { FinanceBaseModal } from './ui/FinanceBaseModal';
 import { buildDateField, buildNoteField, buildButtonRow, buildComboboxField, validateAmountInput } from './ui/formHelpers';
+import { CreditStatus, RecordType } from './constants';
 
 export interface CreditModalOptions {
   title:     string;
@@ -63,7 +64,7 @@ export class CreditModal extends FinanceBaseModal {
           startDate: nowStr,
           createdAt: Date.now(),
           note: '',
-          status: 'active',
+          status: CreditStatus.ACTIVE,
           earlyRepaymentOption: null,
           payments: [],
           purchasePrice: 0,
@@ -422,7 +423,7 @@ export class CreditModal extends FinanceBaseModal {
             createdAt: Date.now(),
             date: dpDate,
             time: '',
-            type: 'expense',
+            type: RecordType.EXPENSE,
             amount: dpVal,
             category: this.tr.creditDefaultCat,
             tag: '',
@@ -439,7 +440,7 @@ export class CreditModal extends FinanceBaseModal {
           createdAt: Date.now(),
           date: dpDate,
           time: '',
-          type: 'expense',
+          type: RecordType.EXPENSE,
           amount: dpVal,
           category: this.tr.creditDefaultCat,
           tag: '',

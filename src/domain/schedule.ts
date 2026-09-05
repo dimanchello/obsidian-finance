@@ -1,6 +1,7 @@
 import { CreditPayment, CreditRecord, DepositAccrual, DepositRecord, PERCENT_100 } from '../types';
 import { addMonthsClamped, withDayClamped, daysBetweenStr, parseDateStr, daysInYear } from './dateMath';
 import { round2 } from './money';
+import { PaymentStatus, DepositAccrualType } from '../constants';
 
 /** Everything non-deterministic is passed in — that is what makes these functions testable. */
 export interface ScheduleDeps {
@@ -33,7 +34,7 @@ function canSchedule(startDate: string, termMonths: number): boolean {
 export function buildDepositSchedule(deposit: DepositRecord, deps: ScheduleDeps): DepositAccrual[] {
   if (deposit.amount <= 0 || !canSchedule(deposit.startDate, deposit.termMonths)) return [];
 
-  const compounding = deposit.accrualType === 'capitalization';
+  const compounding = deposit.accrualType === DepositAccrualType.CAPITALIZATION;
   const accruals: DepositAccrual[] = [];
   let principal = deposit.amount;
   let prevDate = deposit.startDate;
@@ -51,7 +52,7 @@ export function buildDepositSchedule(deposit: DepositRecord, deps: ScheduleDeps)
       id: deps.newId(),
       amount: interest,
       dueDate,
-      status: isPast ? 'paid' : 'pending',
+      status: isPast ? PaymentStatus.PAID : PaymentStatus.PENDING,
       ...(isPast ? { paidDate: dueDate } : {}),
     });
     prevDate = dueDate;
@@ -73,7 +74,7 @@ export function buildCreditSchedule(credit: CreditRecord, deps: ScheduleDeps): C
       id: deps.newId(),
       amount: round2(credit.monthlyPayment),
       dueDate,
-      status: isPast ? 'paid' : 'pending',
+      status: isPast ? PaymentStatus.PAID : PaymentStatus.PENDING,
       ...(isPast ? { paidDate: dueDate } : {}),
     });
   }
@@ -87,16 +88,16 @@ export function buildCreditSchedule(credit: CreditRecord, deps: ScheduleDeps): C
 export function recalcFutureAccruals(deposit: DepositRecord, today: string): DepositAccrual[] {
   const accruals = deposit.accruals;
   const future = accruals
-    .filter(a => a.dueDate > today && a.status === 'pending')
+    .filter(a => a.dueDate > today && a.status === PaymentStatus.PENDING)
     .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
   if (!future.length) return accruals;
 
   // Hoisted out of the loop: recomputing it per iteration was O(N log N × M).
   const lastPaidDate = accruals
-    .filter(a => a.status === 'paid')
+    .filter(a => a.status === PaymentStatus.PAID)
     .reduce<string | null>((latest, a) => (latest === null || a.dueDate > latest ? a.dueDate : latest), null);
 
-  const compounding = deposit.accrualType === 'capitalization';
+  const compounding = deposit.accrualType === DepositAccrualType.CAPITALIZATION;
   const repriced = new Map<string, number>();
   let principal = deposit.amount;
   let prevDate = lastPaidDate ?? deposit.startDate;

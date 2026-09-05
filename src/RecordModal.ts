@@ -8,6 +8,7 @@ import { buildCalculatorIcon } from './ui/icons';
 import { buildAttachmentField } from './ui/attachmentField';
 import { FinanceBaseModal } from './ui/FinanceBaseModal';
 import { buildDateTimeField, buildComboboxField, buildNoteField, buildButtonRow, validateAmountInput } from './ui/formHelpers';
+import { RecordType as RecordTypeValue } from './constants';
 
 export interface RecordModalOptions {
   initial:    Partial<FinanceRecord>;
@@ -43,7 +44,7 @@ export class RecordModal extends FinanceBaseModal {
     this.rec = {
       date: getTodayStr(),
       time: new Date().toTimeString().slice(0, 5),
-      type: 'expense', amount: 0,
+      type: RecordTypeValue.EXPENSE, amount: 0,
       category: '', tag: '', payer: '', note: '', attachmentPath: '',
       ...opts.initial,
     };
@@ -146,15 +147,15 @@ export class RecordModal extends FinanceBaseModal {
 
   private applyType(type: RecordType): void {
     this.rec.type = type;
-    this.incomeBtn .classList.toggle('active',  type === 'income');
-    this.incomeBtn .classList.toggle('income',  type === 'income');
+    this.incomeBtn .classList.toggle('active',  type === RecordTypeValue.INCOME);
+    this.incomeBtn .classList.toggle('income',  type === RecordTypeValue.INCOME);
     this.expenseBtn.classList.toggle('active',  type === 'expense');
     this.expenseBtn.classList.toggle('expense', type === 'expense');
   }
 
   private updateAmountColor(): void {
     if (!this.amountInput) return;
-    this.amountInput.classList.toggle('income-color',  this.rec.type === 'income');
+    this.amountInput.classList.toggle('income-color',  this.rec.type === RecordTypeValue.INCOME);
     this.amountInput.classList.toggle('expense-color', this.rec.type === 'expense');
   }
 

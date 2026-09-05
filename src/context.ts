@@ -4,6 +4,7 @@ import { AccountData, PluginSettings, ViewState, MOBILE_BREAKPOINT } from './typ
 import { fmt } from './utils';
 import { defaultViewState, parseViewState } from './domain/viewState';
 import { getLocaleFromApp, t, type Translations, type Locale } from './i18n';
+import { RecordType } from './constants';
 
 export class ViewContext {
   app: App;
@@ -82,10 +83,10 @@ export class ViewContext {
   renderRecordsStats(container: HTMLElement): void {
     if (!this._data) return;
     const recs = this._data.records;
-    const inc = recs.filter(r => r.type === 'income' && !r.isInternal).reduce((s, r) => s + r.amount, 0);
-    const exp = recs.filter(r => r.type === 'expense' && !r.isInternal).reduce((s, r) => s + r.amount, 0);
-    const totalInc = recs.filter(r => r.type === 'income').reduce((s, r) => s + r.amount, 0);
-    const totalExp = recs.filter(r => r.type === 'expense').reduce((s, r) => s + r.amount, 0);
+    const inc = recs.filter(r => r.type === RecordType.INCOME && !r.isInternal).reduce((s, r) => s + r.amount, 0);
+    const exp = recs.filter(r => r.type === RecordType.EXPENSE && !r.isInternal).reduce((s, r) => s + r.amount, 0);
+    const totalInc = recs.filter(r => r.type === RecordType.INCOME).reduce((s, r) => s + r.amount, 0);
+    const totalExp = recs.filter(r => r.type === RecordType.EXPENSE).reduce((s, r) => s + r.amount, 0);
     const bal = totalInc - totalExp;
 
     const el = container.createDiv('finance-stats-container');

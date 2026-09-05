@@ -18,6 +18,7 @@ import {
   calculatePaymentBreakdown,
 } from './domain/creditCalculations';
 import { svg, fmtShort, shortMonth, createChartTooltip } from './ui/chartHelpers';
+import { CreditStatus, PaymentStatus } from './constants';
 
 interface PaymentBarItem {
   label: string;
@@ -131,7 +132,7 @@ export class CreditsAnalyticsView {
   private renderSummaryCards(): void {
     const credits = this.getFilteredCredits();
     const totalBorrowed = credits.reduce((s, c) => s + c.originalAmount, 0);
-    const totalRemaining = credits.filter(c => c.status === 'active').reduce((s, c) => s + calculateRemainingPrincipal(c), 0);
+    const totalRemaining = credits.filter(c => c.status === CreditStatus.ACTIVE).reduce((s, c) => s + calculateRemainingPrincipal(c), 0);
     const totalPaidPrincipal = credits.reduce((s, c) => s + (c.originalAmount - calculateRemainingPrincipal(c)), 0);
     const totalInterest = credits.reduce((s, c) => s + calculateTotalInterestPaid(c), 0);
 
@@ -160,7 +161,7 @@ export class CreditsAnalyticsView {
     this.credits.forEach(c => {
       let runningPrincipal = c.originalAmount;
       c.payments.forEach((p, i) => {
-        if (p.status !== 'paid') return;
+        if (p.status !== PaymentStatus.PAID) return;
         const d = p.paidDate ?? p.dueDate;
         if (!d) return;
 
@@ -346,7 +347,7 @@ export class CreditsAnalyticsView {
   }
 
   private renderProgressList(): void {
-    const credits = this.getFilteredCredits().filter(c => c.status === 'active');
+    const credits = this.getFilteredCredits().filter(c => c.status === CreditStatus.ACTIVE);
     if (!credits.length) return;
 
     const section = this.el.createDiv('finance-credit-progress-list');

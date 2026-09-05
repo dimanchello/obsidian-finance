@@ -16,6 +16,7 @@ import {
   createDepositRefundRecord,
   findLinkedRecord,
 } from './linkedRecords';
+import { RecordType, DebtDirection, DebtMovementType, PaymentStatus, DepositStatus } from '../constants';
 
 /**
  * AccountCommands provides transactional operations for account entities.
@@ -50,8 +51,8 @@ export class AccountCommands {
     debt.movements = [initialMovement];
     await this.storage.addDebt(this.accountId, debt);
 
-    const recordType = debt.direction === 'lent' ? 'expense' : 'income';
-    const note = debt.direction === 'lent' ? translations.lentNote : translations.borrowedNote;
+    const recordType = debt.direction === DebtDirection.LENT ? RecordType.EXPENSE : RecordType.INCOME;
+    const note = debt.direction === DebtDirection.LENT ? translations.lentNote : translations.borrowedNote;
 
     const record = createDebtMovementRecord(debt, initialMovement, recordType, note, category);
     await this.storage.addRecord(this.accountId, record);
@@ -72,9 +73,9 @@ export class AccountCommands {
 
     await this.storage.addDebtMovement(this.accountId, debtId, movement);
 
-    const recordType = movement.type === 'borrow'
-      ? (debt.direction === 'lent' ? 'expense' : 'income')
-      : (debt.direction === 'lent' ? 'income' : 'expense');
+    const recordType = movement.type === DebtMovementType.BORROW
+      ? (debt.direction === DebtDirection.LENT ? RecordType.EXPENSE : RecordType.INCOME)
+      : (debt.direction === DebtDirection.LENT ? RecordType.INCOME : RecordType.EXPENSE);
 
     const record = createDebtMovementRecord(debt, movement, recordType, note, category);
     await this.storage.addRecord(this.accountId, record);
@@ -171,7 +172,7 @@ export class AccountCommands {
 
     // Payment records for paid payments
     for (const payment of credit.payments) {
-      if (payment.status === 'paid') {
+      if (payment.status === PaymentStatus.PAID) {
         records.push(createCreditPaymentRecord(
           credit,
           payment.dueDate,
@@ -219,12 +220,12 @@ export class AccountCommands {
     // Payment records — skip dates where manual records exist
     const manualExpenseDates = new Set(
       updatedRecords
-        .filter(r => r.linkedId === updated.id && r.isInternal === false && r.type === 'expense')
+        .filter(r => r.linkedId === updated.id && r.isInternal === false && r.type === RecordType.EXPENSE)
         .map(r => r.date)
     );
 
     for (const payment of updated.payments) {
-      if (payment.status !== 'paid') continue;
+      if (payment.status !== PaymentStatus.PAID) continue;
       if (manualExpenseDates.has(payment.dueDate)) continue;
 
       updatedRecords.push(createCreditPaymentRecord(
@@ -264,7 +265,7 @@ export class AccountCommands {
     category: string,
     refundNote: string
   ): Promise<void> {
-    deposit.status = 'closed';
+    deposit.status = DepositStatus.CLOSED;
     await this.storage.updateDeposit(this.accountId, deposit);
 
     const refund = createDepositRefundRecord(deposit, refundNote, category);
@@ -289,7 +290,7 @@ export class AccountCommands {
     const otherRecords = unlinkRecords(data.records, depositId);
 
     // If active, add refund without linkedId
-    if (deposit.status === 'active') {
+    if (deposit.status === DepositStatus.ACTIVE) {
       const refund = createDepositRefundRecord(deposit, refundNote, category);
       delete refund.linkedId; // Remove link so it's a standalone record
       otherRecords.push(refund);
@@ -315,7 +316,7 @@ export class AccountCommands {
 
     // Add refund for each active deposit
     for (const deposit of data.deposits) {
-      if (idSet.has(deposit.id) && deposit.status === 'active') {
+      if (idSet.has(deposit.id) && deposit.status === DepositStatus.ACTIVE) {
         const refund = createDepositRefundRecord(deposit, refundNote, category);
         delete refund.linkedId;
         otherRecords.push(refund);
@@ -342,7 +343,7 @@ export class AccountCommands {
       createdAt: Date.now(),
       date: topUp.date,
       time: topUp.time,
-      type: 'expense',
+      type: RecordType.EXPENSE,
       amount: topUp.amount,
       category,
       tag: '',
@@ -372,7 +373,7 @@ export class AccountCommands {
       topUpAmount
     );
 
-    if (linkedRec?.type === 'expense') {
+    if (linkedRec?.type === RecordType.EXPENSE) {
       await this.storage.deleteRecord(this.accountId, linkedRec.id);
     }
   }
@@ -394,7 +395,7 @@ export class AccountCommands {
       createdAt: Date.now(),
       date: withdrawal.date,
       time: withdrawal.time,
-      type: 'income',
+      type: RecordType.INCOME,
       amount: withdrawal.amount,
       category,
       tag: '',
@@ -419,7 +420,7 @@ export class AccountCommands {
     const data = await this.storage.load(this.accountId);
     const linkedRec = findLinkedRecord(data.records, depositId, withdrawalDate, withdrawalAmount);
 
-    if (linkedRec?.type === 'income') {
+    if (linkedRec?.type === RecordType.INCOME) {
       await this.storage.deleteRecord(this.accountId, linkedRec.id);
     }
   }

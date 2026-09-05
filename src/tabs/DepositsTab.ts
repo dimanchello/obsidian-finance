@@ -16,6 +16,7 @@ import { DataTable, FilterControl } from '../ui/DataTable';
 import { DepositsAnalyticsView } from '../DepositsAnalyticsView';
 import { renderMobileCard, renderSummaryCard, renderProgressBar, renderPaginatedSchedule, pageRange, dateRangeControls, compareValues } from '../ui/tabHelpers';
 import { AccountCommands } from '../domain/AccountCommands';
+import { DepositAccrualType, DepositStatus, PaymentStatus } from '../constants';
 
 export class DepositsTab {
   private ctx: ViewContext;
@@ -62,9 +63,9 @@ export class DepositsTab {
           },
         },
       ],
-      rowCls: d => [d.status === 'active' ? 'finance-row-income' : 'finance-row-expense'],
+      rowCls: d => [d.status === DepositStatus.ACTIVE ? 'finance-row-income' : 'finance-row-expense'],
       rowActions: d => [
-        ...(d.status === 'active' ? [
+        ...(d.status === DepositStatus.ACTIVE ? [
           { icon: '💰', title: this.tr.topUp, onClick: () => this.openDepositTopUpModal(d) },
           { icon: '📤', title: this.tr.withdraw, onClick: () => this.openDepositWithdrawalModal(d) },
           { icon: '✅', title: this.tr.closeAccount, onClick: () => this.confirmCloseDeposit(d) },
@@ -174,7 +175,7 @@ export class DepositsTab {
   }
 
   private getDepositAccrued(deposit: DepositRecord): number {
-    return sumMoney(deposit.accruals.filter(a => a.status === 'paid').map(a => a.amount));
+    return sumMoney(deposit.accruals.filter(a => a.status === PaymentStatus.PAID).map(a => a.amount));
   }
 
   private getDepositProfit(deposit: DepositRecord): number {
@@ -197,8 +198,8 @@ export class DepositsTab {
 
     const allDeposits = this.ctx.data?.deposits ?? [];
     const summary = host.createDiv('finance-stats-container finance-stats-two-cols');
-    const activeDeposits = allDeposits.filter(d => d.status === 'active');
-    const closedDeposits = allDeposits.filter(d => d.status === 'closed');
+    const activeDeposits = allDeposits.filter(d => d.status === DepositStatus.ACTIVE);
+    const closedDeposits = allDeposits.filter(d => d.status === DepositStatus.CLOSED);
 
     const countSub = (count: number, profit: number) => {
       const countLabel = count === 1 ? this.tr.depositCount_one : count < PLURAL_THRESHOLD ? this.tr.depositCount_few : this.tr.depositCount_many;
@@ -289,7 +290,7 @@ export class DepositsTab {
   // ── Mobile card ──────────────────────────────────────────────────────────
 
   private renderCard(block: HTMLElement, deposit: DepositRecord): void {
-    block.addClass(deposit.status === 'active' ? 'finance-row-income' : 'finance-row-expense');
+    block.addClass(deposit.status === DepositStatus.ACTIVE ? 'finance-row-income' : 'finance-row-expense');
 
     const details = [];
     details.push({ label: `📊`, value: `${deposit.interestRate}${this.tr.percentPerAnnum}` });
@@ -298,7 +299,7 @@ export class DepositsTab {
       details.push({ label: `💰 ${this.tr.depositAccruals}:`, value: this.ctx.fmt(profit) });
     }
     const endDate = this.calculateDepositEndDate(deposit);
-    if (endDate && deposit.status === 'active') {
+    if (endDate && deposit.status === DepositStatus.ACTIVE) {
       details.push({ label: this.tr.dueBy, value: fmtDate(endDate) });
     }
 
@@ -370,7 +371,7 @@ export class DepositsTab {
     const totalPages = Math.max(1, Math.ceil(deposit.accruals.length / DEPOSIT_ACCRUAL_PAGE_SIZE));
     let page = this.depositAccrualPages.get(deposit.id);
     if (page === undefined) {
-      const lastPaidIdx = deposit.accruals.findLastIndex(a => a.status === 'paid');
+      const lastPaidIdx = deposit.accruals.findLastIndex(a => a.status === PaymentStatus.PAID);
       page = lastPaidIdx >= 0 ? Math.floor(lastPaidIdx / DEPOSIT_ACCRUAL_PAGE_SIZE) : 0;
     }
     page = Math.max(0, Math.min(page, totalPages - 1));
@@ -385,7 +386,7 @@ export class DepositsTab {
       {
         formatDate: a => fmtDate(a.dueDate, a.paidDate),
         formatStatus: (_a, isPaid) => isPaid
-          ? (deposit.accrualType === 'capitalization' ? this.tr.accrualIncluded : this.tr.accrualPaidToAccount)
+          ? (deposit.accrualType === DepositAccrualType.CAPITALIZATION ? this.tr.accrualIncluded : this.tr.accrualPaidToAccount)
           : this.tr.pendingStatus,
       }
     );
@@ -454,7 +455,7 @@ export class DepositsTab {
           deposit.interestRate !== updated.interestRate ||
           deposit.accrualType !== updated.accrualType;
 
-        if (accrualFieldsChanged && updated.status === 'active') {
+        if (accrualFieldsChanged && updated.status === DepositStatus.ACTIVE) {
           // Terms changed: drop mirrored records and the schedule; auto-transactions rebuild both
           const otherRecords = this.ctx.data!.records.filter(r => r.linkedId !== updated.id);
           // Opening expense is now created automatically by autoTransactions.ts
@@ -477,7 +478,7 @@ export class DepositsTab {
 
   private confirmDeleteDeposit(deposit: DepositRecord): void {
     const label = `${deposit.name} · ${this.ctx.fmt(deposit.amount)}`;
-    const refundNote = deposit.status === 'active'
+    const refundNote = deposit.status === DepositStatus.ACTIVE
       ? `\n\n${this.tr.closeDepositRefund.replace('{amount}', this.ctx.fmt(deposit.amount))}`
       : '';
     new ConfirmModal(this.ctx.app, `${this.tr.confirmDeleteDeposit}${refundNote}\n\n${label}`, async () => {

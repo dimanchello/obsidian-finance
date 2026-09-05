@@ -1,10 +1,14 @@
 import {
-  CreditPayment, CreditRecord, CreditStatus, CreditType,
-  DebtDirection, DebtMovement, DebtMovementType, DebtRecord,
-  DepositAccrual, DepositAccrualType, DepositRecord, DepositStatus, DepositTopUp, DepositType, DepositWithdrawal,
-  FinanceRecord, RecordType, CurrencyExchange, CurrencyOperationType,
+  CreditPayment, CreditRecord,
+  DebtMovement, DebtRecord,
+  DepositAccrual, DepositRecord, DepositTopUp, DepositWithdrawal,
+  FinanceRecord, CurrencyExchange,
 } from '../types';
 import { normalizeDateStr, normalizeTimeStr } from '../utils';
+import {
+  RecordType, DebtDirection, DebtMovementType, CreditType, CreditStatus,
+  DepositType, DepositStatus, DepositAccrualType, PaymentStatus, CurrencyOperationType,
+} from '../constants';
 
 /**
  * Boundary validation for JSON read off disk. Under v1 only the current code writes
@@ -48,16 +52,21 @@ function parseList<T>(raw: unknown, parse: (item: Record<string, unknown>) => T 
   return out;
 }
 
-const RECORD_TYPES = ['income', 'expense'] as const satisfies readonly RecordType[];
-const DEBT_DIRECTIONS = ['lent', 'borrowed'] as const satisfies readonly DebtDirection[];
-const MOVEMENT_TYPES = ['borrow', 'repay'] as const satisfies readonly DebtMovementType[];
-const CREDIT_TYPES = ['consumer', 'auto', 'mortgage'] as const satisfies readonly CreditType[];
-const CREDIT_STATUSES = ['active', 'paid'] as const satisfies readonly CreditStatus[];
-const DEPOSIT_TYPES = ['term', 'demand', 'savings'] as const satisfies readonly DepositType[];
-const DEPOSIT_STATUSES = ['active', 'closed'] as const satisfies readonly DepositStatus[];
-const ACCRUAL_TYPES = ['to_account', 'capitalization'] as const satisfies readonly DepositAccrualType[];
-const SCHEDULE_STATUSES = ['pending', 'paid'] as const;
-const CURRENCY_OPERATION_TYPES = ['buy', 'sell', 'add', 'spend'] as const satisfies readonly CurrencyOperationType[];
+/**
+ * Allowed values are read straight off the constant objects, so a status added
+ * in `constants.ts` widens the type and this validator together — there is no
+ * second list here that can silently fall behind.
+ */
+const RECORD_TYPES = Object.values(RecordType);
+const DEBT_DIRECTIONS = Object.values(DebtDirection);
+const MOVEMENT_TYPES = Object.values(DebtMovementType);
+const CREDIT_TYPES = Object.values(CreditType);
+const CREDIT_STATUSES = Object.values(CreditStatus);
+const DEPOSIT_TYPES = Object.values(DepositType);
+const DEPOSIT_STATUSES = Object.values(DepositStatus);
+const ACCRUAL_TYPES = Object.values(DepositAccrualType);
+const SCHEDULE_STATUSES = Object.values(PaymentStatus);
+const CURRENCY_OPERATION_TYPES = Object.values(CurrencyOperationType);
 
 export function parseRecord(o: Record<string, unknown>): FinanceRecord | null {
   const id = str(o.id);

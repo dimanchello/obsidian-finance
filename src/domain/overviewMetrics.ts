@@ -11,6 +11,7 @@ import { addMonthsClamped, parseDateStr } from './dateMath';
 import { calculateRemainingPrincipal, calculatePaymentBreakdown } from './creditCalculations';
 import { getDebtRepaid, getDebtWithInterest } from './debtCalculations';
 import { getTodayStr } from '../utils';
+import { RecordType, DebtDirection, CreditStatus, DepositStatus, PaymentStatus } from '../constants';
 
 function addDays(dateStr: string, days: number): string {
   const parsed = parseDateStr(dateStr);
@@ -81,7 +82,7 @@ export function resolveMonthRange(
 export function calcNetBalance(records: FinanceRecord[]): number {
   return records.reduce((sum, r) => {
     if (r.isInternal) return sum;
-    return sum + (r.type === 'income' ? r.amount : -r.amount);
+    return sum + (r.type === RecordType.INCOME ? r.amount : -r.amount);
   }, 0);
 }
 
@@ -94,7 +95,7 @@ export function calcAssets(
   debts: DebtRecord[],
 ): number {
   const depositSum = deposits
-    .filter(d => d.status === 'active')
+    .filter(d => d.status === DepositStatus.ACTIVE)
     .reduce((s, d) => s + d.amount, 0);
 
   const exchangeSum = exchanges.reduce((s, e) => {
@@ -105,7 +106,7 @@ export function calcAssets(
   }, 0);
 
   const lentDebts = debts
-    .filter(d => d.direction === 'lent')
+    .filter(d => d.direction === DebtDirection.LENT)
     .reduce((s, d) => s + d.amount, 0);
 
   return depositSum + exchangeSum + lentDebts;
@@ -119,14 +120,14 @@ export function calcLiabilities(
   debts: DebtRecord[],
 ): number {
   const creditPrincipal = credits
-    .filter(c => c.status === 'active')
+    .filter(c => c.status === CreditStatus.ACTIVE)
     .reduce((sum, c) => {
       const remaining = calculateRemainingPrincipal(c);
       return sum + remaining;
     }, 0);
 
   const borrowedDebts = debts
-    .filter(d => d.direction === 'borrowed')
+    .filter(d => d.direction === DebtDirection.BORROWED)
     .reduce((s, d) => s + d.amount, 0);
 
   return creditPrincipal + borrowedDebts;
@@ -142,7 +143,7 @@ export function calcCreditBurden(
 ): number | null {
   const startDate = addMonthsClamped(asOfDate, -OVERVIEW_BURDEN_MONTHS);
   const relevantIncome = incomeRecords.filter(r =>
-    r.type === 'income' && !r.isInternal && r.date >= startDate && r.date <= asOfDate
+    r.type === RecordType.INCOME && !r.isInternal && r.date >= startDate && r.date <= asOfDate
   );
 
   if (relevantIncome.length === 0) return null;
@@ -151,7 +152,7 @@ export function calcCreditBurden(
   const avgMonthlyIncome = totalIncome / OVERVIEW_BURDEN_MONTHS;
 
   const monthlyBurden = credits
-    .filter(c => c.status === 'active')
+    .filter(c => c.status === CreditStatus.ACTIVE)
     .reduce((s, c) => s + c.monthlyPayment, 0);
 
   if (avgMonthlyIncome === 0) return null;
@@ -169,13 +170,13 @@ export function calcUpcomingPayments(
   const endDate = addDays(asOfDate, OVERVIEW_UPCOMING_DAYS);
 
   const creditPayments = credits
-    .filter(c => c.status === 'active')
+    .filter(c => c.status === CreditStatus.ACTIVE)
     .flatMap(c => c.payments)
-    .filter(p => p.status === 'pending' && p.dueDate >= asOfDate && p.dueDate <= endDate)
+    .filter(p => p.status === PaymentStatus.PENDING && p.dueDate >= asOfDate && p.dueDate <= endDate)
     .reduce((s, p) => s + p.amount, 0);
 
   const debtPayments = debts
-    .filter(d => d.direction === 'borrowed' && d.dueDate >= asOfDate && d.dueDate <= endDate)
+    .filter(d => d.direction === DebtDirection.BORROWED && d.dueDate >= asOfDate && d.dueDate <= endDate)
     .reduce((s, d) => s + d.amount, 0);
 
   return creditPayments + debtPayments;
@@ -198,7 +199,7 @@ export function groupRecordsByMonth(records: FinanceRecord[]): MonthGroup[] {
     if (r.isInternal) return;
     const key = r.date.slice(0, 7); // YYYY-MM
     const existing = map.get(key) ?? { income: 0, expense: 0 };
-    if (r.type === 'income') {
+    if (r.type === RecordType.INCOME) {
       existing.income += r.amount;
     } else {
       existing.expense += r.amount;
@@ -259,13 +260,13 @@ export function calcCreditBurdenOverTime(
     const label = month;
 
     const monthIncome = records
-      .filter(r => r.type === 'income' && !r.isInternal && r.date >= monthStart && r.date < monthEnd)
+      .filter(r => r.type === RecordType.INCOME && !r.isInternal && r.date >= monthStart && r.date < monthEnd)
       .reduce((s, r) => s + r.amount, 0);
 
     let principal = 0;
     let interest = 0;
 
-    credits.filter(c => c.status === 'active').forEach(c => {
+    credits.filter(c => c.status === CreditStatus.ACTIVE).forEach(c => {
       const monthPayments = (c.payments ?? []).filter(
         p => (p.dueDate >= monthStart && p.dueDate < monthEnd) ||
              (p.paidDate && p.paidDate >= monthStart && p.paidDate < monthEnd)
@@ -357,20 +358,20 @@ export function calcAssetsLiabilitiesOverTime(
     const checkDate = month === today.slice(0, 7) ? today : monthStart;
 
     const assets = calcAssets(
-      deposits.filter(d => d.status === 'active' && d.startDate <= checkDate),
+      deposits.filter(d => d.status === DepositStatus.ACTIVE && d.startDate <= checkDate),
       exchanges.filter(e => e.date <= checkDate),
-      debts.filter(d => d.direction === 'lent' && d.date <= checkDate)
+      debts.filter(d => d.direction === DebtDirection.LENT && d.date <= checkDate)
     );
 
     const activeCreditsPrincipal = credits
-      .filter(c => c.status === 'active' && c.startDate <= checkDate)
+      .filter(c => c.status === CreditStatus.ACTIVE && c.startDate <= checkDate)
       .reduce((sum, c) => {
         const remaining = calculateRemainingPrincipal(c);
         return sum + remaining;
       }, 0);
 
     const borrowedDebts = debts
-      .filter(d => d.direction === 'borrowed' && d.date <= checkDate)
+      .filter(d => d.direction === DebtDirection.BORROWED && d.date <= checkDate)
       .reduce((s, d) => s + d.amount, 0);
 
     const liabilities = activeCreditsPrincipal + borrowedDebts;
@@ -412,10 +413,10 @@ export function calcSavingsRateOverTime(
       r => !r.isInternal && r.date >= monthStart && r.date < monthEnd
     );
     const income = monthRecords
-      .filter(r => r.type === 'income')
+      .filter(r => r.type === RecordType.INCOME)
       .reduce((s, r) => s + r.amount, 0);
     const expense = monthRecords
-      .filter(r => r.type === 'expense')
+      .filter(r => r.type === RecordType.EXPENSE)
       .reduce((s, r) => s + r.amount, 0);
 
     const savings = income - expense;
@@ -475,7 +476,7 @@ export function calcDebtsBreakdown(debts: DebtRecord[]): DebtBreakdownItem[] {
     const withInterest = getDebtWithInterest(d);
     const total = withInterest > 0 ? withInterest : (d.originalAmount || d.amount);
 
-    if (d.direction === 'lent') {
+    if (d.direction === DebtDirection.LENT) {
       cur.lent += d.amount;
       cur.lentTotal += total;
       cur.lentRepaid += repaid;
@@ -561,7 +562,7 @@ export function calcGroupBreakdown(
     if (!key) key = emptyLabel;
 
     const existing = map.get(key) ?? { income: 0, expense: 0 };
-    if (r.type === 'income') {
+    if (r.type === RecordType.INCOME) {
       existing.income += r.amount;
     } else {
       existing.expense += r.amount;
@@ -709,7 +710,7 @@ export function calcDepositInterestOverTime(
       (d.accruals ?? []).forEach(a => {
         const accrualDate = a.dueDate;
         if (accrualDate >= monthStart && accrualDate < monthEnd) {
-          if (a.status === 'paid') {
+          if (a.status === PaymentStatus.PAID) {
             paidInterest += a.amount;
           } else {
             pendingInterest += a.amount;
@@ -762,7 +763,7 @@ export function calcActiveDepositsProgress(
   deposits: DepositRecord[],
   asOfDate: string = getTodayStr()
 ): ActiveDepositProgress[] {
-  const active = deposits.filter(d => d.status === 'active');
+  const active = deposits.filter(d => d.status === DepositStatus.ACTIVE);
   const nowMs = new Date(asOfDate).getTime();
 
   return active.map(d => {
@@ -790,7 +791,7 @@ export function calcActiveDepositsProgress(
     }
 
     const paidProfit = (d.accruals ?? [])
-      .filter(a => a.status === 'paid')
+      .filter(a => a.status === PaymentStatus.PAID)
       .reduce((s, a) => s + a.amount, 0);
 
     const totalProfit = (d.accruals ?? []).reduce((s, a) => s + a.amount, 0);
@@ -798,7 +799,7 @@ export function calcActiveDepositsProgress(
     const totalEstimatedReturn = d.amount + totalProfit;
 
     const pendingAccruals = (d.accruals ?? [])
-      .filter(a => a.status === 'pending' && a.dueDate >= asOfDate)
+      .filter(a => a.status === PaymentStatus.PENDING && a.dueDate >= asOfDate)
       .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
 
     const nextAccrual = pendingAccruals[0];

@@ -4,6 +4,9 @@ import {
 import { buildCreditSchedule, buildDepositSchedule, type ScheduleDeps } from './schedule';
 import { round2 } from './money';
 import { parseDateStr, withDayClamped } from './dateMath';
+import {
+  PaymentStatus, RecordType, DepositStatus, DepositAccrualType, CreditStatus,
+} from '../constants';
 
 export interface AutoTxLabels {
   depositInterestCat: string;
@@ -84,8 +87,8 @@ function settleDue<T extends { dueDate: string; status: 'pending' | 'paid'; paid
 ): { items: T[]; settled: T[] } {
   const settled: T[] = [];
   const next = items.map(item => {
-    if (item.status !== 'pending' || item.dueDate > today) return item;
-    const paid = { ...item, status: 'paid' as const, paidDate: item.dueDate };
+    if (item.status !== PaymentStatus.PENDING || item.dueDate > today) return item;
+    const paid = { ...item, status: PaymentStatus.PAID, paidDate: item.dueDate };
     settled.push(paid);
     return paid;
   });
@@ -95,7 +98,7 @@ function settleDue<T extends { dueDate: string; status: 'pending' | 'paid'; paid
 function processDeposit(
   deposit: DepositRecord, mirror: RecordMirror, deps: AutoTxDeps,
 ): { deposit: DepositRecord; changed: boolean } {
-  if (deposit.status !== 'active') return { deposit, changed: false };
+  if (deposit.status !== DepositStatus.ACTIVE) return { deposit, changed: false };
 
   let changed = false;
   let accruals: DepositAccrual[] = deposit.accruals;
@@ -110,7 +113,7 @@ function processDeposit(
     // Use a special category to distinguish it from the refund
     mirror.ensure({
       date: deposit.startDate,
-      type: 'expense',
+      type: RecordType.EXPENSE,
       amount: deposit.amount,
       category: deps.labels.depositOpeningCat,
       payer: deposit.bankName,
@@ -118,9 +121,9 @@ function processDeposit(
       linkedId: deposit.id,
     }, deps);
 
-    if (deposit.accrualType === 'capitalization') {
+    if (deposit.accrualType === DepositAccrualType.CAPITALIZATION) {
       for (const a of accruals) {
-        if (a.status === 'paid') amount = round2(amount + a.amount);
+        if (a.status === PaymentStatus.PAID) amount = round2(amount + a.amount);
       }
     }
   } else {
@@ -128,18 +131,18 @@ function processDeposit(
     if (due.settled.length) {
       accruals = due.items;
       changed = true;
-      if (deposit.accrualType === 'capitalization') {
+      if (deposit.accrualType === DepositAccrualType.CAPITALIZATION) {
         for (const a of due.settled) amount = round2(amount + a.amount);
       }
     }
   }
 
-  if (deposit.accrualType !== 'capitalization') {
+  if (deposit.accrualType !== DepositAccrualType.CAPITALIZATION) {
     for (const a of accruals) {
-      if (a.status !== 'paid') continue;
+      if (a.status !== PaymentStatus.PAID) continue;
       mirror.ensure({
         date: a.dueDate,
-        type: 'income',
+        type: RecordType.INCOME,
         amount: a.amount,
         category: deps.labels.depositInterestCat,
         payer: deposit.bankName,
@@ -150,15 +153,15 @@ function processDeposit(
   }
 
   let status: DepositRecord['status'] = deposit.status;
-  const matured = accruals.length > 0 && accruals.every(a => a.status === 'paid');
+  const matured = accruals.length > 0 && accruals.every(a => a.status === PaymentStatus.PAID);
   if (matured) {
-    status = 'closed';
+    status = DepositStatus.CLOSED;
     changed = true;
     // Dated at term end, not at "whenever the note was next opened".
     const lastDueDate = accruals[accruals.length - 1]!.dueDate;
     mirror.ensure({
       date: lastDueDate,
-      type: 'income',
+      type: RecordType.INCOME,
       amount,
       category: deps.labels.depositRefundCat,
       payer: deposit.bankName,
@@ -174,7 +177,7 @@ function processDeposit(
 function processCredit(
   credit: CreditRecord, mirror: RecordMirror, deps: AutoTxDeps,
 ): { credit: CreditRecord; changed: boolean } {
-  if (credit.status !== 'active') return { credit, changed: false };
+  if (credit.status !== CreditStatus.ACTIVE) return { credit, changed: false };
 
   let changed = false;
   let payments: CreditPayment[] = credit.payments;
@@ -187,7 +190,7 @@ function processCredit(
     if (credit.paymentDay !== undefined) {
       const paymentDay = credit.paymentDay; // Capture for type narrowing in callbacks
       const pendingWithWrongDay = payments.filter(p => {
-        if (p.status !== 'pending') return false;
+        if (p.status !== PaymentStatus.PENDING) return false;
         const parsed = parseDateStr(p.dueDate);
         return parsed !== null && parsed.day !== paymentDay;
       });
@@ -213,10 +216,10 @@ function processCredit(
   }
 
   for (const p of payments) {
-    if (p.status !== 'paid') continue;
+    if (p.status !== PaymentStatus.PAID) continue;
     mirror.ensure({
       date: p.dueDate,
-      type: 'expense',
+      type: RecordType.EXPENSE,
       amount: p.amount,
       category: deps.labels.creditDefaultCat,
       payer: credit.bankName,
@@ -226,8 +229,8 @@ function processCredit(
   }
 
   // "No pending payments left" — not `remainingAmount === 0`, which compares a float sum to zero.
-  const status = payments.length > 0 && !payments.some(p => p.status === 'pending')
-    ? 'paid'
+  const status = payments.length > 0 && !payments.some(p => p.status === PaymentStatus.PENDING)
+    ? CreditStatus.PAID
     : credit.status;
   if (status !== credit.status) changed = true;
 

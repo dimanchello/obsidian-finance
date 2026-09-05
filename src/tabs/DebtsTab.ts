@@ -14,6 +14,7 @@ import { DataTable, FilterControl } from '../ui/DataTable';
 import { renderMobileCard, renderSummaryCard, compareValues, dateRangeControls } from '../ui/tabHelpers';
 import { getDebtOriginal, getDebtWithInterest, getDebtRemaining, isDebtPaidOff } from '../domain/debtCalculations';
 import { AccountCommands } from '../domain/AccountCommands';
+import { DebtDirection, DebtMovementType, PaymentStatus } from '../constants';
 
 export class DebtsTab {
   private ctx: ViewContext;
@@ -38,8 +39,8 @@ export class DebtsTab {
         {
           key: 'direction', label: this.tr.type,
           cell: d => ({
-            text: d.direction === 'lent' ? this.tr.lent : this.tr.borrowed,
-            cls: d.direction === 'lent' ? 'finance-dir-lent' : 'finance-dir-borrowed',
+            text: d.direction === DebtDirection.LENT ? this.tr.lent : this.tr.borrowed,
+            cls: d.direction === DebtDirection.LENT ? 'finance-dir-lent' : 'finance-dir-borrowed',
           }),
         },
         { key: 'person', label: this.tr.sortPerson, cell: d => ({ text: d.person || '—' }) },
@@ -74,7 +75,7 @@ export class DebtsTab {
       ],
       rowCls: d => [
         'finance-debt-row',
-        d.direction === 'lent' ? 'finance-debt-lent' : 'finance-debt-borrowed',
+        d.direction === DebtDirection.LENT ? 'finance-debt-lent' : 'finance-debt-borrowed',
         isDebtPaidOff(d) ? 'finance-debt-paid' : 'finance-debt-unpaid',
       ],
       rowActions: d => [
@@ -151,8 +152,8 @@ export class DebtsTab {
     const allDebts = this.ctx.data?.debts ?? [];
     const summary = host.createDiv('finance-stats-container finance-stats-two-cols');
 
-    const lentDebts = allDebts.filter(d => d.direction === 'lent');
-    const borrowedDebts = allDebts.filter(d => d.direction !== 'lent');
+    const lentDebts = allDebts.filter(d => d.direction === DebtDirection.LENT);
+    const borrowedDebts = allDebts.filter(d => d.direction !== DebtDirection.LENT);
     const remainingOf = (debts: DebtRecord[]) =>
       sumMoney(debts.map(d => getDebtRemaining(d)));
 
@@ -219,7 +220,7 @@ export class DebtsTab {
     const q = f.search.toLowerCase();
 
     const rows = this.ctx.data.debts.filter(d => {
-      if (f.status === 'paid' && !isDebtPaidOff(d)) return false;
+      if (f.status === PaymentStatus.PAID && !isDebtPaidOff(d)) return false;
       if (f.status === 'unpaid' && isDebtPaidOff(d)) return false;
       if (f.direction !== 'all' && d.direction !== f.direction) return false;
       if (f.dateFrom && d.date < f.dateFrom) return false;
@@ -253,15 +254,15 @@ export class DebtsTab {
       movHead.createEl('th', { text: l, cls: 'finance-th finance-mov-th' });
     });
     const movBody = movTable.createEl('tbody');
-    const isLent = debt.direction === 'lent';
+    const isLent = debt.direction === DebtDirection.LENT;
     debt.movements.forEach(m => {
       const mr = movBody.createEl('tr', { cls: `finance-mov-${m.type}` });
-      const typeLabel = m.type === 'borrow'
+      const typeLabel = m.type === DebtMovementType.BORROW
         ? (isLent ? this.tr.gaveMore : this.tr.tookMore)
         : (isLent ? this.tr.returned : this.tr.repaymentAct);
       mr.createEl('td', { text: typeLabel, cls: 'finance-td' });
       mr.createEl('td', {
-        text: (m.type === 'borrow' ? '−' : '+') + this.ctx.fmt(m.amount),
+        text: (m.type === DebtMovementType.BORROW ? '−' : '+') + this.ctx.fmt(m.amount),
         cls: `finance-td finance-td-mov-${m.type}`,
       });
       mr.createEl('td', { text: fmtDate(m.date, m.time), cls: 'finance-td' });
@@ -281,7 +282,7 @@ export class DebtsTab {
   // ── Mobile card ──────────────────────────────────────────────────────────
 
   private renderCard(block: HTMLElement, debt: DebtRecord): void {
-    block.addClass(debt.direction === 'lent' ? 'finance-row-income' : 'finance-row-expense');
+    block.addClass(debt.direction === DebtDirection.LENT ? 'finance-row-income' : 'finance-row-expense');
     
     const remaining = getDebtRemaining(debt);
     const original = getDebtOriginal(debt);
@@ -299,8 +300,8 @@ export class DebtsTab {
 
     renderMobileCard(block, {
       amountText: this.ctx.fmt(remaining),
-      amountCls: debt.direction === 'lent' ? 'finance-amount-income' : 'finance-amount-expense',
-      subtitle: `${debt.person || '—'} · ${debt.direction === 'lent' ? this.tr.lent : this.tr.borrowed}`,
+      amountCls: debt.direction === DebtDirection.LENT ? 'finance-amount-income' : 'finance-amount-expense',
+      subtitle: `${debt.person || '—'} · ${debt.direction === DebtDirection.LENT ? this.tr.lent : this.tr.borrowed}`,
       details,
       note: debt.note,
     });
@@ -324,12 +325,12 @@ export class DebtsTab {
       onSave: async debt => {
         const initialMovement: DebtMovement = {
           id: crypto.randomUUID(),
-          type: 'borrow',
+          type: DebtMovementType.BORROW,
           amount: debt.amount,
           date: debt.date,
           time: debt.time,
           createdAt: debt.createdAt,
-          note: debt.direction === 'lent' ? this.tr.lentGiven : this.tr.borrowedTaken,
+          note: debt.direction === DebtDirection.LENT ? this.tr.lentGiven : this.tr.borrowedTaken,
         };
         await this.commands.addDebt(
           debt,
@@ -359,7 +360,7 @@ export class DebtsTab {
   private openRepayModal(debt: DebtRecord): void {
     new DebtMovementModal(this.ctx.app, {
       title: `${this.tr.repaymentAct} — ${debt.person}`,
-      type: 'repay',
+      type: DebtMovementType.REPAY,
       remainingAmount: getDebtRemaining(debt),
       currency: this.ctx.currency,
       onSave: async mov => {
@@ -377,7 +378,7 @@ export class DebtsTab {
   private openBorrowMoreModal(debt: DebtRecord): void {
     new DebtMovementModal(this.ctx.app, {
       title: `${this.tr.borrowMore} — ${debt.person}`,
-      type: 'borrow',
+      type: DebtMovementType.BORROW,
       onSave: async mov => {
         await this.commands.addDebtMovement(
           debt.id,
@@ -404,7 +405,7 @@ export class DebtsTab {
   }
 
   private confirmDeleteMovement(debt: DebtRecord, mov: DebtMovement): void {
-    const label = `${mov.type === 'borrow' ? '−' : '+'}${this.ctx.fmt(mov.amount)}  ·  ${fmtDate(mov.date, mov.time)}`;
+    const label = `${mov.type === DebtMovementType.BORROW ? '−' : '+'}${this.ctx.fmt(mov.amount)}  ·  ${fmtDate(mov.date, mov.time)}`;
     new ConfirmModal(this.ctx.app, `${this.tr.confirmDeleteMovement}\n${label}`, async () => {
       await this.commands.deleteDebtMovement(debt.id, mov.id, mov.date, mov.amount);
       await this.reload(this.tr.debtDeleted);

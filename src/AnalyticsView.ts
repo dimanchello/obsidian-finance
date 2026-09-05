@@ -10,6 +10,7 @@ import {
 import { Translations } from './i18n';
 import { isoWeek } from './domain/dateMath';
 import { svg, fmtShort, shortMonth, createChartTooltip } from './ui/chartHelpers';
+import { RecordType } from './constants';
 
 type ChartType = 'bar' | 'pie';
 type GroupBy   = 'category' | 'payer' | 'month' | 'week' | 'year';
@@ -176,7 +177,7 @@ export class AnalyticsView {
         key = `${y}-${m}`; // for sort
       }
       const cur = map.get(key) ?? { income: 0, expense: 0 };
-      if (r.type === 'income') cur.income += r.amount;
+      if (r.type === RecordType.INCOME) cur.income += r.amount;
       else                     cur.expense += r.amount;
       map.set(key, cur);
     });

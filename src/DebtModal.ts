@@ -6,6 +6,7 @@ import { FieldInfoModal, DEBT_FIELDS } from './FieldInfoModal';
 import { createAmountInput } from './ui/AmountInput';
 import { FinanceBaseModal } from './ui/FinanceBaseModal';
 import { buildDateField, buildRateInput, buildNoteField, buildButtonRow, buildComboboxField, validateAmountInput } from './ui/formHelpers';
+import { DebtDirection } from './constants';
 
 export interface DebtModalOptions {
   title:   string;
@@ -45,7 +46,7 @@ export class DebtModal extends FinanceBaseModal {
           amount: 0,
           originalAmount: 0,
           interestRate: 0,
-          direction: 'borrowed',
+          direction: DebtDirection.BORROWED,
           date: nowStr,
           time: new Date().toTimeString().slice(0, 5),
           dueDate: '',
@@ -61,14 +62,14 @@ export class DebtModal extends FinanceBaseModal {
     const dirRow = this.contentEl.createDiv('finance-type-row');
     const lentBtn = dirRow.createEl('button', {
       text: this.tr.lent,
-      cls: `finance-type-toggle${this.debt.direction === 'lent' ? ' active lent' : ''}`,
+      cls: `finance-type-toggle${this.debt.direction === DebtDirection.LENT ? ' active lent' : ''}`,
     });
     const borrowedBtn = dirRow.createEl('button', {
       text: this.tr.borrowed,
-      cls: `finance-type-toggle${this.debt.direction === 'borrowed' ? ' active borrowed' : ''}`,
+      cls: `finance-type-toggle${this.debt.direction === DebtDirection.BORROWED ? ' active borrowed' : ''}`,
     });
 
-    let personLabelText = this.debt.direction === 'lent' ? `${this.tr.who} *` : `${this.tr.person} *`;
+    let personLabelText = this.debt.direction === DebtDirection.LENT ? `${this.tr.who} *` : `${this.tr.person} *`;
 
     const setDirection = (dir: 'lent' | 'borrowed') => {
       this.debt.direction = dir;
@@ -118,7 +119,7 @@ export class DebtModal extends FinanceBaseModal {
 
     const totalG = row3.createDiv('finance-field-group');
     totalG.createEl('label', {
-      text: this.debt.direction === 'lent' ? this.tr.totalReturnLent : this.tr.totalReturnBorrowed,
+      text: this.debt.direction === DebtDirection.LENT ? this.tr.totalReturnLent : this.tr.totalReturnBorrowed,
       cls: 'finance-field-label finance-total-label',
     });
     this.totalInput = totalG.createEl('input', { type: 'text', cls: 'finance-input' });

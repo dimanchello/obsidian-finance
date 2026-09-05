@@ -16,6 +16,7 @@ import { noteFilename } from '../utils';
 import { isoWeekRange, daysInMonth } from '../domain/dateMath';
 import { DataTable, DataTableApi, FilterControl } from '../ui/DataTable';
 import { renderMobileCard, dateRangeControls, compareValues } from '../ui/tabHelpers';
+import { RecordType } from '../constants';
 
 type Panel = 'analytics' | 'filters' | 'settings';
 
@@ -46,16 +47,16 @@ export class RecordsTab {
         {
           key: 'type', label: this.tr.type,
           cell: r => ({
-            text: r.type === 'income' ? this.tr.typeIncome : this.tr.typeExpense,
-            cls: r.type === 'income' ? 'finance-type-income' : 'finance-type-expense',
+            text: r.type === RecordType.INCOME ? this.tr.typeIncome : this.tr.typeExpense,
+            cls: r.type === RecordType.INCOME ? 'finance-type-income' : 'finance-type-expense',
           }),
         },
         {
           key: 'amount', label: this.tr.sum,
           cell: r => ({
-            text: (r.type === 'income' ? '+' : '−') + this.ctx.fmt(r.amount)
+            text: (r.type === RecordType.INCOME ? '+' : '−') + this.ctx.fmt(r.amount)
               + (r.exchangeRate ? ` @ ${r.exchangeRate}` : ''),
-            cls: 'finance-amount-cell ' + (r.type === 'income' ? 'finance-amount-income' : 'finance-amount-expense'),
+            cls: 'finance-amount-cell ' + (r.type === RecordType.INCOME ? 'finance-amount-income' : 'finance-amount-expense'),
           }),
         },
         { key: 'category', label: this.tr.category, cell: r => ({ text: r.category || '—' }) },
@@ -64,7 +65,7 @@ export class RecordsTab {
         { key: 'note', label: this.tr.note, cell: r => ({ text: r.note || '—', cls: 'finance-note-cell' }) },
       ],
       rowCls: r => {
-        const cls = [r.type === 'income' ? 'finance-row-income' : 'finance-row-expense'];
+        const cls = [r.type === RecordType.INCOME ? 'finance-row-income' : 'finance-row-expense'];
         if (r.isInternal) cls.push('finance-tr-internal');
         return cls;
       },
@@ -94,8 +95,8 @@ export class RecordsTab {
       ownToolbar: (toolbar, api) => this.renderToolbar(toolbar, api),
       renderPanels: host => this.renderPanels(host),
       infoBarSums: (host, filtered) => {
-        const fi = filtered.filter(r => r.type === 'income' && !r.isInternal).reduce((s, r) => s + r.amount, 0);
-        const fe = filtered.filter(r => r.type === 'expense' && !r.isInternal).reduce((s, r) => s + r.amount, 0);
+        const fi = filtered.filter(r => r.type === RecordType.INCOME && !r.isInternal).reduce((s, r) => s + r.amount, 0);
+        const fe = filtered.filter(r => r.type === RecordType.EXPENSE && !r.isInternal).reduce((s, r) => s + r.amount, 0);
         const sums = host.createDiv('finance-table-sums');
         sums.createEl('span', { text: `↑ ${this.ctx.fmt(fi)}`, cls: 'finance-sum-income' });
         sums.createEl('span', { text: '·', cls: 'finance-sum-sep' });
@@ -191,10 +192,10 @@ export class RecordsTab {
     if (!this.ctx.data) return;
     const statsEl = host.createDiv('finance-stats-container');
     const recs = this.ctx.data.records;
-    const inc = recs.filter(r => r.type === 'income' && !r.isInternal).reduce((s, r) => s + r.amount, 0);
-    const exp = recs.filter(r => r.type === 'expense' && !r.isInternal).reduce((s, r) => s + r.amount, 0);
-    const totalInc = recs.filter(r => r.type === 'income').reduce((s, r) => s + r.amount, 0);
-    const totalExp = recs.filter(r => r.type === 'expense').reduce((s, r) => s + r.amount, 0);
+    const inc = recs.filter(r => r.type === RecordType.INCOME && !r.isInternal).reduce((s, r) => s + r.amount, 0);
+    const exp = recs.filter(r => r.type === RecordType.EXPENSE && !r.isInternal).reduce((s, r) => s + r.amount, 0);
+    const totalInc = recs.filter(r => r.type === RecordType.INCOME).reduce((s, r) => s + r.amount, 0);
+    const totalExp = recs.filter(r => r.type === RecordType.EXPENSE).reduce((s, r) => s + r.amount, 0);
     const bal = totalInc - totalExp;
 
     const cards = [

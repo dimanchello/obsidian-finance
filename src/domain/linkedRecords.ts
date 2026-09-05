@@ -1,5 +1,6 @@
 import { FinanceRecord, RecordType, CreditRecord, DebtRecord, DepositRecord, DebtMovement, CurrencyExchange } from '../types';
 import { getTodayTime } from '../utils';
+import { RecordType as RecordTypeValue } from '../constants';
 
 /**
  * Centralized logic for managing linkedId records.
@@ -212,7 +213,7 @@ export function createCreditReceiptRecord(
   return createLinkedRecord({
     entityId: credit.id,
     date: credit.startDate,
-    type: 'income',
+    type: RecordTypeValue.INCOME,
     amount: credit.originalAmount,
     category,
     payer: credit.bankName,
@@ -234,7 +235,7 @@ export function createCreditPaymentRecord(
   return createLinkedRecord({
     entityId: credit.id,
     date: paymentDate,
-    type: 'expense',
+    type: RecordTypeValue.EXPENSE,
     amount: paymentAmount,
     category,
     payer: credit.bankName,
@@ -254,7 +255,7 @@ export function createDepositRefundRecord(
   return createLinkedRecord({
     entityId: deposit.id,
     date: deposit.startDate,
-    type: 'income',
+    type: RecordTypeValue.INCOME,
     amount: deposit.amount,
     category,
     payer: deposit.bankName,

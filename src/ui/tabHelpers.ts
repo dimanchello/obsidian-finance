@@ -5,6 +5,7 @@ import { PERCENT_100, PAGE_RANGE_THRESHOLD } from '../types';
 import { ViewContext } from '../context';
 import { daysBetweenStr, addMonthsClamped } from '../domain/dateMath';
 import { getTodayStr } from '../utils';
+import { PaymentStatus } from '../constants';
 
 export function renderProgressBar(
   host: HTMLElement,
@@ -65,7 +66,7 @@ export function renderPaginatedSchedule<T extends { dueDate: string; status: str
   const movBody = movTable.createEl('tbody');
 
   pageItems.forEach((p, idx) => {
-    const isPaid = p.status === 'paid' || p.dueDate <= today;
+    const isPaid = p.status === PaymentStatus.PAID || p.dueDate <= today;
     const mr = movBody.createEl('tr', { cls: isPaid ? 'finance-payment-paid' : 'finance-payment-pending' });
     mr.createEl('td', { text: String(start + idx + 1), cls: 'finance-td' });
     const dateText = formatters?.formatDate ? formatters.formatDate(p) : fmtDate(p.dueDate);

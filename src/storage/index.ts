@@ -7,6 +7,7 @@ import { parseCredits, parseDebts, parseDeposits, parseRecords, parseStringList,
 import { VaultAdapter } from './VaultAdapter';
 import { AccountFiles } from './AccountFiles';
 import { FileStore, FlushScheduler } from './AccountRepo';
+import { DebtMovementType } from '../constants';
 
 const DATA_VERSION = 1;
 
@@ -268,7 +269,7 @@ export class FinanceStorage {
     const debt = d.find(x => x.id === debtId);
     if (!debt) return;
     fn(debt);
-    debt.amount = sumMoney(debt.movements.map(m => m.type === 'borrow' ? m.amount : -m.amount));
+    debt.amount = sumMoney(debt.movements.map(m => m.type === DebtMovementType.BORROW ? m.amount : -m.amount));
     this.debts.markDirty(accountId);
   }
 

@@ -1,14 +1,15 @@
 import { DebtRecord } from '../types';
 import { round2, sumMoney } from './money';
+import { DebtMovementType } from '../constants';
 
 const PERCENT_100 = 100;
 
 export function getDebtRepaid(debt: DebtRecord): number {
-  return sumMoney(debt.movements.filter(m => m.type === 'repay').map(m => m.amount));
+  return sumMoney(debt.movements.filter(m => m.type === DebtMovementType.REPAY).map(m => m.amount));
 }
 
 export function getDebtOriginal(debt: DebtRecord): number {
-  return sumMoney(debt.movements.filter(m => m.type === 'borrow').map(m => m.amount));
+  return sumMoney(debt.movements.filter(m => m.type === DebtMovementType.BORROW).map(m => m.amount));
 }
 
 export function getDebtWithInterest(debt: DebtRecord): number {

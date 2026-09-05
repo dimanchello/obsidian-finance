@@ -1,4 +1,5 @@
-import { RecordType } from '../types';
+import type { RecordType } from '../types';
+import { RecordType as RecordTypeValue } from '../constants';
 
 /**
  * RFC 4180 parse. A quoted field may contain commas, newlines and doubled quotes,
@@ -65,12 +66,12 @@ export interface TypeMap { incomeVal: string; expenseVal: string }
 export function resolveRecordType(
   mode: TypeMode, typeValue: string, amount: number, map: TypeMap,
 ): RecordType | null {
-  if (mode === 'all_income') return 'income';
-  if (mode === 'all_expense') return 'expense';
-  if (mode === 'sign') return amount >= 0 ? 'income' : 'expense';
+  if (mode === 'all_income') return RecordTypeValue.INCOME;
+  if (mode === 'all_expense') return RecordTypeValue.EXPENSE;
+  if (mode === 'sign') return amount >= 0 ? RecordTypeValue.INCOME : RecordTypeValue.EXPENSE;
 
   const v = typeValue.trim().toLowerCase();
-  if (v === map.incomeVal.trim().toLowerCase()) return 'income';
-  if (v === map.expenseVal.trim().toLowerCase()) return 'expense';
+  if (v === map.incomeVal.trim().toLowerCase()) return RecordTypeValue.INCOME;
+  if (v === map.expenseVal.trim().toLowerCase()) return RecordTypeValue.EXPENSE;
   return null;
 }

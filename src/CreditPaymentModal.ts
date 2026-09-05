@@ -4,6 +4,7 @@ import { parseAmount, getTodayStr, normalizeDateStr } from './utils';
 import { createAmountInput } from './ui/AmountInput';
 import { EntityModal } from './ui/EntityModal';
 import { buildDateField, buildNoteField } from './ui/formHelpers';
+import { PaymentStatus } from './constants';
 
 export interface CreditPaymentOptions {
   title: string;
@@ -21,7 +22,7 @@ export class CreditPaymentModal extends EntityModal<CreditPayment> {
         id: crypto.randomUUID(),
         amount: opts.credit.monthlyPayment,
         dueDate: getTodayStr(),
-        status: 'paid',
+        status: PaymentStatus.PAID,
         paidDate: getTodayStr(),
         note: '',
       },

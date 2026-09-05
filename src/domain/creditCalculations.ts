@@ -2,6 +2,7 @@ import { CreditPayment, CreditRecord, ACCRUAL_STEP_MONTHLY, PERCENT_100 } from '
 import { round2 } from './money';
 import { addMonthsClamped, withDayClamped } from './dateMath';
 import { getTodayStr, normalizeDateStr } from '../utils';
+import { PaymentStatus, CreditStatus } from '../constants';
 
 /**
  * Calculates standard bank annuity monthly payment.
@@ -105,7 +106,7 @@ export function generateAnnuitySchedule(params: GenerateScheduleParams): {
 
     const existing = existingPayments[i - 1];
     const isPast = dueDate <= today;
-    const isPaid = existing ? existing.status === 'paid' : isPast;
+    const isPaid = existing ? existing.status === PaymentStatus.PAID : isPast;
     const amount = existing?.amount ?? monthlyPayment;
     const isLast = i === termMonths || runningPrincipal <= 0;
 
@@ -115,7 +116,7 @@ export function generateAnnuitySchedule(params: GenerateScheduleParams): {
       id: existing?.id ?? crypto.randomUUID(),
       amount,
       dueDate,
-      status: isPaid ? 'paid' : 'pending',
+      status: isPaid ? PaymentStatus.PAID : PaymentStatus.PENDING,
       paidDate: existing?.paidDate ?? (isPaid ? dueDate : undefined),
       note: existing?.note,
       principalPart: breakdown.principalPart,
@@ -144,9 +145,9 @@ export function generateAnnuitySchedule(params: GenerateScheduleParams): {
  * Accurately computes remaining principal balance of a credit.
  */
 export function calculateRemainingPrincipal(credit: CreditRecord): number {
-  if (credit.status === 'paid' || credit.originalAmount <= 0) return 0;
+  if (credit.status === CreditStatus.PAID || credit.originalAmount <= 0) return 0;
 
-  const paidPayments = credit.payments.filter(p => p.status === 'paid');
+  const paidPayments = credit.payments.filter(p => p.status === PaymentStatus.PAID);
   if (paidPayments.length === 0) return credit.originalAmount;
 
   const lastPaid = paidPayments[paidPayments.length - 1];
@@ -174,7 +175,7 @@ export function calculateTotalInterestPaid(credit: CreditRecord): number {
   let runningPrincipal = credit.originalAmount;
 
   credit.payments.forEach((p, i) => {
-    if (p.status !== 'paid') return;
+    if (p.status !== PaymentStatus.PAID) return;
     if (p.interestPart !== undefined) {
       totalInterest += p.interestPart;
     } else {

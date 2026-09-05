@@ -7,6 +7,7 @@ import { createAmountInput } from './ui/AmountInput';
 import { buildAttachmentField } from './ui/attachmentField';
 import { FinanceBaseModal } from './ui/FinanceBaseModal';
 import { buildDateField, buildNoteField, buildButtonRow, buildComboboxField, buildRateInput, validateAmountInput } from './ui/formHelpers';
+import { DepositAccrualType as AccrualTypeValue, DepositStatus } from './constants';
 
 export interface DepositModalOptions {
   title:     string;
@@ -56,10 +57,10 @@ export class DepositModal extends FinanceBaseModal {
           interestRate: 0,
           startDate: nowStr,
           termMonths: 12,
-          accrualType: 'to_account',
+          accrualType: AccrualTypeValue.TO_ACCOUNT,
           createdAt: Date.now(),
           note: '',
-          status: 'active',
+          status: DepositStatus.ACTIVE,
           accruals: [],
           topUps: [],
           withdrawals: [],

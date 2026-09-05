@@ -3,6 +3,7 @@ import { DepositRecord, OVERVIEW_TREND_MONTHS, OVERVIEW_CHART_HEIGHT, OVERVIEW_C
 import { createChartTooltip, fmtShort, svg } from '../chartHelpers';
 import { calcDepositInterestOverTime, calcActiveDepositsProgress, DepositInterestMonth, ActiveDepositProgress } from '../../domain/overviewMetrics';
 import { fmtDate } from '../../utils';
+import { DepositAccrualType, PaymentStatus } from '../../constants';
 
 export class DepositsOverview {
   private ctx: ViewContext;
@@ -147,7 +148,7 @@ export class DepositsOverview {
         const segHeight = maxMonthlyValue > 0 ? (seg.amount / maxMonthlyValue) * plotHeight : 0;
         const segY = baselineY - accumulatedHeight - segHeight;
         const segColor = depositColorMap.get(seg.depositId) ?? 'var(--color-green)';
-        const isPending = seg.status === 'pending';
+        const isPending = seg.status === PaymentStatus.PENDING;
 
         const rect = svg('rect', {
           x: x,
@@ -268,7 +269,7 @@ export class DepositsOverview {
       const badges = header.createDiv('finance-deposit-overview-badges');
       const accrualTypeBadge = badges.createDiv('finance-deposit-badge accrual-type');
       accrualTypeBadge.textContent =
-        dep.accrualType === 'capitalization'
+        dep.accrualType === DepositAccrualType.CAPITALIZATION
           ? tr.overviewDepositCapitalization
           : tr.overviewDepositToAccount;
 

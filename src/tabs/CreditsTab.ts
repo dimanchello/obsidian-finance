@@ -17,6 +17,7 @@ import { DataTable, FilterControl } from '../ui/DataTable';
 import { CreditsAnalyticsView } from '../CreditsAnalyticsView';
 import { renderMobileCard, renderSummaryCard, renderProgressBar, renderPaginatedSchedule, pageRange, dateRangeControls, compareValues } from '../ui/tabHelpers';
 import { AccountCommands } from '../domain/AccountCommands';
+import { CreditStatus, PaymentStatus } from '../constants';
 
 export class CreditsTab {
   private ctx: ViewContext;
@@ -53,9 +54,9 @@ export class CreditsTab {
           },
         },
       ],
-      rowCls: c => [c.status === 'active' ? 'finance-row-income' : 'finance-row-expense'],
+      rowCls: c => [c.status === CreditStatus.ACTIVE ? 'finance-row-income' : 'finance-row-expense'],
       rowActions: c => [
-        ...(c.status === 'active' ? [
+        ...(c.status === CreditStatus.ACTIVE ? [
           { icon: '💰', title: this.tr.addMovement, onClick: () => this.openAddCreditPaymentModal(c) },
           { icon: '⚡', title: this.tr.earlyRepayment, onClick: () => this.openEarlyRepaymentModal(c) },
         ] : []),
@@ -179,8 +180,8 @@ export class CreditsTab {
 
     const allCredits = this.ctx.data?.credits ?? [];
     const summary = host.createDiv('finance-stats-container finance-stats-two-cols');
-    const activeCredits = allCredits.filter(c => c.status === 'active');
-    const paidCredits = allCredits.filter(c => c.status === 'paid');
+    const activeCredits = allCredits.filter(c => c.status === CreditStatus.ACTIVE);
+    const paidCredits = allCredits.filter(c => c.status === CreditStatus.PAID);
 
     const countSub = (count: number) => `${count} ${count === 1 ? this.tr.creditCount_one : count < PLURAL_THRESHOLD ? this.tr.creditCount_few : this.tr.creditCount_many}`;
 
@@ -268,19 +269,19 @@ export class CreditsTab {
   // ── Mobile card ──────────────────────────────────────────────────────────
 
   private renderCard(block: HTMLElement, credit: CreditRecord): void {
-    block.addClass(credit.status === 'active' ? 'finance-row-income' : 'finance-row-expense');
+    block.addClass(credit.status === CreditStatus.ACTIVE ? 'finance-row-income' : 'finance-row-expense');
 
     const details = [];
     details.push({ label: `📊`, value: `${credit.interestRate}${this.tr.percentPerAnnum}` });
     details.push({ label: `💰 ${this.tr.paymentLabel}:`, value: this.ctx.fmt(credit.monthlyPayment) });
 
-    const paidCount = credit.payments.filter(p => p.status === 'paid').length;
+    const paidCount = credit.payments.filter(p => p.status === PaymentStatus.PAID).length;
     if (credit.payments.length > 0) {
       details.push({ label: `✅`, value: `${paidCount}/${credit.payments.length} ${this.tr.paymentsCount}` });
     }
 
     const endDate = this.calculateCreditEndDate(credit);
-    if (endDate && credit.status === 'active') {
+    if (endDate && credit.status === CreditStatus.ACTIVE) {
       details.push({ label: this.tr.dueBy, value: fmtDate(endDate) });
     }
 
@@ -311,7 +312,7 @@ export class CreditsTab {
     const totalPages = Math.max(1, Math.ceil(credit.payments.length / CREDIT_PAYMENT_PAGE_SIZE));
     let page = this.creditPaymentPages.get(credit.id);
     if (page === undefined) {
-      const lastPaidIdx = credit.payments.findLastIndex(p => p.status === 'paid');
+      const lastPaidIdx = credit.payments.findLastIndex(p => p.status === PaymentStatus.PAID);
       page = lastPaidIdx >= 0 ? Math.floor(lastPaidIdx / CREDIT_PAYMENT_PAGE_SIZE) : 0;
     }
     page = Math.max(0, Math.min(page, totalPages - 1));

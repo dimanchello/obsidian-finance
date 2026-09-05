@@ -5,6 +5,7 @@ import { calculateRemainingPrincipal } from './domain/creditCalculations';
 import { fmtAmount, parseAmount, getTodayStr, normalizeDateStr } from './utils';
 import { createAmountInput } from './ui/AmountInput';
 import { round2 } from './domain/money';
+import { PaymentStatus } from './constants';
 
 export interface EarlyRepaymentOptions {
   title: string;
@@ -28,7 +29,7 @@ export class CreditEarlyRepaymentModal extends Modal {
     this.o = opts;
     this.credit = { ...opts.credit, payments: [...opts.credit.payments] };
 
-    this.pendingPayments = this.credit.payments.filter(p => p.status === 'pending');
+    this.pendingPayments = this.credit.payments.filter(p => p.status === PaymentStatus.PENDING);
     this.actualRemaining = this.credit.currentAmount > 0
       ? this.credit.currentAmount
       : calculateRemainingPrincipal(this.credit);
@@ -152,7 +153,7 @@ export class CreditEarlyRepaymentModal extends Modal {
             }
           }
 
-          const stillPending = this.credit.payments.filter(p => p.status === 'pending');
+          const stillPending = this.credit.payments.filter(p => p.status === PaymentStatus.PENDING);
           this.credit.currentAmount = calculateRemainingPrincipal(this.credit);
           if (this.credit.currentAmount <= 0 || stillPending.length === 0) {
             this.credit.status = 'paid';
@@ -168,7 +169,7 @@ export class CreditEarlyRepaymentModal extends Modal {
             if (noteIn.value) p.note = noteIn.value;
           }
 
-          const stillPending = this.credit.payments.filter(p => p.status === 'pending');
+          const stillPending = this.credit.payments.filter(p => p.status === PaymentStatus.PENDING);
           this.credit.currentAmount = calculateRemainingPrincipal(this.credit);
           this.credit.status = (this.credit.currentAmount <= 0 || stillPending.length === 0) ? 'paid' : 'active';
         }

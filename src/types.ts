@@ -1,7 +1,24 @@
-export type RecordType = 'income' | 'expense';
+import type {
+  RecordType as RecordTypeConst,
+  DebtDirection as DebtDirectionConst,
+  DebtMovementType as DebtMovementTypeConst,
+  CreditType as CreditTypeConst,
+  CreditStatus as CreditStatusConst,
+  EarlyRepaymentOption as EarlyRepaymentOptionConst,
+  DepositType as DepositTypeConst,
+  DepositStatus as DepositStatusConst,
+  DepositAccrualType as DepositAccrualTypeConst,
+  PaymentStatus as PaymentStatusConst,
+  CurrencyOperationType as CurrencyOperationTypeConst,
+} from './constants';
+
+/** Value unions derived from `constants.ts` — the literals live there only. */
+type ValueOf<T> = T[keyof T];
+
+export type RecordType = ValueOf<typeof RecordTypeConst>;
 export type SortField  = 'date' | 'amount' | 'category' | 'type' | 'payer' | 'tag';
 export type SortDir    = 'asc'  | 'desc';
-export type DebtMovementType = 'borrow' | 'repay';
+export type DebtMovementType = ValueOf<typeof DebtMovementTypeConst>;
 
 export interface FinanceRecord {
   id:             string;
@@ -31,7 +48,7 @@ export interface DebtMovement {
   note:      string;
 }
 
-export type DebtDirection = 'lent' | 'borrowed';  // lent = мне должны, borrowed = я должен
+export type DebtDirection = ValueOf<typeof DebtDirectionConst>;  // lent = мне должны, borrowed = я должен
 
 export interface DebtRecord {
   id:           string;
@@ -262,9 +279,9 @@ export const OVERVIEW_DEPOSIT_TREND_MONTHS = 6;
 export const CURRENCY_ROUNDING_PRECISION = 100;      // 2 decimal places
 export const EXCHANGE_RATE_PRECISION = 10000;        // 4 decimal places
 
-export type CreditType = 'consumer' | 'auto' | 'mortgage';
-export type CreditStatus = 'active' | 'paid';
-export type CreditPaymentStatus = 'pending' | 'paid';
+export type CreditType = ValueOf<typeof CreditTypeConst>;
+export type CreditStatus = ValueOf<typeof CreditStatusConst>;
+export type CreditPaymentStatus = ValueOf<typeof PaymentStatusConst>;
 
 export interface CreditPayment {
   id: string;
@@ -293,7 +310,7 @@ export interface CreditRecord {
   createdAt: number;
   note: string;
   status: CreditStatus;
-  earlyRepaymentOption: 'term' | 'amount' | null;
+  earlyRepaymentOption: ValueOf<typeof EarlyRepaymentOptionConst> | null;
   payments: CreditPayment[];
   purchasePrice?: number;
   downPayment?: number;
@@ -305,10 +322,10 @@ export interface CreditRecord {
   attachmentPath?: string;
 }
 
-export type DepositType = 'term' | 'demand' | 'savings';
-export type DepositAccrualType = 'to_account' | 'capitalization';
-export type DepositStatus = 'active' | 'closed';
-export type DepositAccrualStatus = 'pending' | 'paid';
+export type DepositType = ValueOf<typeof DepositTypeConst>;
+export type DepositAccrualType = ValueOf<typeof DepositAccrualTypeConst>;
+export type DepositStatus = ValueOf<typeof DepositStatusConst>;
+export type DepositAccrualStatus = ValueOf<typeof PaymentStatusConst>;
 
 export interface DepositAccrual {
   id: string;
@@ -356,7 +373,7 @@ export interface DepositRecord {
   attachmentPath?: string;
 }
 
-export type CurrencyOperationType = 'buy' | 'sell' | 'add' | 'spend';
+export type CurrencyOperationType = ValueOf<typeof CurrencyOperationTypeConst>;
 export type CurrencySortField = 'date' | 'amount' | 'targetCurrency' | 'provider';
 
 export interface CurrencyExchange {
