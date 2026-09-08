@@ -23,6 +23,7 @@ import { BreakdownChart } from '../ui/charts/BreakdownChart';
 import { SavingsRateChart } from '../ui/charts/SavingsRateChart';
 import { DebtsBreakdownChart } from '../ui/charts/DebtsBreakdownChart';
 import { DepositsOverview } from '../ui/charts/DepositsOverview';
+import { renderStatCard } from '../ui/statCards';
 
 export class OverviewTab {
   private el: HTMLElement;
@@ -315,11 +316,6 @@ export class OverviewTab {
     mod: 'income' | 'expense' | 'neutral' | 'warning',
     icon: string
   ): HTMLElement {
-    const card = parent.createDiv(`finance-stat-card finance-stat-${mod}`);
-    card.createEl('div', { text: icon, cls: 'finance-stat-icon' });
-    const info = card.createDiv('finance-stat-info');
-    info.createEl('div', { text: label, cls: 'finance-stat-label' });
-    info.createEl('div', { text: value, cls: 'finance-stat-value' });
-    return card;
+    return renderStatCard(parent, { label, value, mod, icon });
   }
 }

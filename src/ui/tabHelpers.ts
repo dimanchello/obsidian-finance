@@ -3,7 +3,7 @@ import { Translations } from '../i18n';
 import { FilterControl } from './DataTable';
 import { PERCENT_100, PAGE_RANGE_THRESHOLD } from '../types';
 import { ViewContext } from '../context';
-import { daysBetweenStr, addMonthsClamped } from '../domain/dateMath';
+import { daysBetweenStr, safeEndDate } from '../domain/dateMath';
 import { getTodayStr } from '../utils';
 import { PaymentStatus } from '../constants';
 
@@ -162,10 +162,7 @@ export function createAnalyticsToggle(
 }
 
 export function calculateEndDate(startDate: string, termMonths: number | undefined): string | null {
-  if (!startDate) return null;
-  try {
-    return addMonthsClamped(startDate, termMonths ?? 0);
-  } catch {
-    return null;
-  }
+  return safeEndDate(startDate, termMonths) || null;
 }
+
+export { renderStatCard, renderStatCards, type StatCardItem } from './statCards';

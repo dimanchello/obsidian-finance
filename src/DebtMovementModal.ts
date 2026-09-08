@@ -1,6 +1,6 @@
 import { App } from 'obsidian';
 import { DebtMovement, DebtMovementType } from './types';
-import { parseAmount, getTodayStr } from './utils';
+import { parseAmount, getTodayStr, getTodayTime } from './utils';
 import { createAmountInput } from './ui/AmountInput';
 import { EntityModal } from './ui/EntityModal';
 import { buildDateTimeField } from './ui/formHelpers';
@@ -27,7 +27,7 @@ export class DebtMovementModal extends EntityModal<DebtMovement> {
             type: opts.type,
             amount: 0,
             date: getTodayStr(),
-            time: new Date().toTimeString().slice(0, 5),
+            time: getTodayTime(),
             createdAt: Date.now(),
             note: '',
           },
@@ -44,7 +44,7 @@ export class DebtMovementModal extends EntityModal<DebtMovement> {
   protected buildForm(form: HTMLElement): void {
     // ── Amount ───────────────────────────────────────────────────────────
     const amtG = form.createDiv('finance-field-group finance-amount-group');
-    const labelText = this.o.type === 'borrow'
+    const labelText = this.o.type === DebtMovementType.BORROW
       ? this.tr.borrowAmountLabel
       : this.tr.repayAmountLabel;
     amtG.createEl('label', { text: labelText, cls: 'finance-field-label' });
@@ -57,7 +57,7 @@ export class DebtMovementModal extends EntityModal<DebtMovement> {
 
     // ── Full repayment link (only for repay type) ────────────────────────
     const remaining = this.o.remainingAmount;
-    if (this.o.type === 'repay' && remaining !== undefined && remaining > 0) {
+    if (this.o.type === DebtMovementType.REPAY && remaining !== undefined && remaining > 0) {
       const cur = this.o.currency ?? '';
       const formatted = remaining.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       const link = amtG.createEl('span', { cls: 'finance-fill-remaining-link' });

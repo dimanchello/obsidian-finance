@@ -1,11 +1,10 @@
-import { App, Notice } from 'obsidian';
-import { getLocaleFromApp, t, Translations } from './i18n';
-import { DebtRecord } from './types';
-import { fmtAmount, getTodayStr, normalizeDateStr, normalizeTimeStr } from './utils';
-import { FieldInfoModal, DEBT_FIELDS } from './FieldInfoModal';
+import { App } from 'obsidian';
+import { DebtRecord, PERCENT_100 } from './types';
+import { fmtAmount, getTodayStr, getTodayTime, normalizeDateStr, normalizeTimeStr, parseAmount } from './utils';
+import { DEBT_FIELDS, type FieldDef } from './FieldInfoModal';
 import { createAmountInput } from './ui/AmountInput';
-import { FinanceBaseModal } from './ui/FinanceBaseModal';
-import { buildDateField, buildRateInput, buildNoteField, buildButtonRow, buildComboboxField, validateAmountInput } from './ui/formHelpers';
+import { EntityModal } from './ui/EntityModal';
+import { buildDateField, buildRateInput, buildNoteField, buildComboboxField } from './ui/formHelpers';
 import { DebtDirection } from './constants';
 
 export interface DebtModalOptions {
@@ -15,163 +14,175 @@ export interface DebtModalOptions {
   onSave:  (debt: DebtRecord) => void;
 }
 
-export class DebtModal extends FinanceBaseModal {
-  protected tr: Translations;
+export class DebtModal extends EntityModal<DebtRecord> {
   private o: DebtModalOptions;
-  private debt: DebtRecord;
   private amountInput!: HTMLInputElement;
   private totalInput!: HTMLInputElement;
 
   constructor(app: App, opts: DebtModalOptions) {
-    super(app);
-    this.tr = t(getLocaleFromApp(app));
+    super(app, {
+      entity: opts.debt
+        ? {
+            ...opts.debt,
+            direction: opts.debt.direction || DebtDirection.BORROWED,
+            date: normalizeDateStr(opts.debt.date),
+            time: normalizeTimeStr(opts.debt.time || ''),
+            dueDate: opts.debt.dueDate ? normalizeDateStr(opts.debt.dueDate) : '',
+            movements: opts.debt.movements.map(m => ({
+              ...m,
+              date: normalizeDateStr(m.date),
+              time: normalizeTimeStr(m.time || ''),
+            })),
+          }
+        : {
+            id: crypto.randomUUID(),
+            person: '',
+            amount: 0,
+            originalAmount: 0,
+            interestRate: 0,
+            direction: DebtDirection.BORROWED,
+            date: getTodayStr(),
+            time: getTodayTime(),
+            dueDate: '',
+            createdAt: Date.now(),
+            note: '',
+            movements: [],
+          },
+      isEdit: !!opts.debt,
+      onSave: opts.onSave,
+    });
     this.o = opts;
-    const nowStr = getTodayStr();
-    this.debt = opts.debt
-      ? {
-          ...opts.debt,
-          direction: (opts.debt.direction || 'borrowed'),
-          date: normalizeDateStr(opts.debt.date),
-          time: normalizeTimeStr(opts.debt.time || ''),
-          dueDate: opts.debt.dueDate ? normalizeDateStr(opts.debt.dueDate) : '',
-          movements: opts.debt.movements.map(m => ({
-            ...m,
-            date: normalizeDateStr(m.date),
-            time: normalizeTimeStr(m.time || ''),
-          }))
-        }
-      : {
-          id: crypto.randomUUID(),
-          person: '',
-          amount: 0,
-          originalAmount: 0,
-          interestRate: 0,
-          direction: DebtDirection.BORROWED,
-          date: nowStr,
-          time: new Date().toTimeString().slice(0, 5),
-          dueDate: '',
-          createdAt: Date.now(),
-          note: '',
-          movements: [],
-        };
   }
 
-  override onOpen(): void {
-    this.openHeader(this.o.title);
+  protected getTitle(): string { return this.o.title; }
 
-    const dirRow = this.contentEl.createDiv('finance-type-row');
-    const lentBtn = dirRow.createEl('button', {
-      text: this.tr.lent,
-      cls: `finance-type-toggle${this.debt.direction === DebtDirection.LENT ? ' active lent' : ''}`,
-    });
-    const borrowedBtn = dirRow.createEl('button', {
-      text: this.tr.borrowed,
-      cls: `finance-type-toggle${this.debt.direction === DebtDirection.BORROWED ? ' active borrowed' : ''}`,
-    });
+  protected override getInfoFields(): FieldDef[] { return DEBT_FIELDS; }
 
-    let personLabelText = this.debt.direction === DebtDirection.LENT ? `${this.tr.who} *` : `${this.tr.person} *`;
+  protected buildForm(form: HTMLElement): void {
+    form.addClasses(['finance-form-grid', 'finance-form-compact']);
 
-    const setDirection = (dir: 'lent' | 'borrowed') => {
-      this.debt.direction = dir;
-      lentBtn.classList.toggle('active', dir === 'lent');
-      lentBtn.classList.toggle('lent', dir === 'lent');
-      borrowedBtn.classList.toggle('active', dir === 'borrowed');
-      borrowedBtn.classList.toggle('borrowed', dir === 'borrowed');
-      
-      const personLabel = this.contentEl.querySelector('.finance-person-label');
-      const totalLabel = this.contentEl.querySelector('.finance-total-label');
-      
-      if (personLabel) personLabel.textContent = dir === 'lent' ? `${this.tr.who} *` : `${this.tr.person} *`;
-      if (totalLabel) totalLabel.textContent = dir === 'lent' ? this.tr.totalReturnLent : this.tr.totalReturnBorrowed;
-    };
-
-    lentBtn.addEventListener('click', () => setDirection('lent'));
-    borrowedBtn.addEventListener('click', () => setDirection('borrowed'));
-
-    const form = this.contentEl.createDiv('finance-form finance-form-grid finance-form-compact');
+    this.buildDirectionToggle();
 
     const row1 = form.createDiv('finance-form-row finance-full-width');
 
-    const personInput = buildComboboxField(row1, personLabelText, this.debt.person, () => this.o.allPersons, v => { this.debt.person = v; });
-    const personLabelEl = personInput.parentElement?.parentElement?.querySelector('label');
-    if (personLabelEl) personLabelEl.addClass('finance-person-label');
+    const personLabelText = this.personLabel();
+    const personInput = buildComboboxField(
+      row1, personLabelText, this.entity.person,
+      () => this.o.allPersons,
+      v => { this.entity.person = v; },
+    );
+    personInput.parentElement?.parentElement?.querySelector('label')?.addClass('finance-person-label');
 
     const amtG = row1.createDiv('finance-field-group finance-amount-group');
     amtG.createEl('label', { text: this.tr.amountLabel, cls: 'finance-field-label' });
     this.amountInput = createAmountInput(amtG, {
-      value: this.debt.amount,
+      value: this.entity.amount,
       onChange: v => {
-        this.debt.originalAmount = v;
-        this.debt.amount = v;
+        this.entity.originalAmount = v;
+        this.entity.amount = v;
         this.updateTotalReadonly();
       },
     }).input;
 
     const row2 = form.createDiv('finance-form-row finance-full-width');
-    buildDateField(row2, this.tr.dateCreated, this.debt.date, v => { this.debt.date = v; });
-    buildDateField(row2, this.tr.dueDate, this.debt.dueDate, v => { this.debt.dueDate = v; });
+    buildDateField(row2, this.tr.dateCreated, this.entity.date, v => { this.entity.date = v; });
+    buildDateField(row2, this.tr.dueDate, this.entity.dueDate, v => { this.entity.dueDate = v; });
 
     const row3 = form.createDiv('finance-form-row finance-full-width');
-    buildRateInput(row3, this.tr.interestRateLabel, this.debt.interestRate, {
-      onInput: rate => { this.debt.interestRate = rate; this.updateTotalReadonly(); },
-      onBlur: rate => { this.debt.interestRate = rate; this.updateTotalReadonly(); },
+    buildRateInput(row3, this.tr.interestRateLabel, this.entity.interestRate, {
+      onInput: rate => { this.entity.interestRate = rate; this.updateTotalReadonly(); },
+      onBlur: rate => { this.entity.interestRate = rate; this.updateTotalReadonly(); },
     });
 
     const totalG = row3.createDiv('finance-field-group');
     totalG.createEl('label', {
-      text: this.debt.direction === DebtDirection.LENT ? this.tr.totalReturnLent : this.tr.totalReturnBorrowed,
+      text: this.totalLabel(),
       cls: 'finance-field-label finance-total-label',
     });
     this.totalInput = totalG.createEl('input', { type: 'text', cls: 'finance-input' });
     this.totalInput.readOnly = true;
-    this.totalInput.value = this.debt.amount > 0 ? fmtAmount(String(this.debt.amount)) : '';
+    this.totalInput.value = this.entity.amount > 0 ? fmtAmount(String(this.entity.amount)) : '';
 
     const row4 = form.createDiv('finance-form-row finance-full-width');
     buildNoteField(row4, {
       label: this.tr.note,
-      value: this.debt.note,
+      value: this.entity.note,
       placeholder: this.tr.optional,
       rows: 2,
-      onChange: v => { this.debt.note = v; }
+      onChange: v => { this.entity.note = v; },
     });
-
-    buildButtonRow(this.contentEl, this.tr, {
-      onCancel: () => this.close(),
-      onSave: () => this.handleSave(),
-    });
-    
-    // Add info button manually to the btn row
-    const btnRow = this.contentEl.querySelector('.finance-modal-btns');
-    if (btnRow) {
-      const infoBtn = document.createElement('button');
-      infoBtn.textContent = '❓';
-      infoBtn.className = 'finance-btn-cancel finance-info-btn-left';
-      infoBtn.addEventListener('click', () => new FieldInfoModal(this.app, DEBT_FIELDS).open());
-      btnRow.prepend(infoBtn);
-    }
   }
 
-  private handleSave(): void {
-    const amount = validateAmountInput(this.amountInput, this.tr);
-    if (amount === null) return;
-    
-    this.debt.originalAmount = amount;
-    this.debt.amount = amount;
-    
-    if (!this.debt.person.trim()) {
-      new Notice(this.tr.specifyPerson);
-      return;
+  protected validate(): string | null {
+    const amount = parseAmount(this.amountInput.value);
+    if (!amount || amount <= 0) {
+      this.amountInput.focus();
+      return this.tr.invalidAmount;
     }
-    this.debt.person = this.debt.person.trim();
-    this.o.onSave(this.debt);
-    this.close();
+    if (!this.entity.person.trim()) return this.tr.specifyPerson;
+    return null;
+  }
+
+  protected collectData(): DebtRecord {
+    const amount = parseAmount(this.amountInput.value);
+    return {
+      ...this.entity,
+      originalAmount: amount,
+      amount,
+      person: this.entity.person.trim(),
+    };
+  }
+
+  private personLabel(): string {
+    return this.entity.direction === DebtDirection.LENT ? `${this.tr.who} *` : `${this.tr.person} *`;
+  }
+
+  private totalLabel(): string {
+    return this.entity.direction === DebtDirection.LENT ? this.tr.totalReturnLent : this.tr.totalReturnBorrowed;
+  }
+
+  /**
+   * Lent/borrowed switch. Lives above the form (like the old layout) and relabels the
+   * person and total fields in place, since their wording depends on the direction.
+   */
+  private buildDirectionToggle(): void {
+    const dirRow = this.contentEl.createDiv('finance-type-row');
+    const isLent = this.entity.direction === DebtDirection.LENT;
+
+    const lentBtn = dirRow.createEl('button', {
+      text: this.tr.lent,
+      cls: `finance-type-toggle${isLent ? ' active lent' : ''}`,
+    });
+    const borrowedBtn = dirRow.createEl('button', {
+      text: this.tr.borrowed,
+      cls: `finance-type-toggle${isLent ? '' : ' active borrowed'}`,
+    });
+
+    const setDirection = (dir: DebtDirection) => {
+      this.entity.direction = dir;
+      const isLentDir = dir === DebtDirection.LENT;
+      lentBtn.classList.toggle('active', isLentDir);
+      lentBtn.classList.toggle('lent', isLentDir);
+      borrowedBtn.classList.toggle('active', !isLentDir);
+      borrowedBtn.classList.toggle('borrowed', !isLentDir);
+
+      const personLabel = this.contentEl.querySelector('.finance-person-label');
+      const totalLabel = this.contentEl.querySelector('.finance-total-label');
+      if (personLabel) personLabel.textContent = this.personLabel();
+      if (totalLabel) totalLabel.textContent = this.totalLabel();
+    };
+
+    lentBtn.addEventListener('click', () => setDirection(DebtDirection.LENT));
+    borrowedBtn.addEventListener('click', () => setDirection(DebtDirection.BORROWED));
+
+    // The toggle is created before the form div, so move it to the top of the modal body.
+    this.contentEl.insertBefore(dirRow, this.formEl);
   }
 
   private updateTotalReadonly(): void {
-    // using the domain helper conceptually, but here we just need original+interest based on the modal's unconfirmed values
-    const original = this.debt.originalAmount;
-    const rate = this.debt.interestRate;
-    const total = rate > 0 ? original + (original * rate / 100) : original;
+    const original = this.entity.originalAmount;
+    const rate = this.entity.interestRate;
+    const total = rate > 0 ? original + (original * rate / PERCENT_100) : original;
     this.totalInput.value = total > 0 ? fmtAmount(String(total)) : '';
   }
 }

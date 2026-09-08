@@ -1,8 +1,9 @@
-import { App, Modal, Notice } from 'obsidian';
+import { App, Notice } from 'obsidian';
 import { getLocaleFromApp, t, Translations } from './i18n';
-import { FinanceRecord } from './types';
+import { FinanceRecord, RecordType } from './types';
 import { csvToObjects, resolveRecordType, TypeMap, TypeMode } from './domain/csv';
 import { normalizeDateStr, normalizeTimeStr } from './utils';
+import { FinanceBaseModal } from './ui/FinanceBaseModal';
 
 type FileFormat = 'csv' | 'json';
 
@@ -16,8 +17,8 @@ export interface ImportExportOptions {
   mode:     'export' | 'import';
 }
 
-export class ImportExportModal extends Modal {
-  private tr: Translations;
+export class ImportExportModal extends FinanceBaseModal {
+  protected tr: Translations;
   private o:      ImportExportOptions;
   private body!:  HTMLElement;
 
@@ -43,15 +44,9 @@ export class ImportExportModal extends Modal {
   }
 
   override onOpen(): void {
-    const { contentEl } = this;
-    contentEl.empty();
-    contentEl.addClass('finance-modal');
-    contentEl.createEl('h2', {
-      text: this.o.mode === 'export' ? this.tr.export : this.tr.import,
-      cls: 'finance-modal-title',
-    });
+    this.openHeader(this.o.mode === 'export' ? this.tr.export : this.tr.import);
 
-    this.body = contentEl.createDiv('finance-ie-body');
+    this.body = this.contentEl.createDiv('finance-ie-body');
     if (this.o.mode === 'export') this.renderExport();
     else this.renderImport();
   }
@@ -115,7 +110,7 @@ export class ImportExportModal extends Modal {
   private rawData:    Record<string, string>[] = [];
   private srcFields:  string[] = [];
   private mapping:    Record<string, string> = {};  // ourField → srcField
-  private typeMap:    TypeMap = { incomeVal: 'income', expenseVal: 'expense' };
+  private typeMap:    TypeMap = { incomeVal: RecordType.INCOME, expenseVal: RecordType.EXPENSE };
   private typeMode:   TypeMode = 'field';
   private typeField = '';
 
@@ -343,14 +338,14 @@ export class ImportExportModal extends Modal {
 
         const incG = row.createDiv('finance-filter-group');
         incG.createEl('label', { text: this.tr.importIncomeValue, cls: 'finance-filter-label-sm' });
-        const incI = incG.createEl('input', { type: 'text', cls: 'finance-input', placeholder: 'income' });
-        incI.value = 'income';
+        const incI = incG.createEl('input', { type: 'text', cls: 'finance-input', placeholder: RecordType.INCOME });
+        incI.value = RecordType.INCOME;
         incI.addEventListener('input', () => { this.typeMap.incomeVal = incI.value; });
 
         const expG = row.createDiv('finance-filter-group');
         expG.createEl('label', { text: this.tr.importExpenseValue, cls: 'finance-filter-label-sm' });
-        const expI = expG.createEl('input', { type: 'text', cls: 'finance-input', placeholder: 'expense' });
-        expI.value = 'expense';
+        const expI = expG.createEl('input', { type: 'text', cls: 'finance-input', placeholder: RecordType.EXPENSE });
+        expI.value = RecordType.EXPENSE;
         expI.addEventListener('input', () => { this.typeMap.expenseVal = expI.value; });
       }
     };
@@ -424,8 +419,6 @@ export class ImportExportModal extends Modal {
     new Notice(`${this.tr.importSuccess} — ${valid.length} ${this.tr.imported}${skipNote}`);
     this.close();
   }
-
-  override onClose(): void { this.contentEl.empty(); }
 }
 
 

@@ -10,13 +10,13 @@ import { DepositModal } from '../DepositModal';
 import { DepositTopUpModal } from '../DepositTopUpModal';
 import { DepositWithdrawalModal } from '../DepositWithdrawalModal';
 import { ConfirmModal } from '../ConfirmModal';
-import { addMonthsClamped } from '../domain/dateMath';
+import { safeEndDate } from '../domain/dateMath';
 import { sumMoney } from '../domain/money';
 import { DataTable, FilterControl } from '../ui/DataTable';
 import { DepositsAnalyticsView } from '../DepositsAnalyticsView';
 import { renderMobileCard, renderSummaryCard, renderProgressBar, renderPaginatedSchedule, pageRange, dateRangeControls, compareValues } from '../ui/tabHelpers';
 import { AccountCommands } from '../domain/AccountCommands';
-import { DepositAccrualType, DepositStatus, PaymentStatus } from '../constants';
+import { DepositAccrualType, DepositStatus, DepositType, PaymentStatus } from '../constants';
 
 export class DepositsTab {
   private ctx: ViewContext;
@@ -168,8 +168,8 @@ export class DepositsTab {
 
   private typeLabel(deposit: DepositRecord): string {
     switch (deposit.type) {
-      case 'demand': return this.tr.depositTypeDemand;
-      case 'savings': return this.tr.depositTypeSavings;
+      case DepositType.DEMAND: return this.tr.depositTypeDemand;
+      case DepositType.SAVINGS: return this.tr.depositTypeSavings;
       default: return this.tr.depositTypeTerm;
     }
   }
@@ -183,12 +183,7 @@ export class DepositsTab {
   }
 
   private calculateDepositEndDate(deposit: DepositRecord): string {
-    if (!deposit.startDate) return '';
-    try {
-      return addMonthsClamped(deposit.startDate, deposit.termMonths || 0);
-    } catch {
-      return '';
-    }
+    return safeEndDate(deposit.startDate, deposit.termMonths);
   }
 
   // ── Stats ────────────────────────────────────────────────────────────────
@@ -234,8 +229,8 @@ export class DepositsTab {
         kind: 'select', label: this.tr.status,
         options: [
           { value: 'all', label: this.tr.all },
-          { value: 'active', label: this.tr.depositActive },
-          { value: 'closed', label: this.tr.depositClosed },
+          { value: DepositStatus.ACTIVE, label: this.tr.depositActive },
+          { value: DepositStatus.CLOSED, label: this.tr.depositClosed },
         ],
         get: () => f.status, set: v => { f.status = v as typeof f.status; },
       },
@@ -252,9 +247,9 @@ export class DepositsTab {
         kind: 'select', label: this.tr.type,
         options: [
           { value: 'all', label: this.tr.allDepositTypes },
-          { value: 'term', label: this.tr.depositTypeTerm },
-          { value: 'demand', label: this.tr.depositTypeDemand },
-          { value: 'savings', label: this.tr.depositTypeSavings },
+          { value: DepositType.TERM, label: this.tr.depositTypeTerm },
+          { value: DepositType.DEMAND, label: this.tr.depositTypeDemand },
+          { value: DepositType.SAVINGS, label: this.tr.depositTypeSavings },
         ],
         get: () => f.type, set: v => { f.type = v as typeof f.type; },
       },
@@ -427,13 +422,10 @@ export class DepositsTab {
       title: this.tr.newDeposit,
       banks: allBanks,
       pluginId: this.ctx.pluginId,
-      onSave: async (deposit, interestRecords) => {
+      onSave: async deposit => {
         await this.ctx.storage.addDeposit(this.ctx.accountId, deposit);
-        for (const r of interestRecords) {
-          await this.ctx.storage.addRecord(this.ctx.accountId, r);
-        }
-        // Opening expense is now created automatically by autoTransactions.ts
-        // to avoid duplication
+        // Opening expense and interest accruals are created automatically by
+        // autoTransactions.ts, so nothing else has to be materialized here.
         await this.reload(this.tr.depositAdded);
       },
     }).open();

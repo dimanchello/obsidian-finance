@@ -7,11 +7,14 @@ import type {
   OverviewGroupBy,
 } from '../types';
 import { OVERVIEW_UPCOMING_DAYS, OVERVIEW_BURDEN_MONTHS, OVERVIEW_TREND_MONTHS } from '../types';
-import { addMonthsClamped, parseDateStr } from './dateMath';
+import { addMonthsClamped, parseDateStr, isoWeek, MS_PER_DAY } from './dateMath';
 import { calculateRemainingPrincipal, calculatePaymentBreakdown } from './creditCalculations';
 import { getDebtRepaid, getDebtWithInterest } from './debtCalculations';
 import { getTodayStr } from '../utils';
-import { RecordType, DebtDirection, CreditStatus, DepositStatus, PaymentStatus } from '../constants';
+import {
+  RecordType, DebtDirection, CreditStatus, DepositStatus, PaymentStatus,
+  DepositType, DepositAccrualType,
+} from '../constants';
 
 function addDays(dateStr: string, days: number): string {
   const parsed = parseDateStr(dateStr);
@@ -25,14 +28,9 @@ function addDays(dateStr: string, days: number): string {
 }
 
 export function getISOWeekString(dateStr: string): string {
-  const parsed = parseDateStr(dateStr);
-  if (!parsed) return dateStr;
-  const d = new Date(Date.UTC(parsed.year, parsed.month - 1, parsed.day));
-  const dayNum = d.getUTCDay() || 7;
-  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  const weekNo = Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
-  return `${d.getUTCFullYear()}-W${String(weekNo).padStart(2, '0')}`;
+  const iso = isoWeek(dateStr);
+  if (!iso) return dateStr;
+  return `${iso.year}-W${String(iso.week).padStart(2, '0')}`;
 }
 
 export function resolveMonthRange(
@@ -593,7 +591,7 @@ export interface DepositInterestSegment {
   depositName: string;
   bankName: string;
   amount: number;
-  status: 'paid' | 'pending';
+  status: PaymentStatus;
 }
 
 export interface DepositInterestMonth {
@@ -750,7 +748,7 @@ export interface ActiveDepositProgress {
   startDate: string;
   endDate: string;
   isDemand: boolean;
-  accrualType: 'to_account' | 'capitalization';
+  accrualType: DepositAccrualType;
   progressPercent: number;
   accruedProfit: number;
   totalEstimatedReturn: number;
@@ -767,7 +765,7 @@ export function calcActiveDepositsProgress(
   const nowMs = new Date(asOfDate).getTime();
 
   return active.map(d => {
-    const isDemand = d.type === 'demand' || !d.termMonths || d.termMonths <= 0;
+    const isDemand = d.type === DepositType.DEMAND || !d.termMonths || d.termMonths <= 0;
     let endDate = '';
     let progressPercent = 100;
     let remainingDays: number | null = null;
@@ -781,7 +779,7 @@ export function calcActiveDepositsProgress(
         if (totalMs > 0) {
           progressPercent = Math.min(100, Math.max(0, ((nowMs - startMs) / totalMs) * 100));
         }
-        const diffDays = Math.ceil((endMs - nowMs) / (1000 * 60 * 60 * 24));
+        const diffDays = Math.ceil((endMs - nowMs) / MS_PER_DAY);
         remainingDays = Math.max(0, diffDays);
       } catch {
         endDate = '';
@@ -815,7 +813,7 @@ export function calcActiveDepositsProgress(
       startDate: d.startDate,
       endDate,
       isDemand,
-      accrualType: d.accrualType ?? 'to_account',
+      accrualType: d.accrualType ?? DepositAccrualType.TO_ACCOUNT,
       progressPercent,
       accruedProfit,
       totalEstimatedReturn,

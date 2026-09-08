@@ -1,24 +1,33 @@
-import type {
-  RecordType as RecordTypeConst,
-  DebtDirection as DebtDirectionConst,
-  DebtMovementType as DebtMovementTypeConst,
-  CreditType as CreditTypeConst,
-  CreditStatus as CreditStatusConst,
-  EarlyRepaymentOption as EarlyRepaymentOptionConst,
-  DepositType as DepositTypeConst,
-  DepositStatus as DepositStatusConst,
-  DepositAccrualType as DepositAccrualTypeConst,
-  PaymentStatus as PaymentStatusConst,
-  CurrencyOperationType as CurrencyOperationTypeConst,
+import {
+  RecordType,
+  DebtDirection,
+  DebtMovementType,
+  CreditType,
+  CreditStatus,
+  EarlyRepaymentOption,
+  DepositType,
+  DepositStatus,
+  DepositAccrualType,
+  PaymentStatus,
+  CurrencyOperationType,
 } from './constants';
 
-/** Value unions derived from `constants.ts` — the literals live there only. */
-type ValueOf<T> = T[keyof T];
+export {
+  RecordType,
+  DebtDirection,
+  DebtMovementType,
+  CreditType,
+  CreditStatus,
+  EarlyRepaymentOption,
+  DepositType,
+  DepositStatus,
+  DepositAccrualType,
+  PaymentStatus,
+  CurrencyOperationType,
+};
 
-export type RecordType = ValueOf<typeof RecordTypeConst>;
 export type SortField  = 'date' | 'amount' | 'category' | 'type' | 'payer' | 'tag';
 export type SortDir    = 'asc'  | 'desc';
-export type DebtMovementType = ValueOf<typeof DebtMovementTypeConst>;
 
 export interface FinanceRecord {
   id:             string;
@@ -48,7 +57,6 @@ export interface DebtMovement {
   note:      string;
 }
 
-export type DebtDirection = ValueOf<typeof DebtDirectionConst>;  // lent = мне должны, borrowed = я должен
 
 export interface DebtRecord {
   id:           string;
@@ -168,7 +176,7 @@ export const DEFAULT_DEBT_FILTER: DebtFilterState = {
 export type CreditSortField = 'date' | 'amount' | 'bankName';
 export interface CreditFilterState {
   search: string;
-  status: 'all' | 'active' | 'paid';
+  status: 'all' | CreditStatus;
   bankName: string;
   type: 'all' | CreditType;
   dateFrom: string;
@@ -178,7 +186,7 @@ export interface CreditFilterState {
 export type DepositSortField = 'date' | 'amount' | 'bankName';
 export interface DepositFilterState {
   search: string;
-  status: 'all' | 'active' | 'closed';
+  status: 'all' | DepositStatus;
   bankName: string;
   type: 'all' | DepositType;
   dateFrom: string;
@@ -229,8 +237,37 @@ export const CHART_MAX_ITEMS              = 20;
 export const CHART_BAR_GAP                = 2;
 export const CHART_BAR_RADIUS             = 3;
 export const CHART_LABEL_ROTATE_THRESHOLD = 10;
+export const CHART_LABEL_ROTATE_ANGLE     = -30;
+/** Used when `clientWidth` is 0 — the chart is measured before layout on first render. */
+export const CHART_CONTAINER_FALLBACK_WIDTH = 600;
+export const CHART_MIN_GROUP_MEDIUM       = 50;
+export const CHART_MIN_GROUP_COMPACT      = 55;
+/** Item-count thresholds that pick the min group width / max bar width tier. */
+export const CHART_GROUP_COUNT_MANY       = 12;
+export const CHART_GROUP_COUNT_SOME       = 6;
+export const CHART_GROUP_COUNT_FEW        = 3;
+export const CHART_BAR_COUNT_SMALL        = 4;
+export const CHART_BAR_COUNT_MED          = 8;
+export const CHART_BAR_MIN_WIDTH          = 2;
+export const CHART_GRID_DIVISIONS         = 4;
+export const CHART_FONT_SIZE_AXIS         = 11;
+export const CHART_FONT_SIZE_AXIS_Y       = 14;
+export const CHART_FONT_SIZE_AXIS_X       = 12;
+export const CHART_AXIS_LABEL_GAP         = 8;
+export const CHART_AXIS_BASELINE_WIDTH    = 1.5;
+export const CHART_TICK_TEXT_OFFSET_Y     = 4;
+export const CHART_TICK_TEXT_OFFSET_Y_TALL = 6;
+export const CHART_LABEL_OFFSET_Y         = 16;
+export const CHART_LABEL_OFFSET_Y_TALL    = 20;
+export const SAVINGS_RATE_TICKS           = [100, 50, 0, -50, -100] as const;
+export const SAVINGS_RATE_RANGE           = 200;
 
 export const CREDIT_PAGE_SIZE = 20;
+export const DEPOSIT_TERM_DEFAULT_MONTHS = 12;
+export const DEPOSIT_TERM_MAX_MONTHS = 360;
+export const DAY_OF_MONTH_MAX = 31;
+/** Debounce before recomputing the annuity payment while the user is still typing. */
+export const CREDIT_CALC_DEBOUNCE_MS = 500;
 export const CREDIT_PAYMENT_PAGE_SIZE = 15;
 export const DEPOSIT_ACCRUAL_PAGE_SIZE = 20;
 export const MOBILE_BREAKPOINT = 480;
@@ -238,6 +275,9 @@ export const SEARCH_DEBOUNCE_MS = 280;
 export const PAGE_SIZE_OPTIONS = [10, 20, 25, 50, 100, 200, 500] as const;
 export const PAGE_RANGE_THRESHOLD = 7;
 export const FOCUS_DELAY_MS = 20;
+/** Longer than {@link FOCUS_DELAY_MS}: lets the modal finish its open animation first. */
+export const MODAL_FOCUS_DELAY_MS = 50;
+export const AUTOFILL_DEBOUNCE_MS = 350;
 export const AUTOFILL_BADGE_MS = 6_000;
 export const SKELETON_CARD_COUNT = 3;
 export const PLURAL_THRESHOLD = 5;
@@ -279,9 +319,7 @@ export const OVERVIEW_DEPOSIT_TREND_MONTHS = 6;
 export const CURRENCY_ROUNDING_PRECISION = 100;      // 2 decimal places
 export const EXCHANGE_RATE_PRECISION = 10000;        // 4 decimal places
 
-export type CreditType = ValueOf<typeof CreditTypeConst>;
-export type CreditStatus = ValueOf<typeof CreditStatusConst>;
-export type CreditPaymentStatus = ValueOf<typeof PaymentStatusConst>;
+export type CreditPaymentStatus = PaymentStatus;
 
 export interface CreditPayment {
   id: string;
@@ -310,7 +348,7 @@ export interface CreditRecord {
   createdAt: number;
   note: string;
   status: CreditStatus;
-  earlyRepaymentOption: ValueOf<typeof EarlyRepaymentOptionConst> | null;
+  earlyRepaymentOption: EarlyRepaymentOption | null;
   payments: CreditPayment[];
   purchasePrice?: number;
   downPayment?: number;
@@ -322,10 +360,7 @@ export interface CreditRecord {
   attachmentPath?: string;
 }
 
-export type DepositType = ValueOf<typeof DepositTypeConst>;
-export type DepositAccrualType = ValueOf<typeof DepositAccrualTypeConst>;
-export type DepositStatus = ValueOf<typeof DepositStatusConst>;
-export type DepositAccrualStatus = ValueOf<typeof PaymentStatusConst>;
+export type DepositAccrualStatus = PaymentStatus;
 
 export interface DepositAccrual {
   id: string;
@@ -373,7 +408,6 @@ export interface DepositRecord {
   attachmentPath?: string;
 }
 
-export type CurrencyOperationType = ValueOf<typeof CurrencyOperationTypeConst>;
 export type CurrencySortField = 'date' | 'amount' | 'targetCurrency' | 'provider';
 
 export interface CurrencyExchange {

@@ -1,10 +1,11 @@
-import { fmtDate } from "./utils";
+import { fmtDate, fmtInteger } from "./utils";
 import { ViewContext } from './context';
 import { DepositRecord, PERCENT_100 } from './types';
 import { Translations } from './i18n';
-import { addMonthsClamped, toDateStr } from './domain/dateMath';
+import { safeEndDate, toDateStr } from './domain/dateMath';
 import { round2 } from './domain/money';
 import { DepositStatus, PaymentStatus } from './constants';
+import { renderStatCards, StatCardItem } from './ui/tabHelpers';
 
 export class DepositsAnalyticsView {
   private el: HTMLElement;
@@ -24,7 +25,7 @@ export class DepositsAnalyticsView {
   private get state() { return this.ctx.state; }
 
   private fmt(n: number): string {
-    return n.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + ' ' + this.currency;
+    return fmtInteger(n, this.currency);
   }
 
   render(): void {
@@ -84,19 +85,13 @@ export class DepositsAnalyticsView {
     active.forEach(d => { weightedRate += d.interestRate * d.amount; totalWeight += d.amount; });
     const avgRate = totalWeight > 0 ? round2(weightedRate / totalWeight) : 0;
 
-    const wrap = this.el.createDiv('finance-credit-analytics-cards');
-    const cards: { label: string; value: string; mod?: string }[] = [
+    const cards: StatCardItem[] = [
       { label: this.tr.depositTotalBalance, value: this.fmt(totalBalance) },
       { label: this.tr.depositTotalAccrued, value: this.fmt(totalAccrued), mod: 'income' },
       { label: this.tr.depositProjectedIncome, value: this.fmt(projectedIncome), mod: 'income' },
       { label: this.tr.depositAvgRate, value: `${avgRate}%`, mod: 'neutral' },
     ];
-    cards.forEach(({ label, value, mod }) => {
-      const card = wrap.createDiv(`finance-stat-card${mod ? ` finance-stat-${mod}` : ''}`);
-      const info = card.createDiv('finance-stat-info');
-      info.createEl('div', { text: label, cls: 'finance-stat-label' });
-      info.createEl('div', { text: value, cls: 'finance-stat-value' });
-    });
+    renderStatCards(this.el, cards, 'finance-credit-analytics-cards');
   }
 
   private renderActiveDepositsList(): void {
@@ -107,7 +102,7 @@ export class DepositsAnalyticsView {
     section.createEl('div', { text: this.tr.depositActiveList, cls: 'finance-analytics-section-title' });
 
     deposits.forEach(d => {
-      const endDate = this.safeEndDate(d);
+      const endDate = safeEndDate(d.startDate, d.termMonths);
       const today = toDateStr(new Date());
       let pct = 0;
       if (d.startDate && endDate) {
@@ -134,10 +129,5 @@ export class DepositsAnalyticsView {
       const fill = bar.createDiv('finance-deposit-progress-fill');
       fill.style.width = `${pct}%`;
     });
-  }
-
-  private safeEndDate(d: DepositRecord): string {
-    if (!d.startDate) return '';
-    try { return addMonthsClamped(d.startDate, d.termMonths || 0); } catch { return ''; }
   }
 }

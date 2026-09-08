@@ -4,7 +4,7 @@
 
 **Name:** Finance Tracker  
 **Type:** Obsidian plugin (Community plugin for Obsidian.md)  
-**Version:** 2.0.0  
+**Version:** 2.0.1  
 **Min Obsidian Version:** 1.4.0  
 **Languages:** Russian (default), English (Obsidian setting)
 
@@ -43,9 +43,9 @@ npm test       # Run unit tests
 ## Code Conventions
 
 ### Language
-- **All user-facing strings:** Russian
+- **All user-facing strings:** Russian and English via `src/i18n.ts` only — never hardcode UI text
 - **Internal identifiers:** English (camelCase)
-- **No comments** in code unless absolutely necessary for complex logic
+- **Comments:** only where the logic is non-obvious
 
 ### TypeScript
 - Strict mode via `tsconfig.json` (implied default)
@@ -53,10 +53,11 @@ npm test       # Run unit tests
 - Avoid `any`; use proper type guards
 
 ### Architecture Pattern
-- **Storage layer:** `FinanceStorage` class (singleton per plugin instance)
-- **View layer:** `AccountView` class (one per code block)
-- **Modal pattern:** Separate modal classes for each operation
-- **State:** Persisted in localStorage per-note (`ft-view:{notePath}`)
+- **Storage layer:** `FinanceStorage` class (singleton per plugin instance, `src/storage/`)
+- **View layer:** `AccountView` class (~250 lines, one per code block) delegating to stateless tabs in `src/tabs/`
+- **Command layer:** `AccountCommands` (`src/domain/AccountCommands.ts`) — entity + linked-record writes, called by tabs instead of storage directly
+- **Modal pattern:** CRUD forms extend `EntityModal<T>`; helper modals extend `FinanceBaseModal`
+- **State:** Persisted per-account in `state.json` (no localStorage)
 
 ### Naming
 - Classes: PascalCase (`AccountView`, `RecordModal`)
@@ -64,14 +65,23 @@ npm test       # Run unit tests
 - Enums/Types: PascalCase (`RecordType`, `DebtMovementType`)
 - Constants: UPPER_SNAKE_CASE (`DEFAULT_SETTINGS`, `COMMON_CURRENCIES`)
 
-### Constants (Всегда!)
-**Магические числа запрещены!** Все числовые литералы (кроме 0, 1, -1, 2) должны быть вынесены в именованные константы в `types.ts`:
-- Размеры страниц, лимиты, пороги → `PAGE_SIZE_OPTIONS`, `PAGE_RANGE_THRESHOLD`
-- Тайминги, дебаунсы → `SEARCH_DEBOUNCE_MS`, `FOCUS_DELAY_MS`
-- Мобильный брейкпоинт → `MOBILE_BREAKPOINT`
-- Правила склонения → `PLURAL_THRESHOLD`
-- Шаги расчётов → `ACCRUAL_STEP_MONTHLY`, `ACCRUAL_STEP_QUARTERLY`
-- Константы именуются `UPPER_SNAKE_CASE`
+### Constants & String Literals (Строго и обязательно!)
+**1. Полный запрет сырых строк (String Literals)!**
+Категорически запрещено использовать строковые литералы напрямую в коде (как в `src/`, так и в тестах `src/__tests__/`) для любых сущностей, которые могут быть переиспользованы:
+- **Статусы:** `CreditStatus.ACTIVE`, `CreditStatus.PAID`, `DepositStatus.CLOSED`, `PaymentStatus.PENDING` и т.д. (никаких `'active'`, `'paid'`, `'closed'`, `'pending'`).
+- **Типы записей и операций:** `RecordType.INCOME`, `RecordType.EXPENSE`, `CreditType.CONSUMER`, `DepositType.TERM`, `CurrencyOperationType.BUY`, `DebtMovementType.BORROW` и т.д.
+- **Направления и опции:** `DebtDirection.BORROWED`, `EarlyRepaymentOption.TERM`, `DepositAccrualType.TO_ACCOUNT` и т.д.
+- **Названия системных полей, ключей хранилища и сущностей.**
+- Единый источник правды для строковых констант — `src/constants.ts` (реэкспортируются в `src/types.ts`). В тестах assertions, моки и фикстуры обязаны использовать константы: `expect(record.type).toBe(RecordType.EXPENSE)`, а не `'expense'`.
+
+**2. Полный запрет магических чисел (Magic Numbers)!**
+Любые числовые литералы, несущие логический смысл, должны быть вынесены в именованные константы (`UPPER_SNAKE_CASE`) в `src/types.ts` или `src/constants.ts`:
+- Пагинация, размеры страниц, пороги отображения → `PAGE_SIZE_OPTIONS`, `PAGE_RANGE_THRESHOLD`
+- Лимиты, пороги валидации, округления → `CURRENCY_ROUNDING_PRECISION`, `PLURAL_THRESHOLD`
+- Тайминги, дебаунсы, задержки фокуса → `SEARCH_DEBOUNCE_MS`, `MODAL_FOCUS_DELAY_MS`, `AUTOFILL_DEBOUNCE_MS`
+- Мобильные брейкпоинты → `MOBILE_BREAKPOINT`
+- Шаги и периоды расчётов, константы времени → `MS_PER_DAY`, `DAYS_IN_YEAR`, `ACCRUAL_STEP_MONTHLY`
+- *Исключения:* допускаются только тривиальные базовые числа (`0`, `1`, `-1`, `2`) и простые базовые операции (например, смещение индекса `+ 1` или простое обрезание длины строки `str.slice(0, 10)`). Всё остальное — строго через именованные константы!
 
 ### Mobile Adaptation (Обязательно!)
 **Все новые фичи должны поддерживать мобильные устройства!**
@@ -94,39 +104,45 @@ npm test       # Run unit tests
 ## Project Structure
 
 ```
-├── main.ts              # Plugin entry point, settings tab
-├── main.js              # Bundled output (DO NOT EDIT)
+├── main.ts                  # Plugin entry point, settings tab
 ├── src/
-│   ├── types.ts         # All TypeScript interfaces and constants
-│   ├── utils.ts         # Shared utilities (fmtAmount, parseAmount, fmtDate, fmt)
-│   ├── i18n.ts          # Internationalization (Russian/English)
-│   ├── storage.ts       # FinanceStorage class (CRUD for accounts)
-│   ├── AccountView.ts   # Main view component (~3500 lines)
-│   ├── RecordModal.ts   # Add/edit record modal
-│   ├── ConfirmModal.ts  # Delete confirmation modal
-│   ├── ImportExportModal.ts
-│   ├── AnalyticsView.ts
-│   ├── DebtModal.ts
-│   ├── DebtMovementModal.ts
-│   ├── CreditModal.ts
-│   ├── CreditPaymentModal.ts
-│   ├── CreditEarlyRepaymentModal.ts
-│   ├── DepositModal.ts
-│   ├── DepositTopUpModal.ts
-│   ├── DepositWithdrawalModal.ts
-│   ├── CalculatorModal.ts
-│   ├── ColumnVisibilityModal.ts
-│   ├── context.ts
-│   ├── InfoModal.ts
-│   └── tabs/
-│       ├── RecordsTab.ts
-│       ├── DebtsTab.ts
-│       ├── CreditsTab.ts
-│       └── DepositsTab.ts
-├── src/__tests__/       # Unit tests
-├── esbuild.config.mjs   # Build configuration
-├── vitest.config.ts     # Test configuration
-├── manifest.json        # Obsidian plugin manifest
+│   ├── types.ts             # Interfaces and numeric constants
+│   ├── constants.ts         # String-literal unions (RecordType, PaymentStatus, …)
+│   ├── utils.ts             # Shared utilities (fmtAmount, parseAmount, fmtDate, fmt, fmtInteger)
+│   ├── i18n.ts              # Internationalization (Russian/English)
+│   ├── context.ts           # ViewContext — the only object tabs receive
+│   ├── AccountView.ts       # Per-code-block view (~250 lines), wires header + tabs
+│   ├── AnalyticsView.ts     # Records analytics charts
+│   ├── CreditsAnalyticsView.ts
+│   ├── DepositsAnalyticsView.ts
+│   ├── storage/             # FinanceStorage, FileStore<T>, VaultAdapter, AccountFiles
+│   ├── domain/              # Pure business logic (no DOM):
+│   │   ├── AccountCommands.ts   # Transactional entity + linked-record writes
+│   │   ├── linkedRecords.ts     # FinanceRecord mirrors of debts/credits/deposits
+│   │   ├── autoTransactions.ts  # Schedule generation, past-due materialization
+│   │   ├── creditCalculations.ts, overviewMetrics.ts, dateMath.ts, money.ts,
+│   │   ├── currencyBalance.ts, debtCalculations.ts, schedule.ts, csv.ts,
+│   │   └── validate.ts, viewState.ts, accountId.ts, records.ts
+│   ├── ui/                  # Reusable DOM components:
+│   │   ├── FinanceBaseModal.ts  # Base for every modal
+│   │   ├── EntityModal.ts       # CRUD lifecycle: validate → collect → save
+│   │   ├── DataTable.ts, AmountInput.ts, Combobox.ts, formHelpers.ts,
+│   │   ├── tabHelpers.ts, statCards.ts, attachmentField.ts, chartHelpers.ts,
+│   │   └── charts/              # OverviewTab chart components
+│   ├── tabs/                # Stateless tabs, recreated each render:
+│   │   └── OverviewTab.ts, RecordsTab.ts, DebtsTab.ts, CreditsTab.ts,
+│   │       DepositsTab.ts, CurrencyTab.ts
+│   ├── modals/              # CurrencyExchangeModal
+│   ├── RecordModal.ts, DebtModal.ts, CreditModal.ts, DepositModal.ts,
+│   ├── DebtMovementModal.ts, CreditPaymentModal.ts, CreditEarlyRepaymentModal.ts,
+│   ├── DepositTopUpModal.ts, DepositWithdrawalModal.ts,
+│   ├── CalculatorModal.ts, ColumnVisibilityModal.ts, ConfirmModal.ts,
+│   ├── FieldInfoModal.ts, ImportExportModal.ts, OrphanedAccountsModal.ts
+│   └── __tests__/           # Unit tests (business logic only)
+├── esbuild.config.mjs       # Build configuration
+├── vitest.config.ts         # Test configuration
+├── manifest.json            # Obsidian plugin manifest
+├── styles.css               # Injected at runtime, NOT bundled
 └── package.json
 ```
 
@@ -205,17 +221,19 @@ interface AccountData {
 - Creates `AccountView` instance per code block
 - Passes: `app`, `rootElement`, `sourcePath`, `storage`, `settings`
 
-### Storage (src/storage.ts)
-- **Caching:** In-memory Map<string, AccountData>
-- **Lazy loading:** `load(notePath)` returns cached or loads from file
-- **Debounced writes:** 500ms delay before flushing to disk
-- **Location:** `.obsidian/plugins/obsidian-finance/accounts/{sanitized-path}/` (folder per account with meta.json, records.json, debts.json, credits.json, deposits.json)
-- **Versioning:** DATA_VERSION = 4 (handles backward compat for missing fields)
+### Storage (src/storage/)
+- **Caching:** one `FileStore<T>` per file type, each with its own cache + dirty set
+- **Lazy loading:** `load(accountId)` returns cached or loads from disk
+- **Debounced writes:** 500ms delay via a shared `FlushScheduler`
+- **Location:** `.obsidian/plugins/obsidian-finance/accounts/{accountId}/` — 7 files per account: `meta.json`, `records.json`, `debts.json`, `credits.json`, `deposits.json`, `exchanges.json`, `state.json`
+- **Identity:** accountId is a 12-hex-char slice of a UUID, written into the code block as `id: <12-hex>`. The note path is NOT identity — it is tracked in `meta.sourcePath` for diagnostics only.
+- **Versioning:** DATA_VERSION = 1 (reset when the storage layer was split); per-field backfill happens in the parsers
 
 ### View State
-- Saved to localStorage: `ft-view:{pluginId}:{notePath}`
-- Contains: sort, filter, pagination, debt/credit/deposit filters
-- Reset page to 0 on filter change (preserved in state)
+- Saved per account to `state.json` (single source of truth, no localStorage)
+- Contains: sort, filter, pagination, column visibility, per-tab analytics filters
+- Reset page to 0 on every write
+- New fields need a `??=` default in `src/domain/viewState.ts:parseViewState()`
 
 ### Internationalization (src/i18n.ts)
 - **Supported locales:** Russian (`ru`), English (`en`)
@@ -239,9 +257,9 @@ When user enters category/payer, the modal automatically fills amount, tag, and 
 - Per-account currency (stored in AccountData.currency)
 
 ### Data Versioning
-- Current: v4 (DATA_VERSION in storage.ts)
-- Migration handled in `storage.ts` `load()` method
-- Auto-adds missing fields: `time`, `direction`, `dueDate`, `accentColor`, `originalAmount`, `interestRate`
+- Current: DATA_VERSION = 1 (`src/types.ts`)
+- Field-level backfill happens in the per-file parsers (e.g. `d.direction ??= 'borrowed'`, `c.payments ??= []`)
+- Note renames update `meta.sourcePath`; the accountId never changes
 
 ### Mobile Adaptation
 - Desktop: Full table with sticky header
@@ -265,7 +283,7 @@ When user enters category/payer, the modal automatically fills amount, tag, and 
 
 1. **Don't edit main.js** — it's generated by esbuild. Edit source files and rebuild.
 
-2. **State persistence** — view state persists per-note in localStorage. When adding new filter fields, must handle backward compat (see lines 24-28 in AccountView.ts).
+2. **State persistence** — view state lives in each account's `state.json`. When adding a new filter field, give it a `??=` default in `src/domain/viewState.ts:parseViewState()` so older blobs keep loading.
 
 3. **Storage flush** — always call `await this.storage.flush()` in `onunload()` to prevent data loss.
 
@@ -365,11 +383,12 @@ npm run test:watch   # Run tests in watch mode
 
 ## Contributing Notes
 
-- Follow existing naming conventions (Russian UI, English code)
-- Keep `AccountView.ts` organized with region comments (// ── ──)
+- Follow existing naming conventions (Russian/English UI via i18n, English code)
+- Keep tabs stateless across renders — everything that must survive lives in `ctx.state`
 - Add new fields to types with proper defaults
-- Update `DATA_VERSION` in storage.ts if schema changes
-- Test backward compat: load old JSON files and verify migration
-- **Magic numbers → constants:** always extract numeric constants to `types.ts`
-- **localStorage keys:** always use the `LS(pluginId)` function pattern for scoping
+- Update `DATA_VERSION` in `src/types.ts` if the schema changes incompatibly
+- **Strings & Statuses → constants:** never use raw string literals for statuses, types, directions, movements, operations, or field names — always use constants from `src/constants.ts` (in both production code and tests).
+- **Magic numbers → constants:** always extract numeric constants (pagination, limits, thresholds, timeouts, debounce) to `src/types.ts` or `src/constants.ts`; only trivial 0, 1, -1, 2 or simple string slicing are exempt.
+- **View state:** persist through `ctx.saveState()`; there is no localStorage fallback
 - **Shared utilities:** put reusable formatting functions in `utils.ts`, don't duplicate across modals
+- **Modals:** CRUD forms extend `EntityModal<T>` (implement `getTitle`/`buildForm`/`validate`/`collectData`); helper modals extend `FinanceBaseModal` and use `openHeader()`/`openBody()`

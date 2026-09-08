@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import type { FinanceRecord, DebtRecord, CreditRecord, DepositRecord, CurrencyExchange } from '../types';
+import {
+  FinanceRecord, DebtRecord, CreditRecord, DepositRecord, CurrencyExchange,
+  RecordType, DebtDirection, DebtMovementType, CreditType, CreditStatus,
+  DepositType, DepositStatus, DepositAccrualType, PaymentStatus, CurrencyOperationType,
+} from '../types';
 import {
   calcNetBalance, calcAssets, calcLiabilities,
   calcCreditBurden, calcUpcomingPayments,
@@ -7,46 +11,46 @@ import {
   calcAssetsLiabilitiesOverTime, filterRecordsByDateRange,
   calcGroupBreakdown, calcSavingsRateOverTime,
   calcDebtsBreakdown, calcDepositInterestOverTime,
-  calcActiveDepositsProgress,
+  calcActiveDepositsProgress, resolveMonthRange, resolveDepositMonthRange,
 } from '../domain/overviewMetrics';
 
 function rec(overrides: Partial<FinanceRecord> = {}): FinanceRecord {
   return { id: 'r1', createdAt: 0, date: '2026-01-15', time: '',
-    type: 'income', amount: 1000, category: '', tag: '', payer: '',
+    type: RecordType.INCOME, amount: 1000, category: '', tag: '', payer: '',
     note: '', attachmentPath: '', ...overrides };
 }
 function debt(overrides: Partial<DebtRecord> = {}): DebtRecord {
   return { id: 'd1', person: 'А', amount: 1000, originalAmount: 1000,
-    interestRate: 0, direction: 'lent', date: '2026-01-01', time: '',
+    interestRate: 0, direction: DebtDirection.LENT, date: '2026-01-01', time: '',
     dueDate: '2027-01-01', createdAt: 0, note: '',
-    movements: [{ id: 'm1', type: 'borrow', amount: 1000,
+    movements: [{ id: 'm1', type: DebtMovementType.BORROW, amount: 1000,
       date: '2026-01-01', time: '', createdAt: 0, note: '' }],
     ...overrides };
 }
 function credit(overrides: Partial<CreditRecord> = {}): CreditRecord {
-  return { id: 'c1', name: '', type: 'consumer', bankName: '', originalAmount: 100000,
+  return { id: 'c1', name: '', type: CreditType.CONSUMER, bankName: '', originalAmount: 100000,
     currentAmount: 100000, interestRate: 10, monthlyPayment: 5000, termMonths: 24,
-    startDate: '2025-01-01', createdAt: 0, note: '', status: 'active',
+    startDate: '2025-01-01', createdAt: 0, note: '', status: CreditStatus.ACTIVE,
     earlyRepaymentOption: null, payments: [], ...overrides };
 }
 function deposit(overrides: Partial<DepositRecord> = {}): DepositRecord {
-  return { id: 'dep1', name: '', type: 'term', bankName: '', amount: 50000,
-    interestRate: 8, startDate: '2026-01-01', termMonths: 12, accrualType: 'to_account',
-    createdAt: 0, note: '', status: 'active', accruals: [], topUps: [], withdrawals: [],
+  return { id: 'dep1', name: '', type: DepositType.TERM, bankName: '', amount: 50000,
+    interestRate: 8, startDate: '2026-01-01', termMonths: 12, accrualType: DepositAccrualType.TO_ACCOUNT,
+    createdAt: 0, note: '', status: DepositStatus.ACTIVE, accruals: [], topUps: [], withdrawals: [],
     ...overrides };
 }
 function exchange(overrides: Partial<CurrencyExchange> = {}): CurrencyExchange {
   return { id: 'e1', createdAt: 0, date: '2026-01-01', time: '',
-    type: 'buy', amountInAccountCurrency: 9500, targetCurrency: 'USD',
+    type: CurrencyOperationType.BUY, amountInAccountCurrency: 9500, targetCurrency: 'USD',
     targetAmount: 100, exchangeRate: 95, provider: '', note: '', ...overrides };
 }
 
 describe('calcNetBalance', () => {
   it('доход минус расход', () => {
-    expect(calcNetBalance([rec({ type: 'income', amount: 1000 }), rec({ type: 'expense', amount: 400 })])).toBe(600);
+    expect(calcNetBalance([rec({ type: RecordType.INCOME, amount: 1000 }), rec({ type: RecordType.EXPENSE, amount: 400 })])).toBe(600);
   });
   it('isInternal игнорируется', () => {
-    expect(calcNetBalance([rec({ amount: 1000 }), rec({ type: 'expense', amount: 200, isInternal: true })])).toBe(1000);
+    expect(calcNetBalance([rec({ amount: 1000 }), rec({ type: RecordType.EXPENSE, amount: 200, isInternal: true })])).toBe(1000);
   });
   it('пустой массив → 0', () => { expect(calcNetBalance([])).toBe(0); });
 });
@@ -55,27 +59,27 @@ describe('calcAssets', () => {
   it('сумма депозита + валюта + одолженный долг', () => {
     const result = calcAssets(
       [deposit({ amount: 50000 })],
-      [exchange({ targetAmount: 100, exchangeRate: 95, type: 'buy' })],
-      [debt({ direction: 'lent' })],
+      [exchange({ targetAmount: 100, exchangeRate: 95, type: CurrencyOperationType.BUY })],
+      [debt({ direction: DebtDirection.LENT })],
     );
     expect(result).toBe(50000 + 100 * 95 + 1000);
   });
   it('закрытый депозит не считается', () => {
-    expect(calcAssets([deposit({ status: 'closed' })], [], [])).toBe(0);
+    expect(calcAssets([deposit({ status: DepositStatus.CLOSED })], [], [])).toBe(0);
   });
   it('долг borrowed не входит в активы', () => {
-    expect(calcAssets([], [], [debt({ direction: 'borrowed' })])).toBe(0);
+    expect(calcAssets([], [], [debt({ direction: DebtDirection.BORROWED })])).toBe(0);
   });
 });
 
 describe('calcLiabilities', () => {
   it('остаток по кредиту + взятый долг', () => {
     const c = credit({ payments: [] }); // все 100000 остаток
-    const d = debt({ direction: 'borrowed' });
+    const d = debt({ direction: DebtDirection.BORROWED });
     expect(calcLiabilities([c], [d])).toBe(100000 + 1000);
   });
   it('погашенный кредит не считается', () => {
-    expect(calcLiabilities([credit({ status: 'paid' })], [])).toBe(0);
+    expect(calcLiabilities([credit({ status: CreditStatus.PAID })], [])).toBe(0);
   });
 });
 
@@ -99,16 +103,16 @@ describe('calcCreditBurden', () => {
 describe('calcUpcomingPayments', () => {
   it('платёж кредита в пределах 30 дней', () => {
     const c = credit({ payments: [{ id: 'p1', amount: 5000, dueDate: '2026-09-01',
-      status: 'pending' }] });
+      status: PaymentStatus.PENDING }] });
     expect(calcUpcomingPayments([c], [], '2026-08-21')).toBe(5000);
   });
   it('просроченный платёж (в прошлом) не включается', () => {
     const c = credit({ payments: [{ id: 'p1', amount: 5000, dueDate: '2026-07-01',
-      status: 'pending' }] });
+      status: PaymentStatus.PENDING }] });
     expect(calcUpcomingPayments([c], [], '2026-08-21')).toBe(0);
   });
   it('долг с dueDate в диапазоне', () => {
-    const d = debt({ direction: 'borrowed', dueDate: '2026-09-01' });
+    const d = debt({ direction: DebtDirection.BORROWED, dueDate: '2026-09-01' });
     expect(calcUpcomingPayments([], [d], '2026-08-21')).toBe(1000);
   });
 });
@@ -116,9 +120,9 @@ describe('calcUpcomingPayments', () => {
 describe('groupRecordsByMonth', () => {
   it('группирует записи по месяцам', () => {
     const records = [
-      rec({ date: '2026-01-15', type: 'income', amount: 1000 }),
-      rec({ date: '2026-01-20', type: 'expense', amount: 400 }),
-      rec({ date: '2026-02-10', type: 'income', amount: 2000 }),
+      rec({ date: '2026-01-15', type: RecordType.INCOME, amount: 1000 }),
+      rec({ date: '2026-01-20', type: RecordType.EXPENSE, amount: 400 }),
+      rec({ date: '2026-02-10', type: RecordType.INCOME, amount: 2000 }),
     ];
     const groups = groupRecordsByMonth(records);
     expect(groups).toHaveLength(2);
@@ -127,8 +131,8 @@ describe('groupRecordsByMonth', () => {
   });
   it('isInternal игнорируется', () => {
     const records = [
-      rec({ date: '2026-01-15', type: 'income', amount: 1000 }),
-      rec({ date: '2026-01-20', type: 'expense', amount: 400, isInternal: true }),
+      rec({ date: '2026-01-15', type: RecordType.INCOME, amount: 1000 }),
+      rec({ date: '2026-01-20', type: RecordType.EXPENSE, amount: 400, isInternal: true }),
     ];
     const groups = groupRecordsByMonth(records);
     expect(groups).toHaveLength(1);
@@ -144,8 +148,8 @@ describe('calcCreditBurdenOverTime', () => {
     const credits = [
       credit({
         payments: [
-          { id: 'p1', amount: 5000, dueDate: '2026-05-15', status: 'paid', principalPart: 4000, interestPart: 1000 },
-          { id: 'p2', amount: 5000, dueDate: '2026-06-15', status: 'paid', principalPart: 4100, interestPart: 900 },
+          { id: 'p1', amount: 5000, dueDate: '2026-05-15', status: PaymentStatus.PAID, principalPart: 4000, interestPart: 1000 },
+          { id: 'p2', amount: 5000, dueDate: '2026-06-15', status: PaymentStatus.PAID, principalPart: 4100, interestPart: 900 },
         ]
       })
     ];
@@ -173,18 +177,43 @@ describe('calcCreditBurdenOverTime', () => {
   it('нет дохода → burdenPercent = null', () => {
     const credits = [
       credit({
-        payments: [{ id: 'p1', amount: 5000, dueDate: '2026-05-15', status: 'paid', principalPart: 4000, interestPart: 1000 }]
+        payments: [{ id: 'p1', amount: 5000, dueDate: '2026-05-15', status: PaymentStatus.PAID, principalPart: 4000, interestPart: 1000 }]
       })
     ];
     const result = calcCreditBurdenOverTime(credits, [], '2026-05-31', 1);
     expect(result[0].burdenPercent).toBeNull();
+  });
+
+  it('принимает строковый диапазон дат вместо числа месяцев', () => {
+    const credits = [
+      credit({
+        payments: [{ id: 'p1', amount: 5000, dueDate: '2026-05-15', status: PaymentStatus.PAID, principalPart: 4000, interestPart: 1000 }]
+      })
+    ];
+    const result = calcCreditBurdenOverTime(credits, [], '2026-04-01', '2026-06-30');
+    expect(result.map(r => r.label)).toEqual(['2026-04', '2026-05', '2026-06']);
+    expect(result[1].total).toBe(5000);
+  });
+
+  it('рассчитывает разбивку платежа динамически, если principalPart/interestPart отсутствуют', () => {
+    const credits = [
+      credit({
+        currentAmount: 100000,
+        interestRate: 12,
+        payments: [{ id: 'p1', amount: 8884.88, dueDate: '2026-05-15', status: PaymentStatus.PAID }]
+      })
+    ];
+    const result = calcCreditBurdenOverTime(credits, [], '2026-05-01', '2026-05-31');
+    // 100000 при 12% → проценты 1000, тело 7884.88
+    expect(result[0].interest).toBe(1000);
+    expect(result[0].principal).toBe(7884.88);
   });
 });
 
 describe('calcAssetsLiabilitiesOverTime', () => {
   it('рассчитывает активы и обязательства по месяцам', () => {
     const deposits = [
-      deposit({ status: 'active', startDate: '2026-01-01', amount: 50000 }),
+      deposit({ status: DepositStatus.ACTIVE, startDate: '2026-01-01', amount: 50000 }),
     ];
     const exchanges: CurrencyExchange[] = [];
     const credits = [
@@ -192,12 +221,12 @@ describe('calcAssetsLiabilitiesOverTime', () => {
         startDate: '2026-01-15',
         originalAmount: 100000,
         payments: [
-          { id: 'p1', amount: 5000, dueDate: '2026-02-15', status: 'paid', principalPart: 4000, interestPart: 1000 },
+          { id: 'p1', amount: 5000, dueDate: '2026-02-15', status: PaymentStatus.PAID, principalPart: 4000, interestPart: 1000 },
         ]
       }),
     ];
     const debts = [
-      debt({ direction: 'borrowed', date: '2026-02-01', amount: 5000 }),
+      debt({ direction: DebtDirection.BORROWED, date: '2026-02-01', amount: 5000 }),
     ];
 
     const result = calcAssetsLiabilitiesOverTime(deposits, exchanges, credits, debts, '2026-03-01', 3);
@@ -211,6 +240,14 @@ describe('calcAssetsLiabilitiesOverTime', () => {
 
     // Февраль: после платежа кредита + долг
     expect(result[1].liabilities).toBeGreaterThan(90000); // ~96k credit + 5k debt
+  });
+
+  it('принимает строковый диапазон дат вместо числа месяцев', () => {
+    const deposits = [deposit({ status: DepositStatus.ACTIVE, startDate: '2026-01-01', amount: 50000 })];
+    const result = calcAssetsLiabilitiesOverTime(
+      deposits, [], [], [], '2026-01-01', '2026-02-28');
+    expect(result.map(r => r.label)).toEqual(['2026-01', '2026-02']);
+    expect(result[0].assets).toBe(50000);
   });
 });
 
@@ -247,12 +284,12 @@ describe('filterRecordsByDateRange', () => {
 
 describe('calcGroupBreakdown', () => {
   const records = [
-    rec({ type: 'expense', category: 'Еда', tag: 'дом', payer: 'Иван', amount: 500 }),
-    rec({ type: 'expense', category: 'Еда', tag: 'работа', payer: 'Иван', amount: 300 }),
-    rec({ type: 'income', category: 'Зарплата', tag: 'работа', payer: 'ООО', amount: 5000 }),
-    rec({ type: 'expense', category: 'Транспорт', tag: 'город', payer: 'Мария', amount: 200 }),
-    rec({ type: 'expense', category: '', tag: '', payer: '', amount: 100 }),
-    rec({ type: 'expense', category: 'Еда', amount: 1000, isInternal: true }),
+    rec({ type: RecordType.EXPENSE, category: 'Еда', tag: 'дом', payer: 'Иван', amount: 500 }),
+    rec({ type: RecordType.EXPENSE, category: 'Еда', tag: 'работа', payer: 'Иван', amount: 300 }),
+    rec({ type: RecordType.INCOME, category: 'Зарплата', tag: 'работа', payer: 'ООО', amount: 5000 }),
+    rec({ type: RecordType.EXPENSE, category: 'Транспорт', tag: 'город', payer: 'Мария', amount: 200 }),
+    rec({ type: RecordType.EXPENSE, category: '', tag: '', payer: '', amount: 100 }),
+    rec({ type: RecordType.EXPENSE, category: 'Еда', amount: 1000, isInternal: true }),
   ];
 
   it('группирует по category и сортирует по total desc', () => {
@@ -283,9 +320,9 @@ describe('calcGroupBreakdown', () => {
 
   it('группирует по year', () => {
     const dateRecords = [
-      rec({ date: '2024-05-10', type: 'income', amount: 3000 }),
-      rec({ date: '2025-06-15', type: 'expense', amount: 1000 }),
-      rec({ date: '2025-08-20', type: 'income', amount: 2000 }),
+      rec({ date: '2024-05-10', type: RecordType.INCOME, amount: 3000 }),
+      rec({ date: '2025-06-15', type: RecordType.EXPENSE, amount: 1000 }),
+      rec({ date: '2025-08-20', type: RecordType.INCOME, amount: 2000 }),
     ];
     const breakdown = calcGroupBreakdown(dateRecords, 'year');
     expect(breakdown).toHaveLength(2);
@@ -297,8 +334,8 @@ describe('calcGroupBreakdown', () => {
 
   it('группирует по month', () => {
     const dateRecords = [
-      rec({ date: '2026-01-10', type: 'income', amount: 3000 }),
-      rec({ date: '2026-02-15', type: 'expense', amount: 1000 }),
+      rec({ date: '2026-01-10', type: RecordType.INCOME, amount: 3000 }),
+      rec({ date: '2026-02-15', type: RecordType.EXPENSE, amount: 1000 }),
     ];
     const breakdown = calcGroupBreakdown(dateRecords, 'month');
     expect(breakdown).toHaveLength(2);
@@ -308,7 +345,7 @@ describe('calcGroupBreakdown', () => {
 
   it('группирует по week', () => {
     const dateRecords = [
-      rec({ date: '2026-08-25', type: 'expense', amount: 500 }),
+      rec({ date: '2026-08-25', type: RecordType.EXPENSE, amount: 500 }),
     ];
     const breakdown = calcGroupBreakdown(dateRecords, 'week');
     expect(breakdown).toHaveLength(1);
@@ -318,7 +355,7 @@ describe('calcGroupBreakdown', () => {
 
 describe('calcSavingsRateOverTime', () => {
   it('нулевой доход даёт 0% savings rate, не -100%', () => {
-    const records = [rec({ date: '2026-01-15', type: 'expense', amount: 500 })];
+    const records = [rec({ date: '2026-01-15', type: RecordType.EXPENSE, amount: 500 })];
     const result = calcSavingsRateOverTime(records, '2026-01-01', '2026-01-31', '2026-08-25', 1);
     expect(result).toHaveLength(1);
     expect(result[0].income).toBe(0);
@@ -328,8 +365,8 @@ describe('calcSavingsRateOverTime', () => {
 
   it('положительный доход и расход даёт корректный процент', () => {
     const records = [
-      rec({ date: '2026-01-15', type: 'income', amount: 1000 }),
-      rec({ date: '2026-01-20', type: 'expense', amount: 600 }),
+      rec({ date: '2026-01-15', type: RecordType.INCOME, amount: 1000 }),
+      rec({ date: '2026-01-20', type: RecordType.EXPENSE, amount: 600 }),
     ];
     const result = calcSavingsRateOverTime(records, '2026-01-01', '2026-01-31', '2026-08-25', 1);
     expect(result).toHaveLength(1);
@@ -341,10 +378,10 @@ describe('calcSavingsRateOverTime', () => {
 
   it('рассчитывает норму сбережений по месяцам', () => {
     const records = [
-      rec({ date: '2026-01-10', type: 'income', amount: 10000 }),
-      rec({ date: '2026-01-20', type: 'expense', amount: 6000 }),
-      rec({ date: '2026-02-10', type: 'income', amount: 10000 }),
-      rec({ date: '2026-02-20', type: 'expense', amount: 12000 }),
+      rec({ date: '2026-01-10', type: RecordType.INCOME, amount: 10000 }),
+      rec({ date: '2026-01-20', type: RecordType.EXPENSE, amount: 6000 }),
+      rec({ date: '2026-02-10', type: RecordType.INCOME, amount: 10000 }),
+      rec({ date: '2026-02-20', type: RecordType.EXPENSE, amount: 12000 }),
     ];
 
     const result = calcSavingsRateOverTime(records, '2026-01-01', '2026-02-28');
@@ -357,6 +394,18 @@ describe('calcSavingsRateOverTime', () => {
     expect(result[1].savings).toBe(-2000);
     expect(result[1].savingsRate).toBe(-20);
   });
+
+  it('без границ диапазона использует последние defaultMonths месяцев', () => {
+    const records = [
+      rec({ date: '2026-02-10', type: RecordType.INCOME, amount: 10000 }),
+      rec({ date: '2026-02-20', type: RecordType.EXPENSE, amount: 4000 }),
+    ];
+
+    const result = calcSavingsRateOverTime(records, undefined, undefined, '2026-03-15', 2);
+    expect(result.map(r => r.label)).toEqual(['2026-02', '2026-03']);
+    expect(result[0].savingsRate).toBe(60);
+    expect(result[1].income).toBe(0);
+  });
 });
 
 describe('calcDebtsBreakdown', () => {
@@ -365,15 +414,15 @@ describe('calcDebtsBreakdown', () => {
       debt({
         person: 'Иван',
         amount: 5000,
-        direction: 'lent',
+        direction: DebtDirection.LENT,
         originalAmount: 6000,
         movements: [
-          { id: 'm1', type: 'borrow', amount: 6000, date: '2026-01-01', time: '', createdAt: 1, note: '' },
-          { id: 'm2', type: 'repay', amount: 1000, date: '2026-02-01', time: '', createdAt: 2, note: '' },
+          { id: 'm1', type: DebtMovementType.BORROW, amount: 6000, date: '2026-01-01', time: '', createdAt: 1, note: '' },
+          { id: 'm2', type: DebtMovementType.REPAY, amount: 1000, date: '2026-02-01', time: '', createdAt: 2, note: '' },
         ],
       }),
-      debt({ person: 'Иван', amount: 2000, direction: 'borrowed' }),
-      debt({ person: 'Анна', amount: 3000, direction: 'borrowed' }),
+      debt({ person: 'Иван', amount: 2000, direction: DebtDirection.BORROWED }),
+      debt({ person: 'Анна', amount: 3000, direction: DebtDirection.BORROWED }),
     ];
 
     const breakdown = calcDebtsBreakdown(debts);
@@ -391,6 +440,31 @@ describe('calcDebtsBreakdown', () => {
     expect(anna?.borrowed).toBe(3000);
     expect(anna?.net).toBe(-3000);
   });
+
+  it('рассчитывает прогресс возврата взятых в долг сумм', () => {
+    const debts = [
+      debt({
+        person: 'Пётр',
+        amount: 4000,
+        direction: DebtDirection.BORROWED,
+        originalAmount: 10000,
+        movements: [
+          { id: 'm1', type: DebtMovementType.BORROW, amount: 10000, date: '2026-01-01', time: '', createdAt: 1, note: '' },
+          { id: 'm2', type: DebtMovementType.REPAY, amount: 6000, date: '2026-02-01', time: '', createdAt: 2, note: '' },
+        ],
+      }),
+    ];
+
+    const breakdown = calcDebtsBreakdown(debts);
+    expect(breakdown[0].borrowedTotal).toBe(10000);
+    expect(breakdown[0].borrowedRepaid).toBe(6000);
+    expect(breakdown[0].borrowedRepaidPct).toBe(60);
+  });
+
+  it('пустое имя заменяется на прочерк', () => {
+    const breakdown = calcDebtsBreakdown([debt({ person: '   ' })]);
+    expect(breakdown[0].person).toBe('—');
+  });
 });
 
 describe('calcDepositInterestOverTime', () => {
@@ -398,9 +472,9 @@ describe('calcDepositInterestOverTime', () => {
     const deposits = [
       deposit({
         accruals: [
-          { id: 'a1', amount: 500, dueDate: '2026-01-15', status: 'paid', paidDate: '2026-01-15' },
-          { id: 'a2', amount: 600, dueDate: '2026-02-15', status: 'pending' },
-          { id: 'a3', amount: 400, dueDate: '2026-02-20', status: 'paid', paidDate: '2026-02-20' },
+          { id: 'a1', amount: 500, dueDate: '2026-01-15', status: PaymentStatus.PAID, paidDate: '2026-01-15' },
+          { id: 'a2', amount: 600, dueDate: '2026-02-15', status: PaymentStatus.PENDING },
+          { id: 'a3', amount: 400, dueDate: '2026-02-20', status: PaymentStatus.PAID, paidDate: '2026-02-20' },
         ],
       }),
     ];
@@ -430,11 +504,11 @@ describe('calcDepositInterestOverTime', () => {
     const deposits = [
       deposit({
         accruals: [
-          { id: 'a1', amount: 500, dueDate: '2026-07-15', status: 'paid', paidDate: '2026-07-15' },
-          { id: 'a2', amount: 500, dueDate: '2026-08-15', status: 'paid', paidDate: '2026-08-15' },
-          { id: 'a3', amount: 500, dueDate: '2026-09-15', status: 'pending' },
-          { id: 'a4', amount: 500, dueDate: '2026-10-15', status: 'pending' },
-          { id: 'a5', amount: 500, dueDate: '2026-11-15', status: 'pending' },
+          { id: 'a1', amount: 500, dueDate: '2026-07-15', status: PaymentStatus.PAID, paidDate: '2026-07-15' },
+          { id: 'a2', amount: 500, dueDate: '2026-08-15', status: PaymentStatus.PAID, paidDate: '2026-08-15' },
+          { id: 'a3', amount: 500, dueDate: '2026-09-15', status: PaymentStatus.PENDING },
+          { id: 'a4', amount: 500, dueDate: '2026-10-15', status: PaymentStatus.PENDING },
+          { id: 'a5', amount: 500, dueDate: '2026-11-15', status: PaymentStatus.PENDING },
         ],
       }),
     ];
@@ -453,7 +527,26 @@ describe('calcDepositInterestOverTime', () => {
     expect(nov?.cumulativeTotal).toBe(2500);
     expect(nov?.segments).toHaveLength(1);
     expect(nov?.segments[0].amount).toBe(500);
-    expect(nov?.segments[0].status).toBe('pending');
+    expect(nov?.segments[0].status).toBe(PaymentStatus.PENDING);
+  });
+
+  it('перегрузка с числом месяцев: второй аргумент — asOfDate, третий — количество месяцев', () => {
+    const deposits = [
+      deposit({
+        accruals: [
+          { id: 'a1', amount: 100, dueDate: '2026-05-15', status: PaymentStatus.PAID, paidDate: '2026-05-15' },
+          { id: 'a2', amount: 200, dueDate: '2026-06-15', status: PaymentStatus.PAID, paidDate: '2026-06-15' },
+          { id: 'a3', amount: 300, dueDate: '2026-07-15', status: PaymentStatus.PAID, paidDate: '2026-07-15' },
+        ],
+      }),
+    ];
+
+    // months=3 → полуокно ±1 месяц вокруг asOfDate, расширенное до самого раннего начисления
+    const result = calcDepositInterestOverTime(deposits, '2026-07-20', 3);
+    expect(result.map(r => r.monthKey)).toEqual(['2026-05', '2026-06', '2026-07', '2026-08']);
+    expect(result[2].paidInterest).toBe(300);
+    expect(result[2].cumulativeTotal).toBe(600);
+    expect(result[3].total).toBe(0);
   });
 });
 
@@ -468,16 +561,16 @@ describe('calcActiveDepositsProgress', () => {
         interestRate: 16,
         startDate: '2026-01-01',
         termMonths: 12,
-        status: 'active',
-        accrualType: 'capitalization',
+        status: DepositStatus.ACTIVE,
+        accrualType: DepositAccrualType.CAPITALIZATION,
         accruals: [
-          { id: 'a1', amount: 1300, dueDate: '2026-02-01', status: 'paid', paidDate: '2026-02-01' },
-          { id: 'a2', amount: 1300, dueDate: '2026-08-01', status: 'pending' },
+          { id: 'a1', amount: 1300, dueDate: '2026-02-01', status: PaymentStatus.PAID, paidDate: '2026-02-01' },
+          { id: 'a2', amount: 1300, dueDate: '2026-08-01', status: PaymentStatus.PENDING },
         ],
       }),
       deposit({
         id: 'dep2',
-        status: 'closed',
+        status: DepositStatus.CLOSED,
       }),
     ];
 
@@ -490,7 +583,7 @@ describe('calcActiveDepositsProgress', () => {
     expect(result[0].interestRate).toBe(16);
     expect(result[0].endDate).toBe('2027-01-01');
     expect(result[0].isDemand).toBe(false);
-    expect(result[0].accrualType).toBe('capitalization');
+    expect(result[0].accrualType).toBe(DepositAccrualType.CAPITALIZATION);
     expect(result[0].progressPercent).toBeGreaterThan(45);
     expect(result[0].progressPercent).toBeLessThan(55);
     expect(result[0].accruedProfit).toBe(1300);
@@ -504,9 +597,9 @@ describe('calcActiveDepositsProgress', () => {
     const deposits = [
       deposit({
         id: 'dep_demand',
-        type: 'demand',
+        type: DepositType.DEMAND,
         termMonths: 0,
-        status: 'active',
+        status: DepositStatus.ACTIVE,
       }),
     ];
 
@@ -516,6 +609,83 @@ describe('calcActiveDepositsProgress', () => {
     expect(result[0].endDate).toBe('');
     expect(result[0].progressPercent).toBe(100);
     expect(result[0].remainingDays).toBeNull();
+  });
+
+  it('не падает на некорректной дате начала вклада', () => {
+    const deposits = [
+      deposit({
+        id: 'dep_broken',
+        startDate: 'not-a-date',
+        termMonths: 12,
+        status: DepositStatus.ACTIVE,
+      }),
+    ];
+
+    const result = calcActiveDepositsProgress(deposits, '2026-06-01');
+    expect(result).toHaveLength(1);
+    expect(result[0].endDate).toBe('');
+    expect(result[0].progressPercent).toBe(100);
+    expect(result[0].remainingDays).toBeNull();
+  });
+});
+
+describe('resolveMonthRange', () => {
+  it('обе границы заданы → перечисляет месяцы включительно', () => {
+    expect(resolveMonthRange('2026-01-10', '2026-04-20')).toEqual(
+      ['2026-01', '2026-02', '2026-03', '2026-04']);
+  });
+
+  it('только dateFrom → до текущего месяца asOfDate', () => {
+    expect(resolveMonthRange('2026-02-01', undefined, '2026-04-15')).toEqual(
+      ['2026-02', '2026-03', '2026-04']);
+  });
+
+  it('только dateTo → отсчитывает defaultMonths назад', () => {
+    expect(resolveMonthRange(undefined, '2026-04-30', '2026-06-01', 3)).toEqual(
+      ['2026-02', '2026-03', '2026-04']);
+  });
+
+  it('без границ → последние defaultMonths месяцев до asOfDate', () => {
+    expect(resolveMonthRange(undefined, undefined, '2026-03-10', 3)).toEqual(
+      ['2026-01', '2026-02', '2026-03']);
+  });
+
+  it('перевёрнутый диапазон нормализуется', () => {
+    expect(resolveMonthRange('2026-05-01', '2026-03-01')).toEqual(
+      ['2026-03', '2026-04', '2026-05']);
+  });
+});
+
+describe('resolveDepositMonthRange', () => {
+  const withAccruals = [
+    deposit({
+      accruals: [
+        { id: 'a1', amount: 100, dueDate: '2026-01-15', status: PaymentStatus.PAID, paidDate: '2026-01-15' },
+        { id: 'a2', amount: 100, dueDate: '2026-12-15', status: PaymentStatus.PENDING },
+      ],
+    }),
+  ];
+
+  it('только dateFrom → конец расширяется до последнего начисления', () => {
+    const months = resolveDepositMonthRange(withAccruals, '2026-03-01', undefined, '2026-06-15', 4);
+    expect(months[0]).toBe('2026-03');
+    expect(months[months.length - 1]).toBe('2026-12');
+  });
+
+  it('только dateTo → начало расширяется до самого раннего начисления', () => {
+    const months = resolveDepositMonthRange(withAccruals, undefined, '2026-06-30', '2026-06-15', 4);
+    expect(months[0]).toBe('2026-01');
+    expect(months[months.length - 1]).toBe('2026-06');
+  });
+
+  it('без начислений использует окно вокруг asOfDate', () => {
+    expect(resolveDepositMonthRange([], undefined, undefined, '2026-06-15', 2)).toEqual(
+      ['2026-05', '2026-06', '2026-07']);
+  });
+
+  it('перевёрнутый диапазон нормализуется', () => {
+    expect(resolveDepositMonthRange([], '2026-08-01', '2026-06-01', '2026-06-15', 2)).toEqual(
+      ['2026-06', '2026-07', '2026-08']);
   });
 });
 

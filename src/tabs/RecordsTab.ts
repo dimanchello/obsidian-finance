@@ -16,6 +16,7 @@ import { noteFilename } from '../utils';
 import { isoWeekRange, daysInMonth } from '../domain/dateMath';
 import { DataTable, DataTableApi, FilterControl } from '../ui/DataTable';
 import { renderMobileCard, dateRangeControls, compareValues } from '../ui/tabHelpers';
+import { renderStatCard } from '../ui/statCards';
 import { RecordType } from '../constants';
 
 type Panel = 'analytics' | 'filters' | 'settings';
@@ -207,13 +208,7 @@ export class RecordsTab {
       },
     ];
 
-    cards.forEach(item => {
-      const card = statsEl.createDiv(`finance-stat-card finance-stat-${item.mod}`);
-      card.createEl('div', { text: item.icon, cls: 'finance-stat-icon' });
-      const info = card.createDiv('finance-stat-info');
-      info.createEl('div', { text: item.label, cls: 'finance-stat-label' });
-      info.createEl('div', { text: item.value, cls: 'finance-stat-value' });
-    });
+    cards.forEach(item => renderStatCard(statsEl, item));
   }
 
   // ── Filters ──────────────────────────────────────────────────────────────
@@ -230,8 +225,8 @@ export class RecordsTab {
         kind: 'select', label: this.tr.type,
         options: [
           { value: 'all', label: this.tr.allTypes },
-          { value: 'income', label: '↑ ' + this.tr.incomeStat },
-          { value: 'expense', label: '↓ ' + this.tr.expenseStat },
+          { value: RecordType.INCOME, label: '↑ ' + this.tr.incomeStat },
+          { value: RecordType.EXPENSE, label: '↓ ' + this.tr.expenseStat },
         ],
         get: () => f.type, set: v => { f.type = v as typeof f.type; },
       },
@@ -320,8 +315,8 @@ export class RecordsTab {
     if (rec.exchangeRate) details.push({ label: '💱 @', value: String(rec.exchangeRate) });
 
     renderMobileCard(block, {
-      amountText: (rec.type === 'income' ? '+' : '−') + this.ctx.fmt(rec.amount),
-      amountCls: rec.type === 'income' ? 'finance-amount-income' : 'finance-amount-expense',
+      amountText: (rec.type === RecordType.INCOME ? '+' : '−') + this.ctx.fmt(rec.amount),
+      amountCls: rec.type === RecordType.INCOME ? 'finance-amount-income' : 'finance-amount-expense',
       subtitle: fmtDate(rec.date, rec.time),
       details,
       note: rec.note,
@@ -345,7 +340,7 @@ export class RecordsTab {
   }
 
   private confirmDelete(rec: FinanceRecord): void {
-    const label = `${rec.type === 'income' ? '+' : '−'}${this.ctx.fmt(rec.amount)}  ·  ${rec.category || '—'}  ·  ${fmtDate(rec.date, rec.time)}`;
+    const label = `${rec.type === RecordType.INCOME ? '+' : '−'}${this.ctx.fmt(rec.amount)}  ·  ${rec.category || '—'}  ·  ${fmtDate(rec.date, rec.time)}`;
     new ConfirmModal(this.ctx.app, `${this.tr.confirmDeleteRecord}\n${label}`, async () => {
       await this.ctx.storage.deleteRecord(this.ctx.accountId, rec.id);
       await this.reload();

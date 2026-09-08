@@ -2,7 +2,7 @@ import { fmtDate } from "../utils";
 import { Notice } from 'obsidian';
 import { ViewContext } from '../context';
 import {
-  CurrencyExchange, CurrencyOperationType,
+  CurrencyExchange, CurrencyOperationType, RecordType,
   CurrencySortField, DEFAULT_CURRENCY_FILTER, SortDir,
 } from '../types';
 import { CurrencyExchangeModal } from '../modals/CurrencyExchangeModal';
@@ -36,16 +36,17 @@ export class CurrencyTab {
         { key: 'date', label: this.tr.date, cell: e => ({ text: fmtDate(e.date, e.time) }) },
         { key: 'type', label: this.tr.type, cell: e => ({ text: this.typeLabel(e.type), cls: this.typeCls(e.type) }) },
         { key: 'currency', label: this.tr.currency, cell: e => ({ text: e.targetCurrency }) },
-        { key: 'amount', label: `${this.tr.sum} (${this.ctx.data?.currency ?? ''})`, cell: e => ({ text: e.type === 'add' ? '—' : this.ctx.fmt(e.amountInAccountCurrency), cls: 'finance-amount-cell' }) },
+        { key: 'amount', label: `${this.tr.sum} (${this.ctx.data?.currency ?? ''})`, cell: e => ({ text: e.type === CurrencyOperationType.ADD ? '—' : this.ctx.fmt(e.amountInAccountCurrency), cls: 'finance-amount-cell' }) },
         { key: 'targetAmount', label: this.tr.targetAmount, cell: e => {
-          const sign = (e.type === 'buy' || e.type === 'add') ? '+' : '−';
-          return { text: `${sign}${fmt(e.targetAmount, e.targetCurrency)}`, cls: (e.type === 'buy' || e.type === 'add') ? 'finance-amount-income' : 'finance-amount-expense' };
+          const isIncome = e.type === CurrencyOperationType.BUY || e.type === CurrencyOperationType.ADD;
+          const sign = isIncome ? '+' : '−';
+          return { text: `${sign}${fmt(e.targetAmount, e.targetCurrency)}`, cls: isIncome ? 'finance-amount-income' : 'finance-amount-expense' };
         }},
-        { key: 'rate', label: this.tr.rate, cell: e => ({ text: e.type === 'add' ? '—' : String(e.exchangeRate) }) },
+        { key: 'rate', label: this.tr.rate, cell: e => ({ text: e.type === CurrencyOperationType.ADD ? '—' : String(e.exchangeRate) }) },
         { key: 'provider', label: this.tr.provider, cell: e => ({ text: e.provider ?? '—' }) },
         { key: 'category', label: this.tr.category, cell: e => ({ text: e.category ?? '—' }) },
       ],
-      rowCls: e => [(e.type === 'buy' || e.type === 'add') ? 'finance-row-income' : 'finance-row-expense'],
+      rowCls: e => [(e.type === CurrencyOperationType.BUY || e.type === CurrencyOperationType.ADD) ? 'finance-row-income' : 'finance-row-expense'],
       rowActions: e => [
         { icon: '✏️', title: this.tr.edit, onClick: () => this.openModal(e.type, e) },
         { icon: '🗑️', title: this.tr.delete, onClick: () => this.confirmDeleteExchange(e), cls: 'finance-delete-btn' },
@@ -116,15 +117,15 @@ export class CurrencyTab {
       },
       infoBarSums: (host, filtered) => {
         const selCur = this.ctx.state.currencyFilter?.targetCurrency;
-        const fiAcc = filtered.filter(r => r.type === 'buy' || r.type === 'add').reduce((s, r) => s + r.amountInAccountCurrency, 0);
-        const feAcc = filtered.filter(r => r.type === 'sell' || r.type === 'spend').reduce((s, r) => s + r.amountInAccountCurrency, 0);
+        const fiAcc = filtered.filter(r => r.type === CurrencyOperationType.BUY || r.type === CurrencyOperationType.ADD).reduce((s, r) => s + r.amountInAccountCurrency, 0);
+        const feAcc = filtered.filter(r => r.type === CurrencyOperationType.SELL || r.type === CurrencyOperationType.SPEND).reduce((s, r) => s + r.amountInAccountCurrency, 0);
         
         let fiText = `↑\u00A0${this.ctx.fmt(fiAcc)}`;
         let feText = `↓\u00A0${this.ctx.fmt(feAcc)}`;
         
         if (selCur) {
-          const fiCur = filtered.filter(r => r.type === 'buy' || r.type === 'add').reduce((s, r) => s + r.targetAmount, 0);
-          const feCur = filtered.filter(r => r.type === 'sell' || r.type === 'spend').reduce((s, r) => s + r.targetAmount, 0);
+          const fiCur = filtered.filter(r => r.type === CurrencyOperationType.BUY || r.type === CurrencyOperationType.ADD).reduce((s, r) => s + r.targetAmount, 0);
+          const feCur = filtered.filter(r => r.type === CurrencyOperationType.SELL || r.type === CurrencyOperationType.SPEND).reduce((s, r) => s + r.targetAmount, 0);
           fiText = `↑\u00A0${fmt(fiCur, selCur)} (${this.ctx.fmt(fiAcc)})`;
           feText = `↓\u00A0${fmt(feCur, selCur)} (${this.ctx.fmt(feAcc)})`;
         }
@@ -159,10 +160,10 @@ export class CurrencyTab {
       btn.addEventListener('click', () => this.openModal(type));
     };
     
-    createBtn(this.tr.buyButton, '＋', 'buy', 'finance-accent-btn');
-    createBtn(this.tr.sellButton, '－', 'sell');
-    createBtn(this.tr.addButton, '💰', 'add');
-    createBtn(this.tr.spendButton, '💸', 'spend');
+    createBtn(this.tr.buyButton, '＋', CurrencyOperationType.BUY, 'finance-accent-btn');
+    createBtn(this.tr.sellButton, '－', CurrencyOperationType.SELL);
+    createBtn(this.tr.addButton, '💰', CurrencyOperationType.ADD);
+    createBtn(this.tr.spendButton, '💸', CurrencyOperationType.SPEND);
   }
 
   render(): void {
@@ -193,19 +194,19 @@ export class CurrencyTab {
   
   private typeLabel(type: CurrencyOperationType): string {
     switch (type) {
-      case 'buy': return this.tr.buy;
-      case 'sell': return this.tr.sell;
-      case 'add': return this.tr.add;
-      case 'spend': return this.tr.spend;
+      case CurrencyOperationType.BUY: return this.tr.buy;
+      case CurrencyOperationType.SELL: return this.tr.sell;
+      case CurrencyOperationType.ADD: return this.tr.add;
+      case CurrencyOperationType.SPEND: return this.tr.spend;
     }
   }
   
   private typeCls(type: CurrencyOperationType): string {
     switch (type) {
-      case 'buy': return 'finance-text-success';
-      case 'sell': return 'finance-text-error';
-      case 'add': return 'finance-text-accent';
-      case 'spend': return 'finance-text-warning';
+      case CurrencyOperationType.BUY: return 'finance-text-success';
+      case CurrencyOperationType.SELL: return 'finance-text-error';
+      case CurrencyOperationType.ADD: return 'finance-text-accent';
+      case CurrencyOperationType.SPEND: return 'finance-text-warning';
     }
   }
 
@@ -247,10 +248,10 @@ export class CurrencyTab {
         kind: 'select', label: this.tr.type,
         options: [
           { value: 'all', label: this.tr.allOperationTypes },
-          { value: 'buy', label: this.tr.buy },
-          { value: 'sell', label: this.tr.sell },
-          { value: 'add', label: this.tr.add },
-          { value: 'spend', label: this.tr.spend },
+          { value: CurrencyOperationType.BUY, label: this.tr.buy },
+          { value: CurrencyOperationType.SELL, label: this.tr.sell },
+          { value: CurrencyOperationType.ADD, label: this.tr.add },
+          { value: CurrencyOperationType.SPEND, label: this.tr.spend },
         ],
         get: () => f.type, set: v => { f.type = v as typeof f.type; },
       },
@@ -313,19 +314,20 @@ export class CurrencyTab {
   }
 
   private renderCard(block: HTMLElement, e: CurrencyExchange): void {
-    block.addClass(e.type === 'buy' || e.type === 'add' ? 'finance-row-income' : 'finance-row-expense');
+    const isIncome = e.type === CurrencyOperationType.BUY || e.type === CurrencyOperationType.ADD;
+    block.addClass(isIncome ? 'finance-row-income' : 'finance-row-expense');
     
     const header = block.createDiv('finance-record-header');
-    const sign = (e.type === 'buy' || e.type === 'add') ? '+' : '−';
+    const sign = isIncome ? '+' : '−';
     header.createEl('span', {
       text: `${sign}${this.ctx.fmt(e.targetAmount)} ${e.targetCurrency}`,
-      cls: `finance-record-amount ${(e.type === 'buy' || e.type === 'add') ? 'finance-amount-income' : 'finance-amount-expense'}`,
+      cls: `finance-record-amount ${isIncome ? 'finance-amount-income' : 'finance-amount-expense'}`,
     });
     header.createEl('span', { text: fmtDate(e.date, e.time), cls: 'finance-record-date' });
     
     const details = block.createDiv('finance-record-details');
     details.createEl('span', { text: this.typeLabel(e.type), cls: 'finance-record-detail' });
-    if (e.type !== 'add') {
+    if (e.type !== CurrencyOperationType.ADD) {
       details.createEl('span', { text: `${this.tr.sum}: ${this.ctx.fmt(e.amountInAccountCurrency)} ${this.ctx.data?.currency ?? ''}`, cls: 'finance-record-detail' });
       details.createEl('span', { text: `${this.tr.rate}: ${e.exchangeRate}`, cls: 'finance-record-detail' });
     }
@@ -346,11 +348,11 @@ export class CurrencyTab {
         if (initial) {
           await this.ctx.storage.updateExchange(this.ctx.accountId, exchange);
 
-          if (initial.type === exchange.type && exchange.type !== 'add') {
+          if (initial.type === exchange.type && exchange.type !== CurrencyOperationType.ADD) {
             // Same type: just update the existing linked record
             const linked = this.ctx.data!.records.find(r => r.linkedId === exchange.id);
             if (linked) {
-              linked.type = exchange.type === 'sell' ? 'income' : 'expense';
+              linked.type = exchange.type === CurrencyOperationType.SELL ? RecordType.INCOME : RecordType.EXPENSE;
               linked.amount = exchange.amountInAccountCurrency;
               linked.date = exchange.date;
               linked.time = exchange.time;
@@ -366,13 +368,13 @@ export class CurrencyTab {
             if (linked) {
               await this.ctx.storage.deleteRecord(this.ctx.accountId, linked.id);
             }
-            if (exchange.type !== 'add') {
+            if (exchange.type !== CurrencyOperationType.ADD) {
               await this.ctx.storage.addRecord(this.ctx.accountId, this.createFinanceRecordForExchange(exchange));
             }
           }
         } else {
           await this.ctx.storage.addExchange(this.ctx.accountId, exchange);
-          if (exchange.type !== 'add') {
+          if (exchange.type !== CurrencyOperationType.ADD) {
             await this.ctx.storage.addRecord(this.ctx.accountId, this.createFinanceRecordForExchange(exchange));
           }
         }
@@ -384,33 +386,33 @@ export class CurrencyTab {
   private generateExchangeNote(exchange: CurrencyExchange): string {
     const { tr } = this.ctx;
     let noteStr = '';
-    if (exchange.type === 'buy') noteStr = `${tr.currencyPurchase} ${exchange.targetAmount.toFixed(2)} ${exchange.targetCurrency} @ ${exchange.exchangeRate.toFixed(2)}`;
-    if (exchange.type === 'sell') noteStr = `${tr.currencySale} ${exchange.targetAmount.toFixed(2)} ${exchange.targetCurrency} @ ${exchange.exchangeRate.toFixed(2)}`;
-    if (exchange.type === 'spend') noteStr = `${tr.currencySpend} ${exchange.targetAmount.toFixed(2)} ${exchange.targetCurrency} @ ${exchange.exchangeRate.toFixed(2)}`;
+    if (exchange.type === CurrencyOperationType.BUY) noteStr = `${tr.currencyPurchase} ${exchange.targetAmount.toFixed(2)} ${exchange.targetCurrency} @ ${exchange.exchangeRate.toFixed(2)}`;
+    if (exchange.type === CurrencyOperationType.SELL) noteStr = `${tr.currencySale} ${exchange.targetAmount.toFixed(2)} ${exchange.targetCurrency} @ ${exchange.exchangeRate.toFixed(2)}`;
+    if (exchange.type === CurrencyOperationType.SPEND) noteStr = `${tr.currencySpend} ${exchange.targetAmount.toFixed(2)} ${exchange.targetCurrency} @ ${exchange.exchangeRate.toFixed(2)}`;
 
-    if (exchange.fee && exchange.type !== 'spend') {
+    if (exchange.fee && exchange.type !== CurrencyOperationType.SPEND) {
       noteStr += ` (${tr.feeLabel} ${exchange.fee.toFixed(2)})`;
     }
     return noteStr;
   }
 
   private createFinanceRecordForExchange(exchange: CurrencyExchange) {
-    const isExpense = exchange.type === 'buy' || exchange.type === 'spend';
+    const isExpense = exchange.type === CurrencyOperationType.BUY || exchange.type === CurrencyOperationType.SPEND;
     const { tr } = this.ctx;
 
     const noteStr = this.generateExchangeNote(exchange);
 
     let catStr = '';
-    if (exchange.type === 'buy') catStr = tr.currencyExchangeCat;
-    if (exchange.type === 'sell') catStr = tr.currencySaleCat;
-    if (exchange.type === 'spend') catStr = exchange.category ?? tr.currencySpendCat;
+    if (exchange.type === CurrencyOperationType.BUY) catStr = tr.currencyExchangeCat;
+    if (exchange.type === CurrencyOperationType.SELL) catStr = tr.currencySaleCat;
+    if (exchange.type === CurrencyOperationType.SPEND) catStr = exchange.category ?? tr.currencySpendCat;
 
     return {
       id: crypto.randomUUID(),
       createdAt: Date.now(),
       date: exchange.date,
       time: exchange.time,
-      type: isExpense ? 'expense' as const : 'income' as const,
+      type: isExpense ? RecordType.EXPENSE : RecordType.INCOME,
       amount: exchange.amountInAccountCurrency,
       category: catStr,
       tag: '',

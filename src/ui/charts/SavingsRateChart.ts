@@ -1,5 +1,5 @@
 import { ViewContext } from '../../context';
-import { FinanceRecord, OVERVIEW_TREND_MONTHS, OVERVIEW_CHART_HEIGHT, OVERVIEW_CHART_PAD_LEFT, OVERVIEW_CHART_PAD_RIGHT, OVERVIEW_CHART_PAD_TOP, OVERVIEW_CHART_PAD_BOTTOM, OVERVIEW_LABEL_OFFSET_Y, OVERVIEW_MIN_GROUP_W, OVERVIEW_MIN_GROUP_W_MOBILE, OVERVIEW_MAX_BAR_W, OVERVIEW_BAR_SPACING_PAD, OVERVIEW_BAR_RADIUS, OVERVIEW_SAVINGS_BENCHMARK } from '../../types';
+import { FinanceRecord, OVERVIEW_TREND_MONTHS, OVERVIEW_CHART_HEIGHT, OVERVIEW_CHART_PAD_LEFT, OVERVIEW_CHART_PAD_RIGHT, OVERVIEW_CHART_PAD_TOP, OVERVIEW_CHART_PAD_BOTTOM, OVERVIEW_LABEL_OFFSET_Y, OVERVIEW_MIN_GROUP_W, OVERVIEW_MIN_GROUP_W_MOBILE, OVERVIEW_MAX_BAR_W, OVERVIEW_BAR_SPACING_PAD, OVERVIEW_BAR_RADIUS, OVERVIEW_SAVINGS_BENCHMARK, SAVINGS_RATE_TICKS, SAVINGS_RATE_RANGE, PERCENT_100 } from '../../types';
 import { createChartTooltip, svg } from '../chartHelpers';
 import { calcSavingsRateOverTime, SavingsRateMonth } from '../../domain/overviewMetrics';
 
@@ -68,9 +68,8 @@ export class SavingsRateChart {
     const baselineY = OVERVIEW_CHART_PAD_TOP + plotHeight / 2;
 
     // Grid lines: +100%, +50%, 0%, -50%, -100%
-    const ticks = [100, 50, 0, -50, -100];
-    ticks.forEach(rate => {
-      const y = OVERVIEW_CHART_PAD_TOP + plotHeight * (1 - (rate + 100) / 200);
+    SAVINGS_RATE_TICKS.forEach(rate => {
+      const y = OVERVIEW_CHART_PAD_TOP + plotHeight * (1 - (rate + PERCENT_100) / SAVINGS_RATE_RANGE);
       const line = svg('line', {
         x1: OVERVIEW_CHART_PAD_LEFT,
         y1: y,
@@ -94,7 +93,7 @@ export class SavingsRateChart {
     });
 
     // 20% benchmark reference line (golden standard)
-    const benchmarkY = OVERVIEW_CHART_PAD_TOP + plotHeight * (1 - (OVERVIEW_SAVINGS_BENCHMARK + 100) / 200);
+    const benchmarkY = OVERVIEW_CHART_PAD_TOP + plotHeight * (1 - (OVERVIEW_SAVINGS_BENCHMARK + PERCENT_100) / SAVINGS_RATE_RANGE);
     const benchmarkLine = svg('line', {
       x1: OVERVIEW_CHART_PAD_LEFT,
       y1: benchmarkY,
@@ -109,8 +108,8 @@ export class SavingsRateChart {
 
     savingsData.forEach((d: SavingsRateMonth, i: number) => {
       const cx = OVERVIEW_CHART_PAD_LEFT + i * groupWidth + groupWidth / 2;
-      const clampedRate = Math.max(-100, Math.min(100, d.savingsRate));
-      const rateHeight = (Math.abs(clampedRate) / 200) * plotHeight;
+      const clampedRate = Math.max(-PERCENT_100, Math.min(PERCENT_100, d.savingsRate));
+      const rateHeight = (Math.abs(clampedRate) / SAVINGS_RATE_RANGE) * plotHeight;
       const barY = clampedRate >= 0 ? baselineY - rateHeight : baselineY;
 
       const barColor =

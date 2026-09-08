@@ -1,16 +1,22 @@
-import { fmtDate } from "./utils";
+import { fmtDate, fmtInteger } from "./utils";
 import { ViewContext } from './context';
 import {
-  CreditRecord, FinanceRecord, CreditAnalyticsGroupBy,
+  CreditRecord, FinanceRecord, CreditAnalyticsGroupBy, CreditType,
   CHART_SVG_HEIGHT_COMPACT, CHART_SVG_PAD_LEFT, CHART_SVG_PAD_RIGHT,
   CHART_SVG_PAD_TOP, CHART_SVG_PAD_BOTTOM_COMPACT, CHART_MIN_GROUP_MOBILE, CHART_MIN_GROUP_DESKTOP,
   CHART_MAX_BAR_W_MOBILE, CHART_MAX_BAR_W_SMALL, CHART_MAX_BAR_W_MED, CHART_MAX_BAR_W_LARGE,
   CHART_BAR_RATIO_MOBILE, CHART_BAR_RATIO_DESKTOP, CHART_BAR_RADIUS,
   CHART_COLOR_PRINCIPAL, CHART_COLOR_INTEREST, CHART_GRID_DIVISIONS_COMPACT,
+  CHART_CONTAINER_FALLBACK_WIDTH, CHART_MIN_GROUP_MEDIUM, CHART_MIN_GROUP_COMPACT,
+  CHART_GROUP_COUNT_MANY, CHART_GROUP_COUNT_SOME, CHART_GROUP_COUNT_FEW,
+  CHART_BAR_COUNT_SMALL, CHART_BAR_COUNT_MED, CHART_BAR_MIN_WIDTH,
+  CHART_FONT_SIZE_AXIS, CHART_AXIS_LABEL_GAP, CHART_AXIS_BASELINE_WIDTH,
+  CHART_TICK_TEXT_OFFSET_Y, CHART_LABEL_OFFSET_Y,
+  CHART_LABEL_ROTATE_THRESHOLD, CHART_LABEL_ROTATE_ANGLE,
   PERCENT_100,
 } from './types';
 import { Translations } from './i18n';
-import { addMonthsClamped } from './domain/dateMath';
+import { safeEndDate } from './domain/dateMath';
 import { round2 } from './domain/money';
 import {
   calculateRemainingPrincipal,
@@ -18,6 +24,7 @@ import {
   calculatePaymentBreakdown,
 } from './domain/creditCalculations';
 import { svg, fmtShort, shortMonth, createChartTooltip } from './ui/chartHelpers';
+import { renderStatCards, StatCardItem } from './ui/tabHelpers';
 import { CreditStatus, PaymentStatus } from './constants';
 
 interface PaymentBarItem {
@@ -52,7 +59,7 @@ export class CreditsAnalyticsView {
   }
 
   private fmt(n: number): string {
-    return n.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + ' ' + this.currency;
+    return fmtInteger(n, this.currency);
   }
 
   render(): void {
@@ -67,9 +74,9 @@ export class CreditsAnalyticsView {
   }
 
   private creditTypeLabel(type: string): string {
-    if (type === 'consumer') return this.tr.creditTypeConsumer;
-    if (type === 'auto') return this.tr.creditTypeAuto;
-    if (type === 'mortgage') return this.tr.creditTypeMortgage;
+    if (type === CreditType.CONSUMER) return this.tr.creditTypeConsumer;
+    if (type === CreditType.AUTO) return this.tr.creditTypeAuto;
+    if (type === CreditType.MORTGAGE) return this.tr.creditTypeMortgage;
     return type;
   }
 
@@ -136,19 +143,13 @@ export class CreditsAnalyticsView {
     const totalPaidPrincipal = credits.reduce((s, c) => s + (c.originalAmount - calculateRemainingPrincipal(c)), 0);
     const totalInterest = credits.reduce((s, c) => s + calculateTotalInterestPaid(c), 0);
 
-    const wrap = this.el.createDiv('finance-credit-analytics-cards');
-    const cards: { label: string; value: string; mod?: string }[] = [
+    const cards: StatCardItem[] = [
       { label: this.tr.creditTotalBorrowed, value: this.fmt(totalBorrowed) },
       { label: this.tr.creditTotalRemaining, value: this.fmt(totalRemaining), mod: 'expense' },
       { label: this.tr.creditPrincipalPaid, value: this.fmt(totalPaidPrincipal), mod: 'income' },
       { label: this.tr.creditInterestPaid, value: this.fmt(totalInterest), mod: 'neutral' },
     ];
-    cards.forEach(({ label, value, mod }) => {
-      const card = wrap.createDiv(`finance-stat-card${mod ? ` finance-stat-${mod}` : ''}`);
-      const info = card.createDiv('finance-stat-info');
-      info.createEl('div', { text: label, cls: 'finance-stat-label' });
-      info.createEl('div', { text: value, cls: 'finance-stat-value' });
-    });
+    renderStatCards(this.el, cards, 'finance-credit-analytics-cards');
   }
 
   private buildBarData(): PaymentBarItem[] {
@@ -234,8 +235,11 @@ export class CreditsAnalyticsView {
     }
 
     const isMobile = this.isMobile;
-    const containerW = this.chartEl.clientWidth || 600;
-    const MIN_GROUP = data.length > 12 ? CHART_MIN_GROUP_MOBILE : data.length > 6 ? 50 : data.length > 3 ? 55 : CHART_MIN_GROUP_DESKTOP;
+    const containerW = this.chartEl.clientWidth || CHART_CONTAINER_FALLBACK_WIDTH;
+    const MIN_GROUP = data.length > CHART_GROUP_COUNT_MANY ? CHART_MIN_GROUP_MOBILE
+      : data.length > CHART_GROUP_COUNT_SOME ? CHART_MIN_GROUP_MEDIUM
+        : data.length > CHART_GROUP_COUNT_FEW ? CHART_MIN_GROUP_COMPACT
+          : CHART_MIN_GROUP_DESKTOP;
     const PL = CHART_SVG_PAD_LEFT, PR = CHART_SVG_PAD_RIGHT;
     const minW = PL + data.length * MIN_GROUP + PR;
     const W = Math.max(minW, containerW);
@@ -243,9 +247,11 @@ export class CreditsAnalyticsView {
     const PT = CHART_SVG_PAD_TOP, PB = CHART_SVG_PAD_BOTTOM_COMPACT;
     const chartH = CH - PT - PB;
     const groupW = (W - PL - PR) / data.length;
-    const maxBarW = isMobile ? CHART_MAX_BAR_W_MOBILE : (data.length <= 4 ? CHART_MAX_BAR_W_SMALL : data.length <= 8 ? CHART_MAX_BAR_W_MED : CHART_MAX_BAR_W_LARGE);
+    const maxBarW = isMobile ? CHART_MAX_BAR_W_MOBILE
+      : (data.length <= CHART_BAR_COUNT_SMALL ? CHART_MAX_BAR_W_SMALL
+        : data.length <= CHART_BAR_COUNT_MED ? CHART_MAX_BAR_W_MED : CHART_MAX_BAR_W_LARGE);
     const barRatio = isMobile ? CHART_BAR_RATIO_MOBILE : CHART_BAR_RATIO_DESKTOP;
-    const barW = Math.max(2, Math.min(groupW * barRatio, maxBarW));
+    const barW = Math.max(CHART_BAR_MIN_WIDTH, Math.min(groupW * barRatio, maxBarW));
 
     let maxVal = 1;
     data.forEach(d => { maxVal = Math.max(maxVal, d.total); });
@@ -264,11 +270,14 @@ export class CreditsAnalyticsView {
       const line = svg('line', {
         x1: PL, y1: y, x2: W - PR, y2: y,
         stroke: 'var(--background-modifier-border)',
-        'stroke-width': i === divisions ? 1.5 : 1,
+        'stroke-width': i === divisions ? CHART_AXIS_BASELINE_WIDTH : 1,
       });
       if (i > 0 && i < divisions) line.setAttribute('stroke-dasharray', '3 4');
       root.appendChild(line);
-      const t = svg('text', { x: PL - 8, y: y + 4, 'text-anchor': 'end', fill: 'var(--text-muted)', 'font-size': 11 });
+      const t = svg('text', {
+        x: PL - CHART_AXIS_LABEL_GAP, y: y + CHART_TICK_TEXT_OFFSET_Y,
+        'text-anchor': 'end', fill: 'var(--text-muted)', 'font-size': CHART_FONT_SIZE_AXIS,
+      });
       t.textContent = fmtShort(val);
       root.appendChild(t);
     }
@@ -316,10 +325,14 @@ export class CreditsAnalyticsView {
         root.appendChild(hitRect);
       }
 
-      const lbl = svg('text', { x: cx, y: CH - PB + 16, 'text-anchor': 'middle', fill: 'var(--text-muted)', 'font-size': 11 });
+      const lbl = svg('text', {
+        x: cx, y: CH - PB + CHART_LABEL_OFFSET_Y,
+        'text-anchor': 'middle', fill: 'var(--text-muted)', 'font-size': CHART_FONT_SIZE_AXIS,
+      });
       lbl.textContent = d.label;
-      if (data.length > 10) {
-        lbl.setAttribute('transform', `rotate(-30, ${cx}, ${CH - PB + 16})`);
+      if (data.length > CHART_LABEL_ROTATE_THRESHOLD) {
+        lbl.setAttribute('transform',
+          `rotate(${CHART_LABEL_ROTATE_ANGLE}, ${cx}, ${CH - PB + CHART_LABEL_OFFSET_Y})`);
         lbl.setAttribute('text-anchor', 'end');
       }
       root.appendChild(lbl);
@@ -359,7 +372,7 @@ export class CreditsAnalyticsView {
         ? Math.min(PERCENT_100, round2(((c.originalAmount - remainingPrincipal) / c.originalAmount) * PERCENT_100))
         : 0;
 
-      const endDate = this.safeEndDate(c);
+      const endDate = safeEndDate(c.startDate, c.termMonths);
 
       const item = section.createDiv('finance-credit-progress-item');
       const header = item.createDiv('finance-credit-progress-header');
@@ -375,10 +388,5 @@ export class CreditsAnalyticsView {
       const fill = bar.createDiv('finance-deposit-progress-fill');
       fill.style.width = `${pct}%`;
     });
-  }
-
-  private safeEndDate(c: CreditRecord): string {
-    if (!c.startDate) return '';
-    try { return addMonthsClamped(c.startDate, c.termMonths || 0); } catch { return ''; }
   }
 }

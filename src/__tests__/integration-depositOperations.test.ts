@@ -1,6 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { FinanceStorage } from '../storage/index';
-import type { DepositRecord, DepositTopUp, DepositWithdrawal } from '../types';
+import {
+  DepositRecord, DepositTopUp, DepositWithdrawal,
+  DepositType, DepositStatus, DepositAccrualType, PaymentStatus,
+} from '../types';
 
 /**
  * Integration tests for deposit top-up and withdrawal operations.
@@ -32,16 +35,16 @@ function mkDeposit(over: Partial<DepositRecord> = {}): DepositRecord {
   return {
     id: 'dep-1',
     name: 'Накопительный',
-    type: 'savings',
+    type: DepositType.SAVINGS,
     bankName: 'Тест Банк',
     amount: 100_000,
     interestRate: 12,
     startDate: '2026-01-15',
     termMonths: 12,
-    accrualType: 'to_account',
+    accrualType: DepositAccrualType.TO_ACCOUNT,
     createdAt: Date.now(),
     note: '',
-    status: 'active',
+    status: DepositStatus.ACTIVE,
     accruals: [],
     topUps: [],
     withdrawals: [],
@@ -272,8 +275,8 @@ describe('Deposit Operations Integration Tests', () => {
   describe('Accrual Recalculation', () => {
     it('пополнение пересчитывает будущие начисления под новую сумму', async () => {
       const accruals = [
-        { id: 'a1', amount: 1_000, dueDate: '2026-02-15', status: 'paid' as const, paidDate: '2026-02-15' },
-        { id: 'a2', amount: 1_000, dueDate: '2099-01-15', status: 'pending' as const },
+        { id: 'a1', amount: 1_000, dueDate: '2026-02-15', status: PaymentStatus.PAID, paidDate: '2026-02-15' },
+        { id: 'a2', amount: 1_000, dueDate: '2099-01-15', status: PaymentStatus.PENDING },
       ];
       await storage.addDeposit(accountId, mkDeposit({ accruals }));
 
@@ -281,7 +284,7 @@ describe('Deposit Operations Integration Tests', () => {
       await storage.addDepositTopUp(accountId, 'dep-1', mkTopUp({ id: 'top-0', amount: 1 }));
       await storage.flush();
       const before = (await storage.load(accountId)).deposits[0].accruals
-        .find(a => a.status === 'pending');
+        .find(a => a.status === PaymentStatus.PENDING);
       expect(before).toBeDefined();
 
       await storage.addDepositTopUp(accountId, 'dep-1', mkTopUp({ id: 'top-1', amount: 100_000 }));
@@ -293,10 +296,10 @@ describe('Deposit Operations Integration Tests', () => {
       // Paid accrual is history and must not move
       const paid = deposit.accruals.find(a => a.id === 'a1');
       expect(paid?.amount).toBe(1_000);
-      expect(paid?.status).toBe('paid');
+      expect(paid?.status).toBe(PaymentStatus.PAID);
 
       // Doubling the principal must raise the pending accrual
-      const after = deposit.accruals.find(a => a.status === 'pending');
+      const after = deposit.accruals.find(a => a.status === PaymentStatus.PENDING);
       expect(after).toBeDefined();
       expect(after!.amount).toBeGreaterThan(before!.amount);
     });
@@ -305,7 +308,7 @@ describe('Deposit Operations Integration Tests', () => {
       // recalcFutureAccruals overwrites pending amounts from the principal, so the
       // baseline has to come from a recalc too — compare two recalcs, not a literal.
       const accruals = [
-        { id: 'a1', amount: 1_000, dueDate: '2099-01-15', status: 'pending' as const },
+        { id: 'a1', amount: 1_000, dueDate: '2099-01-15', status: PaymentStatus.PENDING },
       ];
       await storage.addDeposit(accountId, mkDeposit({ accruals }));
 
@@ -313,14 +316,14 @@ describe('Deposit Operations Integration Tests', () => {
       await storage.flush();
 
       const before = (await storage.load(accountId)).deposits[0].accruals
-        .find(a => a.status === 'pending');
+        .find(a => a.status === PaymentStatus.PENDING);
       expect(before).toBeDefined();
 
       await storage.addDepositWithdrawal(accountId, 'dep-1', mkWithdrawal({ id: 'wd-2', amount: 50_000 }));
       await storage.flush();
 
       const after = (await storage.load(accountId)).deposits[0].accruals
-        .find(a => a.status === 'pending');
+        .find(a => a.status === PaymentStatus.PENDING);
       expect(after).toBeDefined();
       expect(after!.amount).toBeLessThan(before!.amount);
     });

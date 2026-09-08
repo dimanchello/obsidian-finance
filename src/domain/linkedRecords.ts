@@ -1,6 +1,5 @@
 import { FinanceRecord, RecordType, CreditRecord, DebtRecord, DepositRecord, DebtMovement, CurrencyExchange } from '../types';
 import { getTodayTime } from '../utils';
-import { RecordType as RecordTypeValue } from '../constants';
 
 /**
  * Centralized logic for managing linkedId records.
@@ -213,7 +212,7 @@ export function createCreditReceiptRecord(
   return createLinkedRecord({
     entityId: credit.id,
     date: credit.startDate,
-    type: RecordTypeValue.INCOME,
+    type: RecordType.INCOME,
     amount: credit.originalAmount,
     category,
     payer: credit.bankName,
@@ -235,13 +234,43 @@ export function createCreditPaymentRecord(
   return createLinkedRecord({
     entityId: credit.id,
     date: paymentDate,
-    type: RecordTypeValue.EXPENSE,
+    type: RecordType.EXPENSE,
     amount: paymentAmount,
     category,
     payer: credit.bankName,
     note,
     isInternal,
   });
+}
+
+/**
+ * Creates a linked record for a credit down payment (первоначальный взнос).
+ *
+ * Unlike the other credit records this one is user-visible money that left the account
+ * on a date the user picked, so it keeps a caller-supplied id: the credit stores it in
+ * `downPaymentRecordId` and the record has to survive schedule regeneration.
+ */
+export function createCreditDownPaymentRecord(
+  credit: CreditRecord,
+  recordId: string,
+  date: string,
+  amount: number,
+  note: string,
+  category: string
+): FinanceRecord {
+  return {
+    ...createLinkedRecord({
+      entityId: credit.id,
+      date,
+      time: '',
+      type: RecordType.EXPENSE,
+      amount,
+      category,
+      payer: credit.bankName,
+      note,
+    }),
+    id: recordId,
+  };
 }
 
 /**
@@ -255,7 +284,7 @@ export function createDepositRefundRecord(
   return createLinkedRecord({
     entityId: deposit.id,
     date: deposit.startDate,
-    type: RecordTypeValue.INCOME,
+    type: RecordType.INCOME,
     amount: deposit.amount,
     category,
     payer: deposit.bankName,

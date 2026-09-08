@@ -1,7 +1,12 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { FinanceStorage } from '../storage/index';
 import { applyAutoTransactions, type AutoTxDeps } from '../domain/autoTransactions';
-import type { CreditRecord, DepositRecord } from '../types';
+import {
+  type CreditRecord, type DepositRecord,
+  CreditType, CreditStatus, EarlyRepaymentOption,
+  DepositType, DepositStatus, DepositAccrualType,
+  PaymentStatus, RecordType,
+} from '../types';
 import { findLinkedRecords } from '../domain/linkedRecords';
 
 /**
@@ -44,38 +49,50 @@ function mkDeps(today: string): AutoTxDeps {
   let n = 0;
   return {
     today,
-    now: Date.now(),
+    now: 1_700_000_000_000,
     nowTime: '12:00',
-    newId: () => `auto-${++n}`,
+    newId: () => `gen-${++n}`,
     labels: LABELS,
   };
 }
 
-describe('AutoTransactions Integration Tests', () => {
+describe('autoTransactions Integration Tests', () => {
   let storage: FinanceStorage;
+  let mockAdapter: MockAdapter;
   let mockApp: MockApp;
-  const accountId = 'test-account';
+  const accountId = 'acc-integration-test';
 
-  beforeEach(async () => {
+  beforeEach(() => {
+    const files = new Map<string, string>();
+
+    mockAdapter = {
+      exists: vi.fn(async (p: string) => files.has(p)),
+      read: vi.fn(async (p: string) => files.get(p) ?? ''),
+      write: vi.fn(async (p: string, data: string) => {
+        files.set(p, data);
+      }),
+      mkdir: vi.fn(async () => {}),
+      remove: vi.fn(async (p: string) => {
+        files.delete(p);
+      }),
+      rename: vi.fn(async (oldP: string, newP: string) => {
+        const val = files.get(oldP);
+        if (val !== undefined) {
+          files.set(newP, val);
+          files.delete(oldP);
+        }
+      }),
+      list: vi.fn(async () => ({ files: [], folders: [] })),
+      rmdir: vi.fn(async () => {}),
+    };
+
     mockApp = {
       vault: {
-        adapter: {
-          exists: vi.fn().mockResolvedValue(false),
-          read: vi.fn().mockResolvedValue(null),
-          write: vi.fn().mockResolvedValue(undefined),
-          mkdir: vi.fn().mockResolvedValue(undefined),
-          remove: vi.fn().mockResolvedValue(undefined),
-          rename: vi.fn().mockResolvedValue(undefined),
-          list: vi.fn().mockResolvedValue({ files: [], folders: [] }),
-          rmdir: vi.fn().mockResolvedValue(undefined),
-        },
+        adapter: mockAdapter,
       },
     };
-    storage = new FinanceStorage(mockApp as any, 'test-plugin', '₽');
 
-    // Initialize account
-    await storage.load(accountId);
-    await storage.updateMeta(accountId, { name: 'Test Account', currency: '₽' });
+    storage = new FinanceStorage(mockApp as any, 'test-plugin', '₽');
   });
 
   describe('Credit Auto-Payments', () => {
@@ -87,12 +104,12 @@ describe('AutoTransactions Integration Tests', () => {
         bankName: 'Тест Банк',
         originalAmount: 500000,
         currentAmount: 500000,
-        type: 'consumer',
+        type: CreditType.CONSUMER,
         interestRate: 12,
         monthlyPayment: 16000,
         startDate: '2026-01-15',
         termMonths: 36,
-        status: 'active',
+        status: CreditStatus.ACTIVE,
         earlyRepaymentOption: null,
         payments: [],
         createdAt: Date.now(),
@@ -120,7 +137,7 @@ describe('AutoTransactions Integration Tests', () => {
       // First payment should be marked as paid
       expect(result.changed.credits).toBe(true);
       const firstPayment = result.credits[0].payments[0];
-      expect(firstPayment.status).toBe('paid');
+      expect(firstPayment.status).toBe(PaymentStatus.PAID);
       expect(firstPayment.paidDate).toBe('2026-02-15');
 
       // Mirrored expense record should be created
@@ -128,7 +145,7 @@ describe('AutoTransactions Integration Tests', () => {
       const linkedRecords = findLinkedRecords(result.records, 'credit-1');
       expect(linkedRecords.length).toBeGreaterThan(0);
 
-      const paymentRecord = linkedRecords.find(r => r.type === 'expense' && r.date === '2026-02-15');
+      const paymentRecord = linkedRecords.find(r => r.type === RecordType.EXPENSE && r.date === '2026-02-15');
       expect(paymentRecord).toBeDefined();
       expect(paymentRecord?.amount).toBe(16000);
       expect(paymentRecord?.category).toBe(LABELS.creditDefaultCat);
@@ -141,12 +158,12 @@ describe('AutoTransactions Integration Tests', () => {
         bankName: 'Тест Банк',
         originalAmount: 2000000,
         currentAmount: 2000000,
-        type: 'mortgage',
+        type: CreditType.MORTGAGE,
         interestRate: 9,
         monthlyPayment: 20000,
         startDate: '2026-01-01',
         termMonths: 240,
-        status: 'active',
+        status: CreditStatus.ACTIVE,
         earlyRepaymentOption: null,
         payments: [],
         createdAt: Date.now(),
@@ -165,12 +182,12 @@ describe('AutoTransactions Integration Tests', () => {
       data = await storage.load(accountId);
       result = applyAutoTransactions(data, mkDeps('2026-04-01'));
 
-      const paidPayments = result.credits[0].payments.filter(p => p.status === 'paid');
+      const paidPayments = result.credits[0].payments.filter(p => p.status === PaymentStatus.PAID);
       expect(paidPayments.length).toBe(3);
 
       // Should have 3 linked expense records
       const linkedRecords = findLinkedRecords(result.records, 'credit-2');
-      const expenseRecords = linkedRecords.filter(r => r.type === 'expense');
+      const expenseRecords = linkedRecords.filter(r => r.type === RecordType.EXPENSE);
       expect(expenseRecords.length).toBe(3);
     });
 
@@ -181,12 +198,12 @@ describe('AutoTransactions Integration Tests', () => {
         bankName: 'Тест Банк',
         originalAmount: 100000,
         currentAmount: 100000,
-        type: 'consumer',
+        type: CreditType.CONSUMER,
         interestRate: 15,
         monthlyPayment: 9000,
         startDate: '2026-01-01',
         termMonths: 12,
-        status: 'active',
+        status: CreditStatus.ACTIVE,
         earlyRepaymentOption: null,
         payments: [],
         createdAt: Date.now(),
@@ -224,14 +241,14 @@ describe('AutoTransactions Integration Tests', () => {
       const deposit: DepositRecord = {
         id: 'deposit-1',
         name: 'Срочный вклад',
-        type: 'term',
+        type: DepositType.TERM,
         bankName: 'Тест Банк',
         amount: 100000,
         interestRate: 12,
         startDate: '2026-01-15',
         termMonths: 12,
-        accrualType: 'to_account',
-        status: 'active',
+        accrualType: DepositAccrualType.TO_ACCOUNT,
+        status: DepositStatus.ACTIVE,
         accruals: [],
         topUps: [],
         withdrawals: [],
@@ -251,7 +268,7 @@ describe('AutoTransactions Integration Tests', () => {
       // Opening expense should be created
       expect(result.changed.records).toBe(true);
       const openingRecord = result.records.find(
-        r => r.linkedId === 'deposit-1' && r.type === 'expense'
+        r => r.linkedId === 'deposit-1' && r.type === RecordType.EXPENSE
       );
       expect(openingRecord).toBeDefined();
       expect(openingRecord?.amount).toBe(100000);
@@ -267,13 +284,13 @@ describe('AutoTransactions Integration Tests', () => {
 
       expect(result.changed.deposits).toBe(true);
       const firstAccrual = result.deposits[0].accruals[0];
-      expect(firstAccrual.status).toBe('paid');
+      expect(firstAccrual.status).toBe(PaymentStatus.PAID);
       expect(firstAccrual.paidDate).toBe('2026-02-15');
 
       // Income record should be created (to_account type)
       expect(result.changed.records).toBe(true);
       const accrualRecord = result.records.find(
-        r => r.linkedId === 'deposit-1' && r.type === 'income' && r.date === '2026-02-15'
+        r => r.linkedId === 'deposit-1' && r.type === RecordType.INCOME && r.date === '2026-02-15'
       );
       expect(accrualRecord).toBeDefined();
       expect(accrualRecord?.category).toBe(LABELS.depositInterestCat);
@@ -283,14 +300,14 @@ describe('AutoTransactions Integration Tests', () => {
       const deposit: DepositRecord = {
         id: 'deposit-2',
         name: 'Вклад с капитализацией',
-        type: 'savings',
+        type: DepositType.SAVINGS,
         bankName: 'Тест Банк',
         amount: 100000,
         interestRate: 12,
         startDate: '2026-01-01',
         termMonths: 12,
-        accrualType: 'capitalization',
-        status: 'active',
+        accrualType: DepositAccrualType.CAPITALIZATION,
+        status: DepositStatus.ACTIVE,
         accruals: [],
         topUps: [],
         withdrawals: [],
@@ -315,12 +332,12 @@ describe('AutoTransactions Integration Tests', () => {
       const updatedAmount = result.deposits[0].amount;
       expect(updatedAmount).toBeGreaterThan(initialAmount);
 
-      const paidAccruals = result.deposits[0].accruals.filter(a => a.status === 'paid');
+      const paidAccruals = result.deposits[0].accruals.filter(a => a.status === PaymentStatus.PAID);
       expect(paidAccruals.length).toBe(2);
 
       // With capitalization, no income records should be created
       const incomeRecords = findLinkedRecords(result.records, 'deposit-2').filter(
-        r => r.type === 'income'
+        r => r.type === RecordType.INCOME
       );
       expect(incomeRecords.length).toBe(0);
     });
@@ -329,20 +346,20 @@ describe('AutoTransactions Integration Tests', () => {
       const deposit: DepositRecord = {
         id: 'deposit-3',
         name: 'Закрытый вклад',
-        type: 'term',
+        type: DepositType.TERM,
         bankName: 'Тест Банк',
         amount: 50000,
         interestRate: 8,
         startDate: '2026-01-01',
         termMonths: 6,
-        accrualType: 'to_account',
-        status: 'closed',
+        accrualType: DepositAccrualType.TO_ACCOUNT,
+        status: DepositStatus.CLOSED,
         accruals: [
           {
             id: 'acc-1',
             dueDate: '2026-02-01',
             amount: 333.33,
-            status: 'paid',
+            status: PaymentStatus.PAID,
             paidDate: '2026-02-01',
           },
         ],
@@ -360,7 +377,7 @@ describe('AutoTransactions Integration Tests', () => {
 
       expect(result.changed.deposits).toBe(false);
       expect(result.deposits[0].accruals.length).toBe(1);
-      expect(result.deposits[0].accruals[0].status).toBe('paid');
+      expect(result.deposits[0].accruals[0].status).toBe(PaymentStatus.PAID);
     });
   });
 
@@ -377,13 +394,13 @@ describe('AutoTransactions Integration Tests', () => {
         bankName: 'Тест Банк',
         originalAmount: 300000,
         currentAmount: 300000,
-        type: 'consumer',
+        type: CreditType.CONSUMER,
         interestRate: 15,
         monthlyPayment: 10000,
         startDate: '2026-01-01',
         termMonths: 36,
-        status: 'active',
-        earlyRepaymentOption: 'term',
+        status: CreditStatus.ACTIVE,
+        earlyRepaymentOption: EarlyRepaymentOption.TERM,
         payments: [],
         createdAt: Date.now(),
         note: '',
@@ -400,7 +417,7 @@ describe('AutoTransactions Integration Tests', () => {
       expect(result.credits[0].payments.length).toBeGreaterThan(0);
 
       // Early repayment option should be preserved
-      expect(result.credits[0].earlyRepaymentOption).toBe('term');
+      expect(result.credits[0].earlyRepaymentOption).toBe(EarlyRepaymentOption.TERM);
 
       await storage.updateCredit(accountId, result.credits[0]);
 
@@ -408,8 +425,8 @@ describe('AutoTransactions Integration Tests', () => {
       data = await storage.load(accountId);
       result = applyAutoTransactions(data, mkDeps('2026-02-01'));
 
-      expect(result.credits[0].earlyRepaymentOption).toBe('term');
-      expect(result.credits[0].payments[0].status).toBe('paid');
+      expect(result.credits[0].earlyRepaymentOption).toBe(EarlyRepaymentOption.TERM);
+      expect(result.credits[0].payments[0].status).toBe(PaymentStatus.PAID);
     });
   });
 
@@ -422,12 +439,12 @@ describe('AutoTransactions Integration Tests', () => {
         bankName: 'Банк 1',
         originalAmount: 100000,
         currentAmount: 100000,
-        type: 'consumer',
+        type: CreditType.CONSUMER,
         interestRate: 12,
         monthlyPayment: 9000,
         startDate: '2026-01-01',
         termMonths: 12,
-        status: 'active',
+        status: CreditStatus.ACTIVE,
         earlyRepaymentOption: null,
         payments: [],
         createdAt: Date.now(),
@@ -447,14 +464,14 @@ describe('AutoTransactions Integration Tests', () => {
       const deposit1: DepositRecord = {
         id: 'deposit-m1',
         name: 'Вклад 1',
-        type: 'term',
+        type: DepositType.TERM,
         bankName: 'Банк 1',
         amount: 50000,
         interestRate: 10,
         startDate: '2026-01-01',
         termMonths: 12,
-        accrualType: 'to_account',
-        status: 'active',
+        accrualType: DepositAccrualType.TO_ACCOUNT,
+        status: DepositStatus.ACTIVE,
         accruals: [],
         topUps: [],
         withdrawals: [],
@@ -518,12 +535,12 @@ describe('AutoTransactions Integration Tests', () => {
         bankName: 'Тест Банк',
         originalAmount: 100000,
         currentAmount: 100000,
-        type: 'consumer',
+        type: CreditType.CONSUMER,
         interestRate: 12,
         monthlyPayment: 9000,
         startDate: '2026-01-01',
         termMonths: 12,
-        status: 'active',
+        status: CreditStatus.ACTIVE,
         earlyRepaymentOption: null,
         payments: [],
         createdAt: Date.now(),
@@ -555,7 +572,7 @@ describe('AutoTransactions Integration Tests', () => {
       result = applyAutoTransactions(data, mkDeps('2026-02-01'));
 
       expect(result.changed.credits).toBe(true);
-      expect(result.credits[0].payments[0].status).toBe('paid');
+      expect(result.credits[0].payments[0].status).toBe(PaymentStatus.PAID);
       expect(result.credits[0].payments[0].paidDate).toBe('2026-02-01');
 
       // Save payment status
@@ -565,14 +582,14 @@ describe('AutoTransactions Integration Tests', () => {
 
       // Reload - payment status should persist
       data = await storage.load(accountId);
-      expect(data.credits[0].payments[0].status).toBe('paid');
+      expect(data.credits[0].payments[0].status).toBe(PaymentStatus.PAID);
       expect(data.credits[0].payments[0].paidDate).toBe('2026-02-01');
 
       // Linked record should be persisted
       const linkedRecords = findLinkedRecords(data.records, 'credit-persist');
       expect(linkedRecords.length).toBeGreaterThan(0);
 
-      const paymentRecord = linkedRecords.find(r => r.type === 'expense' && r.date === '2026-02-01');
+      const paymentRecord = linkedRecords.find(r => r.type === RecordType.EXPENSE && r.date === '2026-02-01');
       expect(paymentRecord).toBeDefined();
       expect(paymentRecord?.amount).toBe(9000);
     });

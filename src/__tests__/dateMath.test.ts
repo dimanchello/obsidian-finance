@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   addMonthsClamped, toDateStr, toDateTimeLocalStr, parseDateStr,
   daysBetweenStr, daysInMonth, isLeapYear, isoWeek, isoWeekRange,
+  daysInYear, safeEndDate,
 } from '../domain/dateMath';
 
 describe('isLeapYear', () => {
@@ -218,5 +219,34 @@ describe('isoWeekRange', () => {
       const { from, to } = isoWeekRange(iso.year, iso.week);
       expect(from <= d && d <= to).toBe(true);
     }
+  });
+});
+
+describe('daysInYear', () => {
+  it('366 дней в високосном году, 365 в обычном', () => {
+    expect(daysInYear(2024)).toBe(366);
+    expect(daysInYear(2026)).toBe(365);
+  });
+});
+
+describe('safeEndDate', () => {
+  it('прибавляет срок в месяцах к дате начала', () => {
+    expect(safeEndDate('2026-01-15', 12)).toBe('2027-01-15');
+    expect(safeEndDate('2026-01-31', 1)).toBe('2026-02-28');
+  });
+
+  it('срок не указан → дата начала без изменений', () => {
+    expect(safeEndDate('2026-01-15')).toBe('2026-01-15');
+    expect(safeEndDate('2026-01-15', 0)).toBe('2026-01-15');
+  });
+
+  it('пустая дата начала → пустая строка', () => {
+    expect(safeEndDate('')).toBe('');
+    expect(safeEndDate(undefined, 12)).toBe('');
+  });
+
+  it('некорректная дата начала → пустая строка вместо исключения', () => {
+    expect(safeEndDate('not-a-date', 12)).toBe('');
+    expect(safeEndDate('2026-13-01', 6)).toBe('');
   });
 });

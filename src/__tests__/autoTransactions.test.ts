@@ -1,6 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { applyAutoTransactions, type AutoTxDeps } from '../domain/autoTransactions';
-import type { AccountData, CreditRecord, DepositRecord, FinanceRecord } from '../types';
+import {
+  AccountData, CreditRecord, DepositRecord, FinanceRecord,
+  RecordType, DepositType, DepositAccrualType, DepositStatus,
+  CreditType, CreditStatus, PaymentStatus,
+} from '../types';
 
 const LABELS = {
   depositInterestCat: 'Проценты по вкладу',
@@ -20,19 +24,19 @@ function mkDeps(today: string): AutoTxDeps {
 
 function mkDeposit(over: Partial<DepositRecord> = {}): DepositRecord {
   return {
-    id: 'dep-1', name: 'Вклад', type: 'term', bankName: 'Банк',
+    id: 'dep-1', name: 'Вклад', type: DepositType.TERM, bankName: 'Банк',
     amount: 100_000, interestRate: 12, startDate: '2026-01-15', termMonths: 12,
-    accrualType: 'to_account', createdAt: 0, note: '', status: 'active',
+    accrualType: DepositAccrualType.TO_ACCOUNT, createdAt: 0, note: '', status: DepositStatus.ACTIVE,
     accruals: [], topUps: [], withdrawals: [], ...over,
   };
 }
 
 function mkCredit(over: Partial<CreditRecord> = {}): CreditRecord {
   return {
-    id: 'cr-1', name: 'Кредит', type: 'consumer', bankName: 'Банк',
+    id: 'cr-1', name: 'Кредит', type: CreditType.CONSUMER, bankName: 'Банк',
     originalAmount: 100_000, currentAmount: 100_000, interestRate: 15,
     monthlyPayment: 9_000, termMonths: 12, startDate: '2026-01-15',
-    createdAt: 0, note: '', status: 'active', earlyRepaymentOption: null,
+    createdAt: 0, note: '', status: CreditStatus.ACTIVE, earlyRepaymentOption: null,
     payments: [], ...over,
   };
 }
@@ -75,8 +79,8 @@ describe('applyAutoTransactions — флаг changed', () => {
 
   it('закрытый вклад и выплаченный кредит не трогаются', () => {
     const data = mkData({
-      deposits: [mkDeposit({ status: 'closed' })],
-      credits: [mkCredit({ status: 'paid' })],
+      deposits: [mkDeposit({ status: DepositStatus.CLOSED })],
+      credits: [mkCredit({ status: CreditStatus.PAID })],
     });
     const res = applyAutoTransactions(data, mkDeps('2027-01-01'));
     expect(res.changed).toEqual({ records: false, deposits: false, credits: false });
@@ -88,7 +92,7 @@ describe('applyAutoTransactions — дедупликация', () => {
   function mirroredRecord(over: Partial<FinanceRecord>): FinanceRecord {
     return {
       id: 'existing', createdAt: 0, date: '2026-02-15', time: '',
-      type: 'income', amount: 986.3, category: LABELS.depositInterestCat,
+      type: RecordType.INCOME, amount: 986.3, category: LABELS.depositInterestCat,
       tag: '', payer: 'Банк', note: '', attachmentPath: '', linkedId: 'dep-1', ...over,
     };
   }
@@ -96,8 +100,8 @@ describe('applyAutoTransactions — дедупликация', () => {
   it('не создаёт дубль записи по вкладу — правило то же, что у кредитов', () => {
     // Регрессия: дедупликация была только у кредитов, вклады плодили дубли.
     const accruals = [
-      { id: 'a1', amount: 986.3, dueDate: '2026-02-15', status: 'paid' as const, paidDate: '2026-02-15' },
-      { id: 'a2', amount: 986.3, dueDate: '2026-03-15', status: 'pending' as const },
+      { id: 'a1', amount: 986.3, dueDate: '2026-02-15', status: PaymentStatus.PAID, paidDate: '2026-02-15' },
+      { id: 'a2', amount: 986.3, dueDate: '2026-03-15', status: PaymentStatus.PENDING },
     ];
     const data = mkData({
       deposits: [mkDeposit({ accruals })],
@@ -112,11 +116,11 @@ describe('applyAutoTransactions — дедупликация', () => {
 
   it('не создаёт дубль записи по кредиту', () => {
     const payments = [
-      { id: 'p1', amount: 9_000, dueDate: '2026-02-15', status: 'paid' as const, paidDate: '2026-02-15' },
+      { id: 'p1', amount: 9_000, dueDate: '2026-02-15', status: PaymentStatus.PAID, paidDate: '2026-02-15' },
     ];
     const data = mkData({
       credits: [mkCredit({ payments })],
-      records: [mirroredRecord({ type: 'expense', amount: 9_000, category: LABELS.creditDefaultCat, linkedId: 'cr-1' })],
+      records: [mirroredRecord({ type: RecordType.EXPENSE, amount: 9_000, category: LABELS.creditDefaultCat, linkedId: 'cr-1' })],
     });
 
     const res = applyAutoTransactions(data, mkDeps('2026-02-20'));
@@ -128,28 +132,28 @@ describe('applyAutoTransactions — дедупликация', () => {
   it('запись о получении кредита не мешает записи о платеже в тот же день', () => {
     // Обе имеют категорию «Кредит» и один linkedId — различаются только типом
     const receipt = mirroredRecord({
-      type: 'income', date: '2026-02-15', amount: 100_000,
+      type: RecordType.INCOME, date: '2026-02-15', amount: 100_000,
       category: LABELS.creditDefaultCat, linkedId: 'cr-1',
     });
     const payments = [
-      { id: 'p1', amount: 9_000, dueDate: '2026-02-15', status: 'paid' as const, paidDate: '2026-02-15' },
+      { id: 'p1', amount: 9_000, dueDate: '2026-02-15', status: PaymentStatus.PAID, paidDate: '2026-02-15' },
     ];
     const data = mkData({ credits: [mkCredit({ payments })], records: [receipt] });
 
     const res = applyAutoTransactions(data, mkDeps('2026-02-20'));
 
     expect(res.records).toHaveLength(2);
-    expect(res.records.filter(r => r.type === 'expense')).toHaveLength(1);
+    expect(res.records.filter(r => r.type === RecordType.EXPENSE)).toHaveLength(1);
   });
 
   it('не считает дублем запись без linkedId', () => {
     const manual: FinanceRecord = {
-      id: 'manual', createdAt: 0, date: '2026-02-15', time: '', type: 'income',
+      id: 'manual', createdAt: 0, date: '2026-02-15', time: '', type: RecordType.INCOME,
       amount: 986.3, category: LABELS.depositInterestCat, tag: '', payer: 'Банк',
       note: '', attachmentPath: '',
     };
     const accruals = [
-      { id: 'a1', amount: 986.3, dueDate: '2026-02-15', status: 'paid' as const, paidDate: '2026-02-15' },
+      { id: 'a1', amount: 986.3, dueDate: '2026-02-15', status: PaymentStatus.PAID, paidDate: '2026-02-15' },
     ];
     const data = mkData({ deposits: [mkDeposit({ accruals, termMonths: 1 })], records: [manual] });
 
@@ -167,10 +171,10 @@ describe('applyAutoTransactions — вклады', () => {
 
     expect(res.deposits[0].accruals).toHaveLength(6);
     expect(res.records).toHaveLength(3); // открытие (expense) + 2 начисления (income)
-    const opening = res.records.find(r => r.type === 'expense');
+    const opening = res.records.find(r => r.type === RecordType.EXPENSE);
     expect(opening).toBeDefined();
     expect(opening!.date).toBe('2026-01-15');
-    const incomes = res.records.filter(r => r.type === 'income');
+    const incomes = res.records.filter(r => r.type === RecordType.INCOME);
     expect(incomes.map(r => r.date)).toEqual(['2026-02-15', '2026-03-15']);
     expect(incomes.every(r => r.linkedId === 'dep-1')).toBe(true);
     expect(res.changed).toEqual({ records: true, deposits: true, credits: false });
@@ -178,27 +182,27 @@ describe('applyAutoTransactions — вклады', () => {
 
   it('капитализация не создаёт записей — проценты идут в тело', () => {
     const data = mkData({
-      deposits: [mkDeposit({ accrualType: 'capitalization', startDate: '2026-01-15', termMonths: 6 })],
+      deposits: [mkDeposit({ accrualType: DepositAccrualType.CAPITALIZATION, startDate: '2026-01-15', termMonths: 6 })],
     });
 
     const res = applyAutoTransactions(data, mkDeps('2026-04-01'));
 
     expect(res.records).toHaveLength(1); // только открытие вклада (expense)
-    expect(res.records[0].type).toBe('expense');
+    expect(res.records[0].type).toBe(RecordType.EXPENSE);
     expect(res.records[0].date).toBe('2026-01-15');
     expect(res.deposits[0].amount).toBeGreaterThan(100_000);
   });
 
   it('капитализация: тело растёт только на оплаченные начисления', () => {
     const data = mkData({
-      deposits: [mkDeposit({ accrualType: 'capitalization', startDate: '2026-01-15', termMonths: 12 })],
+      deposits: [mkDeposit({ accrualType: DepositAccrualType.CAPITALIZATION, startDate: '2026-01-15', termMonths: 12 })],
     });
 
     const res = applyAutoTransactions(data, mkDeps('2026-03-01'));
     const deposit = res.deposits[0];
-    const paidSum = deposit.accruals.filter(a => a.status === 'paid').reduce((s, a) => s + a.amount, 0);
+    const paidSum = deposit.accruals.filter(a => a.status === PaymentStatus.PAID).reduce((s, a) => s + a.amount, 0);
 
-    expect(deposit.accruals.filter(a => a.status === 'paid')).toHaveLength(1);
+    expect(deposit.accruals.filter(a => a.status === PaymentStatus.PAID)).toHaveLength(1);
     expect(deposit.amount).toBeCloseTo(100_000 + paidSum, 2);
   });
 
@@ -209,7 +213,7 @@ describe('applyAutoTransactions — вклады', () => {
     const deposit = res.deposits[0];
     const refund = res.records.find(r => r.category === LABELS.depositRefundCat);
 
-    expect(deposit.status).toBe('closed');
+    expect(deposit.status).toBe(DepositStatus.CLOSED);
     expect(refund).toBeDefined();
     expect(refund!.amount).toBe(deposit.amount);
   });
@@ -226,22 +230,22 @@ describe('applyAutoTransactions — вклады', () => {
   it('срок ещё не вышел — вклад остаётся активным', () => {
     const data = mkData({ deposits: [mkDeposit({ startDate: '2026-01-15', termMonths: 12 })] });
     const res = applyAutoTransactions(data, mkDeps('2026-06-01'));
-    expect(res.deposits[0].status).toBe('active');
+    expect(res.deposits[0].status).toBe(DepositStatus.ACTIVE);
     expect(res.records.some(r => r.category === LABELS.depositRefundCat)).toBe(false);
   });
 
   it('добивает наступившие начисления в уже существующем графике', () => {
     const accruals = [
-      { id: 'a1', amount: 100, dueDate: '2026-02-15', status: 'paid' as const, paidDate: '2026-02-15' },
-      { id: 'a2', amount: 100, dueDate: '2026-03-15', status: 'pending' as const },
-      { id: 'a3', amount: 100, dueDate: '2026-04-15', status: 'pending' as const },
+      { id: 'a1', amount: 100, dueDate: '2026-02-15', status: PaymentStatus.PAID, paidDate: '2026-02-15' },
+      { id: 'a2', amount: 100, dueDate: '2026-03-15', status: PaymentStatus.PENDING },
+      { id: 'a3', amount: 100, dueDate: '2026-04-15', status: PaymentStatus.PENDING },
     ];
     const data = mkData({ deposits: [mkDeposit({ accruals })] });
 
     const res = applyAutoTransactions(data, mkDeps('2026-03-20'));
     const deposit = res.deposits[0];
 
-    expect(deposit.accruals.map(a => a.status)).toEqual(['paid', 'paid', 'pending']);
+    expect(deposit.accruals.map(a => a.status)).toEqual([PaymentStatus.PAID, PaymentStatus.PAID, PaymentStatus.PENDING]);
     expect(deposit.accruals[1].paidDate).toBe('2026-03-15');
     expect(res.records.map(r => r.date)).toEqual(['2026-02-15', '2026-03-15']);
   });
@@ -264,33 +268,33 @@ describe('applyAutoTransactions — кредиты', () => {
 
     expect(res.credits[0].payments).toHaveLength(12);
     expect(res.records).toHaveLength(2);
-    expect(res.records.every(r => r.type === 'expense')).toBe(true);
+    expect(res.records.every(r => r.type === RecordType.EXPENSE)).toBe(true);
   });
 
   it('помечает кредит выплаченным, когда не осталось pending — без сравнения float с нулём', () => {
     // Регрессия: проверка была remainingAmount === 0 по сумме float-значений.
     const payments = [
-      { id: 'p1', amount: 0.1, dueDate: '2026-02-15', status: 'pending' as const },
-      { id: 'p2', amount: 0.2, dueDate: '2026-03-15', status: 'pending' as const },
+      { id: 'p1', amount: 0.1, dueDate: '2026-02-15', status: PaymentStatus.PENDING },
+      { id: 'p2', amount: 0.2, dueDate: '2026-03-15', status: PaymentStatus.PENDING },
     ];
     const data = mkData({ credits: [mkCredit({ payments })] });
 
     const res = applyAutoTransactions(data, mkDeps('2026-04-01'));
 
-    expect(res.credits[0].payments.every(p => p.status === 'paid')).toBe(true);
-    expect(res.credits[0].status).toBe('paid');
+    expect(res.credits[0].payments.every(p => p.status === PaymentStatus.PAID)).toBe(true);
+    expect(res.credits[0].status).toBe(CreditStatus.PAID);
   });
 
   it('остаётся активным, пока есть pending', () => {
     const payments = [
-      { id: 'p1', amount: 9_000, dueDate: '2026-02-15', status: 'paid' as const, paidDate: '2026-02-15' },
-      { id: 'p2', amount: 9_000, dueDate: '2026-12-15', status: 'pending' as const },
+      { id: 'p1', amount: 9_000, dueDate: '2026-02-15', status: PaymentStatus.PAID, paidDate: '2026-02-15' },
+      { id: 'p2', amount: 9_000, dueDate: '2026-12-15', status: PaymentStatus.PENDING },
     ];
     const data = mkData({ credits: [mkCredit({ payments })] });
 
     const res = applyAutoTransactions(data, mkDeps('2026-03-01'));
 
-    expect(res.credits[0].status).toBe('active');
+    expect(res.credits[0].status).toBe(CreditStatus.ACTIVE);
   });
 
   it('кредит без платежа и срока не создаёт график', () => {
@@ -302,16 +306,16 @@ describe('applyAutoTransactions — кредиты', () => {
 
   it('перестраивает pending-платежи при смене paymentDay, сохраняя paid', () => {
     const payments = [
-      { id: 'p1', amount: 9_000, dueDate: '2026-02-15', status: 'paid' as const, paidDate: '2026-02-15' },
-      { id: 'p2', amount: 9_000, dueDate: '2026-03-15', status: 'pending' as const },
-      { id: 'p3', amount: 9_000, dueDate: '2026-04-15', status: 'pending' as const },
+      { id: 'p1', amount: 9_000, dueDate: '2026-02-15', status: PaymentStatus.PAID, paidDate: '2026-02-15' },
+      { id: 'p2', amount: 9_000, dueDate: '2026-03-15', status: PaymentStatus.PENDING },
+      { id: 'p3', amount: 9_000, dueDate: '2026-04-15', status: PaymentStatus.PENDING },
     ];
     // User changed paymentDay from 15 to 20
     const data = mkData({ credits: [mkCredit({ payments, paymentDay: 20, startDate: '2026-01-15', termMonths: 3 })] });
     const res = applyAutoTransactions(data, mkDeps('2026-02-20'));
 
     expect(res.credits[0].payments[0]).toEqual(payments[0]); // paid untouched
-    const pending = res.credits[0].payments.filter(p => p.status === 'pending');
+    const pending = res.credits[0].payments.filter(p => p.status === PaymentStatus.PENDING);
     expect(pending.every(p => p.dueDate.endsWith('-20'))).toBe(true);
   });
 });

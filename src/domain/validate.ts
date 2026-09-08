@@ -8,6 +8,7 @@ import { normalizeDateStr, normalizeTimeStr } from '../utils';
 import {
   RecordType, DebtDirection, DebtMovementType, CreditType, CreditStatus,
   DepositType, DepositStatus, DepositAccrualType, PaymentStatus, CurrencyOperationType,
+  EarlyRepaymentOption,
 } from '../constants';
 
 /**
@@ -76,7 +77,7 @@ export function parseRecord(o: Record<string, unknown>): FinanceRecord | null {
     createdAt: num(o.createdAt),
     date: normalizeDateStr(str(o.date)),
     time: normalizeTimeStr(str(o.time)),
-    type: oneOf(o.type, RECORD_TYPES, 'expense'),
+    type: oneOf(o.type, RECORD_TYPES, RecordType.EXPENSE),
     amount: num(o.amount),
     category: str(o.category),
     tag: str(o.tag),
@@ -94,7 +95,7 @@ function parseMovement(o: Record<string, unknown>): DebtMovement | null {
   if (!id) return null;
   return {
     id,
-    type: oneOf(o.type, MOVEMENT_TYPES, 'borrow'),
+    type: oneOf(o.type, MOVEMENT_TYPES, DebtMovementType.BORROW),
     amount: num(o.amount),
     date: normalizeDateStr(str(o.date)),
     time: normalizeTimeStr(str(o.time)),
@@ -112,7 +113,7 @@ export function parseDebt(o: Record<string, unknown>): DebtRecord | null {
     amount: num(o.amount),
     originalAmount: num(o.originalAmount),
     interestRate: num(o.interestRate),
-    direction: oneOf(o.direction, DEBT_DIRECTIONS, 'borrowed'),
+    direction: oneOf(o.direction, DEBT_DIRECTIONS, DebtDirection.BORROWED),
     date: normalizeDateStr(str(o.date)),
     time: normalizeTimeStr(str(o.time)),
     dueDate: typeof o.dueDate === 'string' && o.dueDate ? normalizeDateStr(o.dueDate) : '',
@@ -130,7 +131,7 @@ function parsePayment(o: Record<string, unknown>): CreditPayment | null {
     id,
     amount: num(o.amount),
     dueDate: normalizeDateStr(str(o.dueDate)),
-    status: oneOf(o.status, SCHEDULE_STATUSES, 'pending'),
+    status: oneOf(o.status, SCHEDULE_STATUSES, PaymentStatus.PENDING),
     ...(paidDate === undefined ? {} : { paidDate }),
     ...(typeof o.note === 'string' ? { note: o.note } : {}),
   };
@@ -143,7 +144,7 @@ export function parseCredit(o: Record<string, unknown>): CreditRecord | null {
   return {
     id,
     name: str(o.name),
-    type: oneOf(o.type, CREDIT_TYPES, 'consumer'),
+    type: oneOf(o.type, CREDIT_TYPES, CreditType.CONSUMER),
     bankName: str(o.bankName),
     originalAmount: num(o.originalAmount),
     currentAmount: num(o.currentAmount),
@@ -153,8 +154,8 @@ export function parseCredit(o: Record<string, unknown>): CreditRecord | null {
     startDate: normalizeDateStr(str(o.startDate)),
     createdAt: num(o.createdAt),
     note: str(o.note),
-    status: oneOf(o.status, CREDIT_STATUSES, 'active'),
-    earlyRepaymentOption: earlyRepayment === 'term' || earlyRepayment === 'amount' ? earlyRepayment : null,
+    status: oneOf(o.status, CREDIT_STATUSES, CreditStatus.ACTIVE),
+    earlyRepaymentOption: earlyRepayment === EarlyRepaymentOption.TERM || earlyRepayment === EarlyRepaymentOption.AMOUNT ? earlyRepayment : null,
     payments: parseList(o.payments, parsePayment),
     purchasePrice: num(o.purchasePrice),
     downPayment: num(o.downPayment),
@@ -173,7 +174,7 @@ function parseAccrual(o: Record<string, unknown>): DepositAccrual | null {
     id,
     amount: num(o.amount),
     dueDate: normalizeDateStr(str(o.dueDate)),
-    status: oneOf(o.status, SCHEDULE_STATUSES, 'pending'),
+    status: oneOf(o.status, SCHEDULE_STATUSES, PaymentStatus.PENDING),
     ...(paidDate === undefined ? {} : { paidDate }),
     ...(typeof o.note === 'string' ? { note: o.note } : {}),
   };
@@ -198,16 +199,16 @@ export function parseDeposit(o: Record<string, unknown>): DepositRecord | null {
   return {
     id,
     name: str(o.name),
-    type: oneOf(o.type, DEPOSIT_TYPES, 'term'),
+    type: oneOf(o.type, DEPOSIT_TYPES, DepositType.TERM),
     bankName: str(o.bankName),
     amount: num(o.amount),
     interestRate: num(o.interestRate),
     startDate: normalizeDateStr(str(o.startDate)),
     termMonths: num(o.termMonths),
-    accrualType: oneOf(o.accrualType, ACCRUAL_TYPES, 'to_account'),
+    accrualType: oneOf(o.accrualType, ACCRUAL_TYPES, DepositAccrualType.TO_ACCOUNT),
     createdAt: num(o.createdAt),
     note: str(o.note),
-    status: oneOf(o.status, DEPOSIT_STATUSES, 'active'),
+    status: oneOf(o.status, DEPOSIT_STATUSES, DepositStatus.ACTIVE),
     accruals: parseList(o.accruals, parseAccrual),
     topUps: parseList(o.topUps, parseTopUp),
     withdrawals: parseList<DepositWithdrawal>(o.withdrawals, parseTopUp),
@@ -222,7 +223,7 @@ export function parseExchange(o: Record<string, unknown>): CurrencyExchange | nu
     createdAt: num(o.createdAt),
     date: normalizeDateStr(str(o.date)),
     time: normalizeTimeStr(str(o.time)),
-    type: oneOf(o.type, CURRENCY_OPERATION_TYPES, 'buy'),
+    type: oneOf(o.type, CURRENCY_OPERATION_TYPES, CurrencyOperationType.BUY),
     amountInAccountCurrency: num(o.amountInAccountCurrency),
     targetCurrency: str(o.targetCurrency),
     targetAmount: num(o.targetAmount),

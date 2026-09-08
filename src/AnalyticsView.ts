@@ -14,7 +14,7 @@ import { RecordType } from './constants';
 
 type ChartType = 'bar' | 'pie';
 type GroupBy   = 'category' | 'payer' | 'month' | 'week' | 'year';
-type ShowType  = 'both' | 'income' | 'expense';
+type ShowType  = 'both' | RecordType;
 
 interface Item { label: string; rawKey: string; income: number; expense: number; }
 
@@ -46,7 +46,7 @@ export class AnalyticsView {
   }
 
   private get locale(): string {
-    return this.tr.income === '↑ Доход' ? 'ru' : 'en';
+    return this.tr.searchPlaceholder === 'Search...' ? 'en-US' : 'ru-RU';
   }
 
   /** Call when filter changes outside */
@@ -85,7 +85,7 @@ export class AnalyticsView {
 
     const sg = ctrl2.createDiv('finance-analytics-group');
     sg.createEl('span', { text: this.tr.showData, cls: 'finance-analytics-label' });
-    const sSel = this.mkSelect(sg, [['both',this.tr.all],['income',this.tr.incomeStat],['expense',this.tr.expenseStat]], this.showType);
+    const sSel = this.mkSelect(sg, [['both',this.tr.all],[RecordType.INCOME,this.tr.incomeStat],[RecordType.EXPENSE,this.tr.expenseStat]], this.showType);
     sSel.addEventListener('change', () => { this.showType = sSel.value as ShowType; this.redrawChart(); });
 
     // ── date/time range ───────────────────────────────────────────────────
@@ -256,8 +256,8 @@ export class AnalyticsView {
 
     let maxVal = 1;
     data.forEach(d => {
-      if (this.showType !== 'expense') maxVal = Math.max(maxVal, d.income);
-      if (this.showType !== 'income')  maxVal = Math.max(maxVal, d.expense);
+      if (this.showType !== RecordType.EXPENSE) maxVal = Math.max(maxVal, d.income);
+      if (this.showType !== RecordType.INCOME)  maxVal = Math.max(maxVal, d.expense);
     });
 
     const groupW = (W - PL - PR) / data.length;
@@ -289,7 +289,7 @@ export class AnalyticsView {
         if (this.onBarClick) this.onBarClick({ groupBy: this.groupBy, rawKey: d.rawKey, label: d.label });
       };
 
-      if (this.showType !== 'expense' && d.income > 0) {
+      if (this.showType !== RecordType.EXPENSE && d.income > 0) {
         const h = (d.income / maxVal) * chartH;
         const x = this.showType === 'both' ? cx - barW - gap / 2 : cx - barW / 2;
         const rect = svg('rect', { x, y: PT + chartH - h, width: barW, height: h, fill: CHART_COLOR_INCOME, rx: CHART_BAR_RADIUS });
@@ -301,7 +301,7 @@ export class AnalyticsView {
         root.appendChild(rect);
       }
 
-      if (this.showType !== 'income' && d.expense > 0) {
+      if (this.showType !== RecordType.INCOME && d.expense > 0) {
         const h = (d.expense / maxVal) * chartH;
         const x = this.showType === 'both' ? cx + gap / 2 : cx - barW / 2;
         const rect = svg('rect', { x, y: PT + chartH - h, width: barW, height: h, fill: CHART_COLOR_EXPENSE, rx: CHART_BAR_RADIUS });
@@ -353,8 +353,8 @@ export class AnalyticsView {
     let items = rawData
       .map(d => ({
         label: d.label,
-        value: this.showType === 'income'  ? d.income
-             : this.showType === 'expense' ? d.expense
+        value: this.showType === RecordType.INCOME  ? d.income
+             : this.showType === RecordType.EXPENSE ? d.expense
              : d.income + d.expense,
       }))
       .filter(d => d.value > 0)

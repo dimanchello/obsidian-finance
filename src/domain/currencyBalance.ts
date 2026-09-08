@@ -1,11 +1,11 @@
-import { CurrencyExchange, CURRENCY_ROUNDING_PRECISION } from '../types';
+import { CurrencyExchange, CURRENCY_ROUNDING_PRECISION, CurrencyOperationType } from '../types';
 
 export function getCurrencyBalance(exchanges: CurrencyExchange[], currency: string): number {
   const balance = exchanges
     .filter(e => e.targetCurrency === currency)
     .reduce((sum, e) => {
-      if (e.type === 'buy' || e.type === 'add') return sum + e.targetAmount;
-      if (e.type === 'sell' || e.type === 'spend') return sum - e.targetAmount;
+      if (e.type === CurrencyOperationType.BUY || e.type === CurrencyOperationType.ADD) return sum + e.targetAmount;
+      if (e.type === CurrencyOperationType.SELL || e.type === CurrencyOperationType.SPEND) return sum - e.targetAmount;
       return sum;
     }, 0);
 
@@ -28,10 +28,10 @@ export function getCurrencyBalances(exchanges: CurrencyExchange[]): Map<string, 
   
   for (const currency of currencies) {
     const ops = exchanges.filter(e => e.targetCurrency === currency);
-    const buys = ops.filter(e => e.type === 'buy');
-    const adds = ops.filter(e => e.type === 'add');
-    const sells = ops.filter(e => e.type === 'sell');
-    const spends = ops.filter(e => e.type === 'spend');
+    const buys = ops.filter(e => e.type === CurrencyOperationType.BUY);
+    const adds = ops.filter(e => e.type === CurrencyOperationType.ADD);
+    const sells = ops.filter(e => e.type === CurrencyOperationType.SELL);
+    const spends = ops.filter(e => e.type === CurrencyOperationType.SPEND);
     
     const totalBought = buys.reduce((sum, e) => sum + e.targetAmount, 0);
     const totalAdded = adds.reduce((sum, e) => sum + e.targetAmount, 0);
@@ -69,9 +69,9 @@ export function getCurrencyHistory(exchanges: CurrencyExchange[], currency: stri
   let currentBalance = 0;
   
   return ops.map(e => {
-    if (e.type === 'buy' || e.type === 'add') {
+    if (e.type === CurrencyOperationType.BUY || e.type === CurrencyOperationType.ADD) {
       currentBalance += e.targetAmount;
-    } else if (e.type === 'sell' || e.type === 'spend') {
+    } else if (e.type === CurrencyOperationType.SELL || e.type === CurrencyOperationType.SPEND) {
       currentBalance -= e.targetAmount;
     }
 

@@ -33,6 +33,14 @@ export function fmt(n: number, cur: string): string {
   return n.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '\u00a0' + cur;
 }
 
+/**
+ * Same as {@link fmt} but without the fractional part: analytics cards and chart
+ * labels would otherwise be dominated by ",00" tails.
+ */
+export function fmtInteger(n: number, cur: string): string {
+  return n.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + '\u00a0' + cur;
+}
+
 export function noteFilename(p: string): string {
   return p.split('/').pop()?.replace(/\.md$/i, '') ?? p;
 }

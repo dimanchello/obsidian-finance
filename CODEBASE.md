@@ -44,6 +44,8 @@ Obsidian плагин для личного финансового учёта. �
 - `overviewMetrics.ts` — dashboard calculations (savings rate, debt burden, trends)
 - `currencyBalance.ts` — multi-currency balance aggregation
 - `records.ts`, `dateMath.ts`, `money.ts`, `csv.ts` — utilities
+  (`dateMath` exports `addMonthsClamped`, `withDayClamped`, `daysBetweenStr`, `isoWeek`,
+  `isoWeekRange`, `daysInYear`, `safeEndDate`, `MS_PER_DAY`)
 - `validate.ts` — parses/validates AccountData structures
 - `viewState.ts` — ViewState parsing and defaults
 - `accountId.ts` — accountId mint/parse/insert into code block
@@ -66,19 +68,24 @@ Tab implementations (each instantiated per render):
 
 **`src/ui/`**
 Reusable UI components:
-- `EntityModal.ts` — base class for create/edit modals with validation
-- `FinanceBaseModal.ts` — base Modal with i18n and common styling
+- `FinanceBaseModal.ts` — the only class extending Obsidian `Modal`; `openHeader()`/`openBody()`
+- `EntityModal.ts` — base for create/edit modals: `validate → collectData → onSave`
 - `DataTable.ts` — generic table with sort/filter/pagination/mobile cards
 - `AmountInput.ts` — numeric input with currency symbol
 - `Combobox.ts` — searchable dropdown
 - `DateField.ts` — date picker wrapper
 - `formHelpers.ts`, `tabHelpers.ts`, `pagination.ts` — form/table utilities
+  (`tabHelpers` also re-exports `renderStatCard`/`renderStatCards` and wraps
+  `calculateEndDate` around `domain/dateMath.safeEndDate`)
+- `statCards.ts` — `renderStatCard` / `renderStatCards` / `StatCardItem`; separate module so
+  `context.ts` can use it without importing `tabHelpers` (which imports `ViewContext`)
 - `attachmentField.ts` — file attachment picker
 - `chartHelpers.ts` — SVG chart rendering utilities
 - `icons.ts` — icon constants
 
 **`src/ui/charts/`**
-Chart components for analytics tabs (not explicitly listed in tree, inferred from usage).
+Chart components used by `OverviewTab`: `MoneyFlowChart`, `AssetsChart`, `BurdenChart`,
+`BreakdownChart`, `SavingsRateChart`, `DebtsBreakdownChart`, `DepositsOverview`.
 
 **`src/__tests__/`**
 Vitest tests:
@@ -269,8 +276,13 @@ Debts, credits, deposits do NOT have separate ledgers — they materialize Finan
 - `AccountCommands` class
 - `addDebt()`, `addDebtMovement()`, `updateDebtMovement()`, `deleteDebtMovement()`, `deleteDebt()`, `deleteDebts()`
 - `addCredit()`, `updateCredit()`, `deleteCredit()`, `deleteCredits()`
+- `buildDownPaymentRecord()` (private) — mints/clears `credit.downPaymentRecordId` and builds the
+  down-payment mirror record; called by `addCredit`/`updateCredit` *before* the credit is stored
 - `closeDeposit()`, `deleteDeposit()`, `deleteDeposits()`, `addDepositTopUp()`, `deleteDepositTopUp()`, `addDepositWithdrawal()`, `deleteDepositWithdrawal()`
 - `deleteExchange()`, `deleteExchanges()`
+
+**Note:** `addCredit`/`updateCredit` take an optional `downPaymentNote` in their translations
+argument. `CreditModal` no longer touches records at all.
 
 **Depends on:**
 - `FinanceStorage`, `linkedRecords`
@@ -307,6 +319,8 @@ Debts, credits, deposits do NOT have separate ledgers — they materialize Finan
 **Important symbols:**
 - `createDebtMovementRecord()`
 - `createCreditReceiptRecord()`, `createCreditPaymentRecord()`
+- `createCreditDownPaymentRecord()` — keeps a caller-supplied id (`credit.downPaymentRecordId`) so
+  the record survives schedule regeneration
 - `createDepositRefundRecord()`
 - `findLinkedRecord()` — finds record by linkedId + date + amount
 - `unlinkRecords()` — filters out records with given linkedId
@@ -339,18 +353,23 @@ Debts, credits, deposits do NOT have separate ledgers — they materialize Finan
 
 **Path:** `src/ui/EntityModal.ts`
 
-**Purpose:** Base class for create/edit modals. Provides structure: header, form area, validation, save/cancel buttons.
+**Purpose:** Base class for create/edit modals. Provides structure: header, form area, validation, save/cancel buttons, optional `❓` field-reference button.
 
 **Important symbols:**
 - `EntityModal<T>` (abstract, extends FinanceBaseModal)
-- `buildForm()` — abstract, override to build form
-- `validate()` — abstract, return error or null
+- `getTitle()` — abstract, modal heading
+- `buildForm(form)` — abstract, override to build form
+- `validate()` — abstract, return error message or null
 - `collectData()` — abstract, collect form → entity
+- `getSaveLabel()` — optional, custom save-button text
+- `getInfoFields()` — optional, return `FieldDef[]` to render the `❓` footer button
+- `onFormReady()` — optional, runs after the form is built (focus handling)
+- `EntityModal.translationsFor(app)` — static, resolves `tr` before `super()` for localized entity defaults
 
 **Depends on:**
-- `FinanceBaseModal`, `formHelpers`, `i18n`
+- `FinanceBaseModal`, `formHelpers`, `FieldInfoModal`, `i18n`
 
-**Used by:** DebtModal, CreditModal, DepositModal, and other entity modals
+**Used by (all 9 CRUD modals):** RecordModal, DebtModal, DebtMovementModal, CreditModal, CreditPaymentModal, DepositModal, DepositTopUpModal, DepositWithdrawalModal, CurrencyExchangeModal
 
 ---
 
@@ -486,6 +505,34 @@ Debts, credits, deposits do NOT have separate ledgers — they materialize Finan
 
 **Used by:** `AccountView`
 
+---
+
+### Modal hierarchy
+
+`FinanceBaseModal` (`src/ui/FinanceBaseModal.ts`) is the only class extending Obsidian's `Modal`.
+It owns `onClose()` (empties the body) plus `openHeader(title)` / `openBody()`.
+
+**CRUD forms — extend `EntityModal<T>`** (implement `getTitle`/`buildForm`/`validate`/`collectData`):
+
+| Modal | Entity |
+|---|---|
+| `src/RecordModal.ts` | `FinanceRecord` |
+| `src/DebtModal.ts` | `DebtRecord` |
+| `src/DebtMovementModal.ts` | `DebtMovement` |
+| `src/CreditModal.ts` | `CreditRecord` |
+| `src/CreditPaymentModal.ts` | `CreditPayment` |
+| `src/DepositModal.ts` | `DepositRecord` |
+| `src/DepositTopUpModal.ts` | `DepositTopUp` |
+| `src/DepositWithdrawalModal.ts` | `DepositWithdrawal` |
+| `src/modals/CurrencyExchangeModal.ts` | `CurrencyExchange` |
+
+**Helper modals — extend `FinanceBaseModal` directly** (not entity forms):
+`CalculatorModal`, `ColumnVisibilityModal`, `ConfirmModal`, `CreditEarlyRepaymentModal`,
+`FieldInfoModal`, `ImportExportModal`, `OrphanedAccountsModal`.
+
+`ConfirmModal` uses its own `.finance-confirm-modal` skin; `FieldInfoModal` and
+`OrphanedAccountsModal` render their own heading via `openBody()`.
+
 ## 6. Important Symbols
 
 ### FinanceTrackerPlugin
@@ -582,9 +629,9 @@ Debts, credits, deposits do NOT have separate ledgers — they materialize Finan
 ### EntityModal
 **Definition:** `src/ui/EntityModal.ts:28`  
 **Type:** abstract class (extends FinanceBaseModal)  
-**Purpose:** Base for create/edit modals  
-**Related:** FinanceBaseModal, formHelpers  
-**Used by:** entity modals
+**Purpose:** Base for create/edit modals — `validate → collectData → onSave` lifecycle  
+**Related:** FinanceBaseModal, formHelpers, FieldInfoModal  
+**Used by:** all 9 CRUD modals
 
 ### RecordsTab
 **Definition:** `src/tabs/RecordsTab.ts:16`  
@@ -669,10 +716,10 @@ Obsidian markdown processor detects ```finance-account block
 
 ```
 User clicks "Add Debt" in DebtsTab
- → opens DebtModal (extends EntityModal)
+ → opens DebtModal (extends EntityModal<DebtRecord>)
  → user fills form → clicks Save
+ → DebtModal.validate() → null (valid; a string would be shown as an inline error)
  → DebtModal.collectData() → DebtRecord
- → DebtModal.validate() → null (valid)
  → onSave callback → DebtsTab
  → accountCommands.addDebt(debt, initialMovement, category, translations)
     ├── storage.addDebt(accountId, debt)

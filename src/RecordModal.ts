@@ -1,14 +1,15 @@
 import { App } from 'obsidian';
-import { getLocaleFromApp, t, Translations } from './i18n';
-import { FinanceRecord, RecordType, PluginSettings, AUTOFILL_BADGE_MS } from './types';
-import { parseAmount, getTodayStr, normalizeDateStr, normalizeTimeStr } from './utils';
+import {
+  FinanceRecord, RecordType, PluginSettings,
+  AUTOFILL_BADGE_MS, AUTOFILL_DEBOUNCE_MS, MODAL_FOCUS_DELAY_MS,
+} from './types';
+import { parseAmount, getTodayStr, getTodayTime, normalizeDateStr, normalizeTimeStr } from './utils';
 import { createAmountInput, type AmountInputHandle } from './ui/AmountInput';
 import { CalculatorModal } from './CalculatorModal';
 import { buildCalculatorIcon } from './ui/icons';
 import { buildAttachmentField } from './ui/attachmentField';
-import { FinanceBaseModal } from './ui/FinanceBaseModal';
-import { buildDateTimeField, buildComboboxField, buildNoteField, buildButtonRow, validateAmountInput } from './ui/formHelpers';
-import { RecordType as RecordTypeValue } from './constants';
+import { EntityModal } from './ui/EntityModal';
+import { buildDateTimeField, buildComboboxField, buildNoteField } from './ui/formHelpers';
 
 export interface RecordModalOptions {
   initial:    Partial<FinanceRecord>;
@@ -22,54 +23,56 @@ export interface RecordModalOptions {
   onSave:     (r: FinanceRecord) => void;
 }
 
-export class RecordModal extends FinanceBaseModal {
-  protected tr: Translations;
+export class RecordModal extends EntityModal<FinanceRecord> {
   private o:   RecordModalOptions;
-  private rec: Partial<FinanceRecord>;
 
   private amountInput!:      HTMLInputElement;
   private amountHandle!:     AmountInputHandle;
-  private incomeBtn!:         HTMLButtonElement;
-  private expenseBtn!:        HTMLButtonElement;
-  private categoryInput!:     HTMLInputElement;
-  private tagInput!:          HTMLInputElement;
-  private payerInput!:        HTMLInputElement;
-  private autofillBadge!:     HTMLElement;
-  private autofillTimer:      ReturnType<typeof setTimeout> | null = null;
+  private incomeBtn!:        HTMLButtonElement;
+  private expenseBtn!:       HTMLButtonElement;
+  private categoryInput!:    HTMLInputElement;
+  private tagInput!:         HTMLInputElement;
+  private payerInput!:       HTMLInputElement;
+  private autofillBadge!:    HTMLElement;
+  private autofillTimer:     ReturnType<typeof setTimeout> | null = null;
 
   constructor(app: App, opts: RecordModalOptions) {
-    super(app);
-    this.tr = t(getLocaleFromApp(app));
-    this.o   = opts;
-    this.rec = {
-      date: getTodayStr(),
-      time: new Date().toTimeString().slice(0, 5),
-      type: RecordTypeValue.EXPENSE, amount: 0,
-      category: '', tag: '', payer: '', note: '', attachmentPath: '',
-      ...opts.initial,
-    };
+    super(app, {
+      entity: {
+        id: crypto.randomUUID(),
+        createdAt: Date.now(),
+        date: getTodayStr(),
+        time: getTodayTime(),
+        type: RecordType.EXPENSE,
+        amount: 0,
+        category: '', tag: '', payer: '', note: '', attachmentPath: '',
+        isInternal: false,
+        linkedId: '',
+        ...opts.initial,
+      },
+      isEdit: !!opts.initial.id,
+      onSave: opts.onSave,
+    });
+    this.o = opts;
   }
 
-  override onOpen(): void {
-    const isEdit = !!this.o.initial.id;
-    this.openHeader(isEdit ? '✏️ ' + this.tr.editRecord : '➕ ' + this.tr.newRecord);
+  protected getTitle(): string {
+    return this.isEdit ? '✏️ ' + this.tr.editRecord : '➕ ' + this.tr.newRecord;
+  }
 
-    const typeRow    = this.contentEl.createDiv('finance-type-row');
-    this.incomeBtn   = typeRow.createEl('button', { cls: 'finance-type-toggle', text: this.tr.income });
-    this.expenseBtn  = typeRow.createEl('button', { cls: 'finance-type-toggle', text: this.tr.expense });
-    this.applyType(this.rec.type ?? 'expense');
-    this.incomeBtn .addEventListener('click', () => { this.applyType('income');  this.updateAmountColor(); });
-    this.expenseBtn.addEventListener('click', () => { this.applyType('expense'); this.updateAmountColor(); });
-
-    const form = this.contentEl.createDiv('finance-form');
+  protected buildForm(form: HTMLElement): void {
+    this.buildTypeToggle();
 
     const amtG = form.createDiv('finance-field-group finance-amount-group');
-    amtG.createEl('label', { text: this.tr.amountRequired.replace('{currency}', this.o.currency), cls: 'finance-field-label' });
+    amtG.createEl('label', {
+      text: this.tr.amountRequired.replace('{currency}', this.o.currency),
+      cls: 'finance-field-label',
+    });
     const amtRow = amtG.createDiv('finance-amount-row');
 
     const amountHandle = createAmountInput(amtRow, {
-      value: this.rec.amount,
-      onChange: v => { this.rec.amount = v; },
+      value: this.entity.amount,
+      onChange: v => { this.entity.amount = v; },
       onBlur: () => this.updateAmountColor(),
     });
     this.amountInput = amountHandle.input;
@@ -80,8 +83,8 @@ export class RecordModal extends FinanceBaseModal {
     calcIconBtn.title = this.tr.calculatorTitle;
     buildCalculatorIcon(calcIconBtn);
     calcIconBtn.addEventListener('click', () => {
-      const currentValue = this.amountInput.value.replace(/\u00a0/g, '').replace(',', '.');
-      new CalculatorModal(this.app, (result) => {
+      const currentValue = this.amountInput.value.replace(/ /g, '').replace(',', '.');
+      new CalculatorModal(this.app, result => {
         amountHandle.set(result);
         this.updateAmountColor();
       }, currentValue).open();
@@ -92,71 +95,98 @@ export class RecordModal extends FinanceBaseModal {
 
     const grid = form.createDiv('finance-form-grid');
 
-    const normDate = this.rec.date ? normalizeDateStr(this.rec.date) : getTodayStr();
-    const normTime = this.rec.time ? normalizeTimeStr(this.rec.time) : '';
+    const normDate = this.entity.date ? normalizeDateStr(this.entity.date) : getTodayStr();
+    const normTime = this.entity.time ? normalizeTimeStr(this.entity.time) : '';
     buildDateTimeField(grid, this.tr.dateTime, normDate, normTime, this.tr, (d, t) => {
-      this.rec.date = d;
-      this.rec.time = t;
+      this.entity.date = d;
+      this.entity.time = t;
     });
 
     this.payerInput = this.buildAutocomplete(
-      grid, this.tr.payer, this.rec.payer ?? '', this.o.payers,
-      v => { this.rec.payer = v; this.scheduleAutofill('payer', v); },
+      grid, this.tr.payer, this.entity.payer, this.o.payers,
+      v => { this.entity.payer = v; this.scheduleAutofill('payer', v); },
       {
         withInternalToggle: true,
-        isInternal: !!this.rec.isInternal,
-        onToggleInternal: (v) => { this.rec.isInternal = v; },
+        isInternal: !!this.entity.isInternal,
+        onToggleInternal: v => { this.entity.isInternal = v; },
       },
     );
 
     this.categoryInput = buildComboboxField(
-      grid, this.tr.category, this.rec.category ?? '', () => this.o.categories,
-      v => { this.rec.category = v; this.scheduleAutofill('category', v); }
+      grid, this.tr.category, this.entity.category, () => this.o.categories,
+      v => { this.entity.category = v; this.scheduleAutofill('category', v); }
     );
 
     this.tagInput = buildComboboxField(
-      grid, this.tr.tag, this.rec.tag ?? '', () => this.o.tags,
-      v => { this.rec.tag = v; }
+      grid, this.tr.tag, this.entity.tag, () => this.o.tags,
+      v => { this.entity.tag = v; }
     );
 
     buildNoteField(form, {
       label: this.tr.note,
       icon: '📝',
-      value: this.rec.note ?? '',
+      value: this.entity.note,
       placeholder: this.tr.notePlaceholder,
       rows: 3,
-      onChange: v => { this.rec.note = v; }
+      onChange: v => { this.entity.note = v; },
     });
 
     buildAttachmentField(form, {
       app: this.app,
       pluginId: this.o.pluginId,
       tr: this.tr,
-      initialPath: this.rec.attachmentPath ?? '',
-      onChange: path => { this.rec.attachmentPath = path; },
+      initialPath: this.entity.attachmentPath ?? '',
+      onChange: path => { this.entity.attachmentPath = path; },
     });
+  }
 
-    buildButtonRow(this.contentEl, this.tr, {
-      isEdit,
-      onSave: () => this.handleSave(),
-      onCancel: () => this.close(),
-    });
+  protected override onFormReady(): void {
+    setTimeout(() => this.amountInput.focus(), MODAL_FOCUS_DELAY_MS);
+  }
 
-    setTimeout(() => this.amountInput.focus(), 50);
+  protected validate(): string | null {
+    const amount = parseAmount(this.amountInput.value);
+    if (!amount || amount <= 0) {
+      this.amountInput.focus();
+      return this.tr.invalidAmount;
+    }
+    return null;
+  }
+
+  protected collectData(): FinanceRecord {
+    return {
+      ...this.entity,
+      amount: parseAmount(this.amountInput.value),
+      category: this.entity.category.trim(),
+      tag: this.entity.tag.trim(),
+      payer: this.entity.payer.trim(),
+      note: this.entity.note.trim(),
+    };
+  }
+
+  /** Income/expense switch; sits above the form, like the other entity type toggles. */
+  private buildTypeToggle(): void {
+    const typeRow = this.contentEl.createDiv('finance-type-row');
+    this.incomeBtn = typeRow.createEl('button', { cls: 'finance-type-toggle', text: this.tr.income });
+    this.expenseBtn = typeRow.createEl('button', { cls: 'finance-type-toggle', text: this.tr.expense });
+    this.applyType(this.entity.type);
+    this.incomeBtn.addEventListener('click', () => { this.applyType(RecordType.INCOME); this.updateAmountColor(); });
+    this.expenseBtn.addEventListener('click', () => { this.applyType(RecordType.EXPENSE); this.updateAmountColor(); });
+    this.contentEl.insertBefore(typeRow, this.formEl);
   }
 
   private applyType(type: RecordType): void {
-    this.rec.type = type;
-    this.incomeBtn .classList.toggle('active',  type === RecordTypeValue.INCOME);
-    this.incomeBtn .classList.toggle('income',  type === RecordTypeValue.INCOME);
-    this.expenseBtn.classList.toggle('active',  type === 'expense');
-    this.expenseBtn.classList.toggle('expense', type === 'expense');
+    this.entity.type = type;
+    this.incomeBtn.classList.toggle('active', type === RecordType.INCOME);
+    this.incomeBtn.classList.toggle('income', type === RecordType.INCOME);
+    this.expenseBtn.classList.toggle('active', type === RecordType.EXPENSE);
+    this.expenseBtn.classList.toggle('expense', type === RecordType.EXPENSE);
   }
 
   private updateAmountColor(): void {
     if (!this.amountInput) return;
-    this.amountInput.classList.toggle('income-color',  this.rec.type === RecordTypeValue.INCOME);
-    this.amountInput.classList.toggle('expense-color', this.rec.type === 'expense');
+    this.amountInput.classList.toggle('income-color', this.entity.type === RecordType.INCOME);
+    this.amountInput.classList.toggle('expense-color', this.entity.type === RecordType.EXPENSE);
   }
 
   private buildAutocomplete(
@@ -188,7 +218,7 @@ export class RecordModal extends FinanceBaseModal {
 
   private scheduleAutofill(field: 'category' | 'payer', value: string): void {
     if (this.autofillTimer) clearTimeout(this.autofillTimer);
-    this.autofillTimer = setTimeout(() => this.doAutofill(field, value), 350);
+    this.autofillTimer = setTimeout(() => this.doAutofill(field, value), AUTOFILL_DEBOUNCE_MS);
   }
 
   private doAutofill(field: 'category' | 'payer', value: string): void {
@@ -209,17 +239,17 @@ export class RecordModal extends FinanceBaseModal {
     }
     if (!this.tagInput.value && match.tag) {
       this.tagInput.value = match.tag;
-      this.rec.tag = match.tag;
+      this.entity.tag = match.tag;
       filled = true;
     }
     if (field === 'category' && !this.payerInput.value && match.payer) {
       this.payerInput.value = match.payer;
-      this.rec.payer = match.payer;
+      this.entity.payer = match.payer;
       filled = true;
     }
     if (field === 'payer' && !this.categoryInput.value && match.category) {
       this.categoryInput.value = match.category;
-      this.rec.category = match.category;
+      this.entity.category = match.category;
       filled = true;
     }
 
@@ -229,28 +259,5 @@ export class RecordModal extends FinanceBaseModal {
       this.autofillBadge.textContent = this.tr.autofillFromDate.replace('{date}', `${d[2]}.${d[1]}.${d[0]}`);
       setTimeout(() => { this.autofillBadge.addClass('is-hidden'); }, AUTOFILL_BADGE_MS);
     }
-  }
-
-  private handleSave(): void {
-    const amount = validateAmountInput(this.amountInput, this.tr);
-    if (amount === null) return;
-    
-    const record: FinanceRecord = {
-      id:             this.rec.id             ?? crypto.randomUUID(),
-      createdAt:      this.rec.createdAt      ?? Date.now(),
-      date:           this.rec.date           ?? getTodayStr(),
-      time:           this.rec.time           ?? '',
-      type:           this.rec.type           ?? 'expense',
-      amount,
-      category:       this.rec.category?.trim()       ?? '',
-      tag:            this.rec.tag?.trim()            ?? '',
-      payer:          this.rec.payer?.trim()          ?? '',
-      note:           this.rec.note?.trim()           ?? '',
-      attachmentPath: this.rec.attachmentPath         ?? '',
-      isInternal:     this.rec.isInternal             ?? false,
-      linkedId:       this.rec.linkedId             ?? '',
-    };
-    this.o.onSave(record);
-    this.close();
   }
 }

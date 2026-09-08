@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { parseCSV, csvToObjects, resolveRecordType } from '../domain/csv';
+import { RecordType } from '../types';
 
 describe('parseCSV', () => {
   it('разбирает простые строки', () => {
@@ -71,22 +72,22 @@ describe('csvToObjects', () => {
 });
 
 describe('resolveRecordType', () => {
-  const map = { incomeVal: 'income', expenseVal: 'expense' };
+  const map = { incomeVal: RecordType.INCOME, expenseVal: RecordType.EXPENSE };
 
   it('режимы all_* игнорируют значение', () => {
-    expect(resolveRecordType('all_income', 'что угодно', -5, map)).toBe('income');
-    expect(resolveRecordType('all_expense', 'income', 5, map)).toBe('expense');
+    expect(resolveRecordType('all_income', 'что угодно', -5, map)).toBe(RecordType.INCOME);
+    expect(resolveRecordType('all_expense', 'income', 5, map)).toBe(RecordType.EXPENSE);
   });
 
   it('режим sign смотрит на знак суммы', () => {
-    expect(resolveRecordType('sign', '', 5, map)).toBe('income');
-    expect(resolveRecordType('sign', '', -5, map)).toBe('expense');
-    expect(resolveRecordType('sign', '', 0, map)).toBe('income');
+    expect(resolveRecordType('sign', '', 5, map)).toBe(RecordType.INCOME);
+    expect(resolveRecordType('sign', '', -5, map)).toBe(RecordType.EXPENSE);
+    expect(resolveRecordType('sign', '', 0, map)).toBe(RecordType.INCOME);
   });
 
   it('сверяет с обоими значениями без учёта регистра и пробелов', () => {
-    expect(resolveRecordType('field', ' INCOME ', 0, map)).toBe('income');
-    expect(resolveRecordType('field', 'Expense', 0, map)).toBe('expense');
+    expect(resolveRecordType('field', ' INCOME ', 0, map)).toBe(RecordType.INCOME);
+    expect(resolveRecordType('field', 'Expense', 0, map)).toBe(RecordType.EXPENSE);
   });
 
   it('неизвестный тип не становится расходом', () => {

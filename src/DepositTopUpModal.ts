@@ -1,6 +1,6 @@
 import { App } from 'obsidian';
 import { DepositTopUp, DepositRecord } from './types';
-import { parseAmount, getTodayStr, normalizeDateStr, normalizeTimeStr } from './utils';
+import { parseAmount, getTodayStr, getTodayTime, normalizeDateStr, normalizeTimeStr } from './utils';
 import { createAmountInput } from './ui/AmountInput';
 import { EntityModal } from './ui/EntityModal';
 import { buildDateTimeField, buildNoteField } from './ui/formHelpers';
@@ -21,7 +21,7 @@ export class DepositTopUpModal extends EntityModal<DepositTopUp> {
         id: crypto.randomUUID(),
         amount: 0,
         date: getTodayStr(),
-        time: new Date().toTimeString().slice(0, 5),
+        time: getTodayTime(),
         createdAt: Date.now(),
         note: '',
       },

@@ -1,6 +1,6 @@
 import { App } from 'obsidian';
 import { DepositWithdrawal, DepositRecord } from './types';
-import { fmtAmount, parseAmount, getTodayStr, normalizeDateStr, normalizeTimeStr } from './utils';
+import { fmtAmount, parseAmount, getTodayStr, getTodayTime, normalizeDateStr, normalizeTimeStr } from './utils';
 import { createAmountInput } from './ui/AmountInput';
 import { EntityModal } from './ui/EntityModal';
 import { buildDateTimeField, buildNoteField } from './ui/formHelpers';
@@ -23,7 +23,7 @@ export class DepositWithdrawalModal extends EntityModal<DepositWithdrawal> {
         id: crypto.randomUUID(),
         amount: 0,
         date: getTodayStr(),
-        time: new Date().toTimeString().slice(0, 5),
+        time: getTodayTime(),
         createdAt: Date.now(),
         note: '',
       },

@@ -1,9 +1,9 @@
 import { App, MarkdownRenderChild, Notice, Platform } from 'obsidian';
 import { FinanceStorage } from './storage';
 import {
-  AccountData, PluginSettings, MOBILE_BREAKPOINT,
+  AccountData, PluginSettings, MOBILE_BREAKPOINT, RecordType,
 } from './types';
-import { getTodayStr } from './utils';
+import { getTodayStr, getTodayTime } from './utils';
 import { applyAutoTransactions, type AutoTxDeps } from './domain/autoTransactions';
 import { RecordModal } from './RecordModal';
 import { ViewContext } from './context';
@@ -145,8 +145,8 @@ export class AccountView extends MarkdownRenderChild {
     expBtn.createEl('span', { text: '↓', cls: 'btn-icon' });
     expBtn.createEl('span', { text: this.ctx.tr.typeExpense });
 
-    incBtn.addEventListener('click', () => { this.mode = 'records'; this.renderBodyContent(); this.openAddModal('income'); });
-    expBtn.addEventListener('click', () => { this.mode = 'records'; this.renderBodyContent(); this.openAddModal('expense'); });
+    incBtn.addEventListener('click', () => { this.mode = 'records'; this.renderBodyContent(); this.openAddModal(RecordType.INCOME); });
+    expBtn.addEventListener('click', () => { this.mode = 'records'; this.renderBodyContent(); this.openAddModal(RecordType.EXPENSE); });
 
     new RecordsTab(this.ctx, body).render();
   }
@@ -190,7 +190,7 @@ export class AccountView extends MarkdownRenderChild {
     else this.root.style.removeProperty('--ft-accent');
   }
 
-  private openAddModal(type: 'income' | 'expense'): void {
+  private openAddModal(type: RecordType): void {
     if (!this.data) return;
     new RecordModal(this.app, {
       initial: { type },
@@ -219,7 +219,7 @@ export class AccountView extends MarkdownRenderChild {
       const deps: AutoTxDeps = {
         today: getTodayStr(),
         now: Date.now(),
-        nowTime: new Date().toTimeString().slice(0, 5),
+        nowTime: getTodayTime(),
         newId: () => crypto.randomUUID(),
         labels: {
           depositInterestCat: this.ctx.tr.depositInterestCat,

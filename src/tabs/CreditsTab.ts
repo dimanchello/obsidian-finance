@@ -10,14 +10,14 @@ import { CreditModal } from '../CreditModal';
 import { CreditPaymentModal } from '../CreditPaymentModal';
 import { CreditEarlyRepaymentModal } from '../CreditEarlyRepaymentModal';
 import { ConfirmModal } from '../ConfirmModal';
-import { addMonthsClamped } from '../domain/dateMath';
+import { safeEndDate } from '../domain/dateMath';
 import { sumMoney } from '../domain/money';
 import { calculatePaymentBreakdown, calculateRemainingPrincipal } from '../domain/creditCalculations';
 import { DataTable, FilterControl } from '../ui/DataTable';
 import { CreditsAnalyticsView } from '../CreditsAnalyticsView';
 import { renderMobileCard, renderSummaryCard, renderProgressBar, renderPaginatedSchedule, pageRange, dateRangeControls, compareValues } from '../ui/tabHelpers';
 import { AccountCommands } from '../domain/AccountCommands';
-import { CreditStatus, PaymentStatus } from '../constants';
+import { CreditStatus, CreditType, PaymentStatus } from '../constants';
 
 export class CreditsTab {
   private ctx: ViewContext;
@@ -157,20 +157,15 @@ export class CreditsTab {
 
   private typeLabel(credit: CreditRecord): string {
     switch (credit.type) {
-      case 'consumer': return this.tr.creditTypeConsumer;
-      case 'auto': return this.tr.creditTypeAuto;
-      case 'mortgage': return this.tr.creditTypeMortgage;
+      case CreditType.CONSUMER: return this.tr.creditTypeConsumer;
+      case CreditType.AUTO: return this.tr.creditTypeAuto;
+      case CreditType.MORTGAGE: return this.tr.creditTypeMortgage;
       default: return this.tr.creditTypeCredit;
     }
   }
 
   private calculateCreditEndDate(credit: CreditRecord): string {
-    if (!credit.startDate) return '';
-    try {
-      return addMonthsClamped(credit.startDate, credit.termMonths || 0);
-    } catch {
-      return '';
-    }
+    return safeEndDate(credit.startDate, credit.termMonths);
   }
 
   // ── Stats ────────────────────────────────────────────────────────────────
@@ -213,8 +208,8 @@ export class CreditsTab {
         kind: 'select', label: this.tr.status,
         options: [
           { value: 'all', label: this.tr.all },
-          { value: 'active', label: this.tr.creditActive },
-          { value: 'paid', label: this.tr.creditPaid },
+          { value: CreditStatus.ACTIVE, label: this.tr.creditActive },
+          { value: CreditStatus.PAID, label: this.tr.creditPaid },
         ],
         get: () => f.status, set: v => { f.status = v as typeof f.status; },
       },
@@ -231,9 +226,9 @@ export class CreditsTab {
         kind: 'select', label: this.tr.type,
         options: [
           { value: 'all', label: this.tr.allCreditTypes },
-          { value: 'consumer', label: this.tr.creditTypeConsumer },
-          { value: 'auto', label: this.tr.creditTypeAuto },
-          { value: 'mortgage', label: this.tr.creditTypeMortgage },
+          { value: CreditType.CONSUMER, label: this.tr.creditTypeConsumer },
+          { value: CreditType.AUTO, label: this.tr.creditTypeAuto },
+          { value: CreditType.MORTGAGE, label: this.tr.creditTypeMortgage },
         ],
         get: () => f.type, set: v => { f.type = v as typeof f.type; },
       },
@@ -365,12 +360,15 @@ export class CreditsTab {
       title: this.tr.newCredit,
       banks: allBanks,
       pluginId: this.ctx.pluginId,
-      records: [...this.ctx.data.records],
       onSave: async (credit) => {
         await this.commands.addCredit(
           credit,
           this.tr.creditDefaultCat,
-          { receiptNote: this.tr.creditReceiptNote, paymentNote: this.tr.creditPaymentNote }
+          {
+            receiptNote: this.tr.creditReceiptNote,
+            paymentNote: this.tr.creditPaymentNote,
+            downPaymentNote: this.tr.downPaymentNotePrefix,
+          }
         );
         await this.reload(this.tr.creditAdded);
       },
@@ -385,12 +383,15 @@ export class CreditsTab {
       credit,
       banks: allBanks,
       pluginId: this.ctx.pluginId,
-      records: [...this.ctx.data.records],
       onSave: async (updated) => {
         await this.commands.updateCredit(
           updated,
           this.tr.creditDefaultCat,
-          { receiptNote: this.tr.creditReceiptNote, paymentNote: this.tr.creditPaymentNote }
+          {
+            receiptNote: this.tr.creditReceiptNote,
+            paymentNote: this.tr.creditPaymentNote,
+            downPaymentNote: this.tr.downPaymentNotePrefix,
+          }
         );
         await this.reload(this.tr.creditUpdated);
       },
@@ -409,7 +410,7 @@ export class CreditsTab {
 
         const updatedCredit = { ...credit, payments: [...credit.payments, payment] };
         updatedCredit.currentAmount = calculateRemainingPrincipal(updatedCredit);
-        if (updatedCredit.currentAmount <= 0) updatedCredit.status = 'paid';
+        if (updatedCredit.currentAmount <= 0) updatedCredit.status = CreditStatus.PAID;
 
         await this.commands.updateCredit(
           updatedCredit,

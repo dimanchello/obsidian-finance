@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { RecordType, DebtDirection, DebtMovementType } from '../types';
 
 describe('Type definitions', () => {
   it('FinanceRecord has required fields', () => {
@@ -7,7 +8,7 @@ describe('Type definitions', () => {
       createdAt: 1700000000000,
       date: '2024-11-15',
       time: '14:30',
-      type: 'expense' as const,
+      type: RecordType.EXPENSE,
       amount: 1500.00,
       category: 'Продукты',
       tag: 'еда',
@@ -18,7 +19,7 @@ describe('Type definitions', () => {
 
     expect(record.id).toBeDefined();
     expect(record.amount).toBe(1500);
-    expect(record.type).toBe('expense');
+    expect(record.type).toBe(RecordType.EXPENSE);
   });
 
   it('DebtRecord tracks movements', () => {
@@ -26,15 +27,15 @@ describe('Type definitions', () => {
       id: 'debt-1',
       person: 'Иван',
       amount: 3000,
-      direction: 'lent' as const,
+      direction: DebtDirection.LENT,
       date: '2024-11-01',
       time: '',
       dueDate: '',
       createdAt: 1700000000000,
       note: '',
       movements: [
-        { id: 'm1', type: 'borrow' as const, amount: 5000, date: '2024-11-01', time: '', createdAt: 1, note: '' },
-        { id: 'm2', type: 'repay' as const, amount: 2000, date: '2024-11-15', time: '', createdAt: 2, note: '' },
+        { id: 'm1', type: DebtMovementType.BORROW, amount: 5000, date: '2024-11-01', time: '', createdAt: 1, note: '' },
+        { id: 'm2', type: DebtMovementType.REPAY, amount: 2000, date: '2024-11-15', time: '', createdAt: 2, note: '' },
       ],
     };
 
@@ -44,7 +45,7 @@ describe('Type definitions', () => {
   it('getDebtOriginal should sum all borrow movements regardless of originalAmount', () => {
     const getDebtOriginal = (debt: { movements: { type: string; amount: number }[] }): number => {
       return debt.movements
-        .filter(m => m.type === 'borrow')
+        .filter(m => m.type === DebtMovementType.BORROW)
         .reduce((s, m) => s + m.amount, 0);
     };
 
@@ -54,16 +55,16 @@ describe('Type definitions', () => {
       amount: 8000,
       originalAmount: 5000,
       interestRate: 0,
-      direction: 'lent' as const,
+      direction: DebtDirection.LENT,
       date: '2024-11-01',
       time: '',
       dueDate: '',
       createdAt: 1700000000000,
       note: '',
       movements: [
-        { id: 'm1', type: 'borrow' as const, amount: 5000, date: '2024-11-01', time: '', createdAt: 1, note: '' },
-        { id: 'm2', type: 'borrow' as const, amount: 3000, date: '2024-12-01', time: '', createdAt: 2, note: '' },
-        { id: 'm3', type: 'repay' as const, amount: 2000, date: '2024-12-15', time: '', createdAt: 3, note: '' },
+        { id: 'm1', type: DebtMovementType.BORROW, amount: 5000, date: '2024-11-01', time: '', createdAt: 1, note: '' },
+        { id: 'm2', type: DebtMovementType.BORROW, amount: 3000, date: '2024-12-01', time: '', createdAt: 2, note: '' },
+        { id: 'm3', type: DebtMovementType.REPAY, amount: 2000, date: '2024-12-15', time: '', createdAt: 3, note: '' },
       ],
     };
 

@@ -1,8 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { FinanceStorage } from '../storage/index';
 import { AccountCommands } from '../domain/AccountCommands';
-import type {
+import {
   CreditRecord, DepositRecord, CurrencyExchange, FinanceRecord, DebtRecord,
+  CreditType, CreditStatus, DepositType, DepositStatus, DepositAccrualType,
+  PaymentStatus, RecordType, CurrencyOperationType, DebtDirection,
 } from '../types';
 import { calculateTotalInterestPaid } from '../domain/creditCalculations';
 import { getCurrencyBalance } from '../domain/currencyBalance';
@@ -40,26 +42,26 @@ const TR = { receiptNote: 'Получен {name}', paymentNote: 'Платёж {n
 
 function mkCredit(over: Partial<CreditRecord> = {}): CreditRecord {
   return {
-    id: 'cr-1', name: 'Кредит', type: 'consumer', bankName: 'Банк',
+    id: 'cr-1', name: 'Кредит', type: CreditType.CONSUMER, bankName: 'Банк',
     originalAmount: 100_000, currentAmount: 100_000, interestRate: 12,
     monthlyPayment: 10_000, termMonths: 12, startDate: '2026-01-01',
-    createdAt: 0, note: '', status: 'active', earlyRepaymentOption: null,
+    createdAt: 0, note: '', status: CreditStatus.ACTIVE, earlyRepaymentOption: null,
     payments: [], ...over,
   };
 }
 
 function mkDeposit(over: Partial<DepositRecord> = {}): DepositRecord {
   return {
-    id: 'dep-1', name: 'Вклад', type: 'term', bankName: 'Банк',
+    id: 'dep-1', name: 'Вклад', type: DepositType.TERM, bankName: 'Банк',
     amount: 100_000, interestRate: 8, startDate: '2026-01-01', termMonths: 12,
-    accrualType: 'to_account', createdAt: 0, note: '', status: 'active',
+    accrualType: DepositAccrualType.TO_ACCOUNT, createdAt: 0, note: '', status: DepositStatus.ACTIVE,
     accruals: [], topUps: [], withdrawals: [], ...over,
   };
 }
 
 function mkExchange(over: Partial<CurrencyExchange> = {}): CurrencyExchange {
   return {
-    id: 'ex-1', createdAt: 0, date: '2026-08-01', time: '10:00', type: 'buy',
+    id: 'ex-1', createdAt: 0, date: '2026-08-01', time: '10:00', type: CurrencyOperationType.BUY,
     amountInAccountCurrency: 100_000, targetCurrency: '$', targetAmount: 1_000,
     exchangeRate: 100, provider: 'Банк', note: '', ...over,
   };
@@ -67,7 +69,7 @@ function mkExchange(over: Partial<CurrencyExchange> = {}): CurrencyExchange {
 
 function mkRecord(over: Partial<FinanceRecord> = {}): FinanceRecord {
   return {
-    id: 'rec-1', createdAt: 0, date: '2026-08-01', time: '', type: 'expense',
+    id: 'rec-1', createdAt: 0, date: '2026-08-01', time: '', type: RecordType.EXPENSE,
     amount: 1_000, category: 'Тест', tag: '', payer: '', note: '',
     attachmentPath: '', ...over,
   };
@@ -104,8 +106,8 @@ describe('Business Logic Integration', () => {
       const credit = mkCredit({
         id: 'cr-1',
         payments: [
-          { id: 'p1', dueDate: '2026-02-01', amount: 10_000, status: 'paid' },
-          { id: 'p2', dueDate: '2026-03-01', amount: 10_000, status: 'pending' },
+          { id: 'p1', dueDate: '2026-02-01', amount: 10_000, status: PaymentStatus.PAID },
+          { id: 'p2', dueDate: '2026-03-01', amount: 10_000, status: PaymentStatus.PENDING },
         ],
       });
 
@@ -113,7 +115,7 @@ describe('Business Logic Integration', () => {
       await commands.updateCredit(credit, 'loan_payment', TR);
 
       const data = await storage.load(accountId);
-      const linked = data.records.filter(r => r.linkedId === 'cr-1' && r.type === 'expense' && r.isInternal);
+      const linked = data.records.filter(r => r.linkedId === 'cr-1' && r.type === RecordType.EXPENSE && r.isInternal);
       expect(linked).toHaveLength(1);
       expect(linked[0]!.date).toBe('2026-02-01');
       expect(linked[0]!.amount).toBe(10_000);
@@ -122,12 +124,12 @@ describe('Business Logic Integration', () => {
     it('updateCredit не дублирует expense если вручную создана запись на ту же дату', async () => {
       const credit = mkCredit({
         id: 'cr-2',
-        payments: [{ id: 'p1', dueDate: '2026-02-01', amount: 10_000, status: 'paid' }],
+        payments: [{ id: 'p1', dueDate: '2026-02-01', amount: 10_000, status: PaymentStatus.PAID }],
       });
 
       await storage.addCredit(accountId, credit);
       await storage.addRecord(accountId, mkRecord({
-        id: 'manual-1', date: '2026-02-01', type: 'expense', amount: 10_000,
+        id: 'manual-1', date: '2026-02-01', type: RecordType.EXPENSE, amount: 10_000,
         category: 'loan_payment', isInternal: false, linkedId: 'cr-2',
       }));
 
@@ -140,12 +142,12 @@ describe('Business Logic Integration', () => {
     });
 
     it('updateCredit не создаёт receipt для ипотеки', async () => {
-      const mortgage = mkCredit({ id: 'cr-m', type: 'mortgage', originalAmount: 5_000_000 });
+      const mortgage = mkCredit({ id: 'cr-m', type: CreditType.MORTGAGE, originalAmount: 5_000_000 });
       await storage.addCredit(accountId, mortgage);
       await commands.updateCredit(mortgage, 'loan_payment', TR);
 
       const data = await storage.load(accountId);
-      const receipts = data.records.filter(r => r.linkedId === 'cr-m' && r.type === 'income');
+      const receipts = data.records.filter(r => r.linkedId === 'cr-m' && r.type === RecordType.INCOME);
       expect(receipts).toHaveLength(0);
     });
   });
@@ -153,7 +155,7 @@ describe('Business Logic Integration', () => {
   describe('Batch Exchange Deletion', () => {
     it('deleteExchanges удаляет обмены и их связанные записи', async () => {
       await storage.addExchange(accountId, mkExchange({ id: 'ex-1' }));
-      await storage.addExchange(accountId, mkExchange({ id: 'ex-2', type: 'sell' }));
+      await storage.addExchange(accountId, mkExchange({ id: 'ex-2', type: CurrencyOperationType.SELL }));
       await storage.addRecord(accountId, mkRecord({ id: 'r1', linkedId: 'ex-1', isInternal: true }));
       await storage.addRecord(accountId, mkRecord({ id: 'r2', linkedId: 'ex-2', isInternal: true }));
 
@@ -186,9 +188,9 @@ describe('Business Logic Integration', () => {
       await commands.closeDeposit(deposit, 'deposits', 'Закрыт вручную');
 
       const data = await storage.load(accountId);
-      expect(data.deposits[0]!.status).toBe('closed');
+      expect(data.deposits[0]!.status).toBe(DepositStatus.CLOSED);
 
-      const refunds = data.records.filter(r => r.linkedId === 'dep-1' && r.type === 'income');
+      const refunds = data.records.filter(r => r.linkedId === 'dep-1' && r.type === RecordType.INCOME);
       expect(refunds).toHaveLength(1);
       expect(refunds[0]!.amount).toBe(100_000);
       expect(refunds[0]!.note).toBe('Закрыт вручную');
@@ -203,7 +205,7 @@ describe('Business Logic Integration', () => {
       const data = await storage.load(accountId);
       expect(data.deposits.find(d => d.id === 'dep-2')).toBeUndefined();
 
-      const refunds = data.records.filter(r => r.type === 'income' && r.amount === 50_000);
+      const refunds = data.records.filter(r => r.type === RecordType.INCOME && r.amount === 50_000);
       expect(refunds).toHaveLength(1);
       // Возврат намеренно отвязан — иначе он был бы удалён как осиротевший
       expect(refunds[0]!.linkedId).toBeUndefined();
@@ -212,13 +214,13 @@ describe('Business Logic Integration', () => {
     });
 
     it('deleteDeposit закрытого вклада не создаёт возврат', async () => {
-      await storage.addDeposit(accountId, mkDeposit({ id: 'dep-3', status: 'closed' }));
+      await storage.addDeposit(accountId, mkDeposit({ id: 'dep-3', status: DepositStatus.CLOSED }));
 
       await commands.deleteDeposit('dep-3', 'deposits', 'Возврат');
 
       const data = await storage.load(accountId);
       expect(data.deposits).toHaveLength(0);
-      expect(data.records.filter(r => r.type === 'income')).toHaveLength(0);
+      expect(data.records.filter(r => r.type === RecordType.INCOME)).toHaveLength(0);
     });
 
     it('deleteDeposit несуществующего вклада не бросает исключение', async () => {
@@ -231,7 +233,7 @@ describe('Business Logic Integration', () => {
       await storage.addRecord(accountId, mkRecord({ id: 'r1', category: 'Зарплата' }));
       await storage.addDebt(accountId, {
         id: 'd1', person: 'Друг', amount: 5_000, originalAmount: 5_000, interestRate: 0,
-        direction: 'borrowed', date: '2026-01-01', time: '', dueDate: '',
+        direction: DebtDirection.BORROWED, date: '2026-01-01', time: '', dueDate: '',
         createdAt: 0, note: '', movements: [],
       } as DebtRecord);
       await storage.addCredit(accountId, mkCredit({ id: 'c1' }));
@@ -306,9 +308,9 @@ describe('Business Logic Integration', () => {
     it('calculateTotalInterestPaid суммирует interestPart из paid платежей', () => {
       const credit = mkCredit({
         payments: [
-          { id: 'p1', dueDate: '2026-02-01', amount: 50_000, status: 'paid', interestPart: 8_333 },
-          { id: 'p2', dueDate: '2026-03-01', amount: 50_000, status: 'paid', interestPart: 7_500 },
-          { id: 'p3', dueDate: '2026-04-01', amount: 50_000, status: 'pending', interestPart: 6_700 },
+          { id: 'p1', dueDate: '2026-02-01', amount: 50_000, status: PaymentStatus.PAID, interestPart: 8_333 },
+          { id: 'p2', dueDate: '2026-03-01', amount: 50_000, status: PaymentStatus.PAID, interestPart: 7_500 },
+          { id: 'p3', dueDate: '2026-04-01', amount: 50_000, status: PaymentStatus.PENDING, interestPart: 6_700 },
         ],
       });
 
@@ -317,9 +319,9 @@ describe('Business Logic Integration', () => {
 
     it('getCurrencyBalance считает баланс по операциям', () => {
       const ops = [
-        mkExchange({ type: 'buy', targetCurrency: '$', targetAmount: 100 }),
-        mkExchange({ type: 'sell', targetCurrency: '$', targetAmount: 50 }),
-        mkExchange({ type: 'add', targetCurrency: '$', targetAmount: 25, amountInAccountCurrency: 0 }),
+        mkExchange({ type: CurrencyOperationType.BUY, targetCurrency: '$', targetAmount: 100 }),
+        mkExchange({ type: CurrencyOperationType.SELL, targetCurrency: '$', targetAmount: 50 }),
+        mkExchange({ type: CurrencyOperationType.ADD, targetCurrency: '$', targetAmount: 25, amountInAccountCurrency: 0 }),
       ];
 
       expect(getCurrencyBalance(ops, '$')).toBe(75);
@@ -354,7 +356,7 @@ describe('Business Logic Integration', () => {
       const credit = mkCredit({ id: 'cr-1', bankName: 'Банк' });
       const rec = createCreditPaymentRecord(credit, '2026-02-01', 10_000, 'Платёж', 'loan_payment');
 
-      expect(rec.type).toBe('expense');
+      expect(rec.type).toBe(RecordType.EXPENSE);
       expect(rec.amount).toBe(10_000);
       expect(rec.linkedId).toBe('cr-1');
       expect(rec.isInternal).toBe(true);
@@ -365,7 +367,7 @@ describe('Business Logic Integration', () => {
       const credit = mkCredit({ id: 'cr-2', startDate: '2026-01-15', originalAmount: 200_000 });
       const rec = createCreditReceiptRecord(credit, 'Получено', 'loan_receipt');
 
-      expect(rec.type).toBe('income');
+      expect(rec.type).toBe(RecordType.INCOME);
       expect(rec.amount).toBe(200_000);
       expect(rec.date).toBe('2026-01-15');
       expect(rec.linkedId).toBe('cr-2');
@@ -375,16 +377,16 @@ describe('Business Logic Integration', () => {
       const deposit = mkDeposit({ id: 'dep-1', amount: 50_000, startDate: '2026-06-01' });
       const rec = createDepositRefundRecord(deposit, 'Возврат', 'deposit_refund');
 
-      expect(rec.type).toBe('income');
+      expect(rec.type).toBe(RecordType.INCOME);
       expect(rec.amount).toBe(50_000);
       expect(rec.date).toBe('2026-06-01');
       expect(rec.linkedId).toBe('dep-1');
     });
 
     it('findDuplicateLinkedRecords выявляет дубликаты по ключу', () => {
-      const r1 = mkRecord({ id: 'r1', linkedId: 'e1', date: '2026-08-01', type: 'expense', amount: 1000 });
-      const r2 = mkRecord({ id: 'r2', linkedId: 'e1', date: '2026-08-01', type: 'expense', amount: 1000 });
-      const r3 = mkRecord({ id: 'r3', linkedId: 'e2', date: '2026-08-02', type: 'income', amount: 500 });
+      const r1 = mkRecord({ id: 'r1', linkedId: 'e1', date: '2026-08-01', type: RecordType.EXPENSE, amount: 1000 });
+      const r2 = mkRecord({ id: 'r2', linkedId: 'e1', date: '2026-08-01', type: RecordType.EXPENSE, amount: 1000 });
+      const r3 = mkRecord({ id: 'r3', linkedId: 'e2', date: '2026-08-02', type: RecordType.INCOME, amount: 500 });
 
       const dupes = findDuplicateLinkedRecords([r1, r2, r3]);
       expect(dupes.size).toBe(1);
@@ -392,7 +394,7 @@ describe('Business Logic Integration', () => {
     });
 
     it('linkedRecordKey создаёт уникальный ключ из record', () => {
-      const rec = mkRecord({ linkedId: 'ent', date: '2026-08-01', type: 'expense', amount: 1000 });
+      const rec = mkRecord({ linkedId: 'ent', date: '2026-08-01', type: RecordType.EXPENSE, amount: 1000 });
       expect(linkedRecordKey(rec)).toBe('ent|2026-08-01|expense|1000|');
     });
 
@@ -422,13 +424,13 @@ describe('Business Logic Integration', () => {
     });
 
     it('parseExchange отбрасывает только записи без id', () => {
-      expect(parseExchange({ date: '2026-08-01', type: 'buy', targetAmount: 100 })).toBeNull();
+      expect(parseExchange({ date: '2026-08-01', type: CurrencyOperationType.BUY, targetAmount: 100 })).toBeNull();
     });
 
     it('parseExchange подставляет дефолты для остальных полей, включая targetCurrency', () => {
       // Валидация на границе проверяет только id; пустая валюта — не причина
       // терять запись, иначе битое поле унесло бы всю историю обменов.
-      const ex = parseExchange({ id: 'ex-1', date: '2026-08-01', type: 'buy', targetAmount: 100 });
+      const ex = parseExchange({ id: 'ex-1', date: '2026-08-01', type: CurrencyOperationType.BUY, targetAmount: 100 });
       expect(ex).not.toBeNull();
       expect(ex!.targetCurrency).toBe('');
       expect(ex!.amountInAccountCurrency).toBe(0);
@@ -437,7 +439,7 @@ describe('Business Logic Integration', () => {
 
     it('parseExchange откатывает неизвестный type на buy', () => {
       const ex = parseExchange({ id: 'ex-2', type: 'nonsense' });
-      expect(ex!.type).toBe('buy');
+      expect(ex!.type).toBe(CurrencyOperationType.BUY);
     });
 
     it('parseCredit возвращает null если id отсутствует', () => {

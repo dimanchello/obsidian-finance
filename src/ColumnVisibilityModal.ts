@@ -1,5 +1,6 @@
-import { App, Modal } from 'obsidian';
+import { App } from 'obsidian';
 import { getLocaleFromApp, t, Translations } from './i18n';
+import { FinanceBaseModal } from './ui/FinanceBaseModal';
 
 export interface ColumnVisibilityModalOptions {
   columns: { key: string; label: string }[];
@@ -8,8 +9,8 @@ export interface ColumnVisibilityModalOptions {
   accentColor?: string | undefined;
 }
 
-export class ColumnVisibilityModal extends Modal {
-  private tr: Translations;
+export class ColumnVisibilityModal extends FinanceBaseModal {
+  protected tr: Translations;
   private opts: ColumnVisibilityModalOptions;
   private checkboxes = new Map<string, HTMLInputElement>();
 
@@ -21,12 +22,11 @@ export class ColumnVisibilityModal extends Modal {
   }
 
   override onOpen(): void {
+    this.openHeader(this.tr.columnSettings);
     const { contentEl } = this;
-    contentEl.addClass('finance-modal');
     if (this.opts.accentColor) {
       contentEl.style.setProperty('--ft-accent', this.opts.accentColor);
     }
-    contentEl.createEl('h2', { text: this.tr.columnSettings, cls: 'finance-modal-title' });
 
     const list = contentEl.createDiv('finance-colvis-list');
 
@@ -53,9 +53,5 @@ export class ColumnVisibilityModal extends Modal {
         this.opts.onSave(result);
         this.close();
       });
-  }
-
-  override onClose(): void {
-    this.contentEl.empty();
   }
 }

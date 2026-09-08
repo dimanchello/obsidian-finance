@@ -82,7 +82,7 @@ class RecordMirror {
   }
 }
 
-function settleDue<T extends { dueDate: string; status: 'pending' | 'paid'; paidDate?: string | undefined }>(
+function settleDue<T extends { dueDate: string; status: PaymentStatus; paidDate?: string | undefined }>(
   items: T[], today: string,
 ): { items: T[]; settled: T[] } {
   const settled: T[] = [];

@@ -13,10 +13,11 @@ import {
   createDebtMovementRecord,
   createCreditReceiptRecord,
   createCreditPaymentRecord,
+  createCreditDownPaymentRecord,
   createDepositRefundRecord,
   findLinkedRecord,
 } from './linkedRecords';
-import { RecordType, DebtDirection, DebtMovementType, PaymentStatus, DepositStatus } from '../constants';
+import { RecordType, DebtDirection, DebtMovementType, CreditType, PaymentStatus, DepositStatus } from '../constants';
 
 /**
  * AccountCommands provides transactional operations for account entities.
@@ -155,14 +156,17 @@ export class AccountCommands {
   async addCredit(
     credit: CreditRecord,
     category: string,
-    translations: { receiptNote: string; paymentNote: string }
+    translations: { receiptNote: string; paymentNote: string; downPaymentNote?: string }
   ): Promise<void> {
+    // Built first: it may mint `credit.downPaymentRecordId`, which must be stored too.
+    const downPaymentRec = this.buildDownPaymentRecord(credit, category, translations.downPaymentNote);
+
     await this.storage.addCredit(this.accountId, credit);
 
     const records: FinanceRecord[] = [];
 
     // Receipt record (не создаём для ипотеки и эскроу)
-    if (!credit.isEscrow && credit.type !== 'mortgage') {
+    if (!credit.isEscrow && credit.type !== CreditType.MORTGAGE) {
       records.push(createCreditReceiptRecord(
         credit,
         translations.receiptNote.replace('{name}', credit.name),
@@ -184,8 +188,38 @@ export class AccountCommands {
       }
     }
 
+    if (downPaymentRec) records.push(downPaymentRec);
+
     const data = await this.storage.load(this.accountId);
     await this.storage.saveAllRecords(this.accountId, [...data.records, ...records]);
+  }
+
+  /**
+   * Builds the down-payment mirror record for a credit, or null when the credit has no
+   * down payment. Mutates `credit.downPaymentRecordId` when a new id has to be minted,
+   * so callers must persist the credit after calling this.
+   */
+  private buildDownPaymentRecord(
+    credit: CreditRecord,
+    category: string,
+    note: string | undefined
+  ): FinanceRecord | null {
+    const amount = credit.downPayment ?? 0;
+    const date = credit.downPaymentDate;
+    if (amount <= 0 || !date) {
+      delete credit.downPaymentRecordId;
+      return null;
+    }
+
+    credit.downPaymentRecordId ??= crypto.randomUUID();
+    return createCreditDownPaymentRecord(
+      credit,
+      credit.downPaymentRecordId,
+      date,
+      amount,
+      (note ?? '') + credit.name,
+      category
+    );
   }
 
   /**
@@ -194,22 +228,27 @@ export class AccountCommands {
   async updateCredit(
     updated: CreditRecord,
     category: string,
-    translations: { receiptNote: string; paymentNote: string }
+    translations: { receiptNote: string; paymentNote: string; downPaymentNote?: string }
   ): Promise<void> {
+    // Built first: it may mint `updated.downPaymentRecordId` or clear a stale one.
+    const downPaymentRec = this.buildDownPaymentRecord(updated, category, translations.downPaymentNote);
+
     await this.storage.updateCredit(this.accountId, updated);
 
     const data = await this.storage.load(this.accountId);
 
-    // Удаляем все автогенерированные записи (isInternal === true или undefined)
-    // Сохраняем записи с isInternal === false (вручную добавленные) и downPaymentRecord
-    let updatedRecords = data.records.filter(r =>
+    // Удаляем все автогенерированные записи (isInternal === true или undefined).
+    // Сохраняем записи с isInternal === false (вручную добавленные); запись
+    // первоначального взноса пересоздаётся ниже с тем же id.
+    const updatedRecords = data.records.filter(r =>
       r.linkedId !== updated.id ||
-      r.id === updated.downPaymentRecordId ||
       r.isInternal === false
     );
 
+    if (downPaymentRec) updatedRecords.push(downPaymentRec);
+
     // Receipt record
-    if (!updated.isEscrow && updated.type !== 'mortgage') {
+    if (!updated.isEscrow && updated.type !== CreditType.MORTGAGE) {
       updatedRecords.push(createCreditReceiptRecord(
         updated,
         translations.receiptNote.replace('{name}', updated.name),

@@ -5,6 +5,7 @@ import { fmt } from './utils';
 import { defaultViewState, parseViewState } from './domain/viewState';
 import { getLocaleFromApp, t, type Translations, type Locale } from './i18n';
 import { RecordType } from './constants';
+import { renderStatCard, type StatCardItem } from './ui/statCards';
 
 export class ViewContext {
   app: App;
@@ -90,7 +91,7 @@ export class ViewContext {
     const bal = totalInc - totalExp;
 
     const el = container.createDiv('finance-stats-container');
-    const items = [
+    const items: StatCardItem[] = [
       { label: this.tr.incomeStat, value: this.fmt(inc), mod: 'income', icon: '↑' },
       { label: this.tr.expenseStat, value: this.fmt(exp), mod: 'expense', icon: '↓' },
       {
@@ -98,12 +99,6 @@ export class ViewContext {
         mod: bal >= 0 ? 'positive' : 'negative', icon: '＝',
       },
     ];
-    items.forEach(item => {
-      const card = el.createDiv(`finance-stat-card finance-stat-${item.mod}`);
-      card.createEl('div', { text: item.icon, cls: 'finance-stat-icon' });
-      const info = card.createDiv('finance-stat-info');
-      info.createEl('div', { text: item.label, cls: 'finance-stat-label' });
-      info.createEl('div', { text: item.value, cls: 'finance-stat-value' });
-    });
+    items.forEach(item => renderStatCard(el, item));
   }
 }

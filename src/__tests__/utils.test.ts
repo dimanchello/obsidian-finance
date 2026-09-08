@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getTodayStr, fmtAmount, parseAmount, parseDate, normalizeDateStr, normalizeTimeStr, createDateObject, fmtDate, shiftMonths } from '../utils';
+import { getTodayStr, fmtAmount, parseAmount, parseDate, normalizeDateStr, normalizeTimeStr, createDateObject, fmtDate, shiftMonths, fmt, fmtInteger } from '../utils';
 import { DAYS_IN_YEAR, ACCRUAL_STEP_MONTHLY } from '../types';
 
 
@@ -192,5 +192,26 @@ describe('Date/Time Unified Helpers', () => {
     it('клампит конец месяца корректно', () => {
       expect(shiftMonths('2026-05-31', -1)).toBe('2026-04-30');
     });
+  });
+});
+
+describe('fmt / fmtInteger', () => {
+  const NBSP = '\u00a0';
+
+  it('fmt всегда показывает два знака после запятой', () => {
+    expect(fmt(1234.5, '₽')).toBe(`1${NBSP}234,50${NBSP}₽`);
+    expect(fmt(1000, '₽')).toBe(`1${NBSP}000,00${NBSP}₽`);
+    expect(fmt(0, '$')).toBe(`0,00${NBSP}$`);
+  });
+
+  it('fmtInteger округляет до целых и не оставляет копеек', () => {
+    expect(fmtInteger(1234.5, '₽')).toBe(`1${NBSP}235${NBSP}₽`);
+    expect(fmtInteger(1234.4, '₽')).toBe(`1${NBSP}234${NBSP}₽`);
+    expect(fmtInteger(1000, '₽')).toBe(`1${NBSP}000${NBSP}₽`);
+    expect(fmtInteger(0, '$')).toBe(`0${NBSP}$`);
+  });
+
+  it('fmtInteger сохраняет знак отрицательных сумм', () => {
+    expect(fmtInteger(-5000, '₽')).toBe(`-5${NBSP}000${NBSP}₽`);
   });
 });

@@ -188,7 +188,7 @@ export class DebtsTab {
         options: [
           { value: 'all', label: this.tr.all },
           { value: 'unpaid', label: this.tr.unpaid },
-          { value: 'paid', label: this.tr.paid },
+          { value: PaymentStatus.PAID, label: this.tr.paid },
         ],
         get: () => f.status, set: v => { f.status = v as typeof f.status; },
       },
@@ -196,8 +196,8 @@ export class DebtsTab {
         kind: 'select', label: this.tr.direction,
         options: [
           { value: 'all', label: this.tr.all },
-          { value: 'lent', label: this.tr.lent },
-          { value: 'borrowed', label: this.tr.borrowed },
+          { value: DebtDirection.LENT, label: this.tr.lent },
+          { value: DebtDirection.BORROWED, label: this.tr.borrowed },
         ],
         get: () => f.direction, set: v => { f.direction = v as typeof f.direction; },
       },

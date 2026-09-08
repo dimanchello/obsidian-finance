@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { getCurrencyBalance, getCurrencyBalances, getCurrencyHistory } from '../domain/currencyBalance';
-import { CurrencyExchange } from '../types';
+import { CurrencyExchange, CurrencyOperationType } from '../types';
 
 function createMockExchange(overrides: Partial<CurrencyExchange> = {}): CurrencyExchange {
   return {
@@ -8,7 +8,7 @@ function createMockExchange(overrides: Partial<CurrencyExchange> = {}): Currency
     createdAt: 1000,
     date: '2026-01-01',
     time: '12:00',
-    type: 'buy',
+    type: CurrencyOperationType.BUY,
     amountInAccountCurrency: 10000,
     targetCurrency: 'USD',
     targetAmount: 100,
@@ -26,9 +26,9 @@ describe('getCurrencyBalance', () => {
 
   it('calculates balance for buy and add operations', () => {
     const exchanges: CurrencyExchange[] = [
-      createMockExchange({ id: '1', type: 'buy', targetCurrency: 'USD', targetAmount: 150 }),
-      createMockExchange({ id: '2', type: 'add', targetCurrency: 'USD', targetAmount: 50 }),
-      createMockExchange({ id: '3', type: 'buy', targetCurrency: 'EUR', targetAmount: 200 }),
+      createMockExchange({ id: '1', type: CurrencyOperationType.BUY, targetCurrency: 'USD', targetAmount: 150 }),
+      createMockExchange({ id: '2', type: CurrencyOperationType.ADD, targetCurrency: 'USD', targetAmount: 50 }),
+      createMockExchange({ id: '3', type: CurrencyOperationType.BUY, targetCurrency: 'EUR', targetAmount: 200 }),
     ];
     expect(getCurrencyBalance(exchanges, 'USD')).toBe(200);
     expect(getCurrencyBalance(exchanges, 'EUR')).toBe(200);
@@ -36,17 +36,17 @@ describe('getCurrencyBalance', () => {
 
   it('subtracts sell and spend operations correctly', () => {
     const exchanges: CurrencyExchange[] = [
-      createMockExchange({ id: '1', type: 'buy', targetCurrency: 'USD', targetAmount: 500 }),
-      createMockExchange({ id: '2', type: 'sell', targetCurrency: 'USD', targetAmount: 200 }),
-      createMockExchange({ id: '3', type: 'spend', targetCurrency: 'USD', targetAmount: 50 }),
+      createMockExchange({ id: '1', type: CurrencyOperationType.BUY, targetCurrency: 'USD', targetAmount: 500 }),
+      createMockExchange({ id: '2', type: CurrencyOperationType.SELL, targetCurrency: 'USD', targetAmount: 200 }),
+      createMockExchange({ id: '3', type: CurrencyOperationType.SPEND, targetCurrency: 'USD', targetAmount: 50 }),
     ];
     expect(getCurrencyBalance(exchanges, 'USD')).toBe(250);
   });
 
   it('handles fractional amounts without precision loss', () => {
     const exchanges: CurrencyExchange[] = [
-      createMockExchange({ id: '1', type: 'buy', targetCurrency: 'BTC', targetAmount: 0.123456 }),
-      createMockExchange({ id: '2', type: 'spend', targetCurrency: 'BTC', targetAmount: 0.023456 }),
+      createMockExchange({ id: '1', type: CurrencyOperationType.BUY, targetCurrency: 'BTC', targetAmount: 0.123456 }),
+      createMockExchange({ id: '2', type: CurrencyOperationType.SPEND, targetCurrency: 'BTC', targetAmount: 0.023456 }),
     ];
     expect(getCurrencyBalance(exchanges, 'BTC')).toBe(0.1);
   });
@@ -56,18 +56,18 @@ describe('getCurrencyBalances', () => {
   it('calculates comprehensive metrics per currency', () => {
     const exchanges: CurrencyExchange[] = [
       // Buy 100 USD for 9,000 RUB (rate = 90)
-      createMockExchange({ id: '1', type: 'buy', targetCurrency: 'USD', targetAmount: 100, amountInAccountCurrency: 9000, exchangeRate: 90 }),
+      createMockExchange({ id: '1', type: CurrencyOperationType.BUY, targetCurrency: 'USD', targetAmount: 100, amountInAccountCurrency: 9000, exchangeRate: 90 }),
       // Buy 100 USD for 10,000 RUB (rate = 100)
-      createMockExchange({ id: '2', type: 'buy', targetCurrency: 'USD', targetAmount: 100, amountInAccountCurrency: 10000, exchangeRate: 100 }),
+      createMockExchange({ id: '2', type: CurrencyOperationType.BUY, targetCurrency: 'USD', targetAmount: 100, amountInAccountCurrency: 10000, exchangeRate: 100 }),
       // Add 50 USD directly
-      createMockExchange({ id: '3', type: 'add', targetCurrency: 'USD', targetAmount: 50 }),
+      createMockExchange({ id: '3', type: CurrencyOperationType.ADD, targetCurrency: 'USD', targetAmount: 50 }),
       // Sell 50 USD
-      createMockExchange({ id: '4', type: 'sell', targetCurrency: 'USD', targetAmount: 50 }),
+      createMockExchange({ id: '4', type: CurrencyOperationType.SELL, targetCurrency: 'USD', targetAmount: 50 }),
       // Spend 20 USD
-      createMockExchange({ id: '5', type: 'spend', targetCurrency: 'USD', targetAmount: 20 }),
+      createMockExchange({ id: '5', type: CurrencyOperationType.SPEND, targetCurrency: 'USD', targetAmount: 20 }),
 
       // Buy 200 EUR for 22,000 RUB (rate = 110)
-      createMockExchange({ id: '6', type: 'buy', targetCurrency: 'EUR', targetAmount: 200, amountInAccountCurrency: 22000, exchangeRate: 110 }),
+      createMockExchange({ id: '6', type: CurrencyOperationType.BUY, targetCurrency: 'EUR', targetAmount: 200, amountInAccountCurrency: 22000, exchangeRate: 110 }),
     ];
 
     const balances = getCurrencyBalances(exchanges);
@@ -97,7 +97,7 @@ describe('getCurrencyBalances', () => {
 
   it('handles currency with only add operations (0 average buy rate)', () => {
     const exchanges: CurrencyExchange[] = [
-      createMockExchange({ id: '1', type: 'add', targetCurrency: 'USDT', targetAmount: 500 }),
+      createMockExchange({ id: '1', type: CurrencyOperationType.ADD, targetCurrency: 'USDT', targetAmount: 500 }),
     ];
 
     const balances = getCurrencyBalances(exchanges);
@@ -112,11 +112,11 @@ describe('getCurrencyBalances', () => {
 describe('getCurrencyHistory', () => {
   it('computes chronological running balance for target currency', () => {
     const exchanges: CurrencyExchange[] = [
-      createMockExchange({ id: '1', type: 'buy', targetCurrency: 'USD', targetAmount: 100, date: '2026-01-01' }),
-      createMockExchange({ id: '2', type: 'buy', targetCurrency: 'EUR', targetAmount: 500, date: '2026-01-02' }),
-      createMockExchange({ id: '3', type: 'add', targetCurrency: 'USD', targetAmount: 50, date: '2026-01-03' }),
-      createMockExchange({ id: '4', type: 'sell', targetCurrency: 'USD', targetAmount: 30, date: '2026-01-04' }),
-      createMockExchange({ id: '5', type: 'spend', targetCurrency: 'USD', targetAmount: 20, date: '2026-01-05' }),
+      createMockExchange({ id: '1', type: CurrencyOperationType.BUY, targetCurrency: 'USD', targetAmount: 100, date: '2026-01-01' }),
+      createMockExchange({ id: '2', type: CurrencyOperationType.BUY, targetCurrency: 'EUR', targetAmount: 500, date: '2026-01-02' }),
+      createMockExchange({ id: '3', type: CurrencyOperationType.ADD, targetCurrency: 'USD', targetAmount: 50, date: '2026-01-03' }),
+      createMockExchange({ id: '4', type: CurrencyOperationType.SELL, targetCurrency: 'USD', targetAmount: 30, date: '2026-01-04' }),
+      createMockExchange({ id: '5', type: CurrencyOperationType.SPEND, targetCurrency: 'USD', targetAmount: 20, date: '2026-01-05' }),
     ];
 
     const usdHistory = getCurrencyHistory(exchanges, 'USD');

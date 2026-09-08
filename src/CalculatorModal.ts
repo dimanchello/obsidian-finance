@@ -1,8 +1,9 @@
-import { App, Modal } from 'obsidian';
+import { App } from 'obsidian';
 import { getLocaleFromApp, t, Translations } from './i18n';
+import { FinanceBaseModal } from './ui/FinanceBaseModal';
 
-export class CalculatorModal extends Modal {
-  private tr: Translations;
+export class CalculatorModal extends FinanceBaseModal {
+  protected tr: Translations;
   private displayEl!: HTMLElement;
   private display = '0';
   private previousValue: number | null = null;
@@ -195,6 +196,6 @@ export class CalculatorModal extends Modal {
 
   override onClose(): void {
     document.removeEventListener('keydown', this.keydownHandler);
-    this.contentEl.empty();
+    super.onClose();
   }
 }

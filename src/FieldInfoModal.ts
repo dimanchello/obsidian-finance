@@ -1,5 +1,6 @@
-import { App, Modal } from 'obsidian';
+import { App } from 'obsidian';
 import { getLocaleFromApp, t, Translations } from './i18n';
+import { FinanceBaseModal } from './ui/FinanceBaseModal';
 
 export interface FieldDef {
   labelKey: keyof Translations;
@@ -53,8 +54,8 @@ export const CURRENCY_FIELDS: FieldDef[] = [
 ];
 
 /** Field reference sheet — one modal for deposits, debts and credits. */
-export class FieldInfoModal extends Modal {
-  private tr: Translations;
+export class FieldInfoModal extends FinanceBaseModal {
+  protected tr: Translations;
   private fields: FieldDef[];
 
   constructor(app: App, fields: FieldDef[]) {
@@ -64,9 +65,8 @@ export class FieldInfoModal extends Modal {
   }
 
   override onOpen(): void {
+    this.openBody();
     const { contentEl } = this;
-    contentEl.empty();
-    contentEl.addClass('finance-modal');
 
     const container = contentEl.createDiv('finance-form finance-info-container');
     container.createEl('h3', { text: this.tr.fieldDescriptions, cls: 'finance-modal-title' });
@@ -82,6 +82,4 @@ export class FieldInfoModal extends Modal {
     btnRow.createEl('button', { text: this.tr.close, cls: 'finance-btn-save' })
       .addEventListener('click', () => this.close());
   }
-
-  override onClose(): void { this.contentEl.empty(); }
 }

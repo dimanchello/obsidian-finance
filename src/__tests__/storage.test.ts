@@ -1,6 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { FinanceStorage } from '../storage';
 import { AccountFiles } from '../storage/AccountFiles';
+import {
+  RecordType, DebtDirection, DebtMovementType, CreditType, CreditStatus,
+  EarlyRepaymentOption, DepositType, DepositStatus, DepositAccrualType, CurrencyOperationType,
+} from '../types';
 
 interface MockAdapter {
   exists: ReturnType<typeof vi.fn>;
@@ -49,7 +53,7 @@ describe('FinanceStorage', () => {
         createdAt: 1700000000000,
         date: '2024-11-15',
         time: '10:00',
-        type: 'expense' as const,
+        type: RecordType.EXPENSE,
         amount: 500,
         category: 'Продукты',
         tag: 'еда',
@@ -72,7 +76,7 @@ describe('FinanceStorage', () => {
         createdAt: 1700000000000,
         date: '2024-11-15',
         time: '',
-        type: 'expense' as const,
+        type: RecordType.EXPENSE,
         amount: 500,
         category: 'Old',
         tag: '',
@@ -95,7 +99,7 @@ describe('FinanceStorage', () => {
         createdAt: 1,
         date: '2024-01-01',
         time: '',
-        type: 'expense',
+        type: RecordType.EXPENSE,
         amount: 100,
         category: 'Test',
         tag: '',
@@ -112,8 +116,8 @@ describe('FinanceStorage', () => {
 
     it('should delete records in batch', async () => {
       const notePath = 'test/note.md';
-      const r1 = { id: 'rec-1', createdAt: 1, date: '2024-01-01', time: '', type: 'expense' as const, amount: 100, category: 'Test', tag: '', payer: '', note: '', attachmentPath: '' };
-      const r2 = { id: 'rec-2', createdAt: 2, date: '2024-01-02', time: '', type: 'expense' as const, amount: 200, category: 'Test', tag: '', payer: '', note: '', attachmentPath: '' };
+      const r1 = { id: 'rec-1', createdAt: 1, date: '2024-01-01', time: '', type: RecordType.EXPENSE, amount: 100, category: 'Test', tag: '', payer: '', note: '', attachmentPath: '' };
+      const r2 = { id: 'rec-2', createdAt: 2, date: '2024-01-02', time: '', type: RecordType.EXPENSE, amount: 200, category: 'Test', tag: '', payer: '', note: '', attachmentPath: '' };
       await storage.addRecord(notePath, r1);
       await storage.addRecord(notePath, r2);
 
@@ -132,7 +136,7 @@ describe('FinanceStorage', () => {
         amount: 5000,
         originalAmount: 5000,
         interestRate: 0,
-        direction: 'lent' as const,
+        direction: DebtDirection.LENT,
         date: '2024-11-01',
         time: '',
         dueDate: '',
@@ -143,7 +147,7 @@ describe('FinanceStorage', () => {
 
       await storage.addDebtMovement(notePath, 'debt-1', {
         id: 'm1',
-        type: 'borrow',
+        type: DebtMovementType.BORROW,
         amount: 5000,
         date: '2024-11-01',
         time: '',
@@ -153,7 +157,7 @@ describe('FinanceStorage', () => {
 
       await storage.addDebtMovement(notePath, 'debt-1', {
         id: 'm2',
-        type: 'repay',
+        type: DebtMovementType.REPAY,
         amount: 2000,
         date: '2024-11-15',
         time: '',
@@ -168,8 +172,8 @@ describe('FinanceStorage', () => {
     it('should bulk import records', async () => {
       const notePath = 'test/note.md';
       const records = [
-        { id: '1', createdAt: 1, date: '2024-01-01', time: '', type: 'income' as const, amount: 1000, category: 'Зарплата', tag: '', payer: '', note: '', attachmentPath: '' },
-        { id: '2', createdAt: 2, date: '2024-01-02', time: '', type: 'expense' as const, amount: 500, category: 'Продукты', tag: '', payer: '', note: '', attachmentPath: '' },
+        { id: '1', createdAt: 1, date: '2024-01-01', time: '', type: RecordType.INCOME, amount: 1000, category: 'Зарплата', tag: '', payer: '', note: '', attachmentPath: '' },
+        { id: '2', createdAt: 2, date: '2024-01-02', time: '', type: RecordType.EXPENSE, amount: 500, category: 'Продукты', tag: '', payer: '', note: '', attachmentPath: '' },
       ];
 
       await storage.importRecords(notePath, records);
@@ -184,7 +188,7 @@ describe('FinanceStorage', () => {
     it('не читает старый плоский файл — миграций больше нет', async () => {
       const legacyData = {
         version: 1, name: 'Test', currency: '₽',
-        records: [{ id: '1', createdAt: 1, date: '2024-01-01', type: 'expense', amount: 100, category: 'Старое', tag: '', payer: '', note: '', attachmentPath: '', time: '' }],
+        records: [{ id: '1', createdAt: 1, date: '2024-01-01', type: RecordType.EXPENSE, amount: 100, category: 'Старое', tag: '', payer: '', note: '', attachmentPath: '', time: '' }],
         categories: ['Старое'], tags: [], payers: [], debts: [], credits: [], deposits: [],
       };
       mockAdapter.exists.mockImplementation(async (path: string) => path.endsWith('test_path.md.json'));
@@ -212,8 +216,8 @@ describe('FinanceStorage', () => {
       mockAdapter.read.mockResolvedValue(JSON.stringify({
         version: 1,
         records: [
-          { id: '', date: '2024-01-01', type: 'expense', amount: 1 },
-          { id: 'ok', createdAt: 1, date: '2024-01-01', time: '', type: 'expense', amount: 100, category: 'Т', tag: '', payer: '', note: '', attachmentPath: '' },
+          { id: '', date: '2024-01-01', type: RecordType.EXPENSE, amount: 1 },
+          { id: 'ok', createdAt: 1, date: '2024-01-01', time: '', type: RecordType.EXPENSE, amount: 100, category: 'Т', tag: '', payer: '', note: '', attachmentPath: '' },
         ],
         categories: ['Т'], tags: [], payers: [],
       }));
@@ -306,7 +310,7 @@ describe('FinanceStorage', () => {
         amount: 1000,
         originalAmount: 1000,
         interestRate: 0,
-        direction: 'lent' as const,
+        direction: DebtDirection.LENT,
         date: '2024-01-01',
         time: '',
         dueDate: '',
@@ -315,7 +319,7 @@ describe('FinanceStorage', () => {
         movements: [
           {
             id: 'mov-init',
-            type: 'borrow' as const,
+            type: DebtMovementType.BORROW,
             amount: 1000,
             date: '2024-01-01',
             time: '',
@@ -332,7 +336,7 @@ describe('FinanceStorage', () => {
 
       const movement = {
         id: 'mov-1',
-        type: 'repay' as const,
+        type: DebtMovementType.REPAY,
         amount: 400,
         date: '2024-01-02',
         time: '',
@@ -376,12 +380,12 @@ describe('FinanceStorage', () => {
         termMonths: 12,
         monthlyPayment: 1000,
         startDate: '2024-01-01',
-        status: 'active' as const,
+        status: CreditStatus.ACTIVE,
         payments: [],
-        type: 'consumer' as const,
+        type: CreditType.CONSUMER,
         createdAt: Date.now(),
         note: '',
-        earlyRepaymentOption: 'term' as const,
+        earlyRepaymentOption: EarlyRepaymentOption.TERM,
       };
 
       await storage.addCredit('test.md', credit);
@@ -408,12 +412,12 @@ describe('FinanceStorage', () => {
             termMonths: 12,
             monthlyPayment: 1000,
             startDate: '2024-01-01',
-            status: 'active',
+            status: CreditStatus.ACTIVE,
             payments: [],
-            type: 'consumer',
+            type: CreditType.CONSUMER,
             createdAt: 1700000000000,
             note: '',
-            earlyRepaymentOption: 'term',
+            earlyRepaymentOption: EarlyRepaymentOption.TERM,
           }]);
         }
         if (path.endsWith('meta.json')) return JSON.stringify({ version: 1, name: 'Test', currency: '₽' });
@@ -451,14 +455,14 @@ describe('FinanceStorage', () => {
       const deposit = {
         id: 'dep-1',
         name: 'Накопительный',
-        type: 'term' as const,
+        type: DepositType.TERM,
         bankName: 'Тинькофф',
         amount: 5000,
         interestRate: 8,
         startDate: '2024-01-01',
         termMonths: 6,
-        accrualType: 'capitalization' as const,
-        status: 'active' as const,
+        accrualType: DepositAccrualType.CAPITALIZATION,
+        status: DepositStatus.ACTIVE,
         accruals: [],
         topUps: [],
         withdrawals: [],
@@ -514,10 +518,10 @@ describe('FinanceStorage', () => {
   describe('cascade deletion with linked records', () => {
     it('deleteDebtsWithLinkedRecords deletes debts and all linked records without leaving orphans', async () => {
       const notePath = 'test-cascade-debts.md';
-      await storage.addRecord(notePath, { id: 'r1', createdAt: 1, date: '2024-01-01', time: '', type: 'expense', amount: 1000, category: 'Долг', tag: '', payer: 'Иван', note: '', attachmentPath: '', linkedId: 'debt-1' });
-      await storage.addRecord(notePath, { id: 'r2', createdAt: 2, date: '2024-01-02', time: '', type: 'income', amount: 500, category: 'Долг', tag: '', payer: 'Иван', note: '', attachmentPath: '', linkedId: 'debt-1' });
-      await storage.addRecord(notePath, { id: 'r3', createdAt: 3, date: '2024-01-03', time: '', type: 'expense', amount: 200, category: 'Еда', tag: '', payer: '', note: '', attachmentPath: '' });
-      await storage.addDebt(notePath, { id: 'debt-1', person: 'Иван', amount: 500, originalAmount: 1000, interestRate: 0, direction: 'lent', date: '2024-01-01', time: '', dueDate: '', createdAt: 1, note: '', movements: [] });
+      await storage.addRecord(notePath, { id: 'r1', createdAt: 1, date: '2024-01-01', time: '', type: RecordType.EXPENSE, amount: 1000, category: 'Долг', tag: '', payer: 'Иван', note: '', attachmentPath: '', linkedId: 'debt-1' });
+      await storage.addRecord(notePath, { id: 'r2', createdAt: 2, date: '2024-01-02', time: '', type: RecordType.INCOME, amount: 500, category: 'Долг', tag: '', payer: 'Иван', note: '', attachmentPath: '', linkedId: 'debt-1' });
+      await storage.addRecord(notePath, { id: 'r3', createdAt: 3, date: '2024-01-03', time: '', type: RecordType.EXPENSE, amount: 200, category: 'Еда', tag: '', payer: '', note: '', attachmentPath: '' });
+      await storage.addDebt(notePath, { id: 'debt-1', person: 'Иван', amount: 500, originalAmount: 1000, interestRate: 0, direction: DebtDirection.LENT, date: '2024-01-01', time: '', dueDate: '', createdAt: 1, note: '', movements: [] });
 
       await storage.deleteDebtsWithLinkedRecords(notePath, ['debt-1']);
 
@@ -529,12 +533,12 @@ describe('FinanceStorage', () => {
 
     it('deleteCreditsWithLinkedRecords deletes credits, linked payments, and down payment records', async () => {
       const notePath = 'test-cascade-credits.md';
-      await storage.addRecord(notePath, { id: 'dp-rec-1', createdAt: 1, date: '2024-01-01', time: '', type: 'expense', amount: 20000, category: 'Кредит', tag: '', payer: 'Банк', note: 'Первоначальный взнос', attachmentPath: '' });
-      await storage.addRecord(notePath, { id: 'pay-1', createdAt: 2, date: '2024-02-01', time: '', type: 'expense', amount: 5000, category: 'Кредит', tag: '', payer: 'Банк', note: 'Платёж', attachmentPath: '', linkedId: 'cr-1' });
-      await storage.addRecord(notePath, { id: 'regular-rec', createdAt: 3, date: '2024-02-02', time: '', type: 'income', amount: 50000, category: 'Зарплата', tag: '', payer: '', note: '', attachmentPath: '' });
+      await storage.addRecord(notePath, { id: 'dp-rec-1', createdAt: 1, date: '2024-01-01', time: '', type: RecordType.EXPENSE, amount: 20000, category: 'Кредит', tag: '', payer: 'Банк', note: 'Первоначальный взнос', attachmentPath: '' });
+      await storage.addRecord(notePath, { id: 'pay-1', createdAt: 2, date: '2024-02-01', time: '', type: RecordType.EXPENSE, amount: 5000, category: 'Кредит', tag: '', payer: 'Банк', note: 'Платёж', attachmentPath: '', linkedId: 'cr-1' });
+      await storage.addRecord(notePath, { id: 'regular-rec', createdAt: 3, date: '2024-02-02', time: '', type: RecordType.INCOME, amount: 50000, category: 'Зарплата', tag: '', payer: '', note: '', attachmentPath: '' });
 
       await storage.addCredit(notePath, {
-        id: 'cr-1', name: 'Автокредит', bankName: 'Банк', originalAmount: 100000, currentAmount: 100000, interestRate: 10, termMonths: 12, monthlyPayment: 5000, startDate: '2024-01-01', status: 'active', payments: [], type: 'auto', createdAt: 1, note: '', downPaymentRecordId: 'dp-rec-1', earlyRepaymentOption: null
+        id: 'cr-1', name: 'Автокредит', bankName: 'Банк', originalAmount: 100000, currentAmount: 100000, interestRate: 10, termMonths: 12, monthlyPayment: 5000, startDate: '2024-01-01', status: CreditStatus.ACTIVE, payments: [], type: CreditType.AUTO, createdAt: 1, note: '', downPaymentRecordId: 'dp-rec-1', earlyRepaymentOption: null
       });
 
       await storage.deleteCreditsWithLinkedRecords(notePath, ['cr-1']);
@@ -547,12 +551,12 @@ describe('FinanceStorage', () => {
 
     it('deleteDepositsWithLinkedRecords deletes deposits and all linked transactions', async () => {
       const notePath = 'test-cascade-deposits.md';
-      await storage.addRecord(notePath, { id: 'r-open', createdAt: 1, date: '2024-01-01', time: '', type: 'expense', amount: 100000, category: 'Вклад', tag: '', payer: 'Банк', note: '', attachmentPath: '', linkedId: 'dep-1' });
-      await storage.addRecord(notePath, { id: 'r-int', createdAt: 2, date: '2024-02-01', time: '', type: 'income', amount: 1000, category: 'Проценты', tag: '', payer: 'Банк', note: '', attachmentPath: '', linkedId: 'dep-1' });
-      await storage.addRecord(notePath, { id: 'r-unrelated', createdAt: 3, date: '2024-02-02', time: '', type: 'expense', amount: 300, category: 'Кафе', tag: '', payer: '', note: '', attachmentPath: '' });
+      await storage.addRecord(notePath, { id: 'r-open', createdAt: 1, date: '2024-01-01', time: '', type: RecordType.EXPENSE, amount: 100000, category: 'Вклад', tag: '', payer: 'Банк', note: '', attachmentPath: '', linkedId: 'dep-1' });
+      await storage.addRecord(notePath, { id: 'r-int', createdAt: 2, date: '2024-02-01', time: '', type: RecordType.INCOME, amount: 1000, category: 'Проценты', tag: '', payer: 'Банк', note: '', attachmentPath: '', linkedId: 'dep-1' });
+      await storage.addRecord(notePath, { id: 'r-unrelated', createdAt: 3, date: '2024-02-02', time: '', type: RecordType.EXPENSE, amount: 300, category: 'Кафе', tag: '', payer: '', note: '', attachmentPath: '' });
 
       await storage.addDeposit(notePath, {
-        id: 'dep-1', name: 'Вклад', type: 'term', bankName: 'Банк', amount: 100000, interestRate: 12, startDate: '2024-01-01', termMonths: 6, accrualType: 'to_account', status: 'active', accruals: [], topUps: [], withdrawals: [], createdAt: 1, note: ''
+        id: 'dep-1', name: 'Вклад', type: DepositType.TERM, bankName: 'Банк', amount: 100000, interestRate: 12, startDate: '2024-01-01', termMonths: 6, accrualType: DepositAccrualType.TO_ACCOUNT, status: DepositStatus.ACTIVE, accruals: [], topUps: [], withdrawals: [], createdAt: 1, note: ''
       });
 
       await storage.deleteDepositsWithLinkedRecords(notePath, ['dep-1']);
@@ -572,7 +576,7 @@ describe('FinanceStorage', () => {
         createdAt: 1,
         date: '2024-01-01',
         time: '',
-        type: 'buy' as const,
+        type: CurrencyOperationType.BUY,
         amountInAccountCurrency: 9000,
         targetCurrency: 'USD',
         targetAmount: 100,

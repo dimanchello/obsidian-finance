@@ -19,6 +19,10 @@ import {
   findDuplicateLinkedRecords,
 } from '../domain/linkedRecords';
 import type { FinanceRecord, DebtRecord, CreditRecord, DepositRecord, CurrencyExchange, DebtMovement } from '../types';
+import {
+  RecordType, DebtDirection, DebtMovementType, CreditType, CreditStatus,
+  DepositType, DepositStatus, DepositAccrualType, CurrencyOperationType,
+} from '../types';
 
 describe('linkedRecords', () => {
   describe('linkedRecordKey', () => {
@@ -26,7 +30,7 @@ describe('linkedRecords', () => {
       const spec = {
         entityId: 'debt-1',
         date: '2026-01-15',
-        type: 'income' as const,
+        type: RecordType.INCOME,
         amount: 100,
         category: 'Test',
         payer: 'John',
@@ -40,7 +44,7 @@ describe('linkedRecords', () => {
       const spec = {
         entityId: 'debt-1',
         date: '2026-01-15',
-        type: 'income' as const,
+        type: RecordType.INCOME,
         amount: 100,
         category: 'Test',
         payer: 'John',
@@ -57,7 +61,7 @@ describe('linkedRecords', () => {
         createdAt: Date.now(),
         date: '2026-01-15',
         time: '14:00',
-        type: 'income',
+        type: RecordType.INCOME,
         amount: 100,
         category: 'Test',
         tag: '',
@@ -78,7 +82,7 @@ describe('linkedRecords', () => {
         createdAt: Date.now(),
         date: '2026-01-15',
         time: '14:00',
-        type: 'income',
+        type: RecordType.INCOME,
         amount: 100,
         category: 'Test',
         tag: '',
@@ -90,7 +94,7 @@ describe('linkedRecords', () => {
       const spec = {
         entityId: 'debt-1',
         date: '2026-01-15',
-        type: 'income' as const,
+        type: RecordType.INCOME,
         amount: 100,
         category: 'Test',
         payer: 'John',
@@ -105,7 +109,7 @@ describe('linkedRecords', () => {
         createdAt: Date.now(),
         date: '2026-01-15',
         time: '14:00',
-        type: 'income',
+        type: RecordType.INCOME,
         amount: 100,
         category: 'Test',
         tag: '',
@@ -117,7 +121,7 @@ describe('linkedRecords', () => {
       const spec = {
         entityId: 'debt-1',
         date: '2026-01-15',
-        type: 'income' as const,
+        type: RecordType.INCOME,
         amount: 100,
         category: 'Test',
         payer: 'John',
@@ -132,7 +136,7 @@ describe('linkedRecords', () => {
         createdAt: Date.now(),
         date: '2026-01-15',
         time: '14:00',
-        type: 'income',
+        type: RecordType.INCOME,
         amount: 100,
         category: 'Test',
         tag: '',
@@ -145,7 +149,7 @@ describe('linkedRecords', () => {
       const spec = {
         entityId: 'debt-1',
         date: '2026-01-15',
-        type: 'income' as const,
+        type: RecordType.INCOME,
         amount: 100,
         category: 'Test',
         payer: 'John',
@@ -162,7 +166,7 @@ describe('linkedRecords', () => {
         entityId: 'debt-1',
         date: '2026-01-15',
         time: '14:00',
-        type: 'income' as const,
+        type: RecordType.INCOME,
         amount: 100,
         category: 'Debt',
         payer: 'John',
@@ -174,7 +178,7 @@ describe('linkedRecords', () => {
       expect(record.createdAt).toBeGreaterThan(0);
       expect(record.date).toBe('2026-01-15');
       expect(record.time).toBe('14:00');
-      expect(record.type).toBe('income');
+      expect(record.type).toBe(RecordType.INCOME);
       expect(record.amount).toBe(100);
       expect(record.category).toBe('Debt');
       expect(record.payer).toBe('John');
@@ -186,7 +190,7 @@ describe('linkedRecords', () => {
       const spec = {
         entityId: 'credit-1',
         date: '2026-01-15',
-        type: 'expense' as const,
+        type: RecordType.EXPENSE,
         amount: 1000,
         category: 'Credit',
         payer: 'Bank',
@@ -204,7 +208,7 @@ describe('linkedRecords', () => {
       const spec = {
         entityId: 'debt-1',
         date: '2026-01-15',
-        type: 'income' as const,
+        type: RecordType.INCOME,
         amount: 100,
         category: 'Debt',
         payer: 'John',
@@ -222,7 +226,7 @@ describe('linkedRecords', () => {
         createdAt: Date.now(),
         date: '2026-01-15',
         time: '14:00',
-        type: 'income',
+        type: RecordType.INCOME,
         amount: 100,
         category: 'Debt',
         tag: '',
@@ -235,7 +239,7 @@ describe('linkedRecords', () => {
       const spec = {
         entityId: 'debt-1',
         date: '2026-01-15',
-        type: 'income' as const,
+        type: RecordType.INCOME,
         amount: 100,
         category: 'Debt',
         payer: 'John',
@@ -253,7 +257,7 @@ describe('linkedRecords', () => {
         createdAt: Date.now(),
         date: '2026-01-15',
         time: '14:00',
-        type: 'income',
+        type: RecordType.INCOME,
         amount: 100,
         category: 'Debt',
         tag: '',
@@ -266,7 +270,7 @@ describe('linkedRecords', () => {
       const spec = {
         entityId: 'debt-1',
         date: '2026-01-15',
-        type: 'income' as const,
+        type: RecordType.INCOME,
         amount: 200,
         category: 'Debt',
         payer: 'John',
@@ -286,7 +290,7 @@ describe('linkedRecords', () => {
           createdAt: Date.now(),
           date: '2026-01-15',
           time: '',
-          type: 'income',
+          type: RecordType.INCOME,
           amount: 100,
           category: 'Test',
           tag: '',
@@ -300,7 +304,7 @@ describe('linkedRecords', () => {
           createdAt: Date.now(),
           date: '2026-01-16',
           time: '',
-          type: 'expense',
+          type: RecordType.EXPENSE,
           amount: 50,
           category: 'Test',
           tag: '',
@@ -313,7 +317,7 @@ describe('linkedRecords', () => {
           createdAt: Date.now(),
           date: '2026-01-17',
           time: '',
-          type: 'income',
+          type: RecordType.INCOME,
           amount: 200,
           category: 'Test',
           tag: '',
@@ -336,7 +340,7 @@ describe('linkedRecords', () => {
           createdAt: Date.now(),
           date: '2026-01-15',
           time: '',
-          type: 'income',
+          type: RecordType.INCOME,
           amount: 100,
           category: 'Test',
           tag: '',
@@ -359,7 +363,7 @@ describe('linkedRecords', () => {
           createdAt: Date.now(),
           date: '2026-01-15',
           time: '',
-          type: 'income',
+          type: RecordType.INCOME,
           amount: 100,
           category: 'Test',
           tag: '',
@@ -373,7 +377,7 @@ describe('linkedRecords', () => {
           createdAt: Date.now(),
           date: '2026-01-16',
           time: '',
-          type: 'expense',
+          type: RecordType.EXPENSE,
           amount: 50,
           category: 'Test',
           tag: '',
@@ -387,7 +391,7 @@ describe('linkedRecords', () => {
           createdAt: Date.now(),
           date: '2026-01-17',
           time: '',
-          type: 'income',
+          type: RecordType.INCOME,
           amount: 200,
           category: 'Test',
           tag: '',
@@ -411,7 +415,7 @@ describe('linkedRecords', () => {
           createdAt: Date.now(),
           date: '2026-01-15',
           time: '',
-          type: 'income',
+          type: RecordType.INCOME,
           amount: 100,
           category: 'Test',
           tag: '',
@@ -425,7 +429,7 @@ describe('linkedRecords', () => {
           createdAt: Date.now(),
           date: '2026-01-16',
           time: '',
-          type: 'expense',
+          type: RecordType.EXPENSE,
           amount: 50,
           category: 'Test',
           tag: '',
@@ -438,7 +442,7 @@ describe('linkedRecords', () => {
           createdAt: Date.now(),
           date: '2026-01-17',
           time: '',
-          type: 'income',
+          type: RecordType.INCOME,
           amount: 200,
           category: 'Test',
           tag: '',
@@ -464,7 +468,7 @@ describe('linkedRecords', () => {
           createdAt: Date.now(),
           date: '2026-01-15',
           time: '',
-          type: 'income',
+          type: RecordType.INCOME,
           amount: 100,
           category: 'Test',
           tag: '',
@@ -487,7 +491,7 @@ describe('linkedRecords', () => {
           createdAt: Date.now(),
           date: '2026-01-15',
           time: '',
-          type: 'income',
+          type: RecordType.INCOME,
           amount: 100,
           category: 'Test',
           tag: '',
@@ -519,7 +523,7 @@ describe('linkedRecords', () => {
           createdAt: Date.now(),
           date: '2026-01-15',
           time: '',
-          type: 'income',
+          type: RecordType.INCOME,
           amount: 100,
           category: 'Test',
           tag: '',
@@ -544,7 +548,7 @@ describe('linkedRecords', () => {
           createdAt: Date.now(),
           date: '2026-01-15',
           time: '',
-          type: 'income',
+          type: RecordType.INCOME,
           amount: 100,
           category: 'Test',
           tag: '',
@@ -558,7 +562,7 @@ describe('linkedRecords', () => {
           createdAt: Date.now(),
           date: '2026-01-16',
           time: '',
-          type: 'expense',
+          type: RecordType.EXPENSE,
           amount: 50,
           category: 'Test',
           tag: '',
@@ -582,7 +586,7 @@ describe('linkedRecords', () => {
         amount: 1000,
         originalAmount: 1000,
         interestRate: 0,
-        direction: 'borrowed',
+        direction: DebtDirection.BORROWED,
         date: '2026-01-01',
         time: '',
         dueDate: '',
@@ -592,7 +596,7 @@ describe('linkedRecords', () => {
       };
       const movement: DebtMovement = {
         id: 'mov-1',
-        type: 'repay',
+        type: DebtMovementType.REPAY,
         amount: 100,
         date: '2026-01-15',
         time: '14:00',
@@ -600,10 +604,10 @@ describe('linkedRecords', () => {
         note: 'Partial repayment',
       };
 
-      const record = createDebtMovementRecord(debt, movement, 'expense', 'Repayment: John', 'Debt');
+      const record = createDebtMovementRecord(debt, movement, RecordType.EXPENSE, 'Repayment: John', 'Debt');
       expect(record.linkedId).toBe('debt-1');
       expect(record.linkedMovementId).toBe('mov-1');
-      expect(record.type).toBe('expense');
+      expect(record.type).toBe(RecordType.EXPENSE);
       expect(record.amount).toBe(100);
       expect(record.payer).toBe('John');
     });
@@ -615,12 +619,12 @@ describe('linkedRecords', () => {
         bankName: 'Bank',
         originalAmount: 500000,
         currentAmount: 500000,
-        type: 'consumer',
+        type: CreditType.CONSUMER,
         interestRate: 12,
         monthlyPayment: 15000,
         startDate: '2026-01-01',
         termMonths: 36,
-        status: 'active',
+        status: CreditStatus.ACTIVE,
         earlyRepaymentOption: null,
         payments: [],
         createdAt: Date.now(),
@@ -630,7 +634,7 @@ describe('linkedRecords', () => {
 
       const record = createCreditReceiptRecord(credit, 'Credit receipt: "Car Loan"', 'Credit');
       expect(record.linkedId).toBe('credit-1');
-      expect(record.type).toBe('income');
+      expect(record.type).toBe(RecordType.INCOME);
       expect(record.amount).toBe(500000);
       expect(record.payer).toBe('Bank');
     });
@@ -642,12 +646,12 @@ describe('linkedRecords', () => {
         bankName: 'Bank',
         originalAmount: 500000,
         currentAmount: 480000,
-        type: 'consumer',
+        type: CreditType.CONSUMER,
         interestRate: 12,
         monthlyPayment: 15000,
         startDate: '2026-01-01',
         termMonths: 36,
-        status: 'active',
+        status: CreditStatus.ACTIVE,
         earlyRepaymentOption: null,
         payments: [],
         createdAt: Date.now(),
@@ -657,7 +661,7 @@ describe('linkedRecords', () => {
 
       const record = createCreditPaymentRecord(credit, '2026-02-01', 20000, 'Payment: "Car Loan"', 'Credit');
       expect(record.linkedId).toBe('credit-1');
-      expect(record.type).toBe('expense');
+      expect(record.type).toBe(RecordType.EXPENSE);
       expect(record.amount).toBe(20000);
       expect(record.isInternal).toBe(true);
     });
@@ -666,14 +670,14 @@ describe('linkedRecords', () => {
       const deposit: DepositRecord = {
         id: 'deposit-1',
         name: 'Savings',
-        type: 'term',
+        type: DepositType.TERM,
         bankName: 'Bank',
         amount: 100000,
         interestRate: 5,
         startDate: '2026-01-01',
         termMonths: 12,
-        accrualType: 'to_account',
-        status: 'closed',
+        accrualType: DepositAccrualType.TO_ACCOUNT,
+        status: DepositStatus.CLOSED,
         accruals: [],
         topUps: [],
         withdrawals: [],
@@ -683,7 +687,7 @@ describe('linkedRecords', () => {
 
       const record = createDepositRefundRecord(deposit, 'Deposit refund: "Savings"', 'Deposit');
       expect(record.linkedId).toBe('deposit-1');
-      expect(record.type).toBe('income');
+      expect(record.type).toBe(RecordType.INCOME);
       expect(record.amount).toBe(100000);
       expect(record.payer).toBe('Bank');
     });
@@ -693,7 +697,7 @@ describe('linkedRecords', () => {
         id: 'ex-1',
         date: '2026-01-15',
         time: '14:00',
-        type: 'buy',
+        type: CurrencyOperationType.BUY,
         amountInAccountCurrency: 9550,
         targetCurrency: '$',
         targetAmount: 100,
@@ -703,9 +707,9 @@ describe('linkedRecords', () => {
         note: '',
       };
 
-      const record = createExchangeRecord(exchange, 'expense', 9550, 'Exchange', 'RUB to USD');
+      const record = createExchangeRecord(exchange, RecordType.EXPENSE, 9550, 'Exchange', 'RUB to USD');
       expect(record.linkedId).toBe('ex-1');
-      expect(record.type).toBe('expense');
+      expect(record.type).toBe(RecordType.EXPENSE);
       expect(record.amount).toBe(9550);
       expect(record.isInternal).toBe(true);
     });
@@ -719,7 +723,7 @@ describe('linkedRecords', () => {
           createdAt: Date.now(),
           date: '2026-01-15',
           time: '',
-          type: 'income',
+          type: RecordType.INCOME,
           amount: 100,
           category: 'Test',
           tag: '',
@@ -733,7 +737,7 @@ describe('linkedRecords', () => {
           createdAt: Date.now(),
           date: '2026-01-16',
           time: '',
-          type: 'expense',
+          type: RecordType.EXPENSE,
           amount: 50,
           category: 'Test',
           tag: '',
@@ -747,7 +751,7 @@ describe('linkedRecords', () => {
           createdAt: Date.now(),
           date: '2026-01-17',
           time: '',
-          type: 'income',
+          type: RecordType.INCOME,
           amount: 200,
           category: 'Test',
           tag: '',
@@ -770,7 +774,7 @@ describe('linkedRecords', () => {
           createdAt: Date.now(),
           date: '2026-01-15',
           time: '',
-          type: 'income',
+          type: RecordType.INCOME,
           amount: 100,
           category: 'Test',
           tag: '',
@@ -784,7 +788,7 @@ describe('linkedRecords', () => {
           createdAt: Date.now(),
           date: '2026-01-15',
           time: '',
-          type: 'income',
+          type: RecordType.INCOME,
           amount: 100,
           category: 'Test',
           tag: '',

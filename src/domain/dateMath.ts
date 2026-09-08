@@ -61,7 +61,7 @@ export function withDayClamped(dateStr: string, day: number): string {
   return `${String(parsed.year).padStart(4, '0')}-${pad2(parsed.month)}-${pad2(clamped)}`;
 }
 
-const MS_PER_DAY = 86_400_000;
+export const MS_PER_DAY = 86_400_000;
 
 /** Whole days between two `YYYY-MM-DD` strings; negative when `to` precedes `from`. */
 export function daysBetweenStr(from: string, to: string): number {
@@ -116,6 +116,20 @@ export function isoWeekRange(year: number, week: number): { from: string; to: st
  */
 export function daysInYear(year: number): number {
   return isLeapYear(year) ? 366 : 365;
+}
+
+/**
+ * Maturity date of a term product (credit/deposit): `startDate` shifted by `termMonths`.
+ * Returns '' for a missing or malformed start date instead of throwing, so callers can
+ * render partially-filled entities without guarding every call site.
+ */
+export function safeEndDate(startDate?: string, termMonths?: number): string {
+  if (!startDate) return '';
+  try {
+    return addMonthsClamped(startDate, termMonths ?? 0);
+  } catch {
+    return '';
+  }
 }
 
 

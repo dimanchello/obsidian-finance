@@ -2,6 +2,7 @@ import { App } from 'obsidian';
 import { getLocaleFromApp, t, Translations } from '../i18n';
 import { FinanceBaseModal } from './FinanceBaseModal';
 import { buildButtonRow } from './formHelpers';
+import { FieldInfoModal, type FieldDef } from '../FieldInfoModal';
 
 /**
  * Base class for entity create/edit modals.
@@ -32,6 +33,14 @@ export abstract class EntityModal<T> extends FinanceBaseModal {
 
   protected formEl!: HTMLElement;
   private saveBtn!: HTMLButtonElement;
+
+  /**
+   * Resolves translations before `super()` runs, for subclasses whose default entity
+   * needs a localized value (e.g. a default deposit name).
+   */
+  protected static translationsFor(app: App): Translations {
+    return t(getLocaleFromApp(app));
+  }
 
   constructor(
     app: App,
@@ -67,6 +76,14 @@ export abstract class EntityModal<T> extends FinanceBaseModal {
   protected abstract buildForm(form: HTMLElement): void;
 
   /**
+   * Override to show a `❓` button in the footer that opens a field reference sheet.
+   * Return the field definitions to describe, or undefined for no button.
+   */
+  protected getInfoFields(): FieldDef[] | undefined {
+    return undefined;
+  }
+
+  /**
    * Override to validate form data
    * @returns Error message if invalid, null if valid
    */
@@ -92,6 +109,16 @@ export abstract class EntityModal<T> extends FinanceBaseModal {
     });
 
     this.saveBtn = btnRow.querySelector('.finance-btn-save')!;
+
+    const infoFields = this.getInfoFields();
+    if (infoFields) {
+      const row = btnRow.querySelector('.finance-modal-btns');
+      const infoBtn = document.createElement('button');
+      infoBtn.textContent = '❓';
+      infoBtn.className = 'finance-btn-cancel finance-info-btn-left';
+      infoBtn.addEventListener('click', () => new FieldInfoModal(this.app, infoFields).open());
+      row?.prepend(infoBtn);
+    }
 
     // Hook Enter key to save
     this.scope.register([], 'Enter', (evt: KeyboardEvent) => {

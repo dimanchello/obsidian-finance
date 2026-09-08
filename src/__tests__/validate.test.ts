@@ -2,16 +2,21 @@ import { describe, it, expect } from 'vitest';
 import {
   parseRecords, parseDebts, parseCredits, parseDeposits, parseExchanges, parseStringList,
 } from '../domain/validate';
+import {
+  RecordType, DebtDirection, DebtMovementType, CreditType, CreditStatus,
+  EarlyRepaymentOption, DepositType, DepositStatus, DepositAccrualType,
+  PaymentStatus, CurrencyOperationType,
+} from '../types';
 
 describe('parseRecords', () => {
   const valid = {
-    id: 'r1', createdAt: 1, date: '2026-01-15', time: '10:00', type: 'income',
+    id: 'r1', createdAt: 1, date: '2026-01-15', time: '10:00', type: RecordType.INCOME,
     amount: 500, category: 'Зарплата', tag: 'т', payer: 'п', note: 'н', attachmentPath: '',
   };
 
   it('разбирает корректную запись', () => {
     expect(parseRecords([valid])[0]).toMatchObject({
-      id: 'r1', type: 'income', amount: 500, category: 'Зарплата',
+      id: 'r1', type: RecordType.INCOME, amount: 500, category: 'Зарплата',
     });
   });
 
@@ -30,7 +35,7 @@ describe('parseRecords', () => {
   });
 
   it('неизвестный тип превращается в expense, а не роняет разбор', () => {
-    expect(parseRecords([{ ...valid, type: 'что-то' }])[0].type).toBe('expense');
+    expect(parseRecords([{ ...valid, type: 'что-то' }])[0].type).toBe(RecordType.EXPENSE);
   });
 
   it('нечисловая сумма становится нулём', () => {
@@ -53,8 +58,8 @@ describe('parseRecords', () => {
 describe('parseDebts', () => {
   const valid = {
     id: 'd1', person: 'Иван', amount: 1000, originalAmount: 1000, interestRate: 0,
-    direction: 'lent', date: '2026-01-01', time: '', dueDate: '', createdAt: 1, note: '',
-    movements: [{ id: 'm1', type: 'borrow', amount: 1000, date: '2026-01-01', time: '', createdAt: 1, note: '' }],
+    direction: DebtDirection.LENT, date: '2026-01-01', time: '', dueDate: '', createdAt: 1, note: '',
+    movements: [{ id: 'm1', type: DebtMovementType.BORROW, amount: 1000, date: '2026-01-01', time: '', createdAt: 1, note: '' }],
   };
 
   it('разбирает долг с движениями', () => {
@@ -68,7 +73,7 @@ describe('parseDebts', () => {
   });
 
   it('неизвестное направление становится borrowed', () => {
-    expect(parseDebts([{ ...valid, direction: 'x' }])[0].direction).toBe('borrowed');
+    expect(parseDebts([{ ...valid, direction: 'x' }])[0].direction).toBe(DebtDirection.BORROWED);
   });
 
   it('пустой dueDate остаётся пустым, а не превращается в сегодня', () => {
@@ -78,15 +83,15 @@ describe('parseDebts', () => {
 
 describe('parseCredits', () => {
   const valid = {
-    id: 'c1', name: 'Ипотека', type: 'mortgage', bankName: 'Банк',
+    id: 'c1', name: 'Ипотека', type: CreditType.MORTGAGE, bankName: 'Банк',
     originalAmount: 10000, currentAmount: 10000, interestRate: 10, monthlyPayment: 1000,
-    termMonths: 12, startDate: '2026-01-01', createdAt: 1, note: '', status: 'active',
-    earlyRepaymentOption: 'term', payments: [],
+    termMonths: 12, startDate: '2026-01-01', createdAt: 1, note: '', status: CreditStatus.ACTIVE,
+    earlyRepaymentOption: EarlyRepaymentOption.TERM, payments: [],
   };
 
   it('разбирает кредит', () => {
     const [c] = parseCredits([valid]);
-    expect(c).toMatchObject({ name: 'Ипотека', type: 'mortgage', status: 'active', earlyRepaymentOption: 'term' });
+    expect(c).toMatchObject({ name: 'Ипотека', type: CreditType.MORTGAGE, status: CreditStatus.ACTIVE, earlyRepaymentOption: EarlyRepaymentOption.TERM });
   });
 
   it('неизвестный earlyRepaymentOption становится null', () => {
@@ -95,8 +100,8 @@ describe('parseCredits', () => {
 
   it('разбирает платежи и отбрасывает битые', () => {
     const payments = [
-      { id: 'p1', amount: 1000, dueDate: '2026-02-01', status: 'paid', paidDate: '2026-02-01' },
-      { amount: 1000, dueDate: '2026-03-01', status: 'pending' },
+      { id: 'p1', amount: 1000, dueDate: '2026-02-01', status: PaymentStatus.PAID, paidDate: '2026-02-01' },
+      { amount: 1000, dueDate: '2026-03-01', status: PaymentStatus.PENDING },
     ];
     const [c] = parseCredits([{ ...valid, payments }]);
     expect(c.payments).toHaveLength(1);
@@ -104,24 +109,24 @@ describe('parseCredits', () => {
   });
 
   it('pending-платёж не получает paidDate', () => {
-    const payments = [{ id: 'p1', amount: 1000, dueDate: '2026-03-01', status: 'pending' }];
+    const payments = [{ id: 'p1', amount: 1000, dueDate: '2026-03-01', status: PaymentStatus.PENDING }];
     expect(parseCredits([{ ...valid, payments }])[0].payments[0].paidDate).toBeUndefined();
   });
 });
 
 describe('parseDeposits', () => {
   const valid = {
-    id: 'dep1', name: 'Вклад', type: 'term', bankName: 'Банк', amount: 5000,
-    interestRate: 8, startDate: '2026-01-01', termMonths: 6, accrualType: 'capitalization',
-    createdAt: 1, note: '', status: 'active', accruals: [], topUps: [], withdrawals: [],
+    id: 'dep1', name: 'Вклад', type: DepositType.TERM, bankName: 'Банк', amount: 5000,
+    interestRate: 8, startDate: '2026-01-01', termMonths: 6, accrualType: DepositAccrualType.CAPITALIZATION,
+    createdAt: 1, note: '', status: DepositStatus.ACTIVE, accruals: [], topUps: [], withdrawals: [],
   };
 
   it('разбирает вклад', () => {
-    expect(parseDeposits([valid])[0]).toMatchObject({ name: 'Вклад', accrualType: 'capitalization' });
+    expect(parseDeposits([valid])[0]).toMatchObject({ name: 'Вклад', accrualType: DepositAccrualType.CAPITALIZATION });
   });
 
   it('неизвестный accrualType становится to_account', () => {
-    expect(parseDeposits([{ ...valid, accrualType: 'x' }])[0].accrualType).toBe('to_account');
+    expect(parseDeposits([{ ...valid, accrualType: 'x' }])[0].accrualType).toBe(DepositAccrualType.TO_ACCOUNT);
   });
 
   it('отсутствующие коллекции дают пустые списки, а не undefined', () => {
@@ -139,7 +144,7 @@ describe('parseDeposits', () => {
   it('разбирает вложенные начисления, пополнения и снятия', () => {
     const full = {
       ...valid,
-      accruals: [{ id: 'a1', amount: 100, dueDate: '2026-02-01', status: 'paid', paidDate: '2026-02-01' }],
+      accruals: [{ id: 'a1', amount: 100, dueDate: '2026-02-01', status: PaymentStatus.PAID, paidDate: '2026-02-01' }],
       topUps: [{ id: 't1', amount: 2000, date: '2026-02-10', time: '12:00', createdAt: 1, note: 'Пополнение' }],
       withdrawals: [{ id: 'w1', amount: 500, date: '2026-02-15', time: '14:00', createdAt: 2, note: 'Снятие' }],
     };
@@ -154,7 +159,7 @@ describe('parseDeposits', () => {
 
 describe('parseExchanges', () => {
   const valid = {
-    id: 'ex1', createdAt: 1, date: '2026-01-01', time: '12:00', type: 'buy',
+    id: 'ex1', createdAt: 1, date: '2026-01-01', time: '12:00', type: CurrencyOperationType.BUY,
     amountInAccountCurrency: 9000, targetCurrency: 'USD', targetAmount: 100,
     exchangeRate: 90, provider: 'Банк', category: 'Обмен', fee: 50, note: 'Покупка',
   };
@@ -163,7 +168,7 @@ describe('parseExchanges', () => {
     const [ex] = parseExchanges([valid]);
     expect(ex).toMatchObject({
       id: 'ex1',
-      type: 'buy',
+      type: CurrencyOperationType.BUY,
       targetCurrency: 'USD',
       targetAmount: 100,
       fee: 50,
@@ -175,7 +180,7 @@ describe('parseExchanges', () => {
   });
 
   it('неизвестный тип становится buy', () => {
-    expect(parseExchanges([{ ...valid, type: 'unknown' }])[0].type).toBe('buy');
+    expect(parseExchanges([{ ...valid, type: 'unknown' }])[0].type).toBe(CurrencyOperationType.BUY);
   });
 
   it('не массив даёт пустой список', () => {

@@ -1,11 +1,13 @@
-import { App, Modal, Notice } from 'obsidian';
+import { App, Notice } from 'obsidian';
 import { getLocaleFromApp, t, Translations } from './i18n';
-import { CreditRecord, CreditPayment } from './types';
+import {
+  CreditRecord, CreditPayment, PaymentStatus, CreditStatus, EarlyRepaymentOption,
+} from './types';
 import { calculateRemainingPrincipal } from './domain/creditCalculations';
 import { fmtAmount, parseAmount, getTodayStr, normalizeDateStr } from './utils';
 import { createAmountInput } from './ui/AmountInput';
+import { FinanceBaseModal } from './ui/FinanceBaseModal';
 import { round2 } from './domain/money';
-import { PaymentStatus } from './constants';
 
 export interface EarlyRepaymentOptions {
   title: string;
@@ -14,14 +16,14 @@ export interface EarlyRepaymentOptions {
   onSave: (credit: CreditRecord) => void;
 }
 
-export class CreditEarlyRepaymentModal extends Modal {
-  private tr: Translations;
+export class CreditEarlyRepaymentModal extends FinanceBaseModal {
+  protected tr: Translations;
   private o: EarlyRepaymentOptions;
   private credit: CreditRecord;
   private actualRemaining: number;
   private amountInput!: HTMLInputElement;
   private pendingPayments: CreditPayment[];
-  private selectedOption: 'amount' | 'term' = 'amount';
+  private selectedOption: EarlyRepaymentOption = EarlyRepaymentOption.AMOUNT;
 
   constructor(app: App, opts: EarlyRepaymentOptions) {
     super(app);
@@ -36,12 +38,8 @@ export class CreditEarlyRepaymentModal extends Modal {
   }
 
   override onOpen(): void {
+    this.openHeader(this.o.title);
     const { contentEl } = this;
-    contentEl.empty();
-    contentEl.addClass('finance-modal');
-
-    contentEl.createEl('h2', { text: this.o.title, cls: 'finance-modal-title' });
-
     const cur = this.o.currency;
 
     const info = contentEl.createDiv('finance-early-info');
@@ -86,17 +84,17 @@ export class CreditEarlyRepaymentModal extends Modal {
     termInput.setAttribute('max', String(this.pendingPayments.length));
     termInput.value = '1';
 
-    const selectOption = (option: 'amount' | 'term') => {
+    const selectOption = (option: EarlyRepaymentOption) => {
       this.selectedOption = option;
-      const byAmount = option === 'amount';
+      const byAmount = option === EarlyRepaymentOption.AMOUNT;
       amountBtn.classList.toggle('is-active', byAmount);
       termBtn.classList.toggle('is-active', !byAmount);
       amountSection.classList.toggle('is-hidden', !byAmount);
       termSection.classList.toggle('is-hidden', byAmount);
     };
 
-    amountBtn.addEventListener('click', () => selectOption('amount'));
-    termBtn.addEventListener('click', () => selectOption('term'));
+    amountBtn.addEventListener('click', () => selectOption(EarlyRepaymentOption.AMOUNT));
+    termBtn.addEventListener('click', () => selectOption(EarlyRepaymentOption.TERM));
 
     const noteG = form.createDiv('finance-field-group');
     noteG.createEl('label', { text: this.tr.note, cls: 'finance-field-label' });
@@ -112,7 +110,7 @@ export class CreditEarlyRepaymentModal extends Modal {
         const todayStr = getTodayStr();
         const repaymentDate = normalizeDateStr(dateIn.value || todayStr);
 
-        if (this.selectedOption === 'amount') {
+        if (this.selectedOption === EarlyRepaymentOption.AMOUNT) {
           const amount = parseAmount(this.amountInput.value);
           if (!amount || amount <= 0) {
             new Notice(this.tr.invalidAmount);
@@ -127,7 +125,7 @@ export class CreditEarlyRepaymentModal extends Modal {
 
             if (remainingAmount >= payment.amount) {
               // Full payment: mark as paid
-              payment.status = 'paid';
+              payment.status = PaymentStatus.PAID;
               payment.paidDate = repaymentDate;
               if (noteIn.value) {
                 payment.note = payment.note
@@ -156,7 +154,7 @@ export class CreditEarlyRepaymentModal extends Modal {
           const stillPending = this.credit.payments.filter(p => p.status === PaymentStatus.PENDING);
           this.credit.currentAmount = calculateRemainingPrincipal(this.credit);
           if (this.credit.currentAmount <= 0 || stillPending.length === 0) {
-            this.credit.status = 'paid';
+            this.credit.status = CreditStatus.PAID;
           }
 
         } else {
@@ -164,20 +162,18 @@ export class CreditEarlyRepaymentModal extends Modal {
           const toRemove = Math.min(monthsToRemove, this.pendingPayments.length);
 
           for (const p of this.pendingPayments.slice(0, toRemove)) {
-            p.status = 'paid';
+            p.status = PaymentStatus.PAID;
             p.paidDate = repaymentDate;
             if (noteIn.value) p.note = noteIn.value;
           }
 
           const stillPending = this.credit.payments.filter(p => p.status === PaymentStatus.PENDING);
           this.credit.currentAmount = calculateRemainingPrincipal(this.credit);
-          this.credit.status = (this.credit.currentAmount <= 0 || stillPending.length === 0) ? 'paid' : 'active';
+          this.credit.status = (this.credit.currentAmount <= 0 || stillPending.length === 0) ? CreditStatus.PAID : CreditStatus.ACTIVE;
         }
 
         this.o.onSave(this.credit);
         this.close();
       });
   }
-
-  override onClose(): void { this.contentEl.empty(); }
 }

@@ -868,6 +868,12 @@
 }
 @keyframes ft-fadein { from { opacity:0; transform:translateY(-4px); } to { opacity:1; } }
 
+/* Available-balance hint above the currency exchange amount fields */
+.finance-currency-balance-hint {
+  font-size: .9em; color: var(--text-muted);
+  margin-bottom: 15px; text-align: right;
+}
+
 /* Attachment */
 .finance-attach-wrapper { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .finance-file-input     { display: none; }

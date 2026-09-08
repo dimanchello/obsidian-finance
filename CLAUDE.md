@@ -97,7 +97,10 @@ Debts, credits, and deposits do NOT have separate ledgers — they **materialize
 ## Conventions
 
 - **User-facing strings are Russian/English via i18n only** — never hardcode UI text. Internal identifiers are English camelCase.
-- **No magic numbers.** Numeric literals other than 0/1/-1/2 go into `src/types.ts` or `src/constants.ts` as `UPPER_SNAKE_CASE` constants (`MOBILE_BREAKPOINT`, `SEARCH_DEBOUNCE_MS`, `DAYS_IN_YEAR`, …).
+- **Strictly NO raw string literals for domain state:** Never use raw string literals for statuses, entity types, directions, movements, operations, or field names. All reusable domain values must come from `src/constants.ts` (re-exported in `src/types.ts`), such as `RecordType.INCOME` / `RecordType.EXPENSE`, `CreditStatus.ACTIVE` / `CreditStatus.PAID`, `DepositStatus.ACTIVE` / `DepositStatus.CLOSED`, `PaymentStatus.PENDING` / `PaymentStatus.PAID`, `DebtDirection.LENT` / `DebtDirection.BORROWED`, `DebtMovementType.BORROW` / `DebtMovementType.REPAY`, `DepositAccrualType.TO_ACCOUNT` / `DepositAccrualType.CAPITALIZATION`, `CurrencyOperationType.BUY` / `CurrencyOperationType.SELL`, etc.
+  - **This applies to BOTH production code (`src/`) AND tests (`src/__tests__/`).** Test fixtures, assertions, and mocks must use `RecordType.EXPENSE`, `CreditStatus.ACTIVE`, etc. — never `'expense'`, `'active'`, `'paid'`.
+- **Strictly NO magic numbers:** Any numeric literal that carries semantic meaning (pagination, page sizes, limits, thresholds, timeouts, debounce/focus delays, calculation steps, breakpoints) must be extracted to `src/types.ts` or `src/constants.ts` as an `UPPER_SNAKE_CASE` constant (`MOBILE_BREAKPOINT`, `SEARCH_DEBOUNCE_MS`, `MODAL_FOCUS_DELAY_MS`, `AUTOFILL_DEBOUNCE_MS`, `DAYS_IN_YEAR`, `PAGE_SIZE_OPTIONS`, `CURRENCY_ROUNDING_PRECISION`, …).
+  - *Exemptions:* Only trivial primitives (`0`, `1`, `-1`, `2`) and simple basic operations (e.g. `str.slice(0, 10)` or index offset `i + 1`) are allowed as inline literals. Everything else must be a named constant.
 - **Mobile is mandatory.** Detection is `Platform.isMobile || window.innerWidth <= MOBILE_BREAKPOINT`, computed once at render (not reactive to resize). Tables need a card/block fallback via `DataTable` component; no horizontal scroll.
 - Dates are `YYYY-MM-DD` strings and times are `HH:MM` (or `''`) — never `Date` objects in stored data. Normalize with `normalizeDateStr`/`normalizeTimeStr` from `src/utils.ts`; compare dates as strings.
 - Shared formatting lives in `src/utils.ts`; do not duplicate it in modals.
@@ -106,11 +109,12 @@ Debts, credits, and deposits do NOT have separate ledgers — they **materialize
 - `README.md` (Russian) and `README.en.md` (English) must both be updated when features or installation change.
 
 **Current codebase stats:**
-- ~71 source files (excluding tests)
-- ~15,600 lines of TypeScript
+- ~72 source files (excluding tests)
+- ~16,600 lines of TypeScript
 - 7 storage files per account (meta, records, debts, credits, deposits, exchanges, state)
 - 6 tabs (Overview, Records, Debts, Credits, Deposits, Currency)
-- 15+ modals for CRUD operations
+- 16 modals: 9 CRUD forms on `EntityModal<T>` + 7 helpers on `FinanceBaseModal`
+- ~500 unit tests; `src/domain` at 99.9% statement / 92% branch coverage
 
 See `AGENTS.md` for historical conventions (some are outdated; trust `CLAUDE.md` and `CODEBASE.md` over `AGENTS.md`).
 

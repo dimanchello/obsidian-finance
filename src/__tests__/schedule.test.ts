@@ -1,7 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { buildDepositSchedule, buildCreditSchedule, recalcFutureAccruals, type ScheduleDeps } from '../domain/schedule';
 import { sumMoney, round2 } from '../domain/money';
-import type { CreditRecord, DepositRecord, DepositAccrual } from '../types';
+import {
+  CreditRecord, DepositRecord, DepositAccrual,
+  DepositType, DepositAccrualType, DepositStatus,
+  CreditType, CreditStatus, PaymentStatus,
+} from '../types';
 
 function mkDeps(today: string): ScheduleDeps {
   let n = 0;
@@ -12,16 +16,16 @@ function mkDeposit(over: Partial<DepositRecord> = {}): DepositRecord {
   return {
     id: 'dep-1',
     name: 'Вклад',
-    type: 'term',
+    type: DepositType.TERM,
     bankName: 'Банк',
     amount: 100_000,
     interestRate: 12,
     startDate: '2026-01-15',
     termMonths: 12,
-    accrualType: 'to_account',
+    accrualType: DepositAccrualType.TO_ACCOUNT,
     createdAt: 0,
     note: '',
-    status: 'active',
+    status: DepositStatus.ACTIVE,
     accruals: [],
     topUps: [],
     withdrawals: [],
@@ -33,7 +37,7 @@ function mkCredit(over: Partial<CreditRecord> = {}): CreditRecord {
   return {
     id: 'cr-1',
     name: 'Кредит',
-    type: 'consumer',
+    type: CreditType.CONSUMER,
     bankName: 'Банк',
     originalAmount: 100_000,
     currentAmount: 100_000,
@@ -43,7 +47,7 @@ function mkCredit(over: Partial<CreditRecord> = {}): CreditRecord {
     startDate: '2026-01-31',
     createdAt: 0,
     note: '',
-    status: 'active',
+    status: CreditStatus.ACTIVE,
     earlyRepaymentOption: null,
     payments: [],
     ...over,
@@ -68,7 +72,7 @@ describe('buildDepositSchedule', () => {
   });
 
   it('вклад «на счёт»: тело не растёт, начисления считаются от исходной суммы', () => {
-    const deposit = mkDeposit({ accrualType: 'to_account', startDate: '2026-01-31', termMonths: 3 });
+    const deposit = mkDeposit({ accrualType: DepositAccrualType.TO_ACCOUNT, startDate: '2026-01-31', termMonths: 3 });
     const schedule = buildDepositSchedule(deposit, mkDeps('2026-01-01'));
 
     // 100000 * 12% * дни / 365 от неизменной базы
@@ -79,7 +83,7 @@ describe('buildDepositSchedule', () => {
 
   it('капитализация: каждое следующее начисление больше предыдущего при равных днях', () => {
     const schedule = buildDepositSchedule(
-      mkDeposit({ accrualType: 'capitalization', startDate: '2026-01-31', termMonths: 12 }),
+      mkDeposit({ accrualType: DepositAccrualType.CAPITALIZATION, startDate: '2026-01-31', termMonths: 12 }),
       mkDeps('2026-01-01'),
     );
     // Март и май — оба 31 день, но база во втором случае выросла
@@ -91,7 +95,7 @@ describe('buildDepositSchedule', () => {
   });
 
   it('капитализация: сумма начислений равна итоговой сумме минус тело', () => {
-    const deposit = mkDeposit({ accrualType: 'capitalization', amount: 100_000, termMonths: 12 });
+    const deposit = mkDeposit({ accrualType: DepositAccrualType.CAPITALIZATION, amount: 100_000, termMonths: 12 });
     const schedule = buildDepositSchedule(deposit, mkDeps('2026-01-01'));
 
     const totalInterest = sumMoney(schedule.map(a => a.amount));
@@ -109,7 +113,7 @@ describe('buildDepositSchedule', () => {
       termMonths: 2,
       amount: 100_000,
       interestRate: 12,
-      accrualType: 'to_account',
+      accrualType: DepositAccrualType.TO_ACCOUNT,
     });
     const schedule = buildDepositSchedule(deposit, mkDeps('2024-01-01'));
 
@@ -132,7 +136,7 @@ describe('buildDepositSchedule', () => {
       termMonths: 2,
       amount: 100_000,
       interestRate: 12,
-      accrualType: 'to_account',
+      accrualType: DepositAccrualType.TO_ACCOUNT,
     });
     const schedule = buildDepositSchedule(deposit, mkDeps('2026-01-01'));
 
@@ -148,8 +152,8 @@ describe('buildDepositSchedule', () => {
       mkDeposit({ startDate: '2026-01-15', termMonths: 6 }),
       mkDeps('2026-04-01'),
     );
-    const paid = schedule.filter(a => a.status === 'paid');
-    const pending = schedule.filter(a => a.status === 'pending');
+    const paid = schedule.filter(a => a.status === PaymentStatus.PAID);
+    const pending = schedule.filter(a => a.status === PaymentStatus.PENDING);
 
     expect(paid.map(a => a.dueDate)).toEqual(['2026-02-15', '2026-03-15']);
     expect(paid.every(a => a.paidDate === a.dueDate)).toBe(true);
@@ -161,7 +165,7 @@ describe('buildDepositSchedule', () => {
       mkDeposit({ startDate: '2026-01-15', termMonths: 1 }),
       mkDeps('2026-02-15'),
     );
-    expect(schedule[0].status).toBe('paid');
+    expect(schedule[0].status).toBe(PaymentStatus.PAID);
   });
 
   it('идентификаторы берутся из deps, а не из crypto', () => {
@@ -212,7 +216,7 @@ describe('buildCreditSchedule', () => {
       mkCredit({ startDate: '2026-01-15', termMonths: 6 }),
       mkDeps('2026-04-01'),
     );
-    expect(schedule.filter(p => p.status === 'paid').map(p => p.dueDate))
+    expect(schedule.filter(p => p.status === PaymentStatus.PAID).map(p => p.dueDate))
       .toEqual(['2026-02-15', '2026-03-15']);
   });
 
@@ -226,7 +230,7 @@ describe('buildCreditSchedule', () => {
 
 describe('recalcFutureAccruals', () => {
   function accrual(over: Partial<DepositAccrual> & { dueDate: string }): DepositAccrual {
-    return { id: `a-${over.dueDate}`, amount: 0, status: 'pending', ...over };
+    return { id: `a-${over.dueDate}`, amount: 0, status: PaymentStatus.PENDING, ...over };
   }
 
   it('пересчитывает будущие начисления и не трогает прошлые', () => {
@@ -234,7 +238,7 @@ describe('recalcFutureAccruals', () => {
       amount: 200_000,
       startDate: '2026-01-15',
       accruals: [
-        accrual({ dueDate: '2026-02-15', amount: 986.3, status: 'paid', paidDate: '2026-02-15' }),
+        accrual({ dueDate: '2026-02-15', amount: 986.3, status: PaymentStatus.PAID, paidDate: '2026-02-15' }),
         accrual({ dueDate: '2026-03-15', amount: 986.3 }),
         accrual({ dueDate: '2026-04-15', amount: 986.3 }),
       ],
@@ -251,7 +255,7 @@ describe('recalcFutureAccruals', () => {
     const withPaid = mkDeposit({
       startDate: '2026-01-15',
       accruals: [
-        accrual({ dueDate: '2026-02-15', amount: 1, status: 'paid', paidDate: '2026-02-15' }),
+        accrual({ dueDate: '2026-02-15', amount: 1, status: PaymentStatus.PAID, paidDate: '2026-02-15' }),
         accrual({ dueDate: '2026-03-15', amount: 1 }),
       ],
     });
@@ -271,7 +275,7 @@ describe('recalcFutureAccruals', () => {
 
   it('капитализация: база растёт по цепочке будущих начислений', () => {
     const deposit = mkDeposit({
-      accrualType: 'capitalization',
+      accrualType: DepositAccrualType.CAPITALIZATION,
       startDate: '2026-01-31',
       accruals: [
         accrual({ dueDate: '2026-03-31', amount: 0 }),
@@ -299,7 +303,7 @@ describe('recalcFutureAccruals', () => {
 
   it('возвращает исходный массив, когда пересчитывать нечего', () => {
     const deposit = mkDeposit({
-      accruals: [accrual({ dueDate: '2026-01-20', amount: 5, status: 'paid', paidDate: '2026-01-20' })],
+      accruals: [accrual({ dueDate: '2026-01-20', amount: 5, status: PaymentStatus.PAID, paidDate: '2026-01-20' })],
     });
     expect(recalcFutureAccruals(deposit, '2026-02-01')).toBe(deposit.accruals);
     expect(recalcFutureAccruals(mkDeposit({ accruals: [] }), '2026-02-01')).toEqual([]);

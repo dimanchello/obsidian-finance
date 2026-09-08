@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { DebtRecord } from '../types';
+import { DebtRecord, DebtDirection, DebtMovementType, RecordType } from '../types';
 import {
   getDebtOriginal,
   getDebtRepaid,
@@ -16,7 +16,7 @@ function createMockDebt(overrides: Partial<DebtRecord> = {}): DebtRecord {
     amount: 1000,
     originalAmount: 1000,
     interestRate: 0,
-    direction: 'lent',
+    direction: DebtDirection.LENT,
     date: '2026-01-01',
     time: '12:00',
     dueDate: '2026-06-01',
@@ -25,7 +25,7 @@ function createMockDebt(overrides: Partial<DebtRecord> = {}): DebtRecord {
     movements: [
       {
         id: 'mov-1',
-        type: 'borrow',
+        type: DebtMovementType.BORROW,
         amount: 1000,
         date: '2026-01-01',
         time: '12:00',
@@ -41,9 +41,9 @@ describe('debtCalculations', () => {
   it('getDebtOriginal sums all borrow movements', () => {
     const debt = createMockDebt({
       movements: [
-        { id: 'm1', type: 'borrow', amount: 500, date: '2026-01-01', time: '', createdAt: 1, note: '' },
-        { id: 'm2', type: 'borrow', amount: 300, date: '2026-01-02', time: '', createdAt: 2, note: '' },
-        { id: 'm3', type: 'repay', amount: 200, date: '2026-01-03', time: '', createdAt: 3, note: '' },
+        { id: 'm1', type: DebtMovementType.BORROW, amount: 500, date: '2026-01-01', time: '', createdAt: 1, note: '' },
+        { id: 'm2', type: DebtMovementType.BORROW, amount: 300, date: '2026-01-02', time: '', createdAt: 2, note: '' },
+        { id: 'm3', type: DebtMovementType.REPAY, amount: 200, date: '2026-01-03', time: '', createdAt: 3, note: '' },
       ],
     });
     expect(getDebtOriginal(debt)).toBe(800);
@@ -52,9 +52,9 @@ describe('debtCalculations', () => {
   it('getDebtRepaid sums all repay movements', () => {
     const debt = createMockDebt({
       movements: [
-        { id: 'm1', type: 'borrow', amount: 1000, date: '2026-01-01', time: '', createdAt: 1, note: '' },
-        { id: 'm2', type: 'repay', amount: 400, date: '2026-01-02', time: '', createdAt: 2, note: '' },
-        { id: 'm3', type: 'repay', amount: 250, date: '2026-01-03', time: '', createdAt: 3, note: '' },
+        { id: 'm1', type: DebtMovementType.BORROW, amount: 1000, date: '2026-01-01', time: '', createdAt: 1, note: '' },
+        { id: 'm2', type: DebtMovementType.REPAY, amount: 400, date: '2026-01-02', time: '', createdAt: 2, note: '' },
+        { id: 'm3', type: DebtMovementType.REPAY, amount: 250, date: '2026-01-03', time: '', createdAt: 3, note: '' },
       ],
     });
     expect(getDebtRepaid(debt)).toBe(650);
@@ -69,7 +69,7 @@ describe('debtCalculations', () => {
 
     const debtFractional = createMockDebt({
       interestRate: 7.5,
-      movements: [{ id: 'm1', type: 'borrow', amount: 333.33, date: '2026-01-01', time: '', createdAt: 1, note: '' }],
+      movements: [{ id: 'm1', type: DebtMovementType.BORROW, amount: 333.33, date: '2026-01-01', time: '', createdAt: 1, note: '' }],
     });
     expect(getDebtWithInterest(debtFractional)).toBe(358.33);
   });
@@ -78,8 +78,8 @@ describe('debtCalculations', () => {
     const debt = createMockDebt({
       interestRate: 10, // original 1000 -> total 1100
       movements: [
-        { id: 'm1', type: 'borrow', amount: 1000, date: '2026-01-01', time: '', createdAt: 1, note: '' },
-        { id: 'm2', type: 'repay', amount: 600, date: '2026-01-02', time: '', createdAt: 2, note: '' },
+        { id: 'm1', type: DebtMovementType.BORROW, amount: 1000, date: '2026-01-01', time: '', createdAt: 1, note: '' },
+        { id: 'm2', type: DebtMovementType.REPAY, amount: 600, date: '2026-01-02', time: '', createdAt: 2, note: '' },
       ],
     });
     expect(getDebtRemaining(debt)).toBe(500);
@@ -88,8 +88,8 @@ describe('debtCalculations', () => {
     const overpaidDebt = createMockDebt({
       interestRate: 0,
       movements: [
-        { id: 'm1', type: 'borrow', amount: 1000, date: '2026-01-01', time: '', createdAt: 1, note: '' },
-        { id: 'm2', type: 'repay', amount: 1200, date: '2026-01-02', time: '', createdAt: 2, note: '' },
+        { id: 'm1', type: DebtMovementType.BORROW, amount: 1000, date: '2026-01-01', time: '', createdAt: 1, note: '' },
+        { id: 'm2', type: DebtMovementType.REPAY, amount: 1200, date: '2026-01-02', time: '', createdAt: 2, note: '' },
       ],
     });
     expect(getDebtRemaining(overpaidDebt)).toBe(0);
@@ -98,16 +98,16 @@ describe('debtCalculations', () => {
   it('isDebtPaidOff checks if remaining amount is 0 or less', () => {
     const unpaidDebt = createMockDebt({
       movements: [
-        { id: 'm1', type: 'borrow', amount: 1000, date: '2026-01-01', time: '', createdAt: 1, note: '' },
-        { id: 'm2', type: 'repay', amount: 999.99, date: '2026-01-02', time: '', createdAt: 2, note: '' },
+        { id: 'm1', type: DebtMovementType.BORROW, amount: 1000, date: '2026-01-01', time: '', createdAt: 1, note: '' },
+        { id: 'm2', type: DebtMovementType.REPAY, amount: 999.99, date: '2026-01-02', time: '', createdAt: 2, note: '' },
       ],
     });
     expect(isDebtPaidOff(unpaidDebt)).toBe(false);
 
     const paidDebt = createMockDebt({
       movements: [
-        { id: 'm1', type: 'borrow', amount: 1000, date: '2026-01-01', time: '', createdAt: 1, note: '' },
-        { id: 'm2', type: 'repay', amount: 1000, date: '2026-01-02', time: '', createdAt: 2, note: '' },
+        { id: 'm1', type: DebtMovementType.BORROW, amount: 1000, date: '2026-01-01', time: '', createdAt: 1, note: '' },
+        { id: 'm2', type: DebtMovementType.REPAY, amount: 1000, date: '2026-01-02', time: '', createdAt: 2, note: '' },
       ],
     });
     expect(isDebtPaidOff(paidDebt)).toBe(true);
@@ -123,7 +123,7 @@ describe('createLinkedRecord', () => {
     };
     const rec = createLinkedRecord(deps, {
       date: '2026-05-10',
-      type: 'expense',
+      type: RecordType.EXPENSE,
       amount: 5000,
       category: 'Долг',
       payer: 'Банк',
@@ -136,7 +136,7 @@ describe('createLinkedRecord', () => {
       createdAt: 1700000000000,
       date: '2026-05-10',
       time: '14:30',
-      type: 'expense',
+      type: RecordType.EXPENSE,
       amount: 5000,
       category: 'Долг',
       payer: 'Банк',
