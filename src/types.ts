@@ -5,6 +5,7 @@ import {
   CreditType,
   CreditStatus,
   EarlyRepaymentOption,
+  DownPaymentType,
   DepositType,
   DepositStatus,
   DepositAccrualType,
@@ -19,6 +20,7 @@ export {
   CreditType,
   CreditStatus,
   EarlyRepaymentOption,
+  DownPaymentType,
   DepositType,
   DepositStatus,
   DepositAccrualType,
@@ -352,7 +354,7 @@ export interface CreditRecord {
   payments: CreditPayment[];
   purchasePrice?: number;
   downPayment?: number;
-  downPaymentType?: 'percent' | 'amount';
+  downPaymentType?: DownPaymentType;
   downPaymentValue?: number;
   downPaymentDate?: string;
   downPaymentRecordId?: string | undefined;

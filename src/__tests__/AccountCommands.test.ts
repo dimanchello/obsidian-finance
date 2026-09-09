@@ -4,7 +4,7 @@ import { FinanceStorage } from '../storage/index';
 import {
   DebtRecord, CreditRecord, DepositRecord, CurrencyExchange, DebtMovement,
   RecordType, DebtDirection, DebtMovementType, CreditType, CreditStatus,
-  PaymentStatus, CurrencyOperationType,
+  PaymentStatus, CurrencyOperationType, DownPaymentType,
   DepositType, DepositStatus, DepositAccrualType,
 } from '../types';
 import { findLinkedRecords } from '../domain/linkedRecords';
@@ -190,6 +190,7 @@ describe('AccountCommands', () => {
       await commands.addCredit(credit, 'Credit', {
         receiptNote: 'Credit receipt: "{name}"',
         paymentNote: 'Payment: "{name}"',
+        downPaymentNote: 'Down payment: ',
       });
 
       const data = await storage.load(accountId);
@@ -223,6 +224,7 @@ describe('AccountCommands', () => {
       await commands.addCredit(credit, 'Credit', {
         receiptNote: 'Credit receipt: "{name}"',
         paymentNote: 'Payment: "{name}"',
+        downPaymentNote: 'Down payment: ',
       });
 
       const data = await storage.load(accountId);
@@ -488,7 +490,7 @@ describe('AccountCommands', () => {
       await commands.updateCredit(
         { ...credit, name: 'Renamed Loan', interestRate: 12, note: 'Updated note' },
         'Credit',
-        { receiptNote: 'Receipt for {name}', paymentNote: 'Payment for {name}' }
+        { receiptNote: 'Receipt for {name}', paymentNote: 'Payment for {name}', downPaymentNote: 'Down payment: ' }
       );
 
       const data = await storage.load(accountId);
@@ -805,6 +807,7 @@ describe('AccountCommands', () => {
       await commands.addCredit(credit, 'Credit', {
         receiptNote: 'Получен кредит "{name}"',
         paymentNote: 'Платёж по кредиту "{name}"',
+        downPaymentNote: 'Первоначальный взнос: ',
       });
 
       const data = await storage.load(accountId);
@@ -827,7 +830,7 @@ describe('AccountCommands', () => {
         id: 'credit-dp',
         downPayment: 30_000,
         downPaymentValue: 30_000,
-        downPaymentType: 'amount',
+        downPaymentType: DownPaymentType.AMOUNT,
         downPaymentDate: '2026-01-10',
       });
 
@@ -853,7 +856,7 @@ describe('AccountCommands', () => {
       const credit = makeCredit({
         downPayment: 20_000,
         downPaymentValue: 20_000,
-        downPaymentType: 'amount',
+        downPaymentType: DownPaymentType.AMOUNT,
         downPaymentDate: '2026-01-01',
         downPaymentRecordId: 'rec-down',
         payments: [
@@ -940,6 +943,7 @@ describe('AccountCommands', () => {
       await commands.updateCredit(credit, 'Credit', {
         receiptNote: 'Получен кредит "{name}"',
         paymentNote: 'Платёж по кредиту "{name}"',
+        downPaymentNote: 'Первоначальный взнос: ',
       });
 
       const data = await storage.load(accountId);
@@ -960,12 +964,45 @@ describe('AccountCommands', () => {
       await commands.updateCredit(credit, 'Credit', {
         receiptNote: 'Получен кредит "{name}"',
         paymentNote: 'Платёж по кредиту "{name}"',
+        downPaymentNote: 'Первоначальный взнос: ',
       });
 
       const data = await storage.load(accountId);
       const payments = findLinkedRecords(data.records, 'credit-auto').filter(r => r.type === RecordType.EXPENSE);
       expect(payments.map(r => r.date)).toEqual(['2026-02-01', '2026-03-01']);
       expect(payments.every(r => r.isInternal === true)).toBe(true);
+    });
+
+    it('updateCredit сохраняет id и заметку первоначального взноса при записи платежа', async () => {
+      const credit = makeCredit({
+        id: 'credit-dp-keep',
+        downPayment: 20_000,
+        downPaymentValue: 20_000,
+        downPaymentType: DownPaymentType.AMOUNT,
+        downPaymentDate: '2026-01-01',
+        downPaymentRecordId: 'rec-dp-keep',
+      });
+      await storage.addCredit(accountId, credit);
+      await storage.addRecord(accountId, {
+        id: 'rec-dp-keep', createdAt: 1, date: '2026-01-01', time: '',
+        type: RecordType.EXPENSE, amount: 20_000, category: 'Credit', linkedId: 'credit-dp-keep',
+        tag: '', payer: '', note: 'Первоначальный взнос: Car Loan', attachmentPath: '', isInternal: true,
+      });
+
+      // Путь «записать платёж» / «досрочное погашение»: заметка взноса обязательна,
+      // иначе запись пересоздалась бы с пустым префиксом.
+      await commands.updateCredit(credit, 'Credit', {
+        receiptNote: 'Получен кредит "{name}"',
+        paymentNote: 'Платёж по кредиту "{name}"',
+        downPaymentNote: 'Первоначальный взнос: ',
+      });
+
+      const data = await storage.load(accountId);
+      const downs = data.records.filter(r => r.id === 'rec-dp-keep');
+      expect(downs.length).toBe(1);
+      expect(downs[0].amount).toBe(20_000);
+      expect(downs[0].note).toBe('Первоначальный взнос: Car Loan');
+      expect(data.credits.find(c => c.id === 'credit-dp-keep')?.downPaymentRecordId).toBe('rec-dp-keep');
     });
   });
 

@@ -94,14 +94,10 @@ export function buildDateTimeField(
 export function buildButtonRow(
   parent: HTMLElement,
   tr: Translations,
-  opts: { onSave: () => void; onCancel: () => void; isEdit?: boolean; saveText?: string; infoFields?: { label: string; text: string }[] }
+  opts: { onSave: () => void; onCancel: () => void; isEdit?: boolean; saveText?: string }
 ): void {
   const btnRow = parent.createDiv('finance-modal-btns');
-  
-  if (opts.infoFields && opts.infoFields.length > 0) {
-    // Info button handled in the caller modal or here
-  }
-  
+
   btnRow.createEl('button', { text: tr.cancel, cls: 'finance-btn-cancel' })
     .addEventListener('click', opts.onCancel);
   const saveLabel = opts.saveText ?? (opts.isEdit ? tr.save : tr.addBtn);

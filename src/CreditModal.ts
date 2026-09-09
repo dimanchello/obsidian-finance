@@ -1,6 +1,6 @@
 import { App } from 'obsidian';
 import {
-  CreditRecord, CreditType, PERCENT_100,
+  CreditRecord, CreditType, DownPaymentType, PERCENT_100,
   DEPOSIT_TERM_DEFAULT_MONTHS, DEPOSIT_TERM_MAX_MONTHS,
   CREDIT_CALC_DEBOUNCE_MS, DAY_OF_MONTH_MAX,
 } from './types';
@@ -69,7 +69,7 @@ export class CreditModal extends EntityModal<CreditRecord> {
             payments: [],
             purchasePrice: 0,
             downPayment: 0,
-            downPaymentType: 'amount',
+            downPaymentType: DownPaymentType.AMOUNT,
             downPaymentValue: 0,
             downPaymentDate: '',
             isEscrow: false,
@@ -266,7 +266,7 @@ export class CreditModal extends EntityModal<CreditRecord> {
     this.downPaymentValueInput.setAttribute('placeholder', '0');
     this.downPaymentValueInput.setAttribute('autocomplete', 'off');
     if ((this.entity.downPaymentValue ?? 0) > 0) {
-      this.downPaymentValueInput.value = this.entity.downPaymentType === 'amount'
+      this.downPaymentValueInput.value = this.entity.downPaymentType === DownPaymentType.AMOUNT
         ? fmtAmount(String(this.entity.downPaymentValue))
         : String(this.entity.downPaymentValue);
     }
@@ -275,14 +275,14 @@ export class CreditModal extends EntityModal<CreditRecord> {
 
     const amtBtn = btnGroup.createEl('button', {
       text: '💵',
-      cls: `finance-type-toggle${this.entity.downPaymentType === 'amount' ? ' active' : ''}`,
+      cls: `finance-type-toggle${this.entity.downPaymentType === DownPaymentType.AMOUNT ? ' active' : ''}`,
     });
     amtBtn.setAttribute('type', 'button');
     amtBtn.addClass('finance-dp-toggle');
 
     const pctBtn = btnGroup.createEl('button', {
       text: '%',
-      cls: `finance-type-toggle${this.entity.downPaymentType === 'percent' ? ' active' : ''}`,
+      cls: `finance-type-toggle${this.entity.downPaymentType === DownPaymentType.PERCENT ? ' active' : ''}`,
     });
     pctBtn.setAttribute('type', 'button');
     pctBtn.addClass('finance-dp-toggle', 'finance-dp-toggle-pct');
@@ -304,26 +304,26 @@ export class CreditModal extends EntityModal<CreditRecord> {
     const onDpBlurOrChange = () => {
       const type = this.entity.downPaymentType;
       let rawVal = parseAmount(this.downPaymentValueInput.value);
-      if (type === 'percent' && rawVal > PERCENT_100) rawVal = PERCENT_100;
+      if (type === DownPaymentType.PERCENT && rawVal > PERCENT_100) rawVal = PERCENT_100;
 
       this.entity.downPaymentValue = rawVal;
       this.downPaymentValueInput.value = rawVal > 0
-        ? (type === 'amount' ? fmtAmount(String(rawVal)) : String(rawVal))
+        ? (type === DownPaymentType.AMOUNT ? fmtAmount(String(rawVal)) : String(rawVal))
         : '';
 
       this.updateCalculatedValues();
       this.scheduleCalc();
     };
 
-    const setDpType = (type: 'amount' | 'percent') => {
+    const setDpType = (type: DownPaymentType) => {
       this.entity.downPaymentType = type;
-      amtBtn.classList.toggle('active', type === 'amount');
-      pctBtn.classList.toggle('active', type === 'percent');
+      amtBtn.classList.toggle('active', type === DownPaymentType.AMOUNT);
+      pctBtn.classList.toggle('active', type === DownPaymentType.PERCENT);
       onDpBlurOrChange();
     };
 
-    amtBtn.addEventListener('click', e => { e.preventDefault(); setDpType('amount'); });
-    pctBtn.addEventListener('click', e => { e.preventDefault(); setDpType('percent'); });
+    amtBtn.addEventListener('click', e => { e.preventDefault(); setDpType(DownPaymentType.AMOUNT); });
+    pctBtn.addEventListener('click', e => { e.preventDefault(); setDpType(DownPaymentType.PERCENT); });
 
     this.downPaymentValueInput.addEventListener('blur', onDpBlurOrChange);
     this.downPaymentDateInput.addEventListener('change', () => {
@@ -344,8 +344,8 @@ export class CreditModal extends EntityModal<CreditRecord> {
     this.entity.purchasePrice = purchase;
 
     const dpVal = this.entity.downPaymentValue ?? 0;
-    const dpType = this.entity.downPaymentType ?? 'amount';
-    const dpAmount = dpType === 'percent' ? round2(purchase * (dpVal / PERCENT_100)) : dpVal;
+    const dpType = this.entity.downPaymentType ?? DownPaymentType.AMOUNT;
+    const dpAmount = dpType === DownPaymentType.PERCENT ? round2(purchase * (dpVal / PERCENT_100)) : dpVal;
 
     this.entity.downPayment = dpAmount;
     this.entity.originalAmount = Math.max(0, round2(purchase - dpAmount));

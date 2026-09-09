@@ -16,7 +16,7 @@ import { calculatePaymentBreakdown, calculateRemainingPrincipal } from '../domai
 import { DataTable, FilterControl } from '../ui/DataTable';
 import { CreditsAnalyticsView } from '../CreditsAnalyticsView';
 import { renderMobileCard, renderSummaryCard, renderProgressBar, renderPaginatedSchedule, pageRange, dateRangeControls, compareValues } from '../ui/tabHelpers';
-import { AccountCommands } from '../domain/AccountCommands';
+import { AccountCommands, type CreditNoteTranslations } from '../domain/AccountCommands';
 import { CreditStatus, CreditType, PaymentStatus } from '../constants';
 
 export class CreditsTab {
@@ -351,7 +351,14 @@ export class CreditsTab {
 
   // ── Modals ──────────────────────────────────────────────────────────────
 
-
+  /** Notes for the records `addCredit`/`updateCredit` materialize — all call sites share them. */
+  private creditNotes(): CreditNoteTranslations {
+    return {
+      receiptNote: this.tr.creditReceiptNote,
+      paymentNote: this.tr.creditPaymentNote,
+      downPaymentNote: this.tr.downPaymentNotePrefix,
+    };
+  }
 
   private openNewCreditModal(): void {
     if (!this.ctx.data) { new Notice(this.tr.loading); return; }
@@ -361,15 +368,7 @@ export class CreditsTab {
       banks: allBanks,
       pluginId: this.ctx.pluginId,
       onSave: async (credit) => {
-        await this.commands.addCredit(
-          credit,
-          this.tr.creditDefaultCat,
-          {
-            receiptNote: this.tr.creditReceiptNote,
-            paymentNote: this.tr.creditPaymentNote,
-            downPaymentNote: this.tr.downPaymentNotePrefix,
-          }
-        );
+        await this.commands.addCredit(credit, this.tr.creditDefaultCat, this.creditNotes());
         await this.reload(this.tr.creditAdded);
       },
     }).open();
@@ -384,15 +383,7 @@ export class CreditsTab {
       banks: allBanks,
       pluginId: this.ctx.pluginId,
       onSave: async (updated) => {
-        await this.commands.updateCredit(
-          updated,
-          this.tr.creditDefaultCat,
-          {
-            receiptNote: this.tr.creditReceiptNote,
-            paymentNote: this.tr.creditPaymentNote,
-            downPaymentNote: this.tr.downPaymentNotePrefix,
-          }
-        );
+        await this.commands.updateCredit(updated, this.tr.creditDefaultCat, this.creditNotes());
         await this.reload(this.tr.creditUpdated);
       },
     }).open();
@@ -415,7 +406,7 @@ export class CreditsTab {
         await this.commands.updateCredit(
           updatedCredit,
           this.tr.creditDefaultCat,
-          { receiptNote: this.tr.creditReceiptNote, paymentNote: this.tr.creditPaymentNote }
+          this.creditNotes()
         );
         await this.reload(this.tr.creditPaymentRecorded);
       },
@@ -431,7 +422,7 @@ export class CreditsTab {
         await this.commands.updateCredit(
           updated,
           this.tr.creditDefaultCat,
-          { receiptNote: this.tr.creditReceiptNote, paymentNote: this.tr.creditPaymentNote }
+          this.creditNotes()
         );
         await this.reload(this.tr.creditPaymentRecorded);
       },

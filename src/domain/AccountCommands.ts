@@ -32,6 +32,19 @@ import { RecordType, DebtDirection, DebtMovementType, CreditType, PaymentStatus,
  * - Single source of truth for transaction patterns
  */
 
+/**
+ * Notes for the records `addCredit`/`updateCredit` materialize.
+ *
+ * All three are required: `updateCredit` rebuilds every auto-generated record from
+ * scratch, so a caller that omits `downPaymentNote` would silently relabel the
+ * down-payment record. See {@link AccountCommands.buildDownPaymentRecord}.
+ */
+export interface CreditNoteTranslations {
+  receiptNote: string;
+  paymentNote: string;
+  downPaymentNote: string;
+}
+
 export class AccountCommands {
   constructor(
     private storage: FinanceStorage,
@@ -156,7 +169,7 @@ export class AccountCommands {
   async addCredit(
     credit: CreditRecord,
     category: string,
-    translations: { receiptNote: string; paymentNote: string; downPaymentNote?: string }
+    translations: CreditNoteTranslations
   ): Promise<void> {
     // Built first: it may mint `credit.downPaymentRecordId`, which must be stored too.
     const downPaymentRec = this.buildDownPaymentRecord(credit, category, translations.downPaymentNote);
@@ -202,7 +215,7 @@ export class AccountCommands {
   private buildDownPaymentRecord(
     credit: CreditRecord,
     category: string,
-    note: string | undefined
+    note: string
   ): FinanceRecord | null {
     const amount = credit.downPayment ?? 0;
     const date = credit.downPaymentDate;
@@ -217,7 +230,7 @@ export class AccountCommands {
       credit.downPaymentRecordId,
       date,
       amount,
-      (note ?? '') + credit.name,
+      note + credit.name,
       category
     );
   }
@@ -228,7 +241,7 @@ export class AccountCommands {
   async updateCredit(
     updated: CreditRecord,
     category: string,
-    translations: { receiptNote: string; paymentNote: string; downPaymentNote?: string }
+    translations: CreditNoteTranslations
   ): Promise<void> {
     // Built first: it may mint `updated.downPaymentRecordId` or clear a stale one.
     const downPaymentRec = this.buildDownPaymentRecord(updated, category, translations.downPaymentNote);

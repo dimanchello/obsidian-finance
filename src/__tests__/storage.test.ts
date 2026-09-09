@@ -3,7 +3,8 @@ import { FinanceStorage } from '../storage';
 import { AccountFiles } from '../storage/AccountFiles';
 import {
   RecordType, DebtDirection, DebtMovementType, CreditType, CreditStatus,
-  EarlyRepaymentOption, DepositType, DepositStatus, DepositAccrualType, CurrencyOperationType,
+  EarlyRepaymentOption, DownPaymentType, DepositType, DepositStatus, DepositAccrualType,
+  CurrencyOperationType,
 } from '../types';
 
 interface MockAdapter {
@@ -429,7 +430,7 @@ describe('FinanceStorage', () => {
       const c = data.credits[0];
       expect(c.purchasePrice).toBe(0);
       expect(c.downPayment).toBe(0);
-      expect(c.downPaymentType).toBe('amount');
+      expect(c.downPaymentType).toBe(DownPaymentType.AMOUNT);
       expect(c.downPaymentValue).toBe(0);
       expect(c.downPaymentDate).toBe('');
     });

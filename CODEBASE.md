@@ -274,6 +274,7 @@ Debts, credits, deposits do NOT have separate ledgers — they materialize Finan
 
 **Important symbols:**
 - `AccountCommands` class
+- `CreditNoteTranslations` — `receiptNote` / `paymentNote` / `downPaymentNote`, all required
 - `addDebt()`, `addDebtMovement()`, `updateDebtMovement()`, `deleteDebtMovement()`, `deleteDebt()`, `deleteDebts()`
 - `addCredit()`, `updateCredit()`, `deleteCredit()`, `deleteCredits()`
 - `buildDownPaymentRecord()` (private) — mints/clears `credit.downPaymentRecordId` and builds the
@@ -281,8 +282,10 @@ Debts, credits, deposits do NOT have separate ledgers — they materialize Finan
 - `closeDeposit()`, `deleteDeposit()`, `deleteDeposits()`, `addDepositTopUp()`, `deleteDepositTopUp()`, `addDepositWithdrawal()`, `deleteDepositWithdrawal()`
 - `deleteExchange()`, `deleteExchanges()`
 
-**Note:** `addCredit`/`updateCredit` take an optional `downPaymentNote` in their translations
-argument. `CreditModal` no longer touches records at all.
+**Note:** `addCredit`/`updateCredit` take a `CreditNoteTranslations` (all three notes
+required — `updateCredit` rebuilds every auto record, so an omitted `downPaymentNote`
+would silently relabel the down-payment record). `CreditsTab.creditNotes()` builds it for
+every call site. `CreditModal` no longer touches records at all.
 
 **Depends on:**
 - `FinanceStorage`, `linkedRecords`
@@ -903,6 +906,12 @@ Build/test:
 
 ### Constants
 **File:** `src/types.ts` and `src/constants.ts`  
+`constants.ts` holds the domain-state enums (`RecordType`, `DebtDirection`, `DebtMovementType`,
+`CreditType`, `CreditStatus`, `EarlyRepaymentOption`, `DownPaymentType`, `DepositType`,
+`DepositStatus`, `DepositAccrualType`, `PaymentStatus`, `CurrencyOperationType`) — each an
+`as const` object plus a `ValueOf` union of the same name, re-exported from `types.ts`.
+`domain/validate.ts` derives its allow-lists from them via `Object.values()`.
+
 All magic numbers extracted as `UPPER_SNAKE_CASE`:
 - `MOBILE_BREAKPOINT = 480`
 - `SEARCH_DEBOUNCE_MS = 280`

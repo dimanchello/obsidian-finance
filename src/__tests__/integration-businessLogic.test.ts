@@ -38,7 +38,7 @@ interface MockApp {
   vault: { adapter: MockAdapter };
 }
 
-const TR = { receiptNote: 'Получен {name}', paymentNote: 'Платёж {name}' };
+const TR = { receiptNote: 'Получен {name}', paymentNote: 'Платёж {name}', downPaymentNote: 'Первоначальный взнос: ' };
 
 function mkCredit(over: Partial<CreditRecord> = {}): CreditRecord {
   return {

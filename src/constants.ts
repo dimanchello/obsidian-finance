@@ -58,6 +58,13 @@ export const EarlyRepaymentOption = {
 } as const;
 export type EarlyRepaymentOption = ValueOf<typeof EarlyRepaymentOption>;
 
+/** How the credit down payment was entered: an absolute sum or a share of the price. */
+export const DownPaymentType = {
+  AMOUNT: 'amount',
+  PERCENT: 'percent',
+} as const;
+export type DownPaymentType = ValueOf<typeof DownPaymentType>;
+
 // ── Deposits ──────────────────────────────────────────────────────────────
 
 export const DepositType = {
@@ -96,9 +103,3 @@ export const CurrencyOperationType = {
   SPEND: 'spend',
 } as const;
 export type CurrencyOperationType = ValueOf<typeof CurrencyOperationType>;
-
-// ── Default entity labels ─────────────────────────────────────────────────
-
-export const DEFAULT_CREDIT_NAME = 'Кредит';
-export const DEFAULT_DEPOSIT_NAME = 'Вклад';
-export const DEFAULT_DEBT_CATEGORY = 'Долг';

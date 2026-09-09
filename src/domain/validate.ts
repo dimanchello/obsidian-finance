@@ -8,7 +8,7 @@ import { normalizeDateStr, normalizeTimeStr } from '../utils';
 import {
   RecordType, DebtDirection, DebtMovementType, CreditType, CreditStatus,
   DepositType, DepositStatus, DepositAccrualType, PaymentStatus, CurrencyOperationType,
-  EarlyRepaymentOption,
+  EarlyRepaymentOption, DownPaymentType,
 } from '../constants';
 
 /**
@@ -68,6 +68,7 @@ const DEPOSIT_STATUSES = Object.values(DepositStatus);
 const ACCRUAL_TYPES = Object.values(DepositAccrualType);
 const SCHEDULE_STATUSES = Object.values(PaymentStatus);
 const CURRENCY_OPERATION_TYPES = Object.values(CurrencyOperationType);
+const DOWN_PAYMENT_TYPES = Object.values(DownPaymentType);
 
 export function parseRecord(o: Record<string, unknown>): FinanceRecord | null {
   const id = str(o.id);
@@ -159,7 +160,7 @@ export function parseCredit(o: Record<string, unknown>): CreditRecord | null {
     payments: parseList(o.payments, parsePayment),
     purchasePrice: num(o.purchasePrice),
     downPayment: num(o.downPayment),
-    downPaymentType: oneOf(o.downPaymentType, ['percent', 'amount'] as const, 'amount'),
+    downPaymentType: oneOf(o.downPaymentType, DOWN_PAYMENT_TYPES, DownPaymentType.AMOUNT),
     downPaymentValue: num(o.downPaymentValue),
     downPaymentDate: typeof o.downPaymentDate === 'string' && o.downPaymentDate ? normalizeDateStr(o.downPaymentDate) : '',
     ...(typeof o.downPaymentRecordId === 'string' ? { downPaymentRecordId: o.downPaymentRecordId } : {}),
