@@ -24,3 +24,6 @@ npm-debug.log*
 # Local env
 .env
 .env.local
+
+# Agent scratch (subagent-driven-development ledger, briefs, review packages)
+.superpowers/
