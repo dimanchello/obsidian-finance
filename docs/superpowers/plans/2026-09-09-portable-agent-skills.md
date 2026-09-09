@@ -759,11 +759,18 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 
 - [ ] **Шаг 1: Создать симлинки**
 
+Важно: `ln -sfn` при существующем каталоге по целевому пути не заменяет его, а
+создаёт ссылку *внутри* него (`.claude/skills/<n>/<n>`). Поэтому сначала снести
+пустые каталоги, оставшиеся после `git mv` в Задаче 1. `rmdir` безопасен — он
+отказывается удалять непустой каталог.
+
 ```bash
 cd /home/angus123/project/js/obsidian-finance
 for n in obsidian-finance-plan obsidian-finance-implement \
          obsidian-finance-review obsidian-finance-sync-docs \
          run-obsidian-finance; do
+  rmdir ".claude/skills/$n" 2>/dev/null
+  rmdir ".gemini/skills/$n" 2>/dev/null
   ln -sfn "../../.agents/skills/$n" ".claude/skills/$n"
   ln -sfn "../../.agents/skills/$n" ".gemini/skills/$n"
 done
@@ -783,6 +790,21 @@ done
 
 Ожидается: десять строк `ok`, ни одной `FAIL`. `test -f` проходит через
 симлинк, поэтому это проверяет и ссылку, и наличие целевого файла.
+
+Дополнительно убедиться, что ссылка не оказалась вложенной в каталог:
+
+```bash
+for d in .claude/skills .gemini/skills; do
+  for n in obsidian-finance-plan obsidian-finance-implement \
+           obsidian-finance-review obsidian-finance-sync-docs \
+           run-obsidian-finance; do
+    test -L "$d/$n" && echo "ok   $d/$n is a symlink" || echo "FAIL $d/$n is not a symlink"
+  done
+done
+```
+
+Ожидается: десять строк `ok`. `FAIL` означает, что по пути остался каталог и
+ссылка создалась внутри него.
 
 - [ ] **Шаг 3: Создать пять TOML-обёрток для Gemini CLI**
 
