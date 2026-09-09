@@ -7,7 +7,7 @@
  * domain layer that covers all financial logic.
  *
  * Usage:
- *   node .claude/skills/run-obsidian-finance/driver.mjs [--verbose]
+ *   node .agents/skills/run-obsidian-finance/driver.mjs [--verbose]
  *
  * Exits 0 on success, 1 on any failure.
  */
