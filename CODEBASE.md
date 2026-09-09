@@ -41,11 +41,14 @@ Obsidian плагин для личного финансового учёта. �
 - `linkedRecords.ts` — creates/unlinks mirrored FinanceRecords for debts/credits/deposits
 - `schedule.ts` — builds credit payment and deposit accrual schedules
 - `creditCalculations.ts`, `debtCalculations.ts` — interest/annuity math
-- `overviewMetrics.ts` — dashboard calculations (savings rate, debt burden, trends)
+- `overviewMetrics.ts` — dashboard calculations (savings rate, debt burden, trends).
+  Trend span is a month count; `ALL_TIME_MONTHS` (0) is a sentinel meaning "span the data",
+  clamped to `OVERVIEW_MAX_TREND_MONTHS`. `calcActiveDepositsProgress` returns
+  `accruedProfit` / `pendingProfit` / `totalProfit` per deposit.
 - `currencyBalance.ts` — multi-currency balance aggregation
 - `records.ts`, `dateMath.ts`, `money.ts`, `csv.ts` — utilities
   (`dateMath` exports `addMonthsClamped`, `withDayClamped`, `daysBetweenStr`, `isoWeek`,
-  `isoWeekRange`, `daysInYear`, `safeEndDate`, `MS_PER_DAY`)
+  `isoWeekRange`, `daysInYear`, `safeEndDate`, `MS_PER_DAY`, `MONTHS_IN_YEAR`)
 - `validate.ts` — parses/validates AccountData structures
 - `viewState.ts` — ViewState parsing and defaults
 - `accountId.ts` — accountId mint/parse/insert into code block
@@ -86,6 +89,9 @@ Reusable UI components:
 **`src/ui/charts/`**
 Chart components used by `OverviewTab`: `MoneyFlowChart`, `AssetsChart`, `BurdenChart`,
 `BreakdownChart`, `SavingsRateChart`, `DebtsBreakdownChart`, `DepositsOverview`.
+The four trend charts (`AssetsChart`, `BurdenChart`, `SavingsRateChart`, `DepositsOverview`)
+take a trailing `trendMonths` argument; `OverviewTab` passes `ALL_TIME_MONTHS` when
+`state.overviewAllTime` is set, otherwise `OVERVIEW_TREND_MONTHS`.
 
 **`src/__tests__/`**
 Vitest tests:
@@ -607,6 +613,10 @@ It owns `onClose()` (empties the body) plus `openHeader(title)` / `openBody()`.
 **Purpose:** Sort/filter/pagination state for all tabs  
 **Related:** FilterState, SortState  
 **Used by:** ViewContext, tabs
+
+Overview period: `overviewDateFrom`/`overviewDateTo` hold the bounds, and `overviewAllTime`
+distinguishes an explicit "all time" pick from "no filter yet" — both leave the bounds empty.
+Editing either date input clears the flag.
 
 ### AccountCommands
 **Definition:** `src/domain/AccountCommands.ts:33`  

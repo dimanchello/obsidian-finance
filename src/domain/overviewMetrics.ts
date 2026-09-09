@@ -6,8 +6,8 @@ import type {
   CurrencyExchange,
   OverviewGroupBy,
 } from '../types';
-import { OVERVIEW_UPCOMING_DAYS, OVERVIEW_BURDEN_MONTHS, OVERVIEW_TREND_MONTHS } from '../types';
-import { addMonthsClamped, parseDateStr, isoWeek, MS_PER_DAY } from './dateMath';
+import { OVERVIEW_UPCOMING_DAYS, OVERVIEW_BURDEN_MONTHS, OVERVIEW_TREND_MONTHS, OVERVIEW_MAX_TREND_MONTHS } from '../types';
+import { addMonthsClamped, parseDateStr, isoWeek, MS_PER_DAY, MONTHS_IN_YEAR } from './dateMath';
 import { calculateRemainingPrincipal, calculatePaymentBreakdown } from './creditCalculations';
 import { getDebtRepaid, getDebtWithInterest } from './debtCalculations';
 import { getTodayStr } from '../utils';
@@ -33,11 +33,32 @@ export function getISOWeekString(dateStr: string): string {
   return `${iso.year}-W${String(iso.week).padStart(2, '0')}`;
 }
 
+/**
+ * Sentinel span: "all time" is a real selection, distinct from "no filter chosen yet".
+ * Both arrive as empty date strings, so callers pass this to say which one they mean.
+ */
+export const ALL_TIME_MONTHS = 0;
+
+/** Clamps an all-time span so one stray far-past date cannot produce hundreds of columns. */
+function clampMonthSpan(startMonth: string, endMonth: string): string {
+  const spanMonths = monthsBetween(startMonth, endMonth);
+  if (spanMonths <= OVERVIEW_MAX_TREND_MONTHS) return startMonth;
+  return addMonthsClamped(`${endMonth}-01`, -OVERVIEW_MAX_TREND_MONTHS).slice(0, 7);
+}
+
+function monthsBetween(startMonth: string, endMonth: string): number {
+  const [sy, sm] = startMonth.split('-').map(Number);
+  const [ey, em] = endMonth.split('-').map(Number);
+  if (sy === undefined || sm === undefined || ey === undefined || em === undefined) return 0;
+  return (ey - sy) * MONTHS_IN_YEAR + (em - sm);
+}
+
 export function resolveMonthRange(
   dateFrom?: string,
   dateTo?: string,
   asOfDate: string = getTodayStr(),
-  defaultMonths = 6
+  defaultMonths = 6,
+  allTimeEarliestDate?: string
 ): string[] {
   let startMonth: string;
   let endMonth: string;
@@ -51,6 +72,11 @@ export function resolveMonthRange(
   } else if (dateTo) {
     endMonth = dateTo.slice(0, 7);
     startMonth = addMonthsClamped(`${endMonth}-01`, -(defaultMonths - 1)).slice(0, 7);
+  } else if (defaultMonths === ALL_TIME_MONTHS) {
+    // "All time": span the data itself, not a rolling window.
+    endMonth = asOfDate.slice(0, 7);
+    const earliest = allTimeEarliestDate ? allTimeEarliestDate.slice(0, 7) : endMonth;
+    startMonth = earliest < endMonth ? clampMonthSpan(earliest, endMonth) : endMonth;
   } else {
     endMonth = asOfDate.slice(0, 7);
     startMonth = addMonthsClamped(`${endMonth}-01`, -(defaultMonths - 1)).slice(0, 7);
@@ -223,6 +249,18 @@ export interface CreditBurdenMonth {
   burdenPercent: number | null;
 }
 
+/** Earliest non-empty `YYYY-MM-DD` across the given lists, or '' when they hold no dates. */
+function earliestDate(...dateLists: string[][]): string {
+  let earliest = '';
+  dateLists.forEach(list => {
+    list.forEach(d => {
+      if (!d) return;
+      if (!earliest || d < earliest) earliest = d;
+    });
+  });
+  return earliest;
+}
+
 /**
  * Calculate monthly credit burden breakdown over date range or last N months
  */
@@ -235,20 +273,26 @@ export function calcCreditBurdenOverTime(
   defaultMonths: number = OVERVIEW_BURDEN_MONTHS
 ): CreditBurdenMonth[] {
   let monthsList: string[];
+  const allTimeStart = earliestDate(
+    credits.map(c => c.startDate),
+    records.map(r => r.date)
+  );
 
   if (typeof dateToOrMonths === 'number') {
     monthsList = resolveMonthRange(
       undefined,
       undefined,
       dateFromOrAsOfDate ?? asOfDate,
-      dateToOrMonths
+      dateToOrMonths,
+      allTimeStart
     );
   } else {
     monthsList = resolveMonthRange(
       dateFromOrAsOfDate,
       dateToOrMonths,
       asOfDate,
-      defaultMonths
+      defaultMonths,
+      allTimeStart
     );
   }
 
@@ -331,20 +375,28 @@ export function calcAssetsLiabilitiesOverTime(
   defaultMonths = 6
 ): AssetLiabilityMonth[] {
   let monthsList: string[];
+  const allTimeStart = earliestDate(
+    deposits.map(d => d.startDate),
+    exchanges.map(e => e.date),
+    credits.map(c => c.startDate),
+    debts.map(d => d.date)
+  );
 
   if (typeof dateToOrMonths === 'number') {
     monthsList = resolveMonthRange(
       undefined,
       undefined,
       dateFromOrAsOfDate ?? asOfDate,
-      dateToOrMonths
+      dateToOrMonths,
+      allTimeStart
     );
   } else {
     monthsList = resolveMonthRange(
       dateFromOrAsOfDate,
       dateToOrMonths,
       asOfDate,
-      defaultMonths
+      defaultMonths,
+      allTimeStart
     );
   }
 
@@ -401,7 +453,13 @@ export function calcSavingsRateOverTime(
   asOfDate: string = getTodayStr(),
   defaultMonths = 6
 ): SavingsRateMonth[] {
-  const monthsList = resolveMonthRange(dateFrom, dateTo, asOfDate, defaultMonths);
+  const monthsList = resolveMonthRange(
+    dateFrom,
+    dateTo,
+    asOfDate,
+    defaultMonths,
+    earliestDate(records.filter(r => !r.isInternal).map(r => r.date))
+  );
 
   return monthsList.map(month => {
     const monthStart = `${month}-01`;
@@ -641,6 +699,10 @@ export function resolveDepositMonthRange(
     endMonth = dateTo.slice(0, 7);
     const fallbackStart = addMonthsClamped(`${asOfCurMonth}-01`, -halfMonths).slice(0, 7);
     startMonth = earliestAccrual && earliestAccrual < asOfCurMonth ? earliestAccrual : fallbackStart;
+  } else if (defaultMonths === ALL_TIME_MONTHS) {
+    // "All time": span every accrual, past and scheduled, instead of a window around today.
+    endMonth = latestAccrual > asOfCurMonth ? latestAccrual : asOfCurMonth;
+    startMonth = earliestAccrual ? clampMonthSpan(earliestAccrual, endMonth) : asOfCurMonth;
   } else {
     const fallbackStart = addMonthsClamped(`${asOfCurMonth}-01`, -halfMonths).slice(0, 7);
     const fallbackEnd = addMonthsClamped(`${asOfCurMonth}-01`, halfMonths).slice(0, 7);
@@ -750,7 +812,12 @@ export interface ActiveDepositProgress {
   isDemand: boolean;
   accrualType: DepositAccrualType;
   progressPercent: number;
+  /** Interest already paid out (PAID accruals). */
   accruedProfit: number;
+  /** Interest still scheduled but not yet paid (PENDING accruals). */
+  pendingProfit: number;
+  /** Lifetime interest across the whole term: accrued + pending. */
+  totalProfit: number;
   totalEstimatedReturn: number;
   remainingDays: number | null;
   nextAccrualDate: string | null;
@@ -794,6 +861,7 @@ export function calcActiveDepositsProgress(
 
     const totalProfit = (d.accruals ?? []).reduce((s, a) => s + a.amount, 0);
     const accruedProfit = paidProfit;
+    const pendingProfit = totalProfit - paidProfit;
     const totalEstimatedReturn = d.amount + totalProfit;
 
     const pendingAccruals = (d.accruals ?? [])
@@ -816,6 +884,8 @@ export function calcActiveDepositsProgress(
       accrualType: d.accrualType ?? DepositAccrualType.TO_ACCOUNT,
       progressPercent,
       accruedProfit,
+      pendingProfit,
+      totalProfit,
       totalEstimatedReturn,
       remainingDays,
       nextAccrualDate,

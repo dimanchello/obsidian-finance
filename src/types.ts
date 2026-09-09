@@ -149,6 +149,8 @@ export interface ViewState {
   depositAnalyticsDateTo?:   string;
   overviewDateFrom?:         string;
   overviewDateTo?:           string;
+  /** True when the user picked "all time": empty bounds that mean "span the data", not "no filter". */
+  overviewAllTime?:          boolean;
   overviewGroupBy?:          OverviewGroupBy;
 }
 
@@ -296,6 +298,8 @@ export const OVERVIEW_BURDEN_DANGER = 50;
 export const OVERVIEW_PRESET_MONTHS_3 = 3;
 export const OVERVIEW_PRESET_MONTHS_6 = 6;
 export const OVERVIEW_TREND_MONTHS = 6;
+/** Upper bound for an "all time" trend span, so a stray 1970 date cannot produce hundreds of columns. */
+export const OVERVIEW_MAX_TREND_MONTHS = 120;
 export const OVERVIEW_CHART_HEIGHT = 240;
 export const OVERVIEW_CHART_PAD_LEFT = 50;
 export const OVERVIEW_CHART_PAD_RIGHT = 16;

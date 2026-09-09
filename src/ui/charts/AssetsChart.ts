@@ -43,6 +43,7 @@ export class AssetsChart {
    * @param dateFrom - начало периода (может быть undefined)
    * @param dateTo - конец периода (может быть undefined)
    * @param today - текущая дата
+   * @param trendMonths - ширина окна в месяцах; ALL_TIME_MONTHS растягивает график на все данные
    */
   render(
     parent: HTMLElement,
@@ -52,7 +53,8 @@ export class AssetsChart {
     debts: DebtRecord[],
     dateFrom: string | undefined,
     dateTo: string | undefined,
-    today: string
+    today: string,
+    trendMonths: number = OVERVIEW_TREND_MONTHS
   ): void {
     const { tr } = this.ctx;
 
@@ -67,7 +69,7 @@ export class AssetsChart {
       dateFrom,
       dateTo,
       today,
-      OVERVIEW_TREND_MONTHS
+      trendMonths
     );
 
     if (trendData.length === 0) {

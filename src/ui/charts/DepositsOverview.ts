@@ -21,7 +21,8 @@ export class DepositsOverview {
     parent: HTMLElement,
     deposits: DepositRecord[],
     today: string,
-    onNavigate?: (mode: 'deposits') => void
+    onNavigate?: (mode: 'deposits') => void,
+    trendMonths: number = OVERVIEW_TREND_MONTHS
   ): void {
     const { tr, state } = this.ctx;
     const chartWrap = parent.createDiv('finance-chart-wrap finance-chart-wrap-full');
@@ -43,7 +44,7 @@ export class DepositsOverview {
       state.overviewDateFrom,
       state.overviewDateTo,
       today,
-      OVERVIEW_TREND_MONTHS
+      trendMonths
     );
 
     const hasInterestData = interestData.length > 0 && interestData.some(d => d.total > 0);
@@ -300,9 +301,20 @@ export class DepositsOverview {
       }
 
       const col3 = bodyRow.createDiv('finance-deposit-stat-col');
-      col3.createDiv({ text: tr.overviewDepositTotalReturn, cls: 'finance-deposit-stat-lbl' });
-      const val3 = col3.createDiv('finance-deposit-stat-val bold');
-      val3.textContent = this.fmt(dep.totalEstimatedReturn);
+      col3.createDiv({ text: tr.overviewDepositTotalProfit, cls: 'finance-deposit-stat-lbl' });
+      const val3 = col3.createDiv('finance-deposit-stat-val success');
+      val3.createSpan({ text: dep.totalProfit > 0 ? `+${this.fmt(dep.totalProfit)}` : '—' });
+      if (dep.totalProfit > 0) {
+        col3.createDiv({
+          text: `${this.fmt(dep.accruedProfit)} ${tr.overviewDepositProfitAccrued} · ${this.fmt(dep.pendingProfit)} ${tr.overviewDepositProfitPending}`,
+          cls: 'finance-deposit-stat-sub',
+        });
+      }
+
+      const col4 = bodyRow.createDiv('finance-deposit-stat-col');
+      col4.createDiv({ text: tr.overviewDepositTotalReturn, cls: 'finance-deposit-stat-lbl' });
+      const val4 = col4.createDiv('finance-deposit-stat-val bold');
+      val4.textContent = this.fmt(dep.totalEstimatedReturn);
 
       const progressWrap = card.createDiv('finance-deposit-progress');
       const fill = progressWrap.createDiv('finance-deposit-progress-fill');

@@ -68,5 +68,15 @@ describe('parseViewState', () => {
     expect(s.overviewDateFrom).toBe('2026-01-01');
     expect(s.overviewDateTo).toBe('2026-06-30');
     expect(s.overviewGroupBy).toBe('tag');
+    expect(s.overviewAllTime).toBe(false);
+  });
+
+  it('сохраняет выбор "за всё время"', () => {
+    expect(parseViewState({ overviewAllTime: true }, 25).overviewAllTime).toBe(true);
+  });
+
+  it('нелогическое значение overviewAllTime трактуется как false', () => {
+    expect(parseViewState({ overviewAllTime: 'да' }, 25).overviewAllTime).toBe(false);
+    expect(parseViewState({}, 25).overviewAllTime).toBe(false);
   });
 });

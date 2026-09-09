@@ -6,6 +6,7 @@ import {
   OVERVIEW_PRESET_MONTHS_3,
   OVERVIEW_PRESET_MONTHS_6,
   OVERVIEW_INPUT_DEBOUNCE_MS,
+  OVERVIEW_TREND_MONTHS,
 } from '../types';
 import {
   calcNetBalance,
@@ -14,6 +15,7 @@ import {
   calcCreditBurden,
   calcUpcomingPayments,
   filterRecordsByDateRange,
+  ALL_TIME_MONTHS,
 } from '../domain/overviewMetrics';
 import { shiftMonths, getTodayStr } from '../utils';
 import { MoneyFlowChart } from '../ui/charts/MoneyFlowChart';
@@ -45,7 +47,7 @@ export class OverviewTab {
   private bodyEl: HTMLElement | null = null;
   private fromInput: HTMLInputElement | null = null;
   private toInput: HTMLInputElement | null = null;
-  private presetButtons: { btn: HTMLButtonElement; from: string; to: string }[] = [];
+  private presetButtons: { btn: HTMLButtonElement; from: string; to: string; isAllTime: boolean }[] = [];
 
   constructor(el: HTMLElement, ctx: ViewContext) {
     this.el = el;
@@ -122,17 +124,19 @@ export class OverviewTab {
       this.state.overviewDateFrom,
       this.state.overviewDateTo
     );
+    // "All time" widens the trend span to the data itself; otherwise charts keep their rolling window.
+    const trendMonths = this.state.overviewAllTime === true ? ALL_TIME_MONTHS : OVERVIEW_TREND_MONTHS;
 
     this.renderKpiCards(filteredRecords, today);
 
     const chartsWrap = this.bodyEl.createDiv('finance-overview-charts');
     this.moneyFlowChart.render(chartsWrap, filteredRecords);
     this.breakdownChart.render(chartsWrap, filteredRecords, mode => this.onNavigate?.(mode), () => this.renderBody());
-    this.savingsRateChart.render(chartsWrap, data.records, today);
-    this.burdenChart.render(chartsWrap, data.credits, data.records, this.state.overviewDateFrom, this.state.overviewDateTo, today);
-    this.assetsChart.render(chartsWrap, data.deposits, data.exchanges, data.credits, data.debts, this.state.overviewDateFrom, this.state.overviewDateTo, today);
+    this.savingsRateChart.render(chartsWrap, data.records, today, trendMonths);
+    this.burdenChart.render(chartsWrap, data.credits, data.records, this.state.overviewDateFrom, this.state.overviewDateTo, today, trendMonths);
+    this.assetsChart.render(chartsWrap, data.deposits, data.exchanges, data.credits, data.debts, this.state.overviewDateFrom, this.state.overviewDateTo, today, trendMonths);
     this.debtsBreakdownChart.render(chartsWrap, data.debts, mode => this.onNavigate?.(mode));
-    this.depositsOverview.render(chartsWrap, data.deposits, today, mode => this.onNavigate?.(mode));
+    this.depositsOverview.render(chartsWrap, data.deposits, today, mode => this.onNavigate?.(mode), trendMonths);
   }
 
   private renderFilterBar(): void {
@@ -152,30 +156,35 @@ export class OverviewTab {
         label: this.tr.overviewPeriodAll,
         from: '',
         to: '',
+        isAllTime: true,
       },
       {
         id: 'this_month',
         label: this.tr.overviewPeriodMonth,
         from: thisMonthStart,
         to: today,
+        isAllTime: false,
       },
       {
         id: '3_months',
         label: this.tr.overviewPeriod3Months,
         from: threeMonthsAgo,
         to: today,
+        isAllTime: false,
       },
       {
         id: '6_months',
         label: this.tr.overviewPeriod6Months,
         from: sixMonthsAgo,
         to: today,
+        isAllTime: false,
       },
       {
         id: 'this_year',
         label: this.tr.overviewPeriodYear,
         from: thisYearStart,
         to: today,
+        isAllTime: false,
       },
     ];
 
@@ -184,7 +193,7 @@ export class OverviewTab {
         text: preset.label,
         cls: 'finance-overview-preset-btn',
       });
-      this.presetButtons.push({ btn, from: preset.from, to: preset.to });
+      this.presetButtons.push({ btn, from: preset.from, to: preset.to, isAllTime: preset.isAllTime });
 
       btn.addEventListener('click', () => {
         if (this.debounceTimer !== null) {
@@ -193,6 +202,7 @@ export class OverviewTab {
         }
         this.state.overviewDateFrom = preset.from;
         this.state.overviewDateTo = preset.to;
+        this.state.overviewAllTime = preset.isAllTime;
         this.ctx.saveState();
         if (this.fromInput) this.fromInput.value = preset.from;
         if (this.toInput) this.toInput.value = preset.to;
@@ -211,6 +221,7 @@ export class OverviewTab {
     const handleFromChange = () => {
       if (!this.fromInput) return;
       this.state.overviewDateFrom = this.fromInput.value;
+      this.state.overviewAllTime = false;
       this.ctx.saveState();
       this.updatePresetActiveStates();
       this.debouncedRenderBody();
@@ -226,6 +237,7 @@ export class OverviewTab {
     const handleToChange = () => {
       if (!this.toInput) return;
       this.state.overviewDateTo = this.toInput.value;
+      this.state.overviewAllTime = false;
       this.ctx.saveState();
       this.updatePresetActiveStates();
       this.debouncedRenderBody();
@@ -239,16 +251,18 @@ export class OverviewTab {
   private updatePresetActiveStates(): void {
     const curFrom = this.state.overviewDateFrom ?? '';
     const curTo = this.state.overviewDateTo ?? '';
+    const curAllTime = this.state.overviewAllTime === true;
     const today = getTodayStr();
 
-    this.presetButtons.forEach(({ btn, from, to }) => {
-      const isAll = from === '' && to === '' && curFrom === '' && curTo === '';
-      const isMatch =
-        from !== '' &&
-        curFrom === from &&
-        (curTo === to || (!curTo && to === today));
+    this.presetButtons.forEach(({ btn, from, to, isAllTime }) => {
+      const isMatch = isAllTime
+        ? curAllTime && curFrom === '' && curTo === ''
+        : !curAllTime &&
+          from !== '' &&
+          curFrom === from &&
+          (curTo === to || (!curTo && to === today));
 
-      if (isAll || isMatch) {
+      if (isMatch) {
         btn.addClass('is-active');
       } else {
         btn.removeClass('is-active');

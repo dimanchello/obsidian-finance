@@ -1,6 +1,6 @@
 const DATE_STR_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
 
-const MONTHS_IN_YEAR = 12;
+export const MONTHS_IN_YEAR = 12;
 const DAYS_PER_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
 function pad2(n: number): string {

@@ -3474,11 +3474,12 @@
   font-weight: 600;
 }
 
+/* 2x2: four stats never fit on one line inside a half-width card. */
 .finance-deposit-overview-body-row {
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: flex-start;
-  gap: 8px;
+  gap: 8px 12px;
   padding-top: 2px;
 }
 
@@ -3489,20 +3490,20 @@
   min-width: 0;
 }
 
-.finance-deposit-stat-col:first-child {
+.finance-deposit-stat-col:nth-child(odd) {
   align-items: flex-start;
   text-align: left;
 }
 
-.finance-deposit-stat-col:nth-child(2) {
-  align-items: center;
-  text-align: center;
-  white-space: nowrap;
-}
-
-.finance-deposit-stat-col:last-child {
+.finance-deposit-stat-col:nth-child(even) {
   align-items: flex-end;
   text-align: right;
+}
+
+.finance-deposit-stat-sub {
+  font-size: 0.68em;
+  color: var(--text-muted);
+  white-space: nowrap;
 }
 
 .finance-deposit-stat-lbl {
@@ -3687,13 +3688,21 @@
     flex-direction: row;
     justify-content: space-between;
     align-items: center;
+    flex-wrap: wrap;
   }
 
   .finance-deposit-stat-col:first-child,
-  .finance-deposit-stat-col:nth-child(2),
+  .finance-deposit-stat-col:nth-child(odd),
+  .finance-deposit-stat-col:nth-child(even),
   .finance-deposit-stat-col:last-child {
     align-items: center;
     text-align: left;
+  }
+
+  /* Stacked cards put label and value on one line; the accrued/pending split wraps below. */
+  .finance-deposit-stat-sub {
+    width: 100%;
+    text-align: right;
   }
 
   .finance-deposit-stat-lbl {

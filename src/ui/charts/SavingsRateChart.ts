@@ -15,7 +15,7 @@ export class SavingsRateChart {
     this.tooltip.destroy();
   }
 
-  render(parent: HTMLElement, records: FinanceRecord[], today: string): void {
+  render(parent: HTMLElement, records: FinanceRecord[], today: string, trendMonths: number = OVERVIEW_TREND_MONTHS): void {
     const { tr, state, isMobile } = this.ctx;
     const chartWrap = parent.createDiv('finance-chart-wrap');
     chartWrap.createEl('h3', { text: tr.overviewSavingsRateChart, cls: 'finance-chart-title' });
@@ -38,7 +38,7 @@ export class SavingsRateChart {
       state.overviewDateFrom,
       state.overviewDateTo,
       today,
-      OVERVIEW_TREND_MONTHS
+      trendMonths
     );
 
     if (savingsData.length === 0 || savingsData.every(d => d.income === 0 && d.expense === 0)) {

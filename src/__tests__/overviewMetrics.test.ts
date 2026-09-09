@@ -3,6 +3,7 @@ import {
   FinanceRecord, DebtRecord, CreditRecord, DepositRecord, CurrencyExchange,
   RecordType, DebtDirection, DebtMovementType, CreditType, CreditStatus,
   DepositType, DepositStatus, DepositAccrualType, PaymentStatus, CurrencyOperationType,
+  OVERVIEW_MAX_TREND_MONTHS,
 } from '../types';
 import {
   calcNetBalance, calcAssets, calcLiabilities,
@@ -12,6 +13,7 @@ import {
   calcGroupBreakdown, calcSavingsRateOverTime,
   calcDebtsBreakdown, calcDepositInterestOverTime,
   calcActiveDepositsProgress, resolveMonthRange, resolveDepositMonthRange,
+  ALL_TIME_MONTHS,
 } from '../domain/overviewMetrics';
 
 function rec(overrides: Partial<FinanceRecord> = {}): FinanceRecord {
@@ -587,6 +589,8 @@ describe('calcActiveDepositsProgress', () => {
     expect(result[0].progressPercent).toBeGreaterThan(45);
     expect(result[0].progressPercent).toBeLessThan(55);
     expect(result[0].accruedProfit).toBe(1300);
+    expect(result[0].pendingProfit).toBe(1300);
+    expect(result[0].totalProfit).toBe(2600);
     expect(result[0].totalEstimatedReturn).toBe(102600);
     expect(result[0].remainingDays).toBeGreaterThan(180);
     expect(result[0].nextAccrualDate).toBe('2026-08-01');
@@ -626,6 +630,35 @@ describe('calcActiveDepositsProgress', () => {
     expect(result[0].endDate).toBe('');
     expect(result[0].progressPercent).toBe(100);
     expect(result[0].remainingDays).toBeNull();
+  });
+
+  it('суммирует доход за весь срок: начисленный плюс ожидаемый', () => {
+    const deposits = [
+      deposit({
+        amount: 200000,
+        status: DepositStatus.ACTIVE,
+        accruals: [
+          { id: 'a1', amount: 1000, dueDate: '2026-02-01', status: PaymentStatus.PAID, paidDate: '2026-02-01' },
+          { id: 'a2', amount: 1500, dueDate: '2026-03-01', status: PaymentStatus.PAID, paidDate: '2026-03-01' },
+          { id: 'a3', amount: 2000, dueDate: '2026-11-01', status: PaymentStatus.PENDING },
+        ],
+      }),
+    ];
+
+    const result = calcActiveDepositsProgress(deposits, '2026-06-01');
+    expect(result[0].accruedProfit).toBe(2500);
+    expect(result[0].pendingProfit).toBe(2000);
+    expect(result[0].totalProfit).toBe(4500);
+    expect(result[0].totalEstimatedReturn).toBe(204500);
+  });
+
+  it('вклад без начислений даёт нулевой доход за весь срок', () => {
+    const result = calcActiveDepositsProgress(
+      [deposit({ amount: 10000, status: DepositStatus.ACTIVE, accruals: [] })], '2026-06-01');
+    expect(result[0].accruedProfit).toBe(0);
+    expect(result[0].pendingProfit).toBe(0);
+    expect(result[0].totalProfit).toBe(0);
+    expect(result[0].totalEstimatedReturn).toBe(10000);
   });
 });
 
@@ -686,6 +719,79 @@ describe('resolveDepositMonthRange', () => {
   it('перевёрнутый диапазон нормализуется', () => {
     expect(resolveDepositMonthRange([], '2026-08-01', '2026-06-01', '2026-06-15', 2)).toEqual(
       ['2026-06', '2026-07', '2026-08']);
+  });
+
+  it('ALL_TIME_MONTHS охватывает все начисления, а не окно вокруг asOfDate', () => {
+    const months = resolveDepositMonthRange(
+      withAccruals, undefined, undefined, '2026-06-15', ALL_TIME_MONTHS);
+    expect(months[0]).toBe('2026-01');
+    expect(months[months.length - 1]).toBe('2026-12');
+  });
+
+  it('ALL_TIME_MONTHS без начислений даёт один текущий месяц', () => {
+    expect(resolveDepositMonthRange([], undefined, undefined, '2026-06-15', ALL_TIME_MONTHS))
+      .toEqual(['2026-06']);
+  });
+});
+
+describe('"за всё время" (ALL_TIME_MONTHS)', () => {
+  it('resolveMonthRange растягивает диапазон до самой ранней даты данных', () => {
+    expect(resolveMonthRange(undefined, undefined, '2026-03-10', ALL_TIME_MONTHS, '2025-11-20'))
+      .toEqual(['2025-11', '2025-12', '2026-01', '2026-02', '2026-03']);
+  });
+
+  it('resolveMonthRange без данных даёт только текущий месяц', () => {
+    expect(resolveMonthRange(undefined, undefined, '2026-03-10', ALL_TIME_MONTHS))
+      .toEqual(['2026-03']);
+  });
+
+  it('resolveMonthRange игнорирует дату данных в будущем', () => {
+    expect(resolveMonthRange(undefined, undefined, '2026-03-10', ALL_TIME_MONTHS, '2027-01-01'))
+      .toEqual(['2026-03']);
+  });
+
+  it('диапазон "за всё время" ограничен OVERVIEW_MAX_TREND_MONTHS', () => {
+    const months = resolveMonthRange(
+      undefined, undefined, '2026-03-10', ALL_TIME_MONTHS, '1970-01-01');
+    expect(months).toHaveLength(OVERVIEW_MAX_TREND_MONTHS + 1);
+    expect(months[months.length - 1]).toBe('2026-03');
+  });
+
+  it('явно заданный диапазон не ограничивается лимитом всё-время', () => {
+    // Границы заданы пользователем — уважаем их как есть.
+    const months = resolveMonthRange('2026-01-01', '2026-04-30', '2026-03-10', ALL_TIME_MONTHS);
+    expect(months).toEqual(['2026-01', '2026-02', '2026-03', '2026-04']);
+  });
+
+  it('calcSavingsRateOverTime покрывает все месяцы с записями', () => {
+    const records = [
+      rec({ date: '2025-09-10', type: RecordType.INCOME, amount: 10000 }),
+      rec({ date: '2026-03-10', type: RecordType.INCOME, amount: 10000 }),
+    ];
+    const result = calcSavingsRateOverTime(records, '', '', '2026-03-15', ALL_TIME_MONTHS);
+    expect(result[0].label).toBe('2025-09');
+    expect(result[result.length - 1].label).toBe('2026-03');
+  });
+
+  it('calcCreditBurdenOverTime покрывает период с открытия кредита', () => {
+    const credits = [credit({ startDate: '2025-10-05' })];
+    const result = calcCreditBurdenOverTime(credits, [], '', '', '2026-02-15', ALL_TIME_MONTHS);
+    expect(result[0].label).toBe('2025-10');
+    expect(result[result.length - 1].label).toBe('2026-02');
+  });
+
+  it('calcAssetsLiabilitiesOverTime покрывает период с первой операции', () => {
+    const deposits = [deposit({ startDate: '2025-12-01', amount: 50000 })];
+    const result = calcAssetsLiabilitiesOverTime(
+      deposits, [], [], [], '', '', '2026-02-15', ALL_TIME_MONTHS);
+    expect(result.map(r => r.label)).toEqual(['2025-12', '2026-01', '2026-02']);
+  });
+
+  it('окно по умолчанию остаётся прежним, когда всё-время не выбрано', () => {
+    const records = [rec({ date: '2020-01-10', type: RecordType.INCOME, amount: 10000 })];
+    const result = calcSavingsRateOverTime(records, '', '', '2026-03-15', 6);
+    expect(result.map(r => r.label)).toEqual(
+      ['2025-10', '2025-11', '2025-12', '2026-01', '2026-02', '2026-03']);
   });
 });
 

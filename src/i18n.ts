@@ -608,6 +608,9 @@ export interface Translations {
   overviewDepositToAccount: string;
   overviewDepositCumulativeProfit: string;
   overviewDepositBodyAmount: string;
+  overviewDepositTotalProfit: string;
+  overviewDepositProfitAccrued: string;
+  overviewDepositProfitPending: string;
   overviewDebtsRepaid: string;
   overviewDebtsPaid: string;
   overviewDaysShort: string;
@@ -1210,6 +1213,9 @@ const ru: Translations = {
   overviewDepositToAccount: 'На счёт',
   overviewDepositCumulativeProfit: 'Накопленный доход',
   overviewDepositBodyAmount: 'Тело вклада',
+  overviewDepositTotalProfit: 'Доход за весь срок',
+  overviewDepositProfitAccrued: 'начислено',
+  overviewDepositProfitPending: 'ожидается',
   overviewDebtsRepaid: 'Возвращено',
   overviewDebtsPaid: 'Выплачено',
   overviewDaysShort: 'дн.',
@@ -1812,6 +1818,9 @@ const en: Translations = {
   overviewDepositToAccount: 'To account',
   overviewDepositCumulativeProfit: 'Cumulative profit',
   overviewDepositBodyAmount: 'Principal',
+  overviewDepositTotalProfit: 'Profit over full term',
+  overviewDepositProfitAccrued: 'accrued',
+  overviewDepositProfitPending: 'expected',
   overviewDebtsRepaid: 'Repaid',
   overviewDebtsPaid: 'Paid off',
   overviewDaysShort: 'd',

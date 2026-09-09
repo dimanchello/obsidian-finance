@@ -64,6 +64,7 @@ export function defaultViewState(pageSize: number): ViewState {
     depositAnalyticsDateTo: '',
     overviewDateFrom: '',
     overviewDateTo: '',
+    overviewAllTime: false,
     overviewGroupBy: 'category',
   };
 }
@@ -116,6 +117,7 @@ export function parseViewState(raw: unknown, pageSize: number): ViewState {
   state.depositAnalyticsDateTo = str(raw.depositAnalyticsDateTo, '');
   state.overviewDateFrom = str(raw.overviewDateFrom, '');
   state.overviewDateTo = str(raw.overviewDateTo, '');
+  state.overviewAllTime = raw.overviewAllTime === true;
   state.overviewGroupBy = oneOf(raw.overviewGroupBy, OVERVIEW_GROUP_BY, 'category');
   
   if (typeof raw.creditExpandedId === 'string') state.creditExpandedId = raw.creditExpandedId;

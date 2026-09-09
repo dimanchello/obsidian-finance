@@ -46,6 +46,7 @@ export class BurdenChart {
    * @param dateFrom - начало периода
    * @param dateTo - конец периода
    * @param today - текущая дата
+   * @param trendMonths - ширина окна в месяцах; ALL_TIME_MONTHS растягивает график на все данные
    */
   render(
     parent: HTMLElement,
@@ -53,7 +54,8 @@ export class BurdenChart {
     records: FinanceRecord[],
     dateFrom: string | undefined,
     dateTo: string | undefined,
-    today: string
+    today: string,
+    trendMonths: number = OVERVIEW_TREND_MONTHS
   ): void {
     const { tr } = this.ctx;
 
@@ -66,7 +68,7 @@ export class BurdenChart {
       dateFrom,
       dateTo,
       today,
-      OVERVIEW_TREND_MONTHS
+      trendMonths
     );
 
     if (burdenData.length === 0 || burdenData.every(d => d.total === 0)) {
