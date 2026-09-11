@@ -64,7 +64,7 @@ export function defaultViewState(pageSize: number): ViewState {
     depositAnalyticsDateTo: '',
     overviewDateFrom: '',
     overviewDateTo: '',
-    overviewAllTime: false,
+    overviewAllTime: true,
     overviewGroupBy: 'category',
   };
 }
@@ -105,7 +105,7 @@ export function parseViewState(raw: unknown, pageSize: number): ViewState {
 
   const CREDIT_ANALYTICS_GROUP_BY: readonly CreditAnalyticsGroupBy[] = ['month', 'quarter', 'year', 'type', 'bank'];
   const DEPOSIT_ANALYTICS_GROUP_BY: readonly DepositAnalyticsGroupBy[] = ['month', 'quarter', 'year', 'type', 'bank'];
-  const OVERVIEW_GROUP_BY: readonly OverviewGroupBy[] = ['category', 'tag', 'payer'];
+  const OVERVIEW_GROUP_BY: readonly OverviewGroupBy[] = ['category', 'tag', 'payer', 'year', 'month', 'week'];
 
   state.creditActiveTab = oneOf(raw.creditActiveTab, ['list', 'analytics'] as const, 'list');
   state.creditAnalyticsGroupBy = oneOf(raw.creditAnalyticsGroupBy, CREDIT_ANALYTICS_GROUP_BY, 'month');
@@ -117,7 +117,7 @@ export function parseViewState(raw: unknown, pageSize: number): ViewState {
   state.depositAnalyticsDateTo = str(raw.depositAnalyticsDateTo, '');
   state.overviewDateFrom = str(raw.overviewDateFrom, '');
   state.overviewDateTo = str(raw.overviewDateTo, '');
-  state.overviewAllTime = raw.overviewAllTime === true;
+  state.overviewAllTime = state.overviewDateFrom === '' && state.overviewDateTo === '';
   state.overviewGroupBy = oneOf(raw.overviewGroupBy, OVERVIEW_GROUP_BY, 'category');
   
   if (typeof raw.creditExpandedId === 'string') state.creditExpandedId = raw.creditExpandedId;

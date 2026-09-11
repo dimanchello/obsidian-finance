@@ -1,8 +1,9 @@
 import { ViewContext } from '../../context';
-import { FinanceRecord, OverviewGroupBy, OVERVIEW_MIN_BAR_PCT, PERCENT_100 } from '../../types';
+import { FinanceRecord, OverviewGroupBy, OVERVIEW_MIN_BAR_PCT, PERCENT_100, DEFAULT_FILTER } from '../../types';
 import { createChartTooltip } from '../chartHelpers';
 import { calcGroupBreakdown } from '../../domain/overviewMetrics';
 import { isoWeekRange, daysInMonth } from '../../domain/dateMath';
+import { OverviewRecordsModal } from '../../modals/OverviewRecordsModal';
 
 export class BreakdownChart {
   private ctx: ViewContext;
@@ -65,47 +66,82 @@ export class BreakdownChart {
 
     breakdown.forEach(item => {
       const card = list.createDiv('finance-breakdown-item is-clickable');
-      card.title = `${tr.records} → ${item.key}`;
+      card.title = `${item.key} (${tr.overviewViewDetails})`;
 
       card.addEventListener('click', () => {
         this.tooltip.hideTip();
         const from = state.overviewDateFrom ?? '';
         const to = state.overviewDateTo ?? '';
 
-        this.ctx.state.filter = {
-          search: '',
-          type: 'all',
-          category: '',
-          tag: '',
-          payer: '',
-          dateFrom: from,
-          dateTo: to,
-        };
+        const nonInternalRecords = records.filter(r => !r.isInternal);
+        let sliceRecords: FinanceRecord[] = [];
+        let filterDateFrom = from;
+        let filterDateTo = to;
 
         if (currentGroupBy === 'category') {
-          this.ctx.state.filter.category = item.key === tr.other ? '' : item.key;
+          sliceRecords = nonInternalRecords.filter(r => (item.key === tr.other ? !r.category?.trim() : r.category?.trim() === item.key));
         } else if (currentGroupBy === 'tag') {
-          this.ctx.state.filter.tag = item.key === tr.other ? '' : item.key;
+          sliceRecords = nonInternalRecords.filter(r => (item.key === tr.other ? !r.tag?.trim() : r.tag?.trim() === item.key));
         } else if (currentGroupBy === 'payer') {
-          this.ctx.state.filter.payer = item.key === tr.other ? '' : item.key;
+          sliceRecords = nonInternalRecords.filter(r => (item.key === tr.other ? !r.payer?.trim() : r.payer?.trim() === item.key));
         } else if (currentGroupBy === 'year') {
-          this.ctx.state.filter.dateFrom = `${item.key}-01-01`;
-          this.ctx.state.filter.dateTo = `${item.key}-12-31`;
+          if (item.key === tr.other) {
+            sliceRecords = nonInternalRecords.filter(r => !r.date);
+            filterDateFrom = '';
+            filterDateTo = '';
+          } else {
+            filterDateFrom = `${item.key}-01-01`;
+            filterDateTo = `${item.key}-12-31`;
+            sliceRecords = nonInternalRecords.filter(r => r.date >= filterDateFrom && r.date <= filterDateTo);
+          }
         } else if (currentGroupBy === 'month') {
-          const [y, m] = item.key.split('-');
-          const lastDay = daysInMonth(Number(y), Number(m));
-          this.ctx.state.filter.dateFrom = `${item.key}-01`;
-          this.ctx.state.filter.dateTo = `${item.key}-${String(lastDay).padStart(2, '0')}`;
+          if (item.key === tr.other) {
+            sliceRecords = nonInternalRecords.filter(r => !r.date);
+            filterDateFrom = '';
+            filterDateTo = '';
+          } else {
+            const [y, m] = item.key.split('-');
+            const lastDay = daysInMonth(Number(y), Number(m));
+            filterDateFrom = `${item.key}-01`;
+            filterDateTo = `${item.key}-${String(lastDay).padStart(2, '0')}`;
+            sliceRecords = nonInternalRecords.filter(r => r.date >= filterDateFrom && r.date <= filterDateTo);
+          }
         } else if (currentGroupBy === 'week') {
-          const [yStr, wStr] = item.key.split('-W');
-          const range = isoWeekRange(Number(yStr), Number(wStr));
-          this.ctx.state.filter.dateFrom = range.from;
-          this.ctx.state.filter.dateTo = range.to;
+          if (item.key === tr.other) {
+            sliceRecords = nonInternalRecords.filter(r => !r.date);
+            filterDateFrom = '';
+            filterDateTo = '';
+          } else {
+            const [yStr, wStr] = item.key.split('-W');
+            const range = isoWeekRange(Number(yStr), Number(wStr));
+            filterDateFrom = range.from;
+            filterDateTo = range.to;
+            sliceRecords = nonInternalRecords.filter(r => r.date >= filterDateFrom && r.date <= filterDateTo);
+          }
         }
 
-        this.ctx.state.page = 0;
-        this.ctx.saveState();
-        onNavigate?.('records');
+        const handleNavigate = () => {
+          this.ctx.state.filter = {
+            ...DEFAULT_FILTER,
+            category: currentGroupBy === 'category' ? (item.key === tr.other ? '' : item.key) : '',
+            tag: currentGroupBy === 'tag' ? (item.key === tr.other ? '' : item.key) : '',
+            payer: currentGroupBy === 'payer' ? (item.key === tr.other ? '' : item.key) : '',
+            dateFrom: filterDateFrom,
+            dateTo: filterDateTo,
+          };
+
+          this.ctx.state.page = 0;
+          this.ctx.saveState();
+          onNavigate?.('records');
+        };
+
+        new OverviewRecordsModal(this.ctx.app, {
+          ctx: this.ctx,
+          title: item.key,
+          records: sliceRecords,
+          onNavigateToRecords: onNavigate ? handleNavigate : undefined,
+          onRecordUpdated: () => onGroupByChange?.(),
+        }).open();
       });
 
       const header = card.createDiv('finance-breakdown-item-header');

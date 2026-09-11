@@ -2,6 +2,7 @@ import { ViewContext } from '../../context';
 import { DebtRecord } from '../../types';
 import { createChartTooltip } from '../chartHelpers';
 import { calcDebtsBreakdown } from '../../domain/overviewMetrics';
+import { DebtDetailModal } from '../../modals/DebtDetailModal';
 
 export class DebtsBreakdownChart {
   private ctx: ViewContext;
@@ -15,7 +16,12 @@ export class DebtsBreakdownChart {
     this.tooltip.destroy();
   }
 
-  render(parent: HTMLElement, debts: DebtRecord[], onNavigate?: (mode: 'debts') => void): void {
+  render(
+    parent: HTMLElement,
+    debts: DebtRecord[],
+    onNavigate?: (mode: 'debts') => void,
+    onUpdate?: () => void
+  ): void {
     const { tr, data } = this.ctx;
     const chartWrap = parent.createDiv('finance-chart-wrap');
 
@@ -32,29 +38,37 @@ export class DebtsBreakdownChart {
 
     breakdown.forEach(item => {
       const card = list.createDiv('finance-breakdown-item is-clickable');
-      card.title = `${tr.debts} → ${item.person}`;
+      card.title = `${item.person} (${tr.overviewViewDetails})`;
 
       card.addEventListener('click', () => {
         this.tooltip.hideTip();
         const person = item.person.trim();
-        const match = (data?.debts ?? []).find(d => d.person.trim() === person);
+        const match = (data?.debts ?? []).find(d => (d.person.trim() || '—') === person);
+        if (!match) return;
 
-        this.ctx.state.debtFilter = {
-          search: '',
-          status: 'all',
-          direction: 'all',
-          dateFrom: '',
-          dateTo: '',
-          person: person === '—' ? '' : person,
+        const handleNavigate = () => {
+          this.ctx.state.debtFilter = {
+            search: '',
+            status: 'all',
+            direction: 'all',
+            dateFrom: '',
+            dateTo: '',
+            person: person === '—' ? '' : person,
+          };
+
+          this.ctx.state.debtExpandedId = match.id;
+          this.ctx.state.debtPage = 0;
+          this.ctx.saveState();
+          onNavigate?.('debts');
         };
 
-        if (match) {
-          this.ctx.state.debtExpandedId = match.id;
-        }
-
-        this.ctx.state.debtPage = 0;
-        this.ctx.saveState();
-        onNavigate?.('debts');
+        new DebtDetailModal(this.ctx.app, {
+          ctx: this.ctx,
+          debt: match,
+          person,
+          onNavigateToDebts: onNavigate ? handleNavigate : undefined,
+          onDebtUpdated: () => onUpdate?.(),
+        }).open();
       });
 
       const header = card.createDiv('finance-breakdown-item-header');

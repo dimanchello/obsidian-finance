@@ -9,15 +9,15 @@ describe('pageRange', () => {
 
   it('adds ellipsis for large page counts on desktop', () => {
     // Current at beginning
-    expect(pageRange(0, 20, false)).toEqual([0, 1, 2, 3, '…', 19]);
-    // Current in middle
-    expect(pageRange(10, 20, false)).toEqual([0, '…', 7, 8, 9, 10, 11, 12, 13, '…', 19]);
+    expect(pageRange(0, 20, false)).toEqual([0, 1, 2, -1, 19]);
+    // Current in middle (current 10 with radius 2: 8, 9 on left and 11, 12 on right)
+    expect(pageRange(10, 20, false)).toEqual([0, -1, 8, 9, 10, 11, 12, -1, 19]);
     // Current near end
-    expect(pageRange(18, 20, false)).toEqual([0, '…', 15, 16, 17, 18, 19]);
+    expect(pageRange(18, 20, false)).toEqual([0, -1, 16, 17, 18, 19]);
   });
 
   it('uses tighter radius on mobile', () => {
-    expect(pageRange(5, 20, true)).toEqual([0, '…', 4, 5, 6, '…', 19]);
+    expect(pageRange(5, 20, true)).toEqual([0, -1, 4, 5, 6, -1, 19]);
   });
 });
 

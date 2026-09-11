@@ -1,8 +1,9 @@
 import { CreditPayment, CreditRecord, ACCRUAL_STEP_MONTHLY, PERCENT_100 } from '../types';
 import { round2 } from './money';
-import { addMonthsClamped, withDayClamped } from './dateMath';
+import { addMonthsClamped, withDayClamped, safeEndDate } from './dateMath';
 import { getTodayStr, normalizeDateStr } from '../utils';
-import { PaymentStatus, CreditStatus } from '../constants';
+import { PaymentStatus, CreditStatus, CreditType } from '../constants';
+import type { Translations } from '../i18n';
 
 /**
  * Calculates standard bank annuity monthly payment.
@@ -187,4 +188,17 @@ export function calculateTotalInterestPaid(credit: CreditRecord): number {
   });
 
   return round2(totalInterest);
+}
+
+export function calculateCreditEndDate(credit: CreditRecord): string {
+  return safeEndDate(credit.startDate, credit.termMonths);
+}
+
+export function getCreditTypeLabel(type: CreditType, tr: Translations): string {
+  switch (type) {
+    case CreditType.MORTGAGE: return tr.creditTypeMortgage;
+    case CreditType.AUTO: return tr.creditTypeAuto;
+    case CreditType.CONSUMER:
+    default: return tr.creditTypeConsumer;
+  }
 }

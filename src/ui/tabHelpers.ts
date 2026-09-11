@@ -1,7 +1,7 @@
 import { fmtDate } from "../utils";
 import { Translations } from '../i18n';
 import { FilterControl } from './DataTable';
-import { PERCENT_100, PAGE_RANGE_THRESHOLD } from '../types';
+import { PERCENT_100 } from '../types';
 import { ViewContext } from '../context';
 import { daysBetweenStr, safeEndDate } from '../domain/dateMath';
 import { getTodayStr } from '../utils';
@@ -30,18 +30,11 @@ export function renderProgressBar(
   if (progress >= PERCENT_100) progressFill.addClass('is-complete');
 }
 
-export function pageRange(current: number, total: number, isMobile: boolean): (number | '…')[] {
-  if (total <= PAGE_RANGE_THRESHOLD) return Array.from({ length: total }, (_, i) => i);
-  const radius = isMobile ? 1 : 3;
-  const p: (number | '…')[] = [0];
-  if (current > radius + 1) p.push('…');
-  for (let i = Math.max(1, current - radius); i <= Math.min(total - 2, current + radius); i++) {
-    p.push(i);
-  }
-  if (current < total - (radius + 2)) p.push('…');
-  p.push(total - 1);
-  return p;
-}
+export {
+  pageRange,
+  renderPagination,
+  type PaginationOptions,
+} from './pagination';
 
 export function renderPaginatedSchedule<T extends { dueDate: string; status: string; amount: number }>(
   host: HTMLElement,
@@ -82,18 +75,13 @@ export function renderPaginatedSchedule<T extends { dueDate: string; status: str
   });
 }
 
-export function renderSummaryCard(
-  host: HTMLElement,
-  opts: { icon: string; title: string; main: string; sub: string; mod?: string }
-): void {
-  const card = host.createDiv(`finance-stat-card ${opts.mod ?? ''}`);
-  const header = card.createDiv('finance-debt-summary-header');
-  header.createEl('span', { text: opts.icon, cls: 'finance-debt-summary-icon' });
-  header.createEl('span', { text: opts.title, cls: 'finance-debt-summary-title' });
-  const content = card.createDiv('finance-debt-summary-content');
-  content.createEl('div', { text: opts.main, cls: 'finance-debt-summary-main' });
-  content.createEl('div', { text: opts.sub, cls: 'finance-debt-summary-sub' });
-}
+export {
+  renderStatCard,
+  renderStatCards,
+  type StatCardItem,
+  renderSummaryCard,
+  type SummaryCardItem,
+} from './statCards';
 
 export function renderMobileCard(
   block: HTMLElement,
@@ -164,5 +152,3 @@ export function createAnalyticsToggle(
 export function calculateEndDate(startDate: string, termMonths: number | undefined): string | null {
   return safeEndDate(startDate, termMonths) || null;
 }
-
-export { renderStatCard, renderStatCards, type StatCardItem } from './statCards';

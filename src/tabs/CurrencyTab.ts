@@ -11,6 +11,7 @@ import { getCurrencyBalances } from '../domain/currencyBalance';
 import { DataTable, FilterControl } from '../ui/DataTable';
 import { fmt } from '../utils';
 import { AccountCommands } from '../domain/AccountCommands';
+import { renderSummaryCard } from '../ui/statCards';
 
 export class CurrencyTab {
   private ctx: ViewContext;
@@ -219,19 +220,18 @@ export class CurrencyTab {
     balances.forEach((metrics, currency) => {
       if (metrics.balance === 0) return;
 
-      const card = summary.createDiv('finance-stat-card finance-stat-deposit-active');
-      const header = card.createDiv('finance-debt-summary-header');
-      header.createEl('span', { text: '💱', cls: 'finance-debt-summary-icon' });
-      header.createEl('span', { text: currency, cls: 'finance-debt-summary-title' });
-
-      const content = card.createDiv('finance-debt-summary-content');
-      content.createEl('div', { text: fmt(metrics.balance, currency), cls: 'finance-debt-summary-main' });
-
       let subText = `${this.tr.averageRate}: ${metrics.averageBuyRate.toFixed(2)}`;
       if (metrics.averageBuyRate > 0 && this.ctx.data) {
         subText += ` · ~ ${this.ctx.fmt(metrics.balance * metrics.averageBuyRate)}`;
       }
-      content.createEl('div', { text: subText, cls: 'finance-debt-summary-sub' });
+
+      renderSummaryCard(summary, {
+        icon: '💱',
+        title: currency,
+        main: fmt(metrics.balance, currency),
+        sub: subText,
+        mod: 'finance-stat-deposit-active',
+      });
     });
   }
 

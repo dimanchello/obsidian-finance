@@ -4,6 +4,7 @@ import { createChartTooltip, fmtShort, svg } from '../chartHelpers';
 import { calcDepositInterestOverTime, calcActiveDepositsProgress, DepositInterestMonth, ActiveDepositProgress } from '../../domain/overviewMetrics';
 import { fmtDate } from '../../utils';
 import { DepositAccrualType, PaymentStatus } from '../../constants';
+import { DepositDetailModal } from '../../modals/DepositDetailModal';
 
 export class DepositsOverview {
   private ctx: ViewContext;
@@ -22,7 +23,8 @@ export class DepositsOverview {
     deposits: DepositRecord[],
     today: string,
     onNavigate?: (mode: 'deposits') => void,
-    trendMonths: number = OVERVIEW_TREND_MONTHS
+    trendMonths: number = OVERVIEW_TREND_MONTHS,
+    onUpdate?: () => void
   ): void {
     const { tr, state } = this.ctx;
     const chartWrap = parent.createDiv('finance-chart-wrap finance-chart-wrap-full');
@@ -61,7 +63,7 @@ export class DepositsOverview {
       return;
     }
 
-    this.renderActiveDeposits(section, activeDeposits, depositColorMap, onNavigate);
+    this.renderActiveDeposits(section, activeDeposits, depositColorMap, onNavigate, deposits, onUpdate);
   }
 
   private renderInterestChart(
@@ -233,21 +235,35 @@ export class DepositsOverview {
     parent: HTMLElement,
     activeDeposits: ActiveDepositProgress[],
     depositColorMap: Map<string, string>,
-    onNavigate?: (mode: 'deposits') => void
+    onNavigate?: (mode: 'deposits') => void,
+    deposits?: DepositRecord[],
+    onUpdate?: () => void
   ): void {
     const { tr } = this.ctx;
     const grid = parent.createDiv('finance-deposits-overview-grid');
 
     activeDeposits.forEach((dep: ActiveDepositProgress) => {
       const card = grid.createDiv('finance-deposit-overview-card is-clickable');
-      card.title = `${tr.deposits} → ${dep.name}`;
+      card.title = `${dep.name} (${tr.overviewViewDetails})`;
 
       card.addEventListener('click', () => {
         this.tooltip.hideTip();
-        this.ctx.state.depositExpandedId = dep.id;
-        this.ctx.state.depositPage = 0;
-        this.ctx.saveState();
-        onNavigate?.('deposits');
+        const fullDeposit = deposits?.find(d => d.id === dep.id);
+        if (!fullDeposit) return;
+
+        const handleNavigate = () => {
+          this.ctx.state.depositExpandedId = dep.id;
+          this.ctx.state.depositPage = 0;
+          this.ctx.saveState();
+          onNavigate?.('deposits');
+        };
+
+        new DepositDetailModal(this.ctx.app, {
+          ctx: this.ctx,
+          deposit: fullDeposit,
+          onNavigateToDeposits: onNavigate ? handleNavigate : undefined,
+          onDepositUpdated: () => onUpdate?.(),
+        }).open();
       });
 
       const depositColor = depositColorMap.get(dep.id) ?? 'var(--color-green)';
@@ -305,10 +321,14 @@ export class DepositsOverview {
       const val3 = col3.createDiv('finance-deposit-stat-val success');
       val3.createSpan({ text: dep.totalProfit > 0 ? `+${this.fmt(dep.totalProfit)}` : '—' });
       if (dep.totalProfit > 0) {
-        col3.createDiv({
-          text: `${this.fmt(dep.accruedProfit)} ${tr.overviewDepositProfitAccrued} · ${this.fmt(dep.pendingProfit)} ${tr.overviewDepositProfitPending}`,
-          cls: 'finance-deposit-stat-sub',
-        });
+        const sub = col3.createDiv('finance-deposit-stat-sub');
+        const accruedPill = sub.createSpan('finance-deposit-sub-pill accrued');
+        accruedPill.createSpan({ cls: 'pill-dot', text: '●' });
+        accruedPill.createSpan({ cls: 'pill-text', text: `${this.fmt(dep.accruedProfit)} ${tr.overviewDepositProfitAccrued}` });
+
+        const pendingPill = sub.createSpan('finance-deposit-sub-pill pending');
+        pendingPill.createSpan({ cls: 'pill-dot', text: '○' });
+        pendingPill.createSpan({ cls: 'pill-text', text: `${this.fmt(dep.pendingProfit)} ${tr.overviewDepositProfitPending}` });
       }
 
       const col4 = bodyRow.createDiv('finance-deposit-stat-col');

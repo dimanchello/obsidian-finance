@@ -33,3 +33,29 @@ export function renderStatCards(
   const wrap = container.createDiv(wrapperCls);
   cards.forEach(item => renderStatCard(wrap, item));
 }
+
+export interface SummaryCardItem {
+  icon: string;
+  title: string;
+  main: string;
+  sub: string;
+  mod?: string;
+}
+
+/**
+ * Renders a two-column summary card (used in Debts, Credits, Deposits, Currency tabs)
+ * with an icon and title on the left and main/sub values on the right.
+ */
+export function renderSummaryCard(
+  container: HTMLElement,
+  opts: SummaryCardItem
+): HTMLElement {
+  const card = container.createDiv(`finance-stat-card ${opts.mod ?? ''}`);
+  const header = card.createDiv('finance-debt-summary-header');
+  header.createEl('span', { text: opts.icon, cls: 'finance-debt-summary-icon' });
+  header.createEl('span', { text: opts.title, cls: 'finance-debt-summary-title' });
+  const content = card.createDiv('finance-debt-summary-content');
+  content.createEl('div', { text: opts.main, cls: 'finance-debt-summary-main' });
+  content.createEl('div', { text: opts.sub, cls: 'finance-debt-summary-sub' });
+  return card;
+}

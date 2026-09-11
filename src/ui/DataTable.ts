@@ -1,7 +1,7 @@
 import { ViewContext } from '../context';
 import { SortDir, SEARCH_DEBOUNCE_MS } from '../types';
 import { Combobox, ComboOption } from './Combobox';
-import { pageRange } from './pagination';
+import { renderPagination } from './pagination';
 import { ColumnVisibilityModal } from '../ColumnVisibilityModal';
 import { ConfirmModal } from '../ConfirmModal';
 
@@ -594,32 +594,16 @@ export class DataTable<T> {
   }
 
   private renderPagination(host: HTMLElement, totalPages: number, current: number): void {
-    const nav = host.createDiv('finance-pagination-nav');
-    const go = (page: number) => {
-      this.spec.state.setPage(page);
-      this.spec.rerender();
-    };
-
-    const prev = nav.createEl('button', { cls: 'finance-page-btn', text: '←' });
-    prev.disabled = current === 0;
-    prev.addEventListener('click', () => go(current - 1));
-
-    this.pageRange(current, totalPages).forEach(p => {
-      if (p === -1) { nav.createEl('span', { text: '…', cls: 'finance-page-ellipsis' }); return; }
-      const btn = nav.createEl('button', {
-        text: String(p + 1),
-        cls: `finance-page-btn${p === current ? ' active' : ''}`,
-      });
-      btn.addEventListener('click', () => go(p));
+    renderPagination({
+      container: host,
+      currentPage: current,
+      totalPages,
+      isMobile: this.ctx.isMobile,
+      onPageChange: page => {
+        this.spec.state.setPage(page);
+        this.spec.rerender();
+      },
     });
-
-    const next = nav.createEl('button', { cls: 'finance-page-btn', text: '→' });
-    next.disabled = current >= totalPages - 1;
-    next.addEventListener('click', () => go(current + 1));
-  }
-
-  private pageRange(cur: number, total: number): number[] {
-    return pageRange(cur, total, this.ctx.isMobile);
   }
 
   private confirmBulkDelete(): void {

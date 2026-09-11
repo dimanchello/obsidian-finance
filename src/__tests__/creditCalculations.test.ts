@@ -5,8 +5,11 @@ import {
   generateAnnuitySchedule,
   calculateRemainingPrincipal,
   calculateTotalInterestPaid,
+  calculateCreditEndDate,
+  getCreditTypeLabel,
 } from '../domain/creditCalculations';
 import { CreditRecord, CreditType, CreditStatus, PaymentStatus } from '../types';
+import { t } from '../i18n';
 
 describe('creditCalculations', () => {
   describe('calculateAnnuityPayment', () => {
@@ -293,4 +296,37 @@ describe('creditCalculations', () => {
       })).toBe(50000);
     });
   });
+
+  describe('calculateCreditEndDate', () => {
+    it('calculates end date correctly based on startDate and termMonths', () => {
+      const credit: CreditRecord = {
+        id: 'c1',
+        name: 'Credit 1',
+        type: CreditType.CONSUMER,
+        bankName: 'Bank',
+        originalAmount: 100000,
+        currentAmount: 100000,
+        interestRate: 10,
+        monthlyPayment: 1000,
+        termMonths: 12,
+        startDate: '2025-01-15',
+        createdAt: 1000,
+        note: '',
+        status: CreditStatus.ACTIVE,
+        earlyRepaymentOption: null,
+        payments: [],
+      };
+      expect(calculateCreditEndDate(credit)).toBe('2026-01-15');
+    });
+  });
+
+  describe('getCreditTypeLabel', () => {
+    it('returns localized label for each credit type', () => {
+      const ru = t('ru');
+      expect(getCreditTypeLabel(CreditType.MORTGAGE, ru)).toBe(ru.creditTypeMortgage);
+      expect(getCreditTypeLabel(CreditType.AUTO, ru)).toBe(ru.creditTypeAuto);
+      expect(getCreditTypeLabel(CreditType.CONSUMER, ru)).toBe(ru.creditTypeConsumer);
+    });
+  });
 });
+

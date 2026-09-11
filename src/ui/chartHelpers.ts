@@ -32,13 +32,20 @@ function getOrCreateTooltipEl(): HTMLDivElement {
   }
   if (!clickListenerAttached) {
     clickListenerAttached = true;
-    window.addEventListener(
-      'click',
-      () => {
-        sharedTooltipEl?.classList.remove('is-visible');
-      },
-      { capture: true }
-    );
+    const hideTip = (ev: Event) => {
+      const target = ev.target as Element | null;
+      if (
+        target?.classList.contains('finance-chart-bar-hover') ||
+        target?.classList.contains('finance-chart-point') ||
+        target?.closest('.finance-chart-bar-hover') ||
+        target?.closest('.finance-chart-point')
+      ) {
+        return;
+      }
+      sharedTooltipEl?.classList.remove('is-visible');
+    };
+    window.addEventListener('click', hideTip, { capture: true });
+    window.addEventListener('touchstart', hideTip, { passive: true });
   }
   return sharedTooltipEl;
 }

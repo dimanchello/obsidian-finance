@@ -10,6 +10,7 @@ describe('defaultViewState', () => {
     expect(s.debtFilter).toBeDefined();
     expect(s.creditFilter).toBeDefined();
     expect(s.depositFilter).toBeDefined();
+    expect(s.overviewAllTime).toBe(true);
   });
 });
 
@@ -71,12 +72,25 @@ describe('parseViewState', () => {
     expect(s.overviewAllTime).toBe(false);
   });
 
-  it('сохраняет выбор "за всё время"', () => {
+  it('сохраняет группировку распределения операций по месяцам, годам и неделям', () => {
+    expect(parseViewState({ overviewGroupBy: 'month' }, 25).overviewGroupBy).toBe('month');
+    expect(parseViewState({ overviewGroupBy: 'year' }, 25).overviewGroupBy).toBe('year');
+    expect(parseViewState({ overviewGroupBy: 'week' }, 25).overviewGroupBy).toBe('week');
+    expect(parseViewState({ overviewGroupBy: 'payer' }, 25).overviewGroupBy).toBe('payer');
+    expect(parseViewState({ overviewGroupBy: 'category' }, 25).overviewGroupBy).toBe('category');
+    expect(parseViewState({ overviewGroupBy: 'unknown_value' }, 25).overviewGroupBy).toBe('category');
+  });
+
+  it('по умолчанию выбран фильтр "за всё время"', () => {
+    expect(parseViewState({}, 25).overviewAllTime).toBe(true);
+    expect(parseViewState(null, 25).overviewAllTime).toBe(true);
     expect(parseViewState({ overviewAllTime: true }, 25).overviewAllTime).toBe(true);
   });
 
-  it('нелогическое значение overviewAllTime трактуется как false', () => {
-    expect(parseViewState({ overviewAllTime: 'да' }, 25).overviewAllTime).toBe(false);
-    expect(parseViewState({}, 25).overviewAllTime).toBe(false);
+  it('при наличии дат overviewAllTime сбрасывается в false', () => {
+    expect(parseViewState({ overviewDateFrom: '2026-01-01' }, 25).overviewAllTime).toBe(false);
+    expect(parseViewState({ overviewDateTo: '2026-06-30' }, 25).overviewAllTime).toBe(false);
+    expect(parseViewState({ overviewDateFrom: '2026-01-01', overviewDateTo: '2026-06-30' }, 25).overviewAllTime).toBe(false);
+    expect(parseViewState({ overviewDateFrom: '2026-01-01', overviewAllTime: true }, 25).overviewAllTime).toBe(false);
   });
 });

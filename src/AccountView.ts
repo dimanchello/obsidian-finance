@@ -131,6 +131,7 @@ export class AccountView extends MarkdownRenderChild {
       this.header.updateButtons();
       this.renderBodyContent();
     };
+    tab.onUpdate = () => this.refreshAndRender();
     tab.render();
   }
 

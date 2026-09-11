@@ -10,12 +10,16 @@ import { CreditModal } from '../CreditModal';
 import { CreditPaymentModal } from '../CreditPaymentModal';
 import { CreditEarlyRepaymentModal } from '../CreditEarlyRepaymentModal';
 import { ConfirmModal } from '../ConfirmModal';
-import { safeEndDate } from '../domain/dateMath';
 import { sumMoney } from '../domain/money';
-import { calculatePaymentBreakdown, calculateRemainingPrincipal } from '../domain/creditCalculations';
+import {
+  calculatePaymentBreakdown,
+  calculateRemainingPrincipal,
+  calculateCreditEndDate,
+  getCreditTypeLabel,
+} from '../domain/creditCalculations';
 import { DataTable, FilterControl } from '../ui/DataTable';
 import { CreditsAnalyticsView } from '../CreditsAnalyticsView';
-import { renderMobileCard, renderSummaryCard, renderProgressBar, renderPaginatedSchedule, pageRange, dateRangeControls, compareValues } from '../ui/tabHelpers';
+import { renderMobileCard, renderSummaryCard, renderProgressBar, renderPaginatedSchedule, renderPagination, dateRangeControls, compareValues } from '../ui/tabHelpers';
 import { AccountCommands, type CreditNoteTranslations } from '../domain/AccountCommands';
 import { CreditStatus, CreditType, PaymentStatus } from '../constants';
 
@@ -156,16 +160,11 @@ export class CreditsTab {
   }
 
   private typeLabel(credit: CreditRecord): string {
-    switch (credit.type) {
-      case CreditType.CONSUMER: return this.tr.creditTypeConsumer;
-      case CreditType.AUTO: return this.tr.creditTypeAuto;
-      case CreditType.MORTGAGE: return this.tr.creditTypeMortgage;
-      default: return this.tr.creditTypeCredit;
-    }
+    return getCreditTypeLabel(credit.type, this.tr);
   }
 
   private calculateCreditEndDate(credit: CreditRecord): string {
-    return safeEndDate(credit.startDate, credit.termMonths);
+    return calculateCreditEndDate(credit);
   }
 
   // ── Stats ────────────────────────────────────────────────────────────────
@@ -322,31 +321,18 @@ export class CreditsTab {
       this.ctx
     );
 
-    if (totalPages > 1) {
-      const pagNav = wrapper.createDiv('finance-pagination-nav finance-panel-pagination');
-      const go = (newPage: number) => {
+    renderPagination({
+      container: wrapper,
+      currentPage: page,
+      totalPages,
+      isMobile: this.ctx.isMobile,
+      cls: 'finance-panel-pagination',
+      onPageChange: newPage => {
         this.creditPaymentPages.set(credit.id, newPage);
         parent.empty();
         this.renderCreditPaymentsPanel(parent, credit);
-      };
-
-      const prev = pagNav.createEl('button', { cls: 'finance-page-btn', text: '←' });
-      prev.disabled = page === 0;
-      prev.addEventListener('click', () => go(page - 1));
-
-      pageRange(page, totalPages, this.ctx.isMobile).forEach(p => {
-        if (p === '…') { pagNav.createEl('span', { text: '…', cls: 'finance-page-ellipsis' }); return; }
-        const btn = pagNav.createEl('button', {
-          text: String(p + 1),
-          cls: `finance-page-btn${p === page ? ' active' : ''}`,
-        });
-        btn.addEventListener('click', () => go(p));
-      });
-
-      const next = pagNav.createEl('button', { cls: 'finance-page-btn', text: '→' });
-      next.disabled = page >= totalPages - 1;
-      next.addEventListener('click', () => go(page + 1));
-    }
+      },
+    });
   }
 
   // ── Modals ──────────────────────────────────────────────────────────────

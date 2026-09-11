@@ -40,7 +40,7 @@ Obsidian плагин для личного финансового учёта. �
 - `autoTransactions.ts` — advances schedules to today, materializes deposit/credit records
 - `linkedRecords.ts` — creates/unlinks mirrored FinanceRecords for debts/credits/deposits
 - `schedule.ts` — builds credit payment and deposit accrual schedules
-- `creditCalculations.ts`, `debtCalculations.ts` — interest/annuity math
+- `creditCalculations.ts`, `debtCalculations.ts`, `depositCalculations.ts` — interest/annuity/deposit math
 - `overviewMetrics.ts` — dashboard calculations (savings rate, debt burden, trends).
   Trend span is a month count; `ALL_TIME_MONTHS` (0) is a sentinel meaning "span the data",
   clamped to `OVERVIEW_MAX_TREND_MONTHS`. `calcActiveDepositsProgress` returns
@@ -78,9 +78,9 @@ Reusable UI components:
 - `Combobox.ts` — searchable dropdown
 - `DateField.ts` — date picker wrapper
 - `formHelpers.ts`, `tabHelpers.ts`, `pagination.ts` — form/table utilities
-  (`tabHelpers` also re-exports `renderStatCard`/`renderStatCards` and wraps
-  `calculateEndDate` around `domain/dateMath.safeEndDate`)
-- `statCards.ts` — `renderStatCard` / `renderStatCards` / `StatCardItem`; separate module so
+  (`tabHelpers` also re-exports `renderStatCard`/`renderStatCards`/`renderSummaryCard` and wraps
+  `calculateEndDate` around `domain/dateMath.safeEndDate`; `pagination.ts` provides `renderPagination` and `pageRange`)
+- `statCards.ts` — `renderStatCard` / `renderStatCards` / `renderSummaryCard` / `StatCardItem` / `SummaryCardItem`; separate module so
   `context.ts` can use it without importing `tabHelpers` (which imports `ViewContext`)
 - `attachmentField.ts` — file attachment picker
 - `chartHelpers.ts` — SVG chart rendering utilities
@@ -88,10 +88,14 @@ Reusable UI components:
 
 **`src/ui/charts/`**
 Chart components used by `OverviewTab`: `MoneyFlowChart`, `AssetsChart`, `BurdenChart`,
-`BreakdownChart`, `SavingsRateChart`, `DebtsBreakdownChart`, `DepositsOverview`.
+`BreakdownChart`, `SavingsRateChart`, `DebtsBreakdownChart`, `DepositsOverview`, `CreditsOverview`.
 The four trend charts (`AssetsChart`, `BurdenChart`, `SavingsRateChart`, `DepositsOverview`)
 take a trailing `trendMonths` argument; `OverviewTab` passes `ALL_TIME_MONTHS` when
-`state.overviewAllTime` is set, otherwise `OVERVIEW_TREND_MONTHS`.
+`state.overviewAllTime` is set, otherwise `OVERVIEW_TREND_MONTHS`. Clicking items in
+`BreakdownChart`, `SavingsRateChart`, `DepositsOverview`, `CreditsOverview`, and `DebtsBreakdownChart` opens
+detail modals (`OverviewRecordsModal`, `DepositDetailModal`, `CreditDetailModal`, `DebtDetailModal`) showing
+filtered records, deposit accruals, credit payments or debt movements, with deep-link navigation buttons
+to the corresponding tabs.
 
 **`src/__tests__/`**
 Vitest tests:
@@ -537,7 +541,8 @@ It owns `onClose()` (empties the body) plus `openHeader(title)` / `openBody()`.
 
 **Helper modals — extend `FinanceBaseModal` directly** (not entity forms):
 `CalculatorModal`, `ColumnVisibilityModal`, `ConfirmModal`, `CreditEarlyRepaymentModal`,
-`FieldInfoModal`, `ImportExportModal`, `OrphanedAccountsModal`.
+`FieldInfoModal`, `ImportExportModal`, `OrphanedAccountsModal`,
+`OverviewRecordsModal`, `DepositDetailModal`, `CreditDetailModal`, `DebtDetailModal`.
 
 `ConfirmModal` uses its own `.finance-confirm-modal` skin; `FieldInfoModal` and
 `OrphanedAccountsModal` render their own heading via `openBody()`.
@@ -615,8 +620,8 @@ It owns `onClose()` (empties the body) plus `openHeader(title)` / `openBody()`.
 **Used by:** ViewContext, tabs
 
 Overview period: `overviewDateFrom`/`overviewDateTo` hold the bounds, and `overviewAllTime`
-distinguishes an explicit "all time" pick from "no filter yet" — both leave the bounds empty.
-Editing either date input clears the flag.
+indicates that "all time" is selected (true by default when date bounds are empty).
+Editing either date input clears the flag unless both inputs are empty.
 
 ### AccountCommands
 **Definition:** `src/domain/AccountCommands.ts:33`  

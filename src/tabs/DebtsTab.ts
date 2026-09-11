@@ -295,7 +295,7 @@ export class DebtsTab {
       value: hasInterest ? `${this.ctx.fmt(original)} → ${this.ctx.fmt(withInterest)}` : this.ctx.fmt(original),
     });
     if (remaining > 0) details.push({ label: `📉 ${this.tr.remaining}:`, value: this.ctx.fmt(remaining) });
-    if (debt.dueDate) details.push({ label: `📅 ${this.tr.dueBy}`, value: fmtDate(debt.dueDate) });
+    if (debt.dueDate) details.push({ label: this.tr.dueBy, value: fmtDate(debt.dueDate) });
     if (hasInterest) details.push({ label: `📊`, value: `${debt.interestRate}%` });
 
     renderMobileCard(block, {

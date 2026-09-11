@@ -382,7 +382,7 @@
   overflow-x: auto;
   overflow-y: hidden;
   width: 100%;
-  height: 340px;
+  height: auto;
 }
 .finance-chart-svg {
   display: block;
@@ -1298,9 +1298,13 @@
   .finance-form-grid          { grid-template-columns: 1fr; }
   .finance-export-grid        { grid-template-columns: 1fr 1fr !important; }
   .finance-ie-modal .finance-export-grid { grid-template-columns: 1fr 1fr !important; }
-  .finance-header             { flex-direction: column; align-items: flex-start; gap: 8px; }
-  .finance-header-right       { width: 100%; flex-wrap: wrap; }
-  .finance-header-actions     { flex: 1; min-width: 0; flex-wrap: wrap; }
+  .finance-header             { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+  .finance-header-left        { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
+  .finance-header-right       { display: contents; }
+  .finance-more-dropdown      { order: 2; margin-left: auto; flex-shrink: 0; display: flex; align-items: center; }
+  .finance-more-btn           { flex: none !important; width: auto !important; min-width: 38px; height: 32px; padding: 4px 10px; display: inline-flex; align-items: center; justify-content: center; }
+  .finance-header-actions     { order: 3; width: 100%; display: flex; gap: 8px; flex-wrap: wrap; }
+  .finance-header-actions:empty { display: none; }
   .finance-analytics-controls { flex-direction: column; align-items: flex-start; }
   .finance-analytics-date-row { flex-direction: column; gap: 12px; }
   .finance-table-info-bar     { flex-direction: column; align-items: flex-start; gap: 6px; }
@@ -1334,19 +1338,11 @@
     flex-direction: row !important;
     align-items: center;
   }
-  /* Долговые сводные карточки - тоже вертикально */
-  .finance-stat-lent-summary,
-  .finance-stat-borrowed-summary {
-    width: 100% !important;
-    max-width: 100% !important;
-    flex-direction: column !important;
-    align-items: flex-start;
-  }
 
   .finance-stat-icon  { width: 40px; height: 40px; font-size: 1.2em; flex-shrink: 0; }
   .finance-stat-label { font-size: .75em; }
   .finance-stat-value { font-size: 1.1em; }
-  .finance-stat-info { flex: 1; min-width: 0; }
+  .finance-stat-info  { flex: 1; min-width: 0; }
 
   /* ── Filters: bigger targets, sort pills wrap ────────────────────────── */
   .finance-filters-container { padding: 12px 14px; }
@@ -1357,6 +1353,7 @@
   .finance-custom-select-text { font-size: 1em; }
   .finance-sort-btn           { padding: 8px 14px; font-size: .85em; min-height: 36px; }
   .finance-sort-row           { flex-wrap: wrap; row-gap: 8px; }
+  .finance-sort-label         { width: 100%; margin-bottom: 2px; }
   .finance-analytics-toggle-row { flex-wrap: wrap; gap: 6px; }
   .finance-analytics-toggle-btn { flex: 1; text-align: center; min-height: 40px; font-size: .85em; }
   .finance-reset-btn { padding: 10px 16px; min-height: 44px; }
@@ -1840,8 +1837,6 @@
 /* ── Очень маленькие экраны (< 400px) ────────────────────────────────────── */
 @media (max-width: 400px) {
   .finance-stat-card          { width: 140px; padding: 10px 12px; }
-  .finance-stat-lent-summary,
-  .finance-stat-borrowed-summary { width: 160px; }
   .finance-add-btn            { padding: 9px 10px; font-size: .82em; }
   .finance-export-grid,
   .finance-ie-modal .finance-export-grid { grid-template-columns: 1fr !important; }
@@ -3091,12 +3086,17 @@
   border-radius: var(--ft-radius);
   border: 1px solid var(--ft-border);
   margin-bottom: 10px;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .finance-overview-presets {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .finance-overview-preset-btn {
@@ -3504,6 +3504,34 @@
   font-size: 0.68em;
   color: var(--text-muted);
   white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.finance-deposit-sub-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: var(--background-modifier-hover);
+  font-size: 11px;
+}
+
+.finance-deposit-sub-pill .pill-dot {
+  font-size: 8px;
+  line-height: 1;
+}
+
+.finance-deposit-sub-pill.accrued {
+  color: #16a34a;
+  background: rgba(34, 197, 94, 0.1);
+}
+
+.finance-deposit-sub-pill.pending {
+  color: var(--text-muted);
+  background: var(--background-modifier-hover);
 }
 
 .finance-deposit-stat-lbl {
@@ -3571,33 +3599,95 @@
     font-size: 0.95em;
   }
 
-  /* Filter bar: stack vertically */
+  /* Filter bar on mobile */
   .finance-overview-filter-bar {
     flex-direction: column;
     align-items: stretch;
-    gap: 10px;
-    padding: 10px;
+    gap: 8px;
+    padding: 10px 12px;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
   }
 
   .finance-overview-presets {
-    justify-content: flex-start;
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: var(--ft-border) transparent;
+    gap: 6px;
+    padding: 2px 2px 6px;
+    margin: 0;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .finance-overview-presets::-webkit-scrollbar {
+    height: 4px;
+    display: block;
+  }
+
+  .finance-overview-presets::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .finance-overview-presets::-webkit-scrollbar-thumb {
+    background: var(--ft-border);
+    border-radius: 2px;
   }
 
   .finance-overview-preset-btn {
-    padding: 6px 10px;
-    font-size: .75em;
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: 500;
+    border-radius: 16px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    min-height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .finance-overview-preset-btn.is-active {
+    background: var(--interactive-accent);
+    color: var(--text-on-accent);
+    border-color: var(--interactive-accent);
+    font-weight: 600;
   }
 
   .finance-overview-date-range {
-    margin-left: 0;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
     width: 100%;
-    justify-content: space-between;
-    flex-wrap: wrap;
+    margin-left: 0;
   }
 
   .finance-overview-date-range .finance-filter-group {
-    flex: 1;
-    min-width: 140px;
+    min-width: 0;
+    width: 100%;
+    flex: none;
+  }
+
+  .finance-overview-date-range .finance-filter-label {
+    font-size: 10.5px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 2px;
+  }
+
+  .finance-overview-date-range .finance-filter-input {
+    width: 100%;
+    height: 36px;
+    font-size: 12px;
+    border-radius: var(--ft-radius-sm, 6px);
+    padding: 4px 8px;
+    box-sizing: border-box;
   }
 
   /* Chart wraps: reduce padding */
@@ -3702,7 +3792,18 @@
   /* Stacked cards put label and value on one line; the accrued/pending split wraps below. */
   .finance-deposit-stat-sub {
     width: 100%;
-    text-align: right;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    margin-top: 5px;
+  }
+
+  .finance-deposit-sub-pill {
+    font-size: 11px;
+    padding: 3px 6px;
+    border-radius: 10px;
+    justify-content: center;
+    text-align: center;
   }
 
   .finance-deposit-stat-lbl {
@@ -3733,5 +3834,539 @@
 
   .finance-stat-info {
     flex: 1;
+  }
+}
+
+/* ── Overview detail modals (Records, Deposits, Debts) ─────────────────── */
+.modal.finance-overview-records-modal {
+  max-width: 900px !important;
+  width: min(96vw, 900px) !important;
+}
+
+.modal.finance-deposit-detail-modal,
+.modal.finance-debt-detail-modal,
+.modal.finance-credit-detail-modal {
+  max-width: 680px !important;
+  width: min(96vw, 680px) !important;
+}
+
+.finance-modal-subtitle {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: -6px 0 12px;
+}
+
+.finance-modal-stat-bar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.finance-modal-stat-pill {
+  flex: 1 1 auto;
+  min-width: 90px;
+  padding: 8px 12px;
+  border-radius: var(--ft-radius-sm, 6px);
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.finance-modal-stat-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.finance-modal-stat-val {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.finance-overview-records-table {
+  width: 100%;
+  font-size: 13px;
+}
+
+.finance-overview-records-table .finance-td-date {
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.finance-overview-records-table .finance-amount-cell {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.finance-overview-records-table .finance-actions-td {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.finance-overview-records-table .finance-note-cell {
+  white-space: normal;
+  word-break: break-word;
+  max-width: 280px;
+}
+
+/* Mobile records list in modal */
+.finance-mobile-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.finance-record-mobile-card {
+  padding: 10px 12px;
+  border-radius: var(--ft-radius-sm, 6px);
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.finance-card-top-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.finance-card-date {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.finance-card-amount {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.finance-card-mid-row {
+  font-size: 13px;
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.finance-card-category {
+  font-weight: 500;
+}
+
+.finance-card-payer,
+.finance-card-tag {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.finance-card-note {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.finance-card-actions-row {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+/* Overview modal action buttons */
+.finance-overview-modal-btns {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.finance-modal-actions-left {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.finance-modal-actions-row {
+  display: flex;
+  gap: 8px;
+}
+
+/* Overview detail modals — mobile adaptation */
+@media (max-width: 480px) {
+  .modal.finance-overview-records-modal,
+  .modal.finance-deposit-detail-modal,
+  .modal.finance-debt-detail-modal,
+  .modal.finance-credit-detail-modal {
+    width: calc(100vw - 16px) !important;
+    max-width: calc(100vw - 16px) !important;
+    margin: 8px auto !important;
+    max-height: 90vh !important;
+    box-sizing: border-box !important;
+    border-radius: var(--ft-radius, 8px) !important;
+  }
+
+  .modal.finance-overview-records-modal .modal-content,
+  .modal.finance-deposit-detail-modal .modal-content,
+  .modal.finance-debt-detail-modal .modal-content,
+  .modal.finance-credit-detail-modal .modal-content {
+    padding: 12px 14px 16px !important;
+    box-sizing: border-box !important;
+  }
+
+  .modal.finance-overview-records-modal .modal-close-button,
+  .modal.finance-deposit-detail-modal .modal-close-button,
+  .modal.finance-debt-detail-modal .modal-close-button,
+  .modal.finance-credit-detail-modal .modal-close-button {
+    top: 10px !important;
+    right: 10px !important;
+    width: 28px !important;
+    height: 28px !important;
+    font-size: 14px !important;
+    line-height: 28px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    z-index: 10 !important;
+  }
+
+  /* Headers / Titles / Subtitles */
+  .modal.finance-overview-records-modal .finance-modal-title,
+  .modal.finance-deposit-detail-modal .finance-modal-title,
+  .modal.finance-debt-detail-modal .finance-modal-title,
+  .modal.finance-credit-detail-modal .finance-modal-title {
+    font-size: 1.1em !important;
+    font-weight: 700 !important;
+    line-height: 1.35 !important;
+    margin: 0 0 6px !important;
+    padding-right: 36px !important;
+    word-break: break-word !important;
+    overflow-wrap: break-word !important;
+  }
+
+  .modal.finance-overview-records-modal .finance-modal-subtitle,
+  .modal.finance-deposit-detail-modal .finance-modal-subtitle,
+  .modal.finance-debt-detail-modal .finance-modal-subtitle,
+  .modal.finance-credit-detail-modal .finance-modal-subtitle {
+    font-size: 12px !important;
+    color: var(--text-muted) !important;
+    line-height: 1.4 !important;
+    margin: 0 0 12px !important;
+    word-break: break-word !important;
+    overflow-wrap: break-word !important;
+  }
+
+  .modal.finance-overview-records-modal .finance-section-title,
+  .modal.finance-deposit-detail-modal .finance-section-title,
+  .modal.finance-debt-detail-modal .finance-section-title,
+  .modal.finance-credit-detail-modal .finance-section-title {
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    color: var(--text-muted) !important;
+    margin: 14px 0 8px !important;
+  }
+
+  /* Card data — Stat pills 2-column grid */
+  .modal.finance-overview-records-modal .finance-modal-stat-bar,
+  .modal.finance-deposit-detail-modal .finance-modal-stat-bar,
+  .modal.finance-debt-detail-modal .finance-modal-stat-bar,
+  .modal.finance-credit-detail-modal .finance-modal-stat-bar {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+    margin-bottom: 12px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .modal.finance-overview-records-modal .finance-modal-stat-pill,
+  .modal.finance-deposit-detail-modal .finance-modal-stat-pill,
+  .modal.finance-debt-detail-modal .finance-modal-stat-pill,
+  .modal.finance-credit-detail-modal .finance-modal-stat-pill {
+    min-width: 0 !important;
+    width: 100% !important;
+    padding: 8px 10px !important;
+    box-sizing: border-box !important;
+    border-radius: var(--ft-radius-sm, 6px) !important;
+  }
+
+  .modal.finance-overview-records-modal .finance-modal-stat-pill:last-child:nth-child(odd),
+  .modal.finance-deposit-detail-modal .finance-modal-stat-pill:last-child:nth-child(odd),
+  .modal.finance-debt-detail-modal .finance-modal-stat-pill:last-child:nth-child(odd),
+  .modal.finance-credit-detail-modal .finance-modal-stat-pill:last-child:nth-child(odd) {
+    grid-column: span 2 !important;
+  }
+
+  .modal.finance-overview-records-modal .finance-modal-stat-label,
+  .modal.finance-deposit-detail-modal .finance-modal-stat-label,
+  .modal.finance-debt-detail-modal .finance-modal-stat-label,
+  .modal.finance-credit-detail-modal .finance-modal-stat-label {
+    font-size: 10px !important;
+    letter-spacing: 0.03em !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  .modal.finance-overview-records-modal .finance-modal-stat-val,
+  .modal.finance-deposit-detail-modal .finance-modal-stat-val,
+  .modal.finance-debt-detail-modal .finance-modal-stat-val,
+  .modal.finance-credit-detail-modal .finance-modal-stat-val {
+    font-size: 13.5px !important;
+    font-weight: 600 !important;
+    font-variant-numeric: tabular-nums !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  /* Card data — Mobile records card in OverviewRecordsModal */
+  .finance-record-mobile-card {
+    padding: 10px 12px 10px 14px !important;
+    border-radius: var(--ft-radius-sm, 6px) !important;
+    background: var(--background-secondary) !important;
+    border: 1px solid var(--background-modifier-border) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 5px !important;
+    position: relative !important;
+    overflow: hidden !important;
+    box-sizing: border-box !important;
+  }
+
+  .finance-record-mobile-card::before {
+    content: '' !important;
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    bottom: 0 !important;
+    width: 4px !important;
+  }
+  .finance-record-mobile-card.finance-row-income::before {
+    background: #22c55e !important;
+  }
+  .finance-record-mobile-card.finance-row-expense::before {
+    background: #ef4444 !important;
+  }
+
+  .finance-card-top-row {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: baseline !important;
+    gap: 8px !important;
+  }
+
+  .finance-card-date {
+    font-size: 11.5px !important;
+    color: var(--text-muted) !important;
+    flex: 1 !important;
+    min-width: 0 !important;
+  }
+
+  .finance-card-amount {
+    font-size: 15px !important;
+    font-weight: 700 !important;
+    font-variant-numeric: tabular-nums !important;
+    flex-shrink: 0 !important;
+  }
+
+  .finance-card-mid-row {
+    font-size: 12.5px !important;
+    display: flex !important;
+    gap: 6px !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    margin-top: 1px !important;
+  }
+
+  .finance-card-category {
+    font-weight: 600 !important;
+    color: var(--text-normal) !important;
+  }
+
+  .finance-card-payer,
+  .finance-card-tag {
+    color: var(--text-muted) !important;
+    font-size: 11px !important;
+    background: var(--background-modifier-hover) !important;
+    padding: 2px 6px !important;
+    border-radius: 4px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+  }
+
+  .finance-card-note {
+    font-size: 12px !important;
+    color: var(--text-muted) !important;
+    font-style: italic !important;
+    word-break: break-word !important;
+    margin-top: 2px !important;
+  }
+
+  .finance-card-actions-row {
+    display: flex !important;
+    justify-content: flex-end !important;
+    gap: 8px !important;
+    margin-top: 4px !important;
+    padding-top: 6px !important;
+    border-top: 1px solid var(--background-modifier-border-focus, rgba(255, 255, 255, 0.06)) !important;
+  }
+
+  .finance-card-actions-row .finance-action-btn {
+    opacity: 0.85 !important;
+    min-width: 36px !important;
+    min-height: 36px !important;
+    padding: 6px 10px !important;
+    border-radius: var(--ft-radius-sm, 6px) !important;
+    background: var(--background-modifier-hover) !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 14px !important;
+  }
+  .finance-card-actions-row .finance-action-btn:active {
+    background: var(--background-modifier-border) !important;
+  }
+  .finance-card-actions-row .finance-delete-btn {
+    color: #ef4444 !important;
+  }
+
+  /* Card data — Schedule & movements in Credit/Debt/Deposit modals */
+  .modal.finance-credit-detail-modal .finance-payments-panel,
+  .modal.finance-debt-detail-modal .finance-payments-panel,
+  .modal.finance-deposit-detail-modal .finance-payments-panel {
+    padding: 8px 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  .modal.finance-credit-detail-modal .finance-mov-scroll,
+  .modal.finance-debt-detail-modal .finance-mov-scroll,
+  .modal.finance-deposit-detail-modal .finance-mov-scroll {
+    border-radius: var(--ft-radius-sm, 6px) !important;
+    border: 1px solid var(--background-modifier-border) !important;
+  }
+
+  .modal.finance-credit-detail-modal .finance-mov-table,
+  .modal.finance-debt-detail-modal .finance-mov-table,
+  .modal.finance-deposit-detail-modal .finance-mov-table {
+    font-size: 12px !important;
+  }
+
+  .modal.finance-credit-detail-modal .finance-mov-table .finance-th,
+  .modal.finance-debt-detail-modal .finance-mov-table .finance-th,
+  .modal.finance-deposit-detail-modal .finance-mov-table .finance-th {
+    font-size: 11px !important;
+    padding: 6px 8px !important;
+  }
+
+  .modal.finance-credit-detail-modal .finance-mov-table .finance-td,
+  .modal.finance-debt-detail-modal .finance-mov-table .finance-td,
+  .modal.finance-deposit-detail-modal .finance-mov-table .finance-td {
+    padding: 6px 8px !important;
+  }
+
+  .modal.finance-credit-detail-modal .finance-actions-td .finance-action-btn,
+  .modal.finance-debt-detail-modal .finance-actions-td .finance-action-btn,
+  .modal.finance-deposit-detail-modal .finance-actions-td .finance-action-btn {
+    opacity: 0.85 !important;
+    min-width: 34px !important;
+    min-height: 34px !important;
+    padding: 4px !important;
+    justify-content: center !important;
+    display: inline-flex !important;
+  }
+
+  .finance-deposit-summary {
+    font-size: 12px !important;
+    color: var(--text-muted) !important;
+    margin: 6px 0 12px !important;
+    padding: 6px 10px !important;
+    background: var(--background-secondary) !important;
+    border-radius: var(--ft-radius-sm, 6px) !important;
+    border: 1px solid var(--background-modifier-border) !important;
+    display: inline-block !important;
+  }
+
+  /* Buttons — Footer action buttons layout */
+  .finance-overview-modal-btns {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+    margin-top: 14px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .finance-modal-actions-left {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+    width: 100% !important;
+  }
+
+  .finance-modal-actions-row {
+    display: flex !important;
+    flex-direction: row !important;
+    gap: 8px !important;
+    width: 100% !important;
+  }
+
+  .finance-modal-actions-row button,
+  .finance-modal-actions-row .finance-btn-secondary {
+    flex: 1 1 0 !important;
+    width: auto !important;
+  }
+
+  .finance-overview-modal-btns button,
+  .finance-overview-modal-btns .finance-btn-secondary,
+  .finance-overview-modal-btns .finance-btn-cancel,
+  .finance-modal-actions-left button,
+  .finance-modal-actions-left .finance-btn-secondary {
+    width: 100% !important;
+    min-height: 44px !important;
+    padding: 10px 14px !important;
+    font-size: 14px !important;
+    line-height: 1.3 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    text-align: center !important;
+    box-sizing: border-box !important;
+    border-radius: var(--ft-radius-sm, 6px) !important;
+    margin: 0 !important;
+  }
+
+  .finance-overview-modal-btns .finance-btn-secondary,
+  .finance-modal-actions-left .finance-btn-secondary {
+    font-weight: 500 !important;
+  }
+
+  .finance-overview-modal-btns .finance-btn-cancel {
+    font-weight: 500 !important;
+    background: var(--background-modifier-form-field) !important;
+  }
+
+  /* Pagination buttons inside overview modals */
+  .modal.finance-overview-records-modal .finance-panel-pagination,
+  .modal.finance-deposit-detail-modal .finance-panel-pagination,
+  .modal.finance-credit-detail-modal .finance-panel-pagination {
+    margin-top: 10px !important;
+    gap: 4px !important;
+    flex-wrap: wrap !important;
+  }
+
+  .modal.finance-overview-records-modal .finance-panel-pagination .finance-page-btn,
+  .modal.finance-deposit-detail-modal .finance-panel-pagination .finance-page-btn,
+  .modal.finance-credit-detail-modal .finance-panel-pagination .finance-page-btn {
+    min-width: 36px !important;
+    min-height: 36px !important;
+    padding: 6px 8px !important;
+    font-size: 13px !important;
   }
 }

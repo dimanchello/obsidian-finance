@@ -1,7 +1,28 @@
 import { ViewContext } from '../../context';
-import { FinanceRecord, OVERVIEW_TREND_MONTHS, OVERVIEW_CHART_HEIGHT, OVERVIEW_CHART_PAD_LEFT, OVERVIEW_CHART_PAD_RIGHT, OVERVIEW_CHART_PAD_TOP, OVERVIEW_CHART_PAD_BOTTOM, OVERVIEW_LABEL_OFFSET_Y, OVERVIEW_MIN_GROUP_W, OVERVIEW_MIN_GROUP_W_MOBILE, OVERVIEW_MAX_BAR_W, OVERVIEW_BAR_SPACING_PAD, OVERVIEW_BAR_RADIUS, OVERVIEW_SAVINGS_BENCHMARK, SAVINGS_RATE_TICKS, SAVINGS_RATE_RANGE, PERCENT_100 } from '../../types';
+import {
+  FinanceRecord,
+  OVERVIEW_TREND_MONTHS,
+  OVERVIEW_CHART_HEIGHT,
+  OVERVIEW_CHART_PAD_LEFT,
+  OVERVIEW_CHART_PAD_RIGHT,
+  OVERVIEW_CHART_PAD_TOP,
+  OVERVIEW_CHART_PAD_BOTTOM,
+  OVERVIEW_LABEL_OFFSET_Y,
+  OVERVIEW_MIN_GROUP_W,
+  OVERVIEW_MIN_GROUP_W_MOBILE,
+  OVERVIEW_MAX_BAR_W,
+  OVERVIEW_BAR_SPACING_PAD,
+  OVERVIEW_BAR_RADIUS,
+  OVERVIEW_SAVINGS_BENCHMARK,
+  SAVINGS_RATE_TICKS,
+  SAVINGS_RATE_RANGE,
+  PERCENT_100,
+  DEFAULT_FILTER,
+} from '../../types';
 import { createChartTooltip, svg } from '../chartHelpers';
 import { calcSavingsRateOverTime, SavingsRateMonth } from '../../domain/overviewMetrics';
+import { daysInMonth } from '../../domain/dateMath';
+import { OverviewRecordsModal } from '../../modals/OverviewRecordsModal';
 
 export class SavingsRateChart {
   private ctx: ViewContext;
@@ -15,7 +36,13 @@ export class SavingsRateChart {
     this.tooltip.destroy();
   }
 
-  render(parent: HTMLElement, records: FinanceRecord[], today: string, trendMonths: number = OVERVIEW_TREND_MONTHS): void {
+  render(
+    parent: HTMLElement,
+    records: FinanceRecord[],
+    today: string,
+    onNavigate?: (mode: 'records') => void,
+    trendMonths: number = OVERVIEW_TREND_MONTHS
+  ): void {
     const { tr, state, isMobile } = this.ctx;
     const chartWrap = parent.createDiv('finance-chart-wrap');
     chartWrap.createEl('h3', { text: tr.overviewSavingsRateChart, cls: 'finance-chart-title' });
@@ -119,6 +146,19 @@ export class SavingsRateChart {
           ? 'var(--color-orange)'
           : 'var(--color-red)';
 
+      const colGroup = svg('g', {
+        class: 'finance-chart-bar-hover finance-chart-clickable',
+      });
+
+      const hitArea = svg('rect', {
+        x: cx - groupWidth / 2,
+        y: OVERVIEW_CHART_PAD_TOP,
+        width: groupWidth,
+        height: OVERVIEW_CHART_HEIGHT - OVERVIEW_CHART_PAD_TOP,
+        fill: 'transparent',
+      });
+      colGroup.appendChild(hitArea);
+
       const bar = svg('rect', {
         x: cx - barWidth / 2,
         y: barY,
@@ -126,14 +166,8 @@ export class SavingsRateChart {
         height: Math.max(2, rateHeight),
         fill: barColor,
         rx: OVERVIEW_BAR_RADIUS,
-        class: 'finance-chart-bar-hover',
       });
-
-      const tipText = `${d.label}\n${tr.overviewSavingsRate}: ${clampedRate.toFixed(1)}%\n${tr.income}: ${this.fmt(d.income)}\n${tr.expense}: ${this.fmt(d.expense)}\n${tr.balance}: ${(d.savings >= 0 ? '+' : '') + this.fmt(d.savings)}`;
-      bar.addEventListener('mouseenter', e => this.tooltip.showTip(e, tipText));
-      bar.addEventListener('mousemove', e => this.tooltip.showTip(e, tipText));
-      bar.addEventListener('mouseleave', () => this.tooltip.hideTip());
-      svg_el.appendChild(bar);
+      colGroup.appendChild(bar);
 
       const label = svg('text', {
         x: cx,
@@ -143,7 +177,43 @@ export class SavingsRateChart {
         'font-size': '11px',
       });
       label.textContent = d.label.slice(5);
-      svg_el.appendChild(label);
+      colGroup.appendChild(label);
+
+      const tipText = `${d.label}\n${tr.overviewSavingsRate}: ${clampedRate.toFixed(1)}%\n${tr.income}: ${this.fmt(d.income)}\n${tr.expense}: ${this.fmt(d.expense)}\n${tr.balance}: ${(d.savings >= 0 ? '+' : '') + this.fmt(d.savings)}`;
+      colGroup.addEventListener('mouseenter', e => this.tooltip.showTip(e, tipText));
+      colGroup.addEventListener('mousemove', e => this.tooltip.showTip(e, tipText));
+      colGroup.addEventListener('mouseleave', () => this.tooltip.hideTip());
+
+      if (onNavigate) {
+        colGroup.addEventListener('click', () => {
+          this.tooltip.hideTip();
+          const [y, m] = d.label.split('-');
+          if (!y || !m) return;
+          const lastDay = daysInMonth(Number(y), Number(m));
+          const dateFrom = `${d.label}-01`;
+          const dateTo = `${d.label}-${String(lastDay).padStart(2, '0')}`;
+
+          const monthRecords = records.filter(r => !r.isInternal && r.date >= dateFrom && r.date <= dateTo);
+
+          const handleNavigate = () => {
+            this.ctx.state.filter = { ...DEFAULT_FILTER };
+            this.ctx.state.filter.dateFrom = dateFrom;
+            this.ctx.state.filter.dateTo = dateTo;
+            this.ctx.state.page = 0;
+            this.ctx.saveState();
+            onNavigate('records');
+          };
+
+          new OverviewRecordsModal(this.ctx.app, {
+            ctx: this.ctx,
+            title: d.label,
+            records: monthRecords,
+            onNavigateToRecords: handleNavigate,
+          }).open();
+        });
+      }
+
+      svg_el.appendChild(colGroup);
     });
 
     scrollWrap.appendChild(svg_el);

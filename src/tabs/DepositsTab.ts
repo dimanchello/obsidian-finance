@@ -10,11 +10,16 @@ import { DepositModal } from '../DepositModal';
 import { DepositTopUpModal } from '../DepositTopUpModal';
 import { DepositWithdrawalModal } from '../DepositWithdrawalModal';
 import { ConfirmModal } from '../ConfirmModal';
-import { safeEndDate } from '../domain/dateMath';
+import {
+  getDepositEndDate,
+  getDepositAccrued,
+  getDepositProfit,
+  getDepositTypeLabel,
+} from '../domain/depositCalculations';
 import { sumMoney } from '../domain/money';
 import { DataTable, FilterControl } from '../ui/DataTable';
 import { DepositsAnalyticsView } from '../DepositsAnalyticsView';
-import { renderMobileCard, renderSummaryCard, renderProgressBar, renderPaginatedSchedule, pageRange, dateRangeControls, compareValues } from '../ui/tabHelpers';
+import { renderMobileCard, renderSummaryCard, renderProgressBar, renderPaginatedSchedule, renderPagination, dateRangeControls, compareValues } from '../ui/tabHelpers';
 import { AccountCommands } from '../domain/AccountCommands';
 import { DepositAccrualType, DepositStatus, DepositType, PaymentStatus } from '../constants';
 
@@ -167,23 +172,19 @@ export class DepositsTab {
   // ── Derived helpers ──────────────────────────────────────────────────────
 
   private typeLabel(deposit: DepositRecord): string {
-    switch (deposit.type) {
-      case DepositType.DEMAND: return this.tr.depositTypeDemand;
-      case DepositType.SAVINGS: return this.tr.depositTypeSavings;
-      default: return this.tr.depositTypeTerm;
-    }
+    return getDepositTypeLabel(deposit.type, this.tr);
   }
 
   private getDepositAccrued(deposit: DepositRecord): number {
-    return sumMoney(deposit.accruals.filter(a => a.status === PaymentStatus.PAID).map(a => a.amount));
+    return getDepositAccrued(deposit);
   }
 
   private getDepositProfit(deposit: DepositRecord): number {
-    return sumMoney(deposit.accruals.map(a => a.amount));
+    return getDepositProfit(deposit);
   }
 
   private calculateDepositEndDate(deposit: DepositRecord): string {
-    return safeEndDate(deposit.startDate, deposit.termMonths);
+    return getDepositEndDate(deposit);
   }
 
   // ── Stats ────────────────────────────────────────────────────────────────
@@ -386,31 +387,18 @@ export class DepositsTab {
       }
     );
 
-    if (totalPages > 1) {
-      const pagNav = wrapper.createDiv('finance-pagination-nav finance-panel-pagination');
-      const go = (newPage: number) => {
+    renderPagination({
+      container: wrapper,
+      currentPage: page,
+      totalPages,
+      isMobile: this.ctx.isMobile,
+      cls: 'finance-panel-pagination',
+      onPageChange: newPage => {
         this.depositAccrualPages.set(deposit.id, newPage);
         parent.empty();
         this.renderDepositAccrualsPanel(parent, deposit);
-      };
-
-      const prev = pagNav.createEl('button', { cls: 'finance-page-btn', text: '←' });
-      prev.disabled = page === 0;
-      prev.addEventListener('click', () => go(page - 1));
-
-      pageRange(page, totalPages, this.ctx.isMobile).forEach(p => {
-        if (p === '…') { pagNav.createEl('span', { text: '…', cls: 'finance-page-ellipsis' }); return; }
-        const btn = pagNav.createEl('button', {
-          text: String(p + 1),
-          cls: `finance-page-btn${p === page ? ' active' : ''}`,
-        });
-        btn.addEventListener('click', () => go(p));
-      });
-
-      const next = pagNav.createEl('button', { cls: 'finance-page-btn', text: '→' });
-      next.disabled = page >= totalPages - 1;
-      next.addEventListener('click', () => go(page + 1));
-    }
+      },
+    });
   }
 
   // ── Modals ──────────────────────────────────────────────────────────────

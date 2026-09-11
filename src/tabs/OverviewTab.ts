@@ -25,6 +25,7 @@ import { BreakdownChart } from '../ui/charts/BreakdownChart';
 import { SavingsRateChart } from '../ui/charts/SavingsRateChart';
 import { DebtsBreakdownChart } from '../ui/charts/DebtsBreakdownChart';
 import { DepositsOverview } from '../ui/charts/DepositsOverview';
+import { CreditsOverview } from '../ui/charts/CreditsOverview';
 import { renderStatCard } from '../ui/statCards';
 
 export class OverviewTab {
@@ -40,8 +41,10 @@ export class OverviewTab {
   private savingsRateChart: SavingsRateChart;
   private debtsBreakdownChart: DebtsBreakdownChart;
   private depositsOverview: DepositsOverview;
+  private creditsOverview: CreditsOverview;
 
   public onNavigate?: (mode: 'records' | 'debts' | 'credits' | 'deposits' | 'currency') => void;
+  public onUpdate?: () => void;
 
   private filterBarEl: HTMLElement | null = null;
   private bodyEl: HTMLElement | null = null;
@@ -59,6 +62,7 @@ export class OverviewTab {
     this.savingsRateChart = new SavingsRateChart(ctx);
     this.debtsBreakdownChart = new DebtsBreakdownChart(ctx);
     this.depositsOverview = new DepositsOverview(ctx);
+    this.creditsOverview = new CreditsOverview(ctx);
   }
 
   private debouncedRenderBody(): void {
@@ -92,11 +96,13 @@ export class OverviewTab {
     this.savingsRateChart.destroy();
     this.debtsBreakdownChart.destroy();
     this.depositsOverview.destroy();
+    this.creditsOverview.destroy();
   }
 
   render(): void {
     this.el.empty();
     this.el.addClass('finance-overview-tab');
+    if (this.ctx.isMobile) this.el.addClass('is-mobile');
     this.filterBarEl = null;
     this.bodyEl = null;
     this.fromInput = null;
@@ -129,14 +135,20 @@ export class OverviewTab {
 
     this.renderKpiCards(filteredRecords, today);
 
+    const handleUpdate = () => {
+      this.onUpdate?.();
+      this.renderBody();
+    };
+
     const chartsWrap = this.bodyEl.createDiv('finance-overview-charts');
     this.moneyFlowChart.render(chartsWrap, filteredRecords);
-    this.breakdownChart.render(chartsWrap, filteredRecords, mode => this.onNavigate?.(mode), () => this.renderBody());
-    this.savingsRateChart.render(chartsWrap, data.records, today, trendMonths);
+    this.breakdownChart.render(chartsWrap, filteredRecords, mode => this.onNavigate?.(mode), handleUpdate);
+    this.savingsRateChart.render(chartsWrap, data.records, today, mode => this.onNavigate?.(mode), trendMonths);
     this.burdenChart.render(chartsWrap, data.credits, data.records, this.state.overviewDateFrom, this.state.overviewDateTo, today, trendMonths);
     this.assetsChart.render(chartsWrap, data.deposits, data.exchanges, data.credits, data.debts, this.state.overviewDateFrom, this.state.overviewDateTo, today, trendMonths);
-    this.debtsBreakdownChart.render(chartsWrap, data.debts, mode => this.onNavigate?.(mode));
-    this.depositsOverview.render(chartsWrap, data.deposits, today, mode => this.onNavigate?.(mode), trendMonths);
+    this.debtsBreakdownChart.render(chartsWrap, data.debts, mode => this.onNavigate?.(mode), handleUpdate);
+    this.depositsOverview.render(chartsWrap, data.deposits, today, mode => this.onNavigate?.(mode), trendMonths, handleUpdate);
+    this.creditsOverview.render(chartsWrap, data.credits, today, mode => this.onNavigate?.(mode), handleUpdate);
   }
 
   private renderFilterBar(): void {
@@ -221,7 +233,7 @@ export class OverviewTab {
     const handleFromChange = () => {
       if (!this.fromInput) return;
       this.state.overviewDateFrom = this.fromInput.value;
-      this.state.overviewAllTime = false;
+      this.state.overviewAllTime = this.fromInput.value === '' && (!this.toInput || this.toInput.value === '');
       this.ctx.saveState();
       this.updatePresetActiveStates();
       this.debouncedRenderBody();
@@ -237,7 +249,7 @@ export class OverviewTab {
     const handleToChange = () => {
       if (!this.toInput) return;
       this.state.overviewDateTo = this.toInput.value;
-      this.state.overviewAllTime = false;
+      this.state.overviewAllTime = this.toInput.value === '' && (!this.fromInput || this.fromInput.value === '');
       this.ctx.saveState();
       this.updatePresetActiveStates();
       this.debouncedRenderBody();

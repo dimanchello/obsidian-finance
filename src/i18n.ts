@@ -614,6 +614,22 @@ export interface Translations {
   overviewDebtsRepaid: string;
   overviewDebtsPaid: string;
   overviewDaysShort: string;
+  overviewOpenInRecordsTab: string;
+  overviewOpenInDepositsTab: string;
+  overviewOpenInDebtsTab: string;
+  overviewOperationsCount: string;
+  overviewInitialAmount: string;
+  overviewCurrentBalance: string;
+  overviewExpectedProfit: string;
+  overviewNoRecordsInPeriod: string;
+  overviewViewDetails: string;
+  overviewCreditsSummary: string;
+  overviewNoActiveCredits: string;
+  overviewCreditNextPayment: string;
+  overviewCreditPaid: string;
+  overviewCreditRemaining: string;
+  overviewCreditPaymentsCount: string;
+  overviewOpenInCreditsTab: string;
 }
 
 const ru: Translations = {
@@ -1186,7 +1202,7 @@ const ru: Translations = {
   overviewCategoryBreakdown: 'Распределение по категориям',
   overviewBreakdown: 'Распределение операций',
   overviewNoDebts: 'Нет активных долгов',
-  overviewNoCredits: 'Нет активных кредитов',
+  overviewNoCredits: 'Кредитов пока нет',
   overviewMoneyFlow: 'Денежный поток',
   overviewCreditBurdenChart: 'Кредитная нагрузка',
   overviewAssetLiabilityTrend: 'Динамика активов и обязательств',
@@ -1219,6 +1235,22 @@ const ru: Translations = {
   overviewDebtsRepaid: 'Возвращено',
   overviewDebtsPaid: 'Выплачено',
   overviewDaysShort: 'дн.',
+  overviewOpenInRecordsTab: 'Перейти во вкладку «Операции»',
+  overviewOpenInDepositsTab: 'Перейти во вкладку «Вклады»',
+  overviewOpenInDebtsTab: 'Перейти во вкладку «Долги»',
+  overviewOperationsCount: 'Операций',
+  overviewInitialAmount: 'Начальная сумма',
+  overviewCurrentBalance: 'Текущий баланс',
+  overviewExpectedProfit: 'Ожидаемый доход',
+  overviewNoRecordsInPeriod: 'За данный период операций нет',
+  overviewViewDetails: 'Подробнее',
+  overviewCreditsSummary: 'Кредиты',
+  overviewNoActiveCredits: 'Нет активных кредитов',
+  overviewCreditNextPayment: 'След. платёж',
+  overviewCreditPaid: 'Выплачено',
+  overviewCreditRemaining: 'Остаток долга',
+  overviewCreditPaymentsCount: 'платежей',
+  overviewOpenInCreditsTab: 'Перейти во вкладку «Кредиты»',
 };
 
 const en: Translations = {
@@ -1419,7 +1451,7 @@ const en: Translations = {
   withdraw: 'Withdraw',
   closeAccount: 'Close account',
   repay: 'Repay',
-  borrowMore: 'Borrow more',
+  borrowMore: '➕ Borrow more',
   movementHistory: 'Movement history',
   payments: 'Payments',
   accruals: 'Accruals',
@@ -1791,7 +1823,7 @@ const en: Translations = {
   overviewCategoryBreakdown: 'Category Breakdown',
   overviewBreakdown: 'Transaction Breakdown',
   overviewNoDebts: 'No active debts',
-  overviewNoCredits: 'No active credits',
+  overviewNoCredits: 'No credits yet',
   overviewMoneyFlow: 'Cash Flow',
   overviewCreditBurdenChart: 'Credit Burden',
   overviewAssetLiabilityTrend: 'Assets & Liabilities Trend',
@@ -1824,6 +1856,22 @@ const en: Translations = {
   overviewDebtsRepaid: 'Repaid',
   overviewDebtsPaid: 'Paid off',
   overviewDaysShort: 'd',
+  overviewOpenInRecordsTab: 'Open in Records tab',
+  overviewOpenInDepositsTab: 'Open in Deposits tab',
+  overviewOpenInDebtsTab: 'Open in Debts tab',
+  overviewOperationsCount: 'Operations',
+  overviewInitialAmount: 'Initial amount',
+  overviewCurrentBalance: 'Current balance',
+  overviewExpectedProfit: 'Expected profit',
+  overviewNoRecordsInPeriod: 'No operations for this period',
+  overviewViewDetails: 'View details',
+  overviewCreditsSummary: 'Credits',
+  overviewNoActiveCredits: 'No active credits',
+  overviewCreditNextPayment: 'Next payment',
+  overviewCreditPaid: 'Paid off',
+  overviewCreditRemaining: 'Remaining debt',
+  overviewCreditPaymentsCount: 'payments',
+  overviewOpenInCreditsTab: 'Open in Credits tab',
 };
 
 const translations: Record<Locale, Translations> = { ru, en };

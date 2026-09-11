@@ -149,9 +149,36 @@ export class MoneyFlowChart {
           class: 'finance-chart-bar-hover',
         });
         const tipText = `${g.label}\n${tr.income}: ${this.fmt(g.income)}`;
+        const showIncomeTip = (e: MouseEvent | TouchEvent) => {
+          let clientX: number, clientY: number;
+          if ('touches' in e && e.touches.length > 0 && e.touches[0]) {
+            clientX = e.touches[0].clientX;
+            clientY = e.touches[0].clientY;
+          } else if ('changedTouches' in e && e.changedTouches.length > 0 && e.changedTouches[0]) {
+            clientX = e.changedTouches[0].clientX;
+            clientY = e.changedTouches[0].clientY;
+          } else if ('clientX' in e) {
+            clientX = (e as MouseEvent).clientX;
+            clientY = (e as MouseEvent).clientY;
+          } else {
+            return;
+          }
+          this.tooltip.showTip({ clientX, clientY } as MouseEvent, tipText);
+        };
+
         incomeBar.addEventListener('mouseenter', e => this.tooltip.showTip(e, tipText));
         incomeBar.addEventListener('mousemove', e => this.tooltip.showTip(e, tipText));
-        incomeBar.addEventListener('mouseleave', () => this.tooltip.hideTip());
+        incomeBar.addEventListener('mouseleave', () => {
+          if (!this.ctx.isMobile) this.tooltip.hideTip();
+        });
+        incomeBar.addEventListener('click', (e: MouseEvent) => {
+          e.stopPropagation();
+          showIncomeTip(e);
+        });
+        incomeBar.addEventListener('touchend', (e: TouchEvent) => {
+          e.stopPropagation();
+          showIncomeTip(e);
+        });
         svg_el.appendChild(incomeBar);
       }
 
@@ -168,9 +195,36 @@ export class MoneyFlowChart {
           class: 'finance-chart-bar-hover',
         });
         const tipText = `${g.label}\n${tr.expense}: ${this.fmt(g.expense)}`;
+        const showExpenseTip = (e: MouseEvent | TouchEvent) => {
+          let clientX: number, clientY: number;
+          if ('touches' in e && e.touches.length > 0 && e.touches[0]) {
+            clientX = e.touches[0].clientX;
+            clientY = e.touches[0].clientY;
+          } else if ('changedTouches' in e && e.changedTouches.length > 0 && e.changedTouches[0]) {
+            clientX = e.changedTouches[0].clientX;
+            clientY = e.changedTouches[0].clientY;
+          } else if ('clientX' in e) {
+            clientX = (e as MouseEvent).clientX;
+            clientY = (e as MouseEvent).clientY;
+          } else {
+            return;
+          }
+          this.tooltip.showTip({ clientX, clientY } as MouseEvent, tipText);
+        };
+
         expenseBar.addEventListener('mouseenter', e => this.tooltip.showTip(e, tipText));
         expenseBar.addEventListener('mousemove', e => this.tooltip.showTip(e, tipText));
-        expenseBar.addEventListener('mouseleave', () => this.tooltip.hideTip());
+        expenseBar.addEventListener('mouseleave', () => {
+          if (!this.ctx.isMobile) this.tooltip.hideTip();
+        });
+        expenseBar.addEventListener('click', (e: MouseEvent) => {
+          e.stopPropagation();
+          showExpenseTip(e);
+        });
+        expenseBar.addEventListener('touchend', (e: TouchEvent) => {
+          e.stopPropagation();
+          showExpenseTip(e);
+        });
         svg_el.appendChild(expenseBar);
       }
 
@@ -223,6 +277,24 @@ export class MoneyFlowChart {
         class: 'finance-chart-point',
       });
       const tipText = `${p.group.label}\n${tr.balance}: ${(p.group.net >= 0 ? '+' : '') + this.fmt(p.group.net)}`;
+      const showPointTip = (e: MouseEvent | TouchEvent) => {
+        point.setAttribute('r', String(OVERVIEW_POINT_RADIUS_HOVER));
+        let clientX: number, clientY: number;
+        if ('touches' in e && e.touches.length > 0 && e.touches[0]) {
+          clientX = e.touches[0].clientX;
+          clientY = e.touches[0].clientY;
+        } else if ('changedTouches' in e && e.changedTouches.length > 0 && e.changedTouches[0]) {
+          clientX = e.changedTouches[0].clientX;
+          clientY = e.changedTouches[0].clientY;
+        } else if ('clientX' in e) {
+          clientX = (e as MouseEvent).clientX;
+          clientY = (e as MouseEvent).clientY;
+        } else {
+          return;
+        }
+        this.tooltip.showTip({ clientX, clientY } as MouseEvent, tipText);
+      };
+
       point.addEventListener('mouseenter', e => {
         point.setAttribute('r', String(OVERVIEW_POINT_RADIUS_HOVER));
         this.tooltip.showTip(e, tipText);
@@ -230,7 +302,15 @@ export class MoneyFlowChart {
       point.addEventListener('mousemove', e => this.tooltip.showTip(e, tipText));
       point.addEventListener('mouseleave', () => {
         point.setAttribute('r', String(OVERVIEW_POINT_RADIUS));
-        this.tooltip.hideTip();
+        if (!this.ctx.isMobile) this.tooltip.hideTip();
+      });
+      point.addEventListener('click', (e: MouseEvent) => {
+        e.stopPropagation();
+        showPointTip(e);
+      });
+      point.addEventListener('touchend', (e: TouchEvent) => {
+        e.stopPropagation();
+        showPointTip(e);
       });
       svg_el.appendChild(point);
     });
