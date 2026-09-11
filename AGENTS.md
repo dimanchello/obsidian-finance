@@ -4,7 +4,7 @@
 
 **Name:** Finance Tracker  
 **Type:** Obsidian plugin (Community plugin for Obsidian.md)  
-**Version:** 2.0.1  
+**Version:** 2.1.0  
 **Min Obsidian Version:** 1.4.0  
 **Languages:** Russian (default), English (Obsidian setting)
 
