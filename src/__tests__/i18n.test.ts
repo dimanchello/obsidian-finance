@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest';
-import { getLocale, t, LOCALES } from '../i18n';
+import { describe, it, expect, vi } from 'vitest';
+import { getLocale, getLocaleFromApp, t, LOCALES } from '../i18n';
+import { getLanguage } from 'obsidian';
 
 describe('i18n', () => {
   describe('getLocale', () => {
@@ -39,6 +40,16 @@ describe('i18n', () => {
     it('contains ru and en', () => {
       expect(LOCALES.ru).toBe('Русский');
       expect(LOCALES.en).toBe('English');
+    });
+  });
+
+  describe('getLocaleFromApp', () => {
+    it('detects language from Obsidian getLanguage()', () => {
+      vi.mocked(getLanguage).mockReturnValue('en');
+      expect(getLocaleFromApp()).toBe('en');
+
+      vi.mocked(getLanguage).mockReturnValue('ru');
+      expect(getLocaleFromApp()).toBe('ru');
     });
   });
 });

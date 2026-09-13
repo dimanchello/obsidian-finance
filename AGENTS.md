@@ -377,8 +377,9 @@ npm run test:watch   # Run tests in watch mode
 ## Documentation
 
 ### Bilingual README
-- `README.md` — Russian (primary, with link to English)
-- `README.en.md` — English (with link to Russian)
+- `README.md` — English (primary for Obsidian Community Plugins directory, with link to Russian)
+- `README.ru.md` — Russian (with link to English)
+- `README.en.md` — English mirror / link to `README.md`
 - **Both files must be updated** when adding/modifying features, changing the roadmap, or updating installation instructions
 
 ## Contributing Notes

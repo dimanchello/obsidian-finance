@@ -106,7 +106,7 @@ Debts, credits, and deposits do NOT have separate ledgers — they **materialize
 - Shared formatting lives in `src/utils.ts`; do not duplicate it in modals.
 - ESLint runs `strict-type-checked` + `stylistic-type-checked`. `prefer-nullish-coalescing`, `prefer-optional-chain`, and `consistent-type-definitions: interface` are errors.
 - Tests cover business logic only (utils, domain modules, storage CRUD/migrations) — not DOM or modal rendering. `vitest.config.ts` aliases the `obsidian` module to `src/__tests__/mock-obsidian.ts`, so anything imported from `obsidian` must be stubbed there before it can be tested.
-- `README.md` (Russian) and `README.en.md` (English) must both be updated when features or installation change.
+- `README.md` (English, primary for Obsidian directory) and `README.ru.md` (Russian) must both be updated when features or installation change.
 
 **Current codebase stats:**
 - ~72 source files (excluding tests)

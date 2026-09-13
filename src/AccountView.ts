@@ -74,6 +74,7 @@ export class AccountView extends MarkdownRenderChild {
   async render(): Promise<void> {
     this.root.empty();
     this.root.addClass('finance-manager');
+    this.applyAncestorClasses();
 
     this.isMobile = Platform.isMobile || window.innerWidth <= MOBILE_BREAKPOINT;
     this.ctx.isMobile = this.isMobile;
@@ -98,6 +99,44 @@ export class AccountView extends MarkdownRenderChild {
     this.scheduler.start();
 
     this.renderBodyContent();
+  }
+
+  private applyAncestorClasses(): void {
+    const apply = (): void => {
+      const previewDiv = this.root.closest('.markdown-preview-sizer > div');
+      if (previewDiv instanceof HTMLElement) {
+        previewDiv.addClass('finance-parent-container');
+      }
+      const previewSection = this.root.closest('.markdown-preview-section');
+      if (previewSection instanceof HTMLElement) {
+        previewSection.addClass('finance-preview-section');
+      }
+      if (this.root.parentElement && this.root.parentElement !== document.body) {
+        this.root.parentElement.addClass('finance-parent-wrapper');
+      }
+
+      const cmDiv = this.root.closest('.cm-content > div');
+      if (cmDiv instanceof HTMLElement) {
+        cmDiv.addClass('finance-parent-container');
+      }
+      const embedBlock = this.root.closest('.cm-embed-block');
+      if (embedBlock instanceof HTMLElement) {
+        embedBlock.addClass('finance-embed-block');
+      }
+      const tableWidget = this.root.closest('.cm-table-widget');
+      if (tableWidget instanceof HTMLElement) {
+        tableWidget.addClass('finance-embed-block');
+      }
+      const cmContent = this.root.closest('.cm-content');
+      if (cmContent instanceof HTMLElement) {
+        cmContent.addClass('finance-cm-content');
+      }
+    };
+
+    apply();
+    if (typeof window !== 'undefined') {
+      window.requestAnimationFrame(apply);
+    }
   }
 
   override onunload(): void {

@@ -1,207 +1,207 @@
-[🇬🇧 English](README.en.md)
+[🇷🇺 Русский](README.ru.md)
 
 ---
 
-# 💰 Finance Manager — плагин для Obsidian
+# 💰 Finance Manager — Obsidian plugin
 
-Учёт доходов и расходов прямо в заметках Obsidian.  
-Каждая заметка — отдельный **счёт** (наличные, карта, крипто-кошелёк и т.д.).
+Track income and expenses directly in your Obsidian notes.  
+Each note is a separate **account** (cash, card, crypto wallet, etc.).
 
-**Версия:** 2.1.0 | **Минимальная версия Obsidian:** 1.4.0
+**Version:** 2.1.0 | **Min Obsidian Version:** 1.4.0
 
 ---
 
-## Установка
+## Installation
 
-### Вариант 1: Вручную
+### Option 1: Manual
 
 ```bash
 npm install
 npm run build
 ```
 
-Содержимое папки `dist/` скопируйте в `.obsidian/plugins/finance-manager/`
+Copy the contents of `dist/` to `.obsidian/plugins/finance-manager/`
 
-Затем: Настройки Obsidian → Сторонние плагины → включить **Finance Manager**.
+Then: Obsidian Settings → Community plugins → enable **Finance Manager**.
 
-### Вариант 2: Через BRAT
+### Option 2: Via BRAT
 
-1. Установите плагин **BRAT** (Beta Reviewers Auto-update Tool)
-2. Вызовите команду: `BRAT: Add a beta plugin for testing`
-3. Введите репозиторий: `https://github.com/dimanchello/obsidian-finance`
-4. Подтвердите → плагин установится автоматически
+1. Install **BRAT** plugin (Beta Reviewers Auto-update Tool)
+2. Run command: `BRAT: Add a beta plugin for testing`
+3. Enter repo: `https://github.com/dimanchello/obsidian-finance`
+4. Confirm → plugin installs automatically
 
 ---
 
-## Язык
+## Language
 
-Плагин автоматически определяет язык из настроек Obsidian:
-- 🇷🇺 **Русский** (по умолчанию)
+Plugin auto-detects language from Obsidian settings:
+- 🇷🇺 **Russian** (default)
 - 🇬🇧 **English**
 
 ---
 
-## Использование
+## Usage
 
-Вставьте в любую заметку:
+Insert in any note:
 
 ````markdown
 ```finance-account
 ```
 ````
 
-При первом открытии плагин автоматически добавит в блок строку `id: <hex>` — уникальный идентификатор счёта. Это позволяет переименовывать и перемещать заметку без потери данных.
+On first open the plugin automatically inserts an `id: <hex>` line into the block — a unique account identifier. This lets you rename or move the note without losing data.
 
-Доступна команда `Вставить шаблон счёта` из палитры команд.
+Use `Insert account template` command from the command palette.
 
-<img src="assets/screenshots/records_usage_ru.png" width="900" alt="Пример блока finance-account в заметке">
+<img src="assets/screenshots/records_usage_en.png" width="900" alt="Finance-account code block in a note">
 
 ---
 
-## Возможности
+## Features
 
-### Навигация по вкладкам
-Счёт имеет четыре вкладки, переключаемые через меню `•••`:
+### Tab Navigation
+Each account has four tabs, switched via the `•••` menu:
 
-- **Записи** — доходы и расходы
-- **Долги** — долговые обязательства
-- **Кредиты** — кредиты и графики платежей
-- **Вклады** — депозиты с начислением процентов
+- **Records** — income and expenses
+- **Debts** — debt tracking
+- **Credits** — loans with payment schedules
+- **Deposits** — savings with interest accruals
 
-### Счёт
+### Account
 | | |
 |---|---|
-| **Название** | Кликните на заголовок → редактируется inline |
-| **Валюта** | Кликните на бейдж рядом с названием → выбор из списка или своя |
+| **Name** | Click the title → edit inline |
+| **Currency** | Click the badge next to the title → select from list or custom |
 
-### Записи
-- Обязательное поле — только **Сумма**
-- **Дата** и **Время** рядом
-- **Умное автозаполнение**: при вводе категории или плательщика автоматически подставляются сумма, тег и второе поле из последней совпадающей записи (появляется бейдж «✨ данные подставлены»)
-- **Примечание** — визуально выделено цветом акцента
-- **Внутренние операции**: кнопка 🔄 в поле «Плательщик» помечает запись как внутреннюю — она не учитывается в статистике. Фильтр «Внутренние» позволяет показать только такие записи.
-- **Калькулятор**: кнопка 🧮 в поле суммы открывает встроенный калькулятор
+### Records
+- Only **Amount** is required
+- **Date** and **Time** side by side
+- **Smart autocomplete**: entering a category or payer auto-fills amount, tag, and the other field from the last matching record (shows "✨ data substituted" badge)
+- **Note** — visually highlighted with accent color
+- **Internal operations**: 🔄 button in the "Payer" field marks a record as internal — excluded from stats. Filter "Internal" in the filter panel shows only such records.
+- **Calculator**: 🧮 button in the amount field opens a built-in calculator
 
-<img src="assets/screenshots/records_add_ru.png" width="400" alt="Модальное окно добавления записи">
+<img src="assets/screenshots/records_add_en.png" width="400" alt="Add record modal">
 
-### Таблица
-- На десктопе — полноценная таблица с закреплённым заголовком
-- На мобильном — каждая запись отображается как карточка с подписями полей
-- **Настройка колонок**: скрытие/отображение колонок через меню ⚙️ — настройки сохраняются между перезапусками Obsidian
+### Table
+- Desktop: full table with sticky header
+- Mobile: each record renders as a card with field labels
+- **Column visibility**: show/hide columns via ⚙️ menu — settings persist across Obsidian restarts
 
-<img src="assets/screenshots/records_table_ru.png" width="600" alt="Таблица записей на десктопе">
+<img src="assets/screenshots/records_table_en.png" width="600" alt="Records table on desktop">
 <br>
-<img src="assets/screenshots/mobile_cards_ru.png" width="200" alt="Мобильный вид: карточки">
+<img src="assets/screenshots/mobile_cards_en.png" width="200" alt="Mobile card layout">
 
-### Фильтры и сортировка
-- Поиск по всем полям
-- Фильтр по типу (доход/расход), категории, тегу, плательщику, датам
-- Сортировка по дате, сумме, категории, дате добавления
-- Состояние фильтров сохраняется для каждой заметки
+### Filters & Sorting
+- Search across all fields
+- Filter by type (income/expense), category, tag, payer, dates
+- Sort by date, amount, category, date added
+- Filter state persists per note
 
-<!-- ![Панель фильтров и сортировки](assets/screenshots/filters_ru.png) -->
+<!-- ![Filters and sorting panel](assets/screenshots/filters_en.png) -->
 
-### Аналитика
-- Статистика: доходы, расходы, баланс (с учётом долгов)
-- Графики по категориям и месяцам
+### Analytics
+- Statistics: income, expenses, balance (including debts)
+- Charts by category and month
 
-<img src="assets/screenshots/analytic_charts_ru.png" width="600" alt="Аналитика график: бары">
+<img src="assets/screenshots/analytic_charts_en.png" width="600" alt="Analytics bar chart">
 <br>
-<img src="assets/screenshots/analytic_pie_ru.png" width="600" alt="Аналитика график: пирог">
+<img src="assets/screenshots/analytic_pie_en.png" width="600" alt="Analytics pie chart">
 
-### Вложения
-- Фото чеков и документов
-- Прикрепляются к записи и открываются в Obsidian
+### Attachments
+- Photo receipts and documents
+- Attached to records and open in Obsidian
 
-### Импорт / Экспорт
-**Экспорт:** CSV, JSON, XML
+### Import / Export
+**Export:** CSV, JSON, XML
 
-**Импорт:**
-1. Выберите файл (.csv / .json / .xml)
-2. Для JSON — укажите путь к массиву (напр. `data.records`)
-3. Для XML — укажите тег записи (автоопределяется)
-4. Настройте соответствие полей файла ↔ полям счёта
-5. Укажите как определять тип: по полю, по знаку суммы, или все доходы/расходы
-6. Нажмите «Импортировать»
+**Import:**
+1. Select file (.csv / .json / .xml)
+2. For JSON — specify array path (e.g. `data.records`)
+3. For XML — specify record tag (auto-detected)
+4. Map file fields to account fields
+5. Choose type detection: by field, by amount sign, or all income/expense
+6. Click "Import"
 
-> **Курс валюты** импортируется, только если явно указан в файле и не равен 1. Пустое значение или курс = 1 не сохраняется.
+> **Exchange rate** is imported only when explicitly specified in the file and not equal to 1. Empty value or rate = 1 is not stored.
 
-<img src="assets/screenshots/import1_ru.png" width="450" alt="Окно импорта">
+<img src="assets/screenshots/import1_en.png" width="450" alt="Import window step 1">
 <br>
-<img src="assets/screenshots/import2_ru.png" width="450" alt="Окно импорта">
+<img src="assets/screenshots/import2_en.png" width="450" alt="Import window step 2">
 <br>
-<img src="assets/screenshots/import3_ru.png" width="450" alt="Окно импорта">
+<img src="assets/screenshots/import3_en.png" width="450" alt="Import window step 3">
 
-### Долги
-- Два направления: «Мне должны» (lent) и «Я должен» (borrowed)
-- Отслеживание платежей: занял → погасил
-- Автоматический расчёт остатка с учётом всех дополнительных выдач
-- Процентная ставка и дата возврата
-- Фильтры по статусу (погашен/не погашен), направлению, человеку, датам
-- История движений по каждому долгу
+### Debts
+- Two directions: "Owed to me" (lent) and "I owe" (borrowed)
+- Payment tracking: borrow → repay
+- Auto-calculated balance accounting for all additional disbursements
+- Interest rate and due date
+- Filters by status (paid/unpaid), direction, person, dates
+- Movement history for each debt
 
-<img src="assets/screenshots/debt_usage_ru.png" width="600" alt="Список долгов">
+<img src="assets/screenshots/debt_usage_en.png" width="600" alt="Debt list">
 <br>
-<img src="assets/screenshots/debt_add_ru.png" width="450" alt="Добавление долга">
+<img src="assets/screenshots/debt_add_en.png" width="450" alt="Add debt">
 
-### Кредиты
-- Типы: потребительский, автокредит, ипотека
-- График ежемесячных платежей
-- Автоматическое создание платежей и записей о расходах
-- Досрочное погашение (с уменьшением суммы или срока)
-- Отслеживание статуса: активен / погашен
+### Credits
+- Types: consumer, auto loan, mortgage
+- Monthly payment schedule
+- Automatic payment creation and expense records
+- Early repayment (reduce amount or term)
+- Status tracking: active / paid
 
-<img src="assets/screenshots/credit_view_ru.png" width="700" alt="Список кредитов">
+<img src="assets/screenshots/credit_view_en.png" width="700" alt="Credit list">
 <br>
-<img src="assets/screenshots/credit_modals_ru.png" width="450" alt="Добавление кредита">
+<img src="assets/screenshots/credit_modals_en.png" width="450" alt="Add credit">
 <br>
-<img src="assets/screenshots/credit_early_repayment_ru.png" width="450" alt="Досрочное погашение">
+<img src="assets/screenshots/credit_early_repayment_en.png" width="450" alt="Early repayment">
 
-### Вклады
-- Типы: срочный, до востребования, накопительный
-- Автоматический расчёт процентов по фактическим дням (rate × days / 365)
-- Тип начисления: на счёт или с капитализацией
-- Пополнения и частичные снятия
-- Автоматическое создание записей о доходах при начислении процентов
-- Автоматическое закрытие вклада по окончании срока
+### Deposits
+- Types: term, demand, savings
+- Automatic interest calculation based on actual calendar days (rate × days / 365)
+- Accrual type: to account or capitalization
+- Top-ups and partial withdrawals
+- Automatic income records on interest accrual
+- Automatic deposit closure at term end
 
-<img src="assets/screenshots/deposits_usage_ru.png" width="700" alt="Список вкладов">
+<img src="assets/screenshots/deposits_usage_en.png" width="700" alt="Deposit list">
 <br>
-<img src="assets/screenshots/deposits_view_ru.png" width="600" alt="Деталка вклада">
+<img src="assets/screenshots/deposits_view_en.png" width="600" alt="Deposit details">
 <br>
-<img src="assets/screenshots/deposits_modal_ru.png" width="450" alt="Добавление вклада">
+<img src="assets/screenshots/deposits_modal_en.png" width="450" alt="Add deposit">
 
-### Настройки плагина
-- **Валюта по умолчанию** для новых счетов
-- **Управление валютами**: добавление, удаление, сортировка валют drag-and-drop
-- **Количество записей на странице**
+### Plugin Settings
+- **Default currency** for new accounts
+- **Currency management**: add, remove, reorder currencies via drag-and-drop
+- **Records per page**
 
-### Команды
+### Commands
 
-**Поиск осиротевших счетов** — показывает папки данных, чей `id` отсутствует во всех заметках. Это может произойти, если заметка была удалена или её блок `finance-account` был стёрт. Команда предлагает удалить такие папки вручную.
+**Find orphaned accounts** — shows data folders whose `id` does not appear in any note. This can happen if a note was deleted or its `finance-account` block was removed. The command lets you delete such folders manually.
 
 ---
 
-## Структура данных
+## Data Structure
 
-Данные хранятся в `.obsidian/plugins/obsidian-finance/accounts/` в отдельных папках для каждого счёта. Имя папки образуется из последних двух сегментов пути к заметке. При коллизиях добавляется суффикс `_1`, `_2` и т.д.
+Data is stored in `.obsidian/plugins/finance-manager/accounts/{accountId}/` in separate JSON files:
 
 ```
-.obsidian/plugins/obsidian-finance/accounts/
-  Счета_Наличные.md/
-    meta.json       # название, валюта, цвет акцента, путь к заметке
-    records.json    # записи доходов/расходов
-    debts.json      # долги
-    credits.json    # кредиты
-    deposits.json   # вклады
-    state.json      # настройки видимости колонок
+.obsidian/plugins/finance-manager/accounts/{accountId}/
+  meta.json       # name, currency, accent color, note path
+  records.json    # income/expense records
+  debts.json      # debts
+  credits.json    # credits
+  deposits.json   # deposits
+  exchanges.json  # currency exchanges
+  state.json      # filter state and column visibility settings
 ```
 
 ### meta.json
 ```json
 {
   "version": 4,
-  "name": "Карта Сбербанка",
+  "name": "Sberbank Card",
   "currency": "₽",
   "accentColor": "#7c3aed"
 }
@@ -219,58 +219,58 @@ npm run build
       "time": "14:30",
       "type": "expense",
       "amount": 1500.00,
-      "category": "Продукты",
-      "tag": "еда",
-      "payer": "Иван",
-      "note": "Магнит",
+      "category": "Groceries",
+      "tag": "food",
+      "payer": "Ivan",
+      "note": "Supermarket",
       "attachmentPath": "",
       "isInternal": false
     }
   ],
-  "categories": ["Продукты", "Транспорт"],
-  "tags": ["еда"],
-  "payers": ["Иван"]
+  "categories": ["Groceries", "Transport"],
+  "tags": ["food"],
+  "payers": ["Ivan"]
 }
 ```
 
 ---
 
-## Разработка
+## Development
 
 ```bash
-npm run dev     # Режим разработки (watch)
-npm run build   # Сборка в dist/
-npm test        # Unit тесты
-npm run lint    # Проверка ESLint
+npm run dev     # Watch mode
+npm run build   # Build to dist/
+npm test        # Unit tests
+npm run lint    # ESLint check
 ```
 
 ---
 
-## Дорожная карта
+## Roadmap
 
-- [x] CRUD записей с датой и временем
-- [x] Редактирование названия счёта inline
-- [x] Валюта для каждого счёта
-- [x] Фильтры и сортировка с сохранением
-- [x] Пагинация
-- [x] Статистика (доходы/расходы/баланс)
-- [x] Умное автозаполнение
-- [x] Вложения (фото чеков)
-- [x] Импорт CSV/JSON/XML с маппингом полей
-- [x] Экспорт CSV/JSON/XML
-- [x] Адаптивный вид для мобильных
-- [x] Система долгов
-- [x] Аналитика с графиками
-- [x] Мультиязычность (RU/EN)
-- [x] Внутренние операции (исключение из статистики)
-- [x] Управление кредитами
-- [x] Управление вкладами
-- [x] Автоматические начисления по вкладам и платежи по кредитам
-- [x] Настройка колонок таблиц
-- [x] Встроенный калькулятор
+- [x] CRUD records with date and time
+- [x] Inline account name editing
+- [x] Per-account currency
+- [x] Filters and sorting with persistence
+- [x] Pagination
+- [x] Statistics (income/expenses/balance)
+- [x] Smart autocomplete
+- [x] Attachments (photo receipts)
+- [x] Import CSV/JSON/XML with field mapping
+- [x] Export CSV/JSON/XML
+- [x] Mobile responsive layout
+- [x] Debt system
+- [x] Analytics with charts
+- [x] Multi-language (RU/EN)
+- [x] Internal operations (excluded from stats)
+- [x] Credit management
+- [x] Deposit management
+- [x] Auto-accruals for deposits and payments for credits
+- [x] Table column visibility
+- [x] Built-in calculator
 
 ---
 
-## Лицензия
+## License
 
 MIT

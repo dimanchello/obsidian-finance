@@ -2250,7 +2250,8 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    Minimal Theme Integration
    ═══════════════════════════════════════════════════════════════════════════ */
-.markdown-source-view.mod-cm6.max .cm-embed-block > div:has(.finance-manager) {
+.markdown-source-view.mod-cm6.max .cm-embed-block > div.finance-parent-wrapper,
+.markdown-source-view.mod-cm6.max .cm-embed-block > div.finance-parent-container {
   width: 100% !important;
   max-width: 100% !important;
   min-width: 0 !important;
@@ -2277,8 +2278,7 @@
    Без .max плагин ведёт себя как обычный контент заметки и уважает
    readable line width.  С .max — растягивается на всю ширину панели.
 
-   .max добавляется темой Minimal на <body> через Style Settings.
-   :has() ограничивает действие правил только блоками с нашим плагином,
+   Классы предков выставляются через AccountView.applyAncestorClasses(),
    не затрагивая остальной контент заметки.
    ─────────────────────────────────────────────────────────────────────── */
 
@@ -2293,12 +2293,12 @@
 }
 
 /* ② Reading view — предки внутри sizer, которые оборачивают наш блок */
-.markdown-preview-view.is-readable-line-width .markdown-preview-sizer > div:has(.finance-manager),
-.max .markdown-preview-view.is-readable-line-width .markdown-preview-sizer > div:has(.finance-manager),
-.max .markdown-preview-view.is-readable-line-width .markdown-preview-section:has(.finance-manager),
-.max .markdown-preview-view.is-readable-line-width div:has(> .finance-manager),
-.markdown-preview-view.max.is-readable-line-width .markdown-preview-sizer > div:has(.finance-manager),
-.markdown-preview-view.max.is-readable-line-width div:has(> .finance-manager) {
+.markdown-preview-view.is-readable-line-width .markdown-preview-sizer > div.finance-parent-container,
+.max .markdown-preview-view.is-readable-line-width .markdown-preview-sizer > div.finance-parent-container,
+.max .markdown-preview-view.is-readable-line-width .markdown-preview-section.finance-preview-section,
+.max .markdown-preview-view.is-readable-line-width div.finance-parent-wrapper,
+.markdown-preview-view.max.is-readable-line-width .markdown-preview-sizer > div.finance-parent-container,
+.markdown-preview-view.max.is-readable-line-width div.finance-parent-wrapper {
   width: 100% !important;
   max-width: 100% !important;
   margin-inline: 0 !important;
@@ -2306,14 +2306,14 @@
 }
 
 /* ③ Live Preview — враппер embed-блока и переопределение стилей таблиц Minimal Theme */
-.markdown-source-view.mod-cm6 .cm-contentContainer.cm-contentContainer > .cm-content > div:has(.finance-manager),
-.markdown-source-view.mod-cm6.is-readable-line-width .cm-contentContainer.cm-contentContainer > .cm-content > div:has(.finance-manager),
-.markdown-source-view.mod-cm6.max.is-readable-line-width .cm-contentContainer.cm-contentContainer > .cm-content > div:has(.finance-manager),
-.max .markdown-source-view.mod-cm6.is-readable-line-width .cm-contentContainer.cm-contentContainer > .cm-content > div:has(.finance-manager),
-.max .markdown-source-view.mod-cm6 .cm-embed-block:has(.finance-manager),
-.max .markdown-source-view.mod-cm6 .cm-table-widget:has(.finance-manager),
-.markdown-source-view.mod-cm6.max .cm-embed-block:has(.finance-manager),
-.markdown-source-view.mod-cm6.max .cm-table-widget:has(.finance-manager) {
+.markdown-source-view.mod-cm6 .cm-contentContainer.cm-contentContainer > .cm-content > div.finance-parent-container,
+.markdown-source-view.mod-cm6.is-readable-line-width .cm-contentContainer.cm-contentContainer > .cm-content > div.finance-parent-container,
+.markdown-source-view.mod-cm6.max.is-readable-line-width .cm-contentContainer.cm-contentContainer > .cm-content > div.finance-parent-container,
+.max .markdown-source-view.mod-cm6.is-readable-line-width .cm-contentContainer.cm-contentContainer > .cm-content > div.finance-parent-container,
+.max .markdown-source-view.mod-cm6 .cm-embed-block.finance-embed-block,
+.max .markdown-source-view.mod-cm6 .cm-table-widget.finance-embed-block,
+.markdown-source-view.mod-cm6.max .cm-embed-block.finance-embed-block,
+.markdown-source-view.mod-cm6.max .cm-table-widget.finance-embed-block {
   width: 100% !important;
   max-width: none !important;
   margin-inline: 0 !important;
@@ -2327,8 +2327,8 @@
 }
 
 /* ④ Live Preview — readable-line-width вешает padding-inline на .cm-content */
-.max .markdown-source-view.mod-cm6.is-readable-line-width .cm-content:has(.finance-manager),
-.markdown-source-view.mod-cm6.max.is-readable-line-width .cm-content:has(.finance-manager) {
+.max .markdown-source-view.mod-cm6.is-readable-line-width .cm-content.finance-cm-content,
+.markdown-source-view.mod-cm6.max.is-readable-line-width .cm-content.finance-cm-content {
   padding-inline: 0 !important;
 }
 .max .finance-stats-container,

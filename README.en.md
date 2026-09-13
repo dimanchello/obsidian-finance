@@ -1,4 +1,4 @@
-[🇷🇺 Русский](README.md)
+[🇬🇧 English](README.md) | [🇷🇺 Русский](README.ru.md)
 
 ---
 
@@ -184,17 +184,17 @@ Each account has four tabs, switched via the `•••` menu:
 
 ## Data Structure
 
-Data is stored in `.obsidian/plugins/obsidian-finance/accounts/` in separate folders per account. The folder name is derived from the last two path segments of the note. On collisions, a `_1`, `_2` suffix is added.
+Data is stored in `.obsidian/plugins/finance-manager/accounts/{accountId}/` in separate JSON files:
 
 ```
-.obsidian/plugins/obsidian-finance/accounts/
-  Accounts_Cash.md/
-    meta.json       # name, currency, accent color, note path
-    records.json    # income/expense records
-    debts.json      # debts
-    credits.json    # credits
-    deposits.json   # deposits
-    state.json      # column visibility settings
+.obsidian/plugins/finance-manager/accounts/{accountId}/
+  meta.json       # name, currency, accent color, note path
+  records.json    # income/expense records
+  debts.json      # debts
+  credits.json    # credits
+  deposits.json   # deposits
+  exchanges.json  # currency exchanges
+  state.json      # filter state and column visibility settings
 ```
 
 ### meta.json

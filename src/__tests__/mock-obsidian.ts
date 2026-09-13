@@ -10,3 +10,4 @@ export class PluginSettingTab {}
 export class Setting {}
 export function TextComponent() {}
 export function DropdownComponent() {}
+export const getLanguage = vi.fn(() => 'ru');

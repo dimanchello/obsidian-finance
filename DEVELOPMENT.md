@@ -282,7 +282,7 @@ obsidian-finance/
 ├── CODEBASE.md                    # Архитектурный индекс (навигация)
 ├── CLAUDE.md                      # Conventions и правила
 ├── AGENTS.md                      # Устаревшая документация (reference only)
-├── README.md / README.en.md       # Пользовательская документация
+├── README.md / README.ru.md       # Пользовательская документация (EN / RU)
 ├── main.ts                        # Plugin entry point
 ├── styles.css                     # Все стили
 ├── src/

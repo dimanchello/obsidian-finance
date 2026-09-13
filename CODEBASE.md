@@ -111,7 +111,7 @@ Vitest tests:
 - `esbuild.config.mjs` — build script
 - `vitest.config.ts` — test config
 - `CLAUDE.md`, `AGENTS.md` — AI assistant guidance
-- `README.md`, `README.en.md` — user documentation
+- `README.md`, `README.ru.md`, `README.en.md` — user documentation
 
 ## 4. Architecture
 
