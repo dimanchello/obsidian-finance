@@ -1,5 +1,5 @@
 import { ViewContext } from '../../context';
-import { FinanceRecord, OverviewGroupBy, OVERVIEW_MIN_BAR_PCT, PERCENT_100, DEFAULT_FILTER } from '../../types';
+import { FinanceRecord, OverviewGroupBy, OVERVIEW_MIN_BAR_PCT, PERCENT_100, DEFAULT_FILTER, AccountMode } from '../../types';
 import { createChartTooltip } from '../chartHelpers';
 import { calcGroupBreakdown } from '../../domain/overviewMetrics';
 import { isoWeekRange, daysInMonth } from '../../domain/dateMath';
@@ -20,7 +20,7 @@ export class BreakdownChart {
   render(
     parent: HTMLElement,
     records: FinanceRecord[],
-    onNavigate?: (mode: 'records') => void,
+    onNavigate?: (mode: AccountMode) => void,
     onGroupByChange?: () => void
   ): void {
     const { tr, state } = this.ctx;
@@ -132,7 +132,7 @@ export class BreakdownChart {
 
           this.ctx.state.page = 0;
           this.ctx.saveState();
-          onNavigate?.('records');
+          onNavigate?.(AccountMode.RECORDS);
         };
 
         new OverviewRecordsModal(this.ctx.app, {

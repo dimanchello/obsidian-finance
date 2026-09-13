@@ -18,6 +18,7 @@ import {
   SAVINGS_RATE_RANGE,
   PERCENT_100,
   DEFAULT_FILTER,
+  AccountMode,
 } from '../../types';
 import { createChartTooltip, svg } from '../chartHelpers';
 import { calcSavingsRateOverTime, SavingsRateMonth } from '../../domain/overviewMetrics';
@@ -40,7 +41,7 @@ export class SavingsRateChart {
     parent: HTMLElement,
     records: FinanceRecord[],
     today: string,
-    onNavigate?: (mode: 'records') => void,
+    onNavigate?: (mode: AccountMode) => void,
     trendMonths: number = OVERVIEW_TREND_MONTHS
   ): void {
     const { tr, state, isMobile } = this.ctx;
@@ -201,7 +202,7 @@ export class SavingsRateChart {
             this.ctx.state.filter.dateTo = dateTo;
             this.ctx.state.page = 0;
             this.ctx.saveState();
-            onNavigate('records');
+            onNavigate(AccountMode.RECORDS);
           };
 
           new OverviewRecordsModal(this.ctx.app, {

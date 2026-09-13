@@ -1,5 +1,5 @@
 import { ViewContext } from '../../context';
-import { CreditRecord, CHART_PALETTE, PERCENT_100 } from '../../types';
+import { CreditRecord, CHART_PALETTE, PERCENT_100, AccountMode } from '../../types';
 import { MS_PER_DAY } from '../../domain/dateMath';
 import { createChartTooltip } from '../chartHelpers';
 import {
@@ -28,7 +28,7 @@ export class CreditsOverview {
     parent: HTMLElement,
     credits: CreditRecord[],
     today: string,
-    onNavigate?: (mode: 'credits') => void,
+    onNavigate?: (mode: AccountMode) => void,
     onUpdate?: () => void
   ): void {
     const { tr } = this.ctx;
@@ -61,7 +61,7 @@ export class CreditsOverview {
     parent: HTMLElement,
     activeCredits: CreditRecord[],
     creditColorMap: Map<string, string>,
-    onNavigate?: (mode: 'credits') => void,
+    onNavigate?: (mode: AccountMode) => void,
     credits?: CreditRecord[],
     onUpdate?: () => void,
     today: string = getTodayStr()
@@ -82,7 +82,7 @@ export class CreditsOverview {
           this.ctx.state.creditExpandedId = credit.id;
           this.ctx.state.creditPage = 0;
           this.ctx.saveState();
-          onNavigate?.('credits');
+          onNavigate?.(AccountMode.CREDITS);
         };
 
         new CreditDetailModal(this.ctx.app, {

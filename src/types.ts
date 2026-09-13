@@ -11,6 +11,9 @@ import {
   DepositAccrualType,
   PaymentStatus,
   CurrencyOperationType,
+  AccountMode,
+  CODE_BLOCK_LANGUAGES,
+  type CodeBlockLanguage,
 } from './constants';
 
 export {
@@ -26,6 +29,9 @@ export {
   DepositAccrualType,
   PaymentStatus,
   CurrencyOperationType,
+  AccountMode,
+  CODE_BLOCK_LANGUAGES,
+  type CodeBlockLanguage,
 };
 
 export type SortField  = 'date' | 'amount' | 'category' | 'type' | 'payer' | 'tag';

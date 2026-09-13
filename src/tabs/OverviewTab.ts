@@ -7,6 +7,7 @@ import {
   OVERVIEW_PRESET_MONTHS_6,
   OVERVIEW_INPUT_DEBOUNCE_MS,
   OVERVIEW_TREND_MONTHS,
+  AccountMode,
 } from '../types';
 import {
   calcNetBalance,
@@ -43,7 +44,7 @@ export class OverviewTab {
   private depositsOverview: DepositsOverview;
   private creditsOverview: CreditsOverview;
 
-  public onNavigate?: (mode: 'records' | 'debts' | 'credits' | 'deposits' | 'currency') => void;
+  public onNavigate?: (mode: AccountMode) => void;
   public onUpdate?: () => void;
 
   private filterBarEl: HTMLElement | null = null;

@@ -1,5 +1,5 @@
 import { ViewContext } from '../../context';
-import { DebtRecord } from '../../types';
+import { DebtRecord, AccountMode } from '../../types';
 import { createChartTooltip } from '../chartHelpers';
 import { calcDebtsBreakdown } from '../../domain/overviewMetrics';
 import { DebtDetailModal } from '../../modals/DebtDetailModal';
@@ -19,7 +19,7 @@ export class DebtsBreakdownChart {
   render(
     parent: HTMLElement,
     debts: DebtRecord[],
-    onNavigate?: (mode: 'debts') => void,
+    onNavigate?: (mode: AccountMode) => void,
     onUpdate?: () => void
   ): void {
     const { tr, data } = this.ctx;
@@ -59,7 +59,7 @@ export class DebtsBreakdownChart {
           this.ctx.state.debtExpandedId = match.id;
           this.ctx.state.debtPage = 0;
           this.ctx.saveState();
-          onNavigate?.('debts');
+          onNavigate?.(AccountMode.DEBTS);
         };
 
         new DebtDetailModal(this.ctx.app, {

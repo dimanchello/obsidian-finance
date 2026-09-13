@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { FinanceStorage } from '../storage/index';
+import { AccountMode } from '../types';
 
 /**
  * Integration tests for ViewState persistence.
@@ -55,7 +56,7 @@ describe('State Persistence Integration Tests', () => {
   describe('State Persistence', () => {
     it('сохранение и загрузка state работает корректно', async () => {
       const testState = {
-        activeTab: 'records',
+        activeTab: AccountMode.RECORDS,
         page: 5,
         recordsSort: { field: 'amount', dir: 'desc' },
       };
@@ -72,7 +73,7 @@ describe('State Persistence Integration Tests', () => {
 
       expect(stateWriteCall).toBeDefined();
       const savedState = JSON.parse(stateWriteCall[1]);
-      expect(savedState.activeTab).toBe('records');
+      expect(savedState.activeTab).toBe(AccountMode.RECORDS);
       expect(savedState.page).toBe(5);
       expect(savedState.recordsSort.field).toBe('amount');
     });
@@ -87,7 +88,7 @@ describe('State Persistence Integration Tests', () => {
 
     it('загрузка существующего state возвращает данные', async () => {
       const existingState = {
-        activeTab: 'debts',
+        activeTab: AccountMode.DEBTS,
         page: 0,
         debtsSort: { field: 'date', dir: 'desc' },
       };
@@ -109,7 +110,7 @@ describe('State Persistence Integration Tests', () => {
       // loadViewState returns Record<string, unknown> | null
       // If state.json exists and is valid, it should return the data
       if (loadedState !== null) {
-        expect(loadedState.activeTab).toBe('debts');
+        expect(loadedState.activeTab).toBe(AccountMode.DEBTS);
         expect(loadedState.page).toBe(0);
       } else {
         // If null, verify the save/flush cycle worked
@@ -145,8 +146,8 @@ describe('State Persistence Integration Tests', () => {
       await storage.load(accountId2);
 
       // Save different states for each account
-      await storage.saveViewState(accountId1, { activeTab: 'records', page: 1 });
-      await storage.saveViewState(accountId2, { activeTab: 'debts', page: 2 });
+      await storage.saveViewState(accountId1, { activeTab: AccountMode.RECORDS, page: 1 });
+      await storage.saveViewState(accountId2, { activeTab: AccountMode.DEBTS, page: 2 });
       await storage.flush();
 
       // Verify writes went to different files
@@ -167,7 +168,7 @@ describe('State Persistence Integration Tests', () => {
   describe('State Updates', () => {
     it('повторное сохранение state перезаписывает предыдущее', async () => {
       // First save
-      await storage.saveViewState(accountId, { activeTab: 'records', page: 1 });
+      await storage.saveViewState(accountId, { activeTab: AccountMode.RECORDS, page: 1 });
       await storage.flush();
 
       const firstWriteCount = (mockApp.vault.adapter.write as any).mock.calls.filter(
@@ -175,7 +176,7 @@ describe('State Persistence Integration Tests', () => {
       ).length;
 
       // Second save (update)
-      await storage.saveViewState(accountId, { activeTab: 'credits', page: 2 });
+      await storage.saveViewState(accountId, { activeTab: AccountMode.CREDITS, page: 2 });
       await storage.flush();
 
       const secondWriteCount = (mockApp.vault.adapter.write as any).mock.calls.filter(
@@ -192,7 +193,7 @@ describe('State Persistence Integration Tests', () => {
         .pop();
 
       const latestState = JSON.parse(lastStateWrite[1]);
-      expect(latestState.activeTab).toBe('credits');
+      expect(latestState.activeTab).toBe(AccountMode.CREDITS);
       expect(latestState.page).toBe(2);
     });
   });

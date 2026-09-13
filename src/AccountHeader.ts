@@ -1,8 +1,8 @@
-import { PluginSettings } from './types';
+import { PluginSettings, AccountMode } from './types';
 import { noteFilename } from './utils';
 import { ViewContext } from './context';
 
-export type AccountMode = 'overview' | 'records' | 'debts' | 'credits' | 'deposits' | 'currency';
+export type { AccountMode };
 
 export interface AccountHeaderOptions {
   ctx: ViewContext;
@@ -62,7 +62,7 @@ export class AccountHeader {
     const moreBtn = this.root.querySelector<HTMLElement>('.finance-more-btn');
     if (!moreBtn) return;
     const mode = this.o.getMode();
-    moreBtn.toggleClass('is-active-mode', mode !== 'records');
+    moreBtn.toggleClass('is-active-mode', mode !== AccountMode.RECORDS);
   }
 
   private renderModeDropdown(parent: HTMLElement): void {
@@ -91,13 +91,13 @@ export class AccountHeader {
         return;
       }
       dropdown.empty();
-      mkItem('📄', this.tr.records, 'records');
-      mkItem('💳', this.tr.debts, 'debts');
-      mkItem('🏦', this.tr.credits, 'credits');
-      mkItem('📈', this.tr.deposits, 'deposits');
-      mkItem('💱', this.tr.currencyExchange, 'currency');
+      mkItem('📄', this.tr.records, AccountMode.RECORDS);
+      mkItem('💳', this.tr.debts, AccountMode.DEBTS);
+      mkItem('🏦', this.tr.credits, AccountMode.CREDITS);
+      mkItem('📈', this.tr.deposits, AccountMode.DEPOSITS);
+      mkItem('💱', this.tr.currencyExchange, AccountMode.CURRENCY);
       dropdown.createDiv('finance-dropdown-separator');
-      mkItem('📊', this.tr.overview, 'overview');
+      mkItem('📊', this.tr.overview, AccountMode.OVERVIEW);
       dropdown.removeClass('is-hidden');
     });
 

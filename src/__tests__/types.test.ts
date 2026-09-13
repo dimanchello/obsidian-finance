@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { RecordType, DebtDirection, DebtMovementType } from '../types';
+import { RecordType, DebtDirection, DebtMovementType, AccountMode, CODE_BLOCK_LANGUAGES } from '../types';
 
 describe('Type definitions', () => {
   it('FinanceRecord has required fields', () => {
@@ -98,5 +98,20 @@ describe('Type definitions', () => {
     const er = parseFloat(rawEr);
     const exchangeRate = er > 0 && er !== 1 ? er : undefined;
     expect(exchangeRate).toBeUndefined();
+  });
+
+  it('AccountMode defines valid tabs', () => {
+    expect(AccountMode.RECORDS).toBe('records');
+    expect(AccountMode.OVERVIEW).toBe('overview');
+    expect(AccountMode.DEBTS).toBe('debts');
+    expect(AccountMode.CREDITS).toBe('credits');
+    expect(AccountMode.DEPOSITS).toBe('deposits');
+    expect(AccountMode.CURRENCY).toBe('currency');
+  });
+
+  it('CODE_BLOCK_LANGUAGES includes finance-account and aliases', () => {
+    expect(CODE_BLOCK_LANGUAGES).toContain('finance-account');
+    expect(CODE_BLOCK_LANGUAGES).toContain('finance-manager');
+    expect(CODE_BLOCK_LANGUAGES).toContain('finance-tracker');
   });
 });

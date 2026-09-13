@@ -103,3 +103,24 @@ export const CurrencyOperationType = {
   SPEND: 'spend',
 } as const;
 export type CurrencyOperationType = ValueOf<typeof CurrencyOperationType>;
+
+// ── Account Modes / Tabs ──────────────────────────────────────────────────
+
+export const AccountMode = {
+  OVERVIEW: 'overview',
+  RECORDS: 'records',
+  DEBTS: 'debts',
+  CREDITS: 'credits',
+  DEPOSITS: 'deposits',
+  CURRENCY: 'currency',
+} as const;
+export type AccountMode = ValueOf<typeof AccountMode>;
+
+// ── Markdown Code Block Languages ─────────────────────────────────────────
+
+export const CODE_BLOCK_LANGUAGES = [
+  'finance-account',
+  'finance-manager',
+  'finance-tracker',
+] as const;
+export type CodeBlockLanguage = (typeof CODE_BLOCK_LANGUAGES)[number];

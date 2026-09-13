@@ -1,7 +1,7 @@
 import { MarkdownPostProcessorContext, Notice, Plugin, PluginSettingTab, App, Setting, TFile } from 'obsidian';
 import { FinanceStorage } from './src/storage';
 import { AccountView }    from './src/AccountView';
-import { PluginSettings, DEFAULT_SETTINGS, MINT_GUARD_MS } from './src/types';
+import { PluginSettings, DEFAULT_SETTINGS, MINT_GUARD_MS, CODE_BLOCK_LANGUAGES } from './src/types';
 import { getLocaleFromApp, t } from './src/i18n';
 import { collectAccountIds, insertAccountId, newAccountId, parseAccountId } from './src/domain/accountId';
 import { OrphanedAccountsModal } from './src/OrphanedAccountsModal';
@@ -25,19 +25,24 @@ export default class FinanceManagerPlugin extends Plugin {
     // Inject styles dynamically to avoid Obsidian CSS caching issues
     await this.injectStyles();
 
-    this.registerMarkdownCodeBlockProcessor(
-      'finance-account',
-      async (source, el, ctx) => {
-        const resolved = await this.resolveAccountId(source, el, ctx);
-        if (resolved.kind !== 'ok') {
-          this.renderBlockError(el, resolved);
-          return;
-        }
-        const view = new AccountView(this.app, el, resolved.id, ctx.sourcePath, this.storage, this.settings, this.manifest.id);
-        ctx.addChild(view);
-        await view.render();
-      },
-    );
+    const processAccountBlock = async (source: string, el: HTMLElement, ctx: MarkdownPostProcessorContext) => {
+      const resolved = await this.resolveAccountId(source, el, ctx);
+      if (resolved.kind !== 'ok') {
+        this.renderBlockError(el, resolved);
+        return;
+      }
+      const view = new AccountView(this.app, el, resolved.id, ctx.sourcePath, this.storage, this.settings, this.manifest.id);
+      ctx.addChild(view);
+      await view.render();
+    };
+
+    CODE_BLOCK_LANGUAGES.forEach(lang => {
+      try {
+        this.registerMarkdownCodeBlockProcessor(lang, processAccountBlock);
+      } catch (err: unknown) {
+        console.warn(`[finance] Could not register code block processor for "${lang}":`, err);
+      }
+    });
 
     this.addCommand({
       id: 'find-orphaned-accounts',

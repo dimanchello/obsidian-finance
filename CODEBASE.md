@@ -15,8 +15,8 @@ Obsidian плагин для личного финансового учёта. �
 ## 2. Entry Points
 
 **Plugin initialization**
-- `main.ts:FinanceManagerPlugin.onload()` — loads settings, creates storage, registers code block processor, injects styles
-- `main.ts:28-40` — `registerMarkdownCodeBlockProcessor('finance-account', ...)` creates `AccountView` per block
+- `main.ts:FinanceManagerPlugin.onload()` — loads settings, creates storage, registers code block processors, injects styles
+- `main.ts:28-40` — `registerMarkdownCodeBlockProcessor` for `CODE_BLOCK_LANGUAGES` (`finance-account`, `finance-manager`, `finance-tracker`) creates `AccountView` per block
 
 **Code block rendering**
 - `main.ts:75-113` — `resolveAccountId()` mints new accountId if absent, writes to note on first render
@@ -703,7 +703,7 @@ Obsidian plugin system
  → await loadSettings()
  → FinanceStorage = new FinanceStorage(app, pluginId, defaultCurrency)
  → await injectStyles() — reads styles.css from plugin folder
- → registerMarkdownCodeBlockProcessor('finance-account', callback)
+ → registerMarkdownCodeBlockProcessor(lang, callback) for each CODE_BLOCK_LANGUAGES
  → addCommand('find-orphaned-accounts')
  → addCommand('insert-finance-account-template')
  → addSettingTab(FinanceSettingTab)
@@ -855,7 +855,7 @@ Build/test:
 - `MarkdownRenderChild` — AccountView extends this, gets `onunload()` callback
 
 ### Markdown code block processor
-- `registerMarkdownCodeBlockProcessor('finance-account', callback)` in main.ts
+- `registerMarkdownCodeBlockProcessor(lang, callback)` for `CODE_BLOCK_LANGUAGES` (`finance-account`, `finance-manager`, `finance-tracker`) in main.ts
 - Callback receives `(source, el, ctx)` where ctx has `sourcePath`, `getSectionInfo()`
 - AccountView instantiated as child of MarkdownPostProcessorContext
 
@@ -923,7 +923,7 @@ Build/test:
 **File:** `src/types.ts` and `src/constants.ts`  
 `constants.ts` holds the domain-state enums (`RecordType`, `DebtDirection`, `DebtMovementType`,
 `CreditType`, `CreditStatus`, `EarlyRepaymentOption`, `DownPaymentType`, `DepositType`,
-`DepositStatus`, `DepositAccrualType`, `PaymentStatus`, `CurrencyOperationType`) — each an
+`DepositStatus`, `DepositAccrualType`, `PaymentStatus`, `CurrencyOperationType`, `AccountMode`) — each an
 `as const` object plus a `ValueOf` union of the same name, re-exported from `types.ts`.
 `domain/validate.ts` derives its allow-lists from them via `Object.values()`.
 

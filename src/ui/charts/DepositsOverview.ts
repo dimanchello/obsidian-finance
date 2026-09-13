@@ -1,5 +1,5 @@
 import { ViewContext } from '../../context';
-import { DepositRecord, OVERVIEW_TREND_MONTHS, OVERVIEW_CHART_HEIGHT, OVERVIEW_CHART_PAD_LEFT, OVERVIEW_CHART_PAD_RIGHT, OVERVIEW_CHART_PAD_TOP, OVERVIEW_CHART_PAD_BOTTOM, OVERVIEW_LABEL_OFFSET_Y, OVERVIEW_MIN_GROUP_W, OVERVIEW_MIN_GROUP_W_MOBILE, OVERVIEW_Y_TICKS, OVERVIEW_MAX_BAR_W, OVERVIEW_BAR_SPACING_PAD, OVERVIEW_BAR_RADIUS, OVERVIEW_LINE_STROKE_W, OVERVIEW_POINT_RADIUS, OVERVIEW_POINT_RADIUS_HOVER, CHART_PALETTE } from '../../types';
+import { DepositRecord, OVERVIEW_TREND_MONTHS, OVERVIEW_CHART_HEIGHT, OVERVIEW_CHART_PAD_LEFT, OVERVIEW_CHART_PAD_RIGHT, OVERVIEW_CHART_PAD_TOP, OVERVIEW_CHART_PAD_BOTTOM, OVERVIEW_LABEL_OFFSET_Y, OVERVIEW_MIN_GROUP_W, OVERVIEW_MIN_GROUP_W_MOBILE, OVERVIEW_Y_TICKS, OVERVIEW_MAX_BAR_W, OVERVIEW_BAR_SPACING_PAD, OVERVIEW_BAR_RADIUS, OVERVIEW_LINE_STROKE_W, OVERVIEW_POINT_RADIUS, OVERVIEW_POINT_RADIUS_HOVER, CHART_PALETTE, AccountMode } from '../../types';
 import { createChartTooltip, fmtShort, svg } from '../chartHelpers';
 import { calcDepositInterestOverTime, calcActiveDepositsProgress, DepositInterestMonth, ActiveDepositProgress } from '../../domain/overviewMetrics';
 import { fmtDate } from '../../utils';
@@ -22,7 +22,7 @@ export class DepositsOverview {
     parent: HTMLElement,
     deposits: DepositRecord[],
     today: string,
-    onNavigate?: (mode: 'deposits') => void,
+    onNavigate?: (mode: AccountMode) => void,
     trendMonths: number = OVERVIEW_TREND_MONTHS,
     onUpdate?: () => void
   ): void {
@@ -235,7 +235,7 @@ export class DepositsOverview {
     parent: HTMLElement,
     activeDeposits: ActiveDepositProgress[],
     depositColorMap: Map<string, string>,
-    onNavigate?: (mode: 'deposits') => void,
+    onNavigate?: (mode: AccountMode) => void,
     deposits?: DepositRecord[],
     onUpdate?: () => void
   ): void {
@@ -255,7 +255,7 @@ export class DepositsOverview {
           this.ctx.state.depositExpandedId = dep.id;
           this.ctx.state.depositPage = 0;
           this.ctx.saveState();
-          onNavigate?.('deposits');
+          onNavigate?.(AccountMode.DEPOSITS);
         };
 
         new DepositDetailModal(this.ctx.app, {

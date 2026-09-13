@@ -1,13 +1,13 @@
 import { App, MarkdownRenderChild, Notice, Platform } from 'obsidian';
 import { FinanceStorage } from './storage';
 import {
-  AccountData, PluginSettings, MOBILE_BREAKPOINT, RecordType,
+  AccountData, PluginSettings, MOBILE_BREAKPOINT, RecordType, AccountMode,
 } from './types';
 import { getTodayStr, getTodayTime } from './utils';
 import { applyAutoTransactions, type AutoTxDeps } from './domain/autoTransactions';
 import { RecordModal } from './RecordModal';
 import { ViewContext } from './context';
-import { AccountHeader, type AccountMode } from './AccountHeader';
+import { AccountHeader } from './AccountHeader';
 import { AutoTxScheduler } from './AutoTxScheduler';
 import { OverviewTab } from './tabs/OverviewTab';
 import { RecordsTab } from './tabs/RecordsTab';
@@ -27,7 +27,7 @@ export class AccountView extends MarkdownRenderChild {
   private header:   AccountHeader;
   private scheduler: AutoTxScheduler;
 
-  private mode: AccountMode = 'overview';
+  private mode: AccountMode = AccountMode.RECORDS;
   private isMobile = false;
   private isCheckingAutoTransactions = false;
 
@@ -113,15 +113,15 @@ export class AccountView extends MarkdownRenderChild {
     body.empty();
     this.header.actionsContainer?.empty();
 
-    if (this.mode === 'overview') {
+    if (this.mode === AccountMode.OVERVIEW) {
       this.renderOverviewTab(body);
-    } else if (this.mode === 'debts') {
+    } else if (this.mode === AccountMode.DEBTS) {
       this.renderDebtsTab(body);
-    } else if (this.mode === 'credits') {
+    } else if (this.mode === AccountMode.CREDITS) {
       this.renderCreditsTab(body);
-    } else if (this.mode === 'deposits') {
+    } else if (this.mode === AccountMode.DEPOSITS) {
       this.renderDepositsTab(body);
-    } else if (this.mode === 'currency') {
+    } else if (this.mode === AccountMode.CURRENCY) {
       this.renderCurrencyTab(body);
     } else {
       this.renderRecordsTab(body);
@@ -150,8 +150,8 @@ export class AccountView extends MarkdownRenderChild {
     expBtn.createEl('span', { text: '↓', cls: 'btn-icon' });
     expBtn.createEl('span', { text: this.ctx.tr.typeExpense });
 
-    incBtn.addEventListener('click', () => { this.mode = 'records'; this.renderBodyContent(); this.openAddModal(RecordType.INCOME); });
-    expBtn.addEventListener('click', () => { this.mode = 'records'; this.renderBodyContent(); this.openAddModal(RecordType.EXPENSE); });
+    incBtn.addEventListener('click', () => { this.mode = AccountMode.RECORDS; this.renderBodyContent(); this.openAddModal(RecordType.INCOME); });
+    expBtn.addEventListener('click', () => { this.mode = AccountMode.RECORDS; this.renderBodyContent(); this.openAddModal(RecordType.EXPENSE); });
 
     new RecordsTab(this.ctx, body).render();
   }
