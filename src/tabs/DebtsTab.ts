@@ -123,8 +123,8 @@ export class DebtsTab {
 
   public renderHeaderActions(container: HTMLElement): void {
     const newDebtBtn = container.createEl('button', { cls: 'finance-add-btn finance-accent-btn' });
-    newDebtBtn.createEl('span', { text: '＋', cls: 'btn-icon' });
-    newDebtBtn.createEl('span', { text: this.tr.newDebt });
+    newDebtBtn.createSpan({ text: '＋', cls: 'btn-icon' });
+    newDebtBtn.createSpan({ text: this.tr.newDebt });
     newDebtBtn.addEventListener('click', () => this.openNewDebtModal());
   }
 

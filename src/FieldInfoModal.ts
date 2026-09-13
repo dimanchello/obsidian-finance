@@ -74,8 +74,8 @@ export class FieldInfoModal extends FinanceBaseModal {
 
     this.fields.forEach(({ labelKey, descKey }) => {
       const card = container.createDiv('finance-info-card');
-      card.createEl('div', { text: this.tr[labelKey], cls: 'finance-info-card-label' });
-      card.createEl('div', { text: this.tr[descKey], cls: 'finance-info-card-desc' });
+      card.createDiv({ text: this.tr[labelKey], cls: 'finance-info-card-label' });
+      card.createDiv({ text: this.tr[descKey], cls: 'finance-info-card-desc' });
     });
 
     const btnRow = contentEl.createDiv('finance-modal-btns finance-info-btns');

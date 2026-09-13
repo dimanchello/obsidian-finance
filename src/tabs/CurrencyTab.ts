@@ -132,9 +132,9 @@ export class CurrencyTab {
         }
 
         const sums = host.createDiv('finance-table-sums');
-        sums.createEl('span', { text: fiText, cls: 'finance-sum-income' });
-        sums.createEl('span', { text: '·', cls: 'finance-sum-sep' });
-        sums.createEl('span', { text: feText, cls: 'finance-sum-expense' });
+        sums.createSpan({ text: fiText, cls: 'finance-sum-income' });
+        sums.createSpan({ text: '·', cls: 'finance-sum-sep' });
+        sums.createSpan({ text: feText, cls: 'finance-sum-expense' });
       },
       emptyState: { icon: '💱', title: this.tr.noRecords, subtitle: this.tr.newCurrencyExchange },
       emptyFiltered: { icon: '🔍', title: this.tr.noRecordsFilter, subtitle: this.tr.tryChangeFilters },
@@ -156,8 +156,8 @@ export class CurrencyTab {
   public renderHeaderActions(container: HTMLElement): void {
     const createBtn = (label: string, icon: string, type: CurrencyOperationType, cls = '') => {
       const btn = container.createEl('button', { cls: `finance-add-btn finance-currency-btn ${cls}`.trim() });
-      btn.createEl('span', { text: icon, cls: 'btn-icon' });
-      btn.createEl('span', { text: label, cls: 'finance-currency-btn-text' });
+      btn.createSpan({ text: icon, cls: 'btn-icon' });
+      btn.createSpan({ text: label, cls: 'finance-currency-btn-text' });
       btn.addEventListener('click', () => this.openModal(type));
     };
     
@@ -319,19 +319,19 @@ export class CurrencyTab {
     
     const header = block.createDiv('finance-record-header');
     const sign = isIncome ? '+' : '−';
-    header.createEl('span', {
+    header.createSpan({
       text: `${sign}${this.ctx.fmt(e.targetAmount)} ${e.targetCurrency}`,
       cls: `finance-record-amount ${isIncome ? 'finance-amount-income' : 'finance-amount-expense'}`,
     });
-    header.createEl('span', { text: fmtDate(e.date, e.time), cls: 'finance-record-date' });
+    header.createSpan({ text: fmtDate(e.date, e.time), cls: 'finance-record-date' });
     
     const details = block.createDiv('finance-record-details');
-    details.createEl('span', { text: this.typeLabel(e.type), cls: 'finance-record-detail' });
+    details.createSpan({ text: this.typeLabel(e.type), cls: 'finance-record-detail' });
     if (e.type !== CurrencyOperationType.ADD) {
-      details.createEl('span', { text: `${this.tr.sum}: ${this.ctx.fmt(e.amountInAccountCurrency)} ${this.ctx.data?.currency ?? ''}`, cls: 'finance-record-detail' });
-      details.createEl('span', { text: `${this.tr.rate}: ${e.exchangeRate}`, cls: 'finance-record-detail' });
+      details.createSpan({ text: `${this.tr.sum}: ${this.ctx.fmt(e.amountInAccountCurrency)} ${this.ctx.data?.currency ?? ''}`, cls: 'finance-record-detail' });
+      details.createSpan({ text: `${this.tr.rate}: ${e.exchangeRate}`, cls: 'finance-record-detail' });
     }
-    if (e.provider) details.createEl('span', { text: e.provider, cls: 'finance-record-detail' });
+    if (e.provider) details.createSpan({ text: e.provider, cls: 'finance-record-detail' });
   }
 
   private openModal(type: CurrencyOperationType, initial?: CurrencyExchange): void {

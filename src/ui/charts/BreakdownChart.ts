@@ -29,7 +29,7 @@ export class BreakdownChart {
     chartWrap.createEl('h3', { text: tr.overviewBreakdown, cls: 'finance-chart-title' });
 
     const controls = chartWrap.createDiv('finance-chart-controls');
-    controls.createEl('span', { text: tr.groupBy, cls: 'finance-stat-label' });
+    controls.createSpan({ text: tr.groupBy, cls: 'finance-stat-label' });
 
     const select = controls.createEl('select', { cls: 'dropdown' });
     const groupOptions: { value: OverviewGroupBy; label: string }[] = [

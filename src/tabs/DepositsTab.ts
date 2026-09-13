@@ -143,8 +143,8 @@ export class DepositsTab {
 
   public renderHeaderActions(container: HTMLElement): void {
     const btn = container.createEl('button', { cls: 'finance-add-btn finance-accent-btn' });
-    btn.createEl('span', { text: '＋', cls: 'btn-icon' });
-    btn.createEl('span', { text: this.tr.newDeposit });
+    btn.createSpan({ text: '＋', cls: 'btn-icon' });
+    btn.createSpan({ text: this.tr.newDeposit });
     btn.addEventListener('click', () => this.openNewDepositModal());
   }
 

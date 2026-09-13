@@ -67,7 +67,7 @@ export class ImportExportModal extends FinanceBaseModal {
     const grid = b.createDiv('finance-export-grid');
     fmts.forEach(({ fmt, labelKey, icon }) => {
       const card = grid.createDiv('finance-export-card');
-      card.createEl('div',    { text: icon,  cls: 'finance-export-icon' });
+      card.createDiv({ text: icon,  cls: 'finance-export-icon' });
       card.createEl('strong', { text: this.tr[labelKey] });
       const btn  = card.createEl('button', { text: this.tr.download, cls: 'finance-btn-save finance-export-btn' });
       btn.addEventListener('click', () => this.doExport(fmt));
@@ -94,7 +94,7 @@ export class ImportExportModal extends FinanceBaseModal {
 
     const blob = new Blob([content], { type: mime });
     const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
+    const a    = createEl('a');
     a.href     = url;
     a.download = `${this.o.noteName.replace(/[^\w\s-]/g, '')}.${ext}`;
     a.click();
@@ -125,7 +125,7 @@ export class ImportExportModal extends FinanceBaseModal {
 
     // ── Step 1: File picker ────────────────────────────────────────────────
     const step1 = b.createDiv('finance-import-step');
-    step1.createEl('div', { text: this.tr.importStep1, cls: 'finance-step-title' });
+    step1.createDiv({ text: this.tr.importStep1, cls: 'finance-step-title' });
 
     const pickWrap = step1.createDiv('finance-attach-wrapper');
     const fi       = pickWrap.createEl('input', { type: 'file', cls: 'finance-file-input' });
@@ -133,12 +133,12 @@ export class ImportExportModal extends FinanceBaseModal {
     const uid      = `ft-import-${Date.now()}`;
     fi.id          = uid;
 
-    const nameEl   = pickWrap.createEl('span', { text: this.tr.importNoFile, cls: 'finance-attach-name' });
+    const nameEl   = pickWrap.createSpan({ text: this.tr.importNoFile, cls: 'finance-attach-name' });
 
     const openBtn  = pickWrap.createEl('label', { cls: 'finance-attach-label' });
     openBtn.setAttribute('for', uid);
-    openBtn.createEl('span', { text: '📂' });
-    openBtn.createEl('span', { text: this.tr.importOpenFile });
+    openBtn.createSpan({ text: '📂' });
+    openBtn.createSpan({ text: this.tr.importOpenFile });
 
     // Steps 2+ appear here after file load
     const stepsContainer = b.createDiv('finance-import-steps');
@@ -192,7 +192,7 @@ export class ImportExportModal extends FinanceBaseModal {
   }
 
   private parseJSON(text: string, container: HTMLElement): void {
-    const parsed = JSON.parse(text);
+    const parsed: unknown = JSON.parse(text);
 
     const tryArr = (obj: unknown): Record<string, unknown>[] | null => {
       if (Array.isArray(obj) && obj.length > 0 && typeof obj[0] === 'object' && obj[0] !== null) {
@@ -210,7 +210,7 @@ export class ImportExportModal extends FinanceBaseModal {
 
     // Object — need to pick path
     const step = container.createDiv('finance-import-step');
-    step.createEl('div', { text: this.tr.importStep1b, cls: 'finance-step-title' });
+    step.createDiv({ text: this.tr.importStep1b, cls: 'finance-step-title' });
     step.createEl('small', { text: this.tr.importJsonPathHint, cls: 'finance-hint-text' });
 
     const row  = step.createDiv('finance-filters-row');
@@ -254,7 +254,7 @@ export class ImportExportModal extends FinanceBaseModal {
     if (!this.rawData.length) { container.createEl('p', { text: this.tr.noRecords, cls: 'finance-error' }); return; }
 
     const step = container.createDiv('finance-import-step');
-    step.createEl('div', {
+    step.createDiv({
       text: this.tpl(this.tr.importStep2, { count: this.rawData.length }),
       cls: 'finance-step-title',
     });
@@ -270,9 +270,9 @@ export class ImportExportModal extends FinanceBaseModal {
 
     // header row
     const hRow = tbl.createDiv('finance-mapping-row finance-mapping-header');
-    hRow.createEl('div', { text: this.tr.importAccountField, cls: 'finance-mapping-cell' });
-    hRow.createEl('div', { text: this.tr.importFileField,    cls: 'finance-mapping-cell' });
-    hRow.createEl('div', { text: this.tr.importSampleValue,  cls: 'finance-mapping-cell' });
+    hRow.createDiv({ text: this.tr.importAccountField, cls: 'finance-mapping-cell' });
+    hRow.createDiv({ text: this.tr.importFileField,    cls: 'finance-mapping-cell' });
+    hRow.createDiv({ text: this.tr.importSampleValue,  cls: 'finance-mapping-cell' });
 
     const notImport = this.tr.importNotImport;
     const srcOptions = [notImport, ...this.srcFields];
@@ -302,7 +302,7 @@ export class ImportExportModal extends FinanceBaseModal {
     this.getOurFields().filter(f => f.key !== '_skip').forEach(f => {
       const row = tbl.createDiv('finance-mapping-row');
 
-      row.createEl('div', { text: this.tr[f.labelKey], cls: 'finance-mapping-cell finance-mapping-label' });
+      row.createDiv({ text: this.tr[f.labelKey], cls: 'finance-mapping-cell finance-mapping-label' });
 
       const selWrapper = row.createDiv('finance-mapping-cell');
       const sel        = selWrapper.createEl('select', { cls: 'finance-filter-select' });
@@ -315,7 +315,7 @@ export class ImportExportModal extends FinanceBaseModal {
       this.mapping[f.key] = guessed;
       sel.addEventListener('change', () => { this.mapping[f.key] = sel.value; this.updatePreviewCell(previewEl, f.key, sel.value, sample); });
 
-      const previewEl = row.createEl('div', { cls: 'finance-mapping-cell finance-mapping-preview' });
+      const previewEl = row.createDiv('finance-mapping-cell finance-mapping-preview');
       this.updatePreviewCell(previewEl, f.key, guessed, sample);
     });
 
@@ -329,7 +329,7 @@ export class ImportExportModal extends FinanceBaseModal {
       inp.name   = 'ftTypeMode';
       inp.value  = value;
       inp.checked= value === 'field';
-      wrap.createEl('span', { text: label });
+      wrap.createSpan({ text: label });
       return inp;
     };
 

@@ -63,8 +63,8 @@ export default class FinanceManagerPlugin extends Plugin {
     this.addSettingTab(new FinanceSettingTab(this.app, this));
   }
 
-  override async onunload(): Promise<void> {
-    await this.storage.flush();
+  override onunload(): void {
+    void this.storage.flush();
   }
 
   /**
@@ -144,7 +144,8 @@ export default class FinanceManagerPlugin extends Plugin {
   }
 
   async loadSettings(): Promise<void> {
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    const loaded = (await this.loadData()) as Partial<PluginSettings> | null | undefined;
+    this.settings = Object.assign({}, DEFAULT_SETTINGS, loaded);
   }
 
   async saveSettings(): Promise<void> {
@@ -260,7 +261,7 @@ class FinanceSettingTab extends PluginSettingTab {
         row.draggable = true;
         row.setAttribute('data-index', String(i));
 
-        row.createEl('span', { text: '⠿', cls: 'finance-currency-grip' });
+        row.createSpan({ text: '⠿', cls: 'finance-currency-grip' });
         row.createSpan({ text: c });
         const rmBtn = row.createEl('button', { text: '×', cls: 'finance-currency-remove' });
         rmBtn.addEventListener('click', () => {

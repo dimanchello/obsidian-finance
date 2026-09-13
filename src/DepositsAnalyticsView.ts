@@ -99,7 +99,7 @@ export class DepositsAnalyticsView {
     if (!deposits.length) return;
 
     const section = this.el.createDiv('finance-credit-progress-list');
-    section.createEl('div', { text: this.tr.depositActiveList, cls: 'finance-analytics-section-title' });
+    section.createDiv({ text: this.tr.depositActiveList, cls: 'finance-analytics-section-title' });
 
     deposits.forEach(d => {
       const endDate = safeEndDate(d.startDate, d.termMonths);
@@ -117,13 +117,13 @@ export class DepositsAnalyticsView {
 
       const item = section.createDiv('finance-credit-progress-item');
       const header = item.createDiv('finance-credit-progress-header');
-      header.createEl('span', { text: d.name || d.bankName || '—', cls: 'finance-credit-progress-name' });
-      header.createEl('span', { text: `${d.interestRate}% · ${this.fmt(d.amount)}`, cls: 'finance-credit-progress-pct' });
+      header.createSpan({ text: d.name || d.bankName || '—', cls: 'finance-credit-progress-name' });
+      header.createSpan({ text: `${d.interestRate}% · ${this.fmt(d.amount)}`, cls: 'finance-credit-progress-pct' });
 
       const sub = item.createDiv('finance-credit-progress-sub');
-      sub.createEl('span', { text: d.bankName || '—', cls: 'finance-credit-progress-bank' });
-      if (endDate) sub.createEl('span', { text: `До ${fmtDate(endDate)}`, cls: 'finance-credit-progress-date' });
-      sub.createEl('span', { text: `+${this.fmt(totalProfit)}`, cls: 'finance-credit-progress-amount finance-text-success' });
+      sub.createSpan({ text: d.bankName || '—', cls: 'finance-credit-progress-bank' });
+      if (endDate) sub.createSpan({ text: `До ${fmtDate(endDate)}`, cls: 'finance-credit-progress-date' });
+      sub.createSpan({ text: `+${this.fmt(totalProfit)}`, cls: 'finance-credit-progress-amount finance-text-success' });
 
       const bar = item.createDiv('finance-deposit-progress');
       const fill = bar.createDiv('finance-deposit-progress-fill');

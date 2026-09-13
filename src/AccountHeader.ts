@@ -51,10 +51,9 @@ export class AccountHeader {
     curWrap.title = this.tr.changeCurrency;
     this.renderCurrencyBadge(curWrap);
 
-    const right = header.createDiv('finance-header-right');
-    this.actionsContainer = right.createDiv('finance-header-actions');
+    this.actionsContainer = header.createDiv('finance-header-actions');
 
-    this.renderModeDropdown(right);
+    this.renderModeDropdown(header);
   }
 
   /** Highlights the "•••" button while a tab reachable only from it is active. */
@@ -75,8 +74,8 @@ export class AccountHeader {
     const mkItem = (icon: string, label: string, targetMode: AccountMode) => {
       const isActive = this.o.getMode() === targetMode;
       const item = dropdown.createDiv(`finance-dropdown-item${isActive ? ' active' : ''}`);
-      item.createEl('span', { text: icon, cls: 'btn-icon' });
-      item.createEl('span', { text: label });
+      item.createSpan({ text: icon, cls: 'btn-icon' });
+      item.createSpan({ text: label });
       if (isActive) return;
       item.addEventListener('click', () => {
         dropdown.addClass('is-hidden');
@@ -135,7 +134,7 @@ export class AccountHeader {
     const cur = this.o.ctx.currency;
     wrap.empty();
 
-    const badge = wrap.createEl('span', { text: cur, cls: 'finance-cur-badge' });
+    const badge = wrap.createSpan({ text: cur, cls: 'finance-cur-badge' });
 
     badge.addEventListener('click', e => {
       e.stopPropagation();
@@ -147,10 +146,12 @@ export class AccountHeader {
       this.o.settings.customCurrencies.forEach(c => {
         const btn = popup.createEl('button', { text: c, cls: 'finance-cur-option' });
         if (c === cur) btn.addClass('active');
-        btn.addEventListener('click', async ev => {
+        btn.addEventListener('click', ev => {
           ev.stopPropagation();
-          if (c !== cur) await this.o.onCurrencyChange(c);
-          this.renderCurrencyBadge(wrap);
+          void (async () => {
+            if (c !== cur) await this.o.onCurrencyChange(c);
+            this.renderCurrencyBadge(wrap);
+          })();
         });
       });
 

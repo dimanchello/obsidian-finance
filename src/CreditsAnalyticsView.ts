@@ -343,18 +343,18 @@ export class CreditsAnalyticsView {
 
     // Title & Legend
     const header = this.chartEl.createDiv('finance-chart-header-row');
-    header.createEl('div', { text: this.tr.creditPaymentSchedule, cls: 'finance-analytics-section-title' });
+    header.createDiv({ text: this.tr.creditPaymentSchedule, cls: 'finance-analytics-section-title' });
 
     const legend = header.createDiv('finance-chart-legend');
     const legPrincipal = legend.createDiv('finance-chart-legend-row');
     const dotPrin = legPrincipal.createDiv('finance-chart-legend-dot');
     dotPrin.style.setProperty('--ft-dot-color', CHART_COLOR_PRINCIPAL);
-    legPrincipal.createEl('span', { text: this.tr.creditPrincipal });
+    legPrincipal.createSpan({ text: this.tr.creditPrincipal });
 
     const legInterest = legend.createDiv('finance-chart-legend-row');
     const dotInt = legInterest.createDiv('finance-chart-legend-dot');
     dotInt.style.setProperty('--ft-dot-color', CHART_COLOR_INTEREST);
-    legInterest.createEl('span', { text: this.tr.creditInterest });
+    legInterest.createSpan({ text: this.tr.creditInterest });
 
     wrap.before(header);
   }
@@ -364,7 +364,7 @@ export class CreditsAnalyticsView {
     if (!credits.length) return;
 
     const section = this.el.createDiv('finance-credit-progress-list');
-    section.createEl('div', { text: this.tr.creditRepaymentProgress, cls: 'finance-analytics-section-title' });
+    section.createDiv({ text: this.tr.creditRepaymentProgress, cls: 'finance-analytics-section-title' });
 
     credits.forEach(c => {
       const remainingPrincipal = calculateRemainingPrincipal(c);
@@ -376,13 +376,13 @@ export class CreditsAnalyticsView {
 
       const item = section.createDiv('finance-credit-progress-item');
       const header = item.createDiv('finance-credit-progress-header');
-      header.createEl('span', { text: c.name || c.bankName || '—', cls: 'finance-credit-progress-name' });
-      header.createEl('span', { text: `${pct}%`, cls: 'finance-credit-progress-pct' });
+      header.createSpan({ text: c.name || c.bankName || '—', cls: 'finance-credit-progress-name' });
+      header.createSpan({ text: `${pct}%`, cls: 'finance-credit-progress-pct' });
 
       const sub = item.createDiv('finance-credit-progress-sub');
-      sub.createEl('span', { text: c.bankName || '—', cls: 'finance-credit-progress-bank' });
-      if (endDate) sub.createEl('span', { text: fmtDate(endDate), cls: 'finance-credit-progress-date' });
-      sub.createEl('span', { text: this.fmt(remainingPrincipal), cls: 'finance-credit-progress-amount' });
+      sub.createSpan({ text: c.bankName || '—', cls: 'finance-credit-progress-bank' });
+      if (endDate) sub.createSpan({ text: fmtDate(endDate), cls: 'finance-credit-progress-date' });
+      sub.createSpan({ text: this.fmt(remainingPrincipal), cls: 'finance-credit-progress-amount' });
 
       const bar = item.createDiv('finance-deposit-progress');
       const fill = bar.createDiv('finance-deposit-progress-fill');

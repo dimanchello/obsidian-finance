@@ -45,7 +45,7 @@ export function renderPagination(opts: PaginationOptions): HTMLElement | null {
 
   pageRange(opts.currentPage, opts.totalPages, opts.isMobile).forEach(p => {
     if (p === -1) {
-      nav.createEl('span', { text: '…', cls: 'finance-page-ellipsis' });
+      nav.createSpan({ text: '…', cls: 'finance-page-ellipsis' });
       return;
     }
     const btn = nav.createEl('button', {

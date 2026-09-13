@@ -66,7 +66,7 @@ export class CreditDetailModal extends FinanceBaseModal {
     const typeLabel = getCreditTypeLabel(this.credit.type, this.tr);
 
     // Subtitle
-    this.bodyContainer.createEl('div', {
+    this.bodyContainer.createDiv({
       text: `${this.credit.bankName || '—'} · ${typeLabel} · ${this.credit.interestRate}%`,
       cls: 'finance-modal-subtitle',
     });

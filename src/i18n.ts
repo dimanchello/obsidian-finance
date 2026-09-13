@@ -1,4 +1,4 @@
-import { App, getLanguage } from 'obsidian';
+import { App } from 'obsidian';
 
 export type Locale = 'ru' | 'en';
 
@@ -1882,15 +1882,13 @@ export function getLocale(lang: string | undefined): Locale {
 }
 
 export function getLocaleFromApp(app?: App): Locale {
-  if (typeof getLanguage === 'function') {
-    const lang = getLanguage();
-    if (lang) return getLocale(lang);
+  const fromLocal = typeof window !== 'undefined' ? window.localStorage.getItem('language') : null;
+  if (typeof fromLocal === 'string' && fromLocal) {
+    return getLocale(fromLocal);
   }
-  if (app) {
-    const fromLocal = app.loadLocalStorage('language');
-    if (typeof fromLocal === 'string' && fromLocal) {
-      return getLocale(fromLocal);
-    }
+  const fromConfig = (app?.vault as { getConfig?: (key: string) => unknown } | undefined)?.getConfig?.('language');
+  if (typeof fromConfig === 'string' && fromConfig) {
+    return getLocale(fromConfig);
   }
   const fromHtml = typeof document !== 'undefined' ? document.documentElement.lang : '';
   if (fromHtml) return getLocale(fromHtml);

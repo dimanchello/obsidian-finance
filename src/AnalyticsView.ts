@@ -68,7 +68,7 @@ export class AnalyticsView {
 
     // chart type (row 1)
     const tg = ctrl.createDiv('finance-analytics-group');
-    tg.createEl('span', { text: this.tr.chartView, cls: 'finance-analytics-label' });
+    tg.createSpan({ text: this.tr.chartView, cls: 'finance-analytics-label' });
     const tgBtnWrap = tg.createDiv('finance-analytics-btn-wrap');
     const barBtn = this.mkToggle(tgBtnWrap, this.tr.barChart, this.chartType === 'bar');
     const pieBtn = this.mkToggle(tgBtnWrap, this.tr.pieChart, this.chartType === 'pie');
@@ -79,12 +79,12 @@ export class AnalyticsView {
     const ctrl2 = ctrl.createDiv('finance-analytics-group finance-analytics-group-row');
 
     const gg = ctrl2.createDiv('finance-analytics-group');
-    gg.createEl('span', { text: this.tr.groupBy, cls: 'finance-analytics-label' });
+    gg.createSpan({ text: this.tr.groupBy, cls: 'finance-analytics-label' });
     const gSel = this.mkSelect(gg, [['category',this.tr.byCategory],['payer',this.tr.byPayer],['week',this.tr.byWeek],['month',this.tr.byMonth],['year',this.tr.byYear]], this.groupBy);
     gSel.addEventListener('change', () => { this.groupBy = gSel.value as GroupBy; this.redrawChart(); });
 
     const sg = ctrl2.createDiv('finance-analytics-group');
-    sg.createEl('span', { text: this.tr.showData, cls: 'finance-analytics-label' });
+    sg.createSpan({ text: this.tr.showData, cls: 'finance-analytics-label' });
     const sSel = this.mkSelect(sg, [['both',this.tr.all],[RecordType.INCOME,this.tr.incomeStat],[RecordType.EXPENSE,this.tr.expenseStat]], this.showType);
     sSel.addEventListener('change', () => { this.showType = sSel.value as ShowType; this.redrawChart(); });
 
@@ -341,7 +341,7 @@ export class AnalyticsView {
         const row = legEl.createDiv('finance-chart-legend-row');
         const dot = row.createDiv('finance-chart-legend-dot');
         dot.style.setProperty('--ft-dot-color', c);
-        row.createEl('span', { text: lbl });
+        row.createSpan({ text: lbl });
       });
     }
   }
@@ -425,8 +425,8 @@ export class AnalyticsView {
       const row = legend.createDiv('finance-pie-legend-row');
       const dot = row.createDiv('finance-pie-dot');
       dot.style.setProperty('--ft-dot-color', CHART_PALETTE[idx % CHART_PALETTE.length]!);
-      row.createEl('span', { text: d.label,                      cls: 'finance-pie-label' });
-      row.createEl('span', { text: `${this.fmtNum(d.value)} · ${pct(d.value, total)}`, cls: 'finance-pie-val' });
+      row.createSpan({ text: d.label,                      cls: 'finance-pie-label' });
+      row.createSpan({ text: `${this.fmtNum(d.value)} · ${pct(d.value, total)}`, cls: 'finance-pie-val' });
     });
   }
 }

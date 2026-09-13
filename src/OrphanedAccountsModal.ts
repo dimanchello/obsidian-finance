@@ -32,12 +32,14 @@ export class OrphanedAccountsModal extends FinanceBaseModal {
       const row = list.createDiv('finance-orphan-row');
       row.createSpan({ text: id, cls: 'finance-orphan-id' });
       const del = row.createEl('button', { text: this.tr.delete, cls: 'finance-orphan-delete' });
-      del.addEventListener('click', async () => {
-        await this.storage.deleteAccount(id);
-        this.ids = this.ids.filter(x => x !== id);
-        new Notice(this.tr.orphanDeleted);
-        if (!this.ids.length) this.close();
-        else this.renderList(list);
+      del.addEventListener('click', () => {
+        void (async () => {
+          await this.storage.deleteAccount(id);
+          this.ids = this.ids.filter(x => x !== id);
+          new Notice(this.tr.orphanDeleted);
+          if (!this.ids.length) this.close();
+          else this.renderList(list);
+        })();
       });
     }
   }

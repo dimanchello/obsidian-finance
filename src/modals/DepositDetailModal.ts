@@ -71,7 +71,7 @@ export class DepositDetailModal extends FinanceBaseModal {
     const typeLabel = getDepositTypeLabel(this.deposit.type, this.tr);
 
     // Subtitle
-    this.bodyContainer.createEl('div', {
+    this.bodyContainer.createDiv({
       text: `${this.deposit.bankName || '—'} · ${typeLabel} · ${this.deposit.interestRate}%`,
       cls: 'finance-modal-subtitle',
     });

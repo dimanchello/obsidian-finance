@@ -48,7 +48,7 @@ export class OverviewRecordsModal extends FinanceBaseModal {
     this.openHeader(this.opts.title);
 
     if (this.opts.subtitle) {
-      this.contentEl.createEl('div', {
+      this.contentEl.createDiv({
         text: this.opts.subtitle,
         cls: 'finance-modal-subtitle',
       });
@@ -180,22 +180,22 @@ export class OverviewRecordsModal extends FinanceBaseModal {
       });
 
       const topRow = card.createDiv('finance-card-top-row');
-      topRow.createEl('span', { text: fmtDate(rec.date, rec.time), cls: 'finance-card-date' });
+      topRow.createSpan({ text: fmtDate(rec.date, rec.time), cls: 'finance-card-date' });
 
       const amountPrefix = rec.type === RecordType.INCOME ? '+' : '−';
-      topRow.createEl('span', {
+      topRow.createSpan({
         text: amountPrefix + this.ctx.fmt(rec.amount),
         cls: 'finance-card-amount ' + (rec.type === RecordType.INCOME ? 'finance-amount-income' : 'finance-amount-expense'),
       });
 
       const midRow = card.createDiv('finance-card-mid-row');
-      midRow.createEl('span', { text: rec.category || this.tr.uncategorized, cls: 'finance-card-category' });
+      midRow.createSpan({ text: rec.category || this.tr.uncategorized, cls: 'finance-card-category' });
       if (rec.payer) {
-        midRow.createEl('span', { text: `👤 ${rec.payer}`, cls: 'finance-card-payer' });
+        midRow.createSpan({ text: `👤 ${rec.payer}`, cls: 'finance-card-payer' });
       }
       if (rec.tag) {
         const tagText = rec.tag.startsWith('#') ? rec.tag : `#${rec.tag}`;
-        midRow.createEl('span', { text: tagText, cls: 'finance-card-tag' });
+        midRow.createSpan({ text: tagText, cls: 'finance-card-tag' });
       }
 
       if (rec.note) {

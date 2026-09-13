@@ -4,7 +4,7 @@ const TOOLTIP_EDGE_GAP = 8;
 export function svg<K extends keyof SVGElementTagNameMap>(
   tag: K, attrs: Record<string, string | number> = {},
 ): SVGElementTagNameMap[K] {
-  const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+  const el = createSvg(tag);
   for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, String(v));
   return el;
 }
@@ -26,9 +26,7 @@ let clickListenerAttached = false;
 
 function getOrCreateTooltipEl(): HTMLDivElement {
   if (!sharedTooltipEl || !document.body.contains(sharedTooltipEl)) {
-    sharedTooltipEl = document.createElement('div');
-    sharedTooltipEl.className = 'finance-bar-tooltip';
-    document.body.appendChild(sharedTooltipEl);
+    sharedTooltipEl = document.body.createDiv('finance-bar-tooltip');
   }
   if (!clickListenerAttached) {
     clickListenerAttached = true;

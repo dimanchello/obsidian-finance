@@ -176,7 +176,7 @@ export class DataTable<T> {
 
   private renderEmpty(host: HTMLElement, spec: { icon: string; title: string; subtitle: string }): void {
     const e = host.createDiv('finance-empty-state');
-    e.createEl('div', { text: spec.icon, cls: 'finance-empty-icon' });
+    e.createDiv({ text: spec.icon, cls: 'finance-empty-icon' });
     e.createEl('p', { text: spec.title, cls: 'finance-empty-title' });
     e.createEl('p', { text: spec.subtitle, cls: 'finance-empty-sub' });
   }
@@ -318,7 +318,7 @@ export class DataTable<T> {
 
   private renderSortRow(container: HTMLElement): void {
     const sortRow = container.createDiv('finance-sort-row');
-    sortRow.createEl('span', { text: this.tr.sortBy, cls: 'finance-sort-label' });
+    sortRow.createSpan({ text: this.tr.sortBy, cls: 'finance-sort-label' });
 
     const s = this.spec.state.getSort();
     this.spec.sortFields.forEach(({ field, label }) => {
@@ -350,7 +350,7 @@ export class DataTable<T> {
   private renderInfoBar(container: HTMLElement, filtered: T[], start: number, pageSize: number): void {
     const infoBar = container.createDiv('finance-table-info-bar');
     const metaLeft = infoBar.createDiv('finance-table-meta');
-    metaLeft.createEl('span', {
+    metaLeft.createSpan({
       text: `${start + 1}–${Math.min(start + pageSize, filtered.length)} ${this.tr.fromLower} ${filtered.length}`,
       cls: 'finance-count-text',
     });
@@ -428,14 +428,14 @@ export class DataTable<T> {
       hRow.createEl('th', { cls: 'finance-th' });
     }
 
-    const frag = document.createDocumentFragment();
+    const frag = createFragment();
 
     pageItems.forEach(item => {
       const id = this.spec.itemId(item);
-      const itemTbody = document.createElement('tbody');
+      const itemTbody = createEl('tbody');
       itemTbody.classList.add('finance-item-tbody');
       
-      const tr = document.createElement('tr');
+      const tr = createEl('tr');
       tr.classList.add('finance-tr', 'finance-data-tr');
       this.spec.rowCls?.(item).forEach(c => {
         tr.classList.add(c);
@@ -444,15 +444,15 @@ export class DataTable<T> {
 
       // Actions above
       if (this.spec.actionsPosition === 'above') {
-        const actionTr = document.createElement('tr');
+        const actionTr = createEl('tr');
         actionTr.classList.add('finance-tr', 'finance-actions-tr');
         this.spec.rowCls?.(item).forEach(c => actionTr.classList.add(c));
         
-        const actionTd = document.createElement('td');
+        const actionTd = createEl('td');
         actionTd.colSpan = colSpan;
         actionTd.classList.add('finance-td', 'finance-actions-td-above');
         
-        const actionsContainer = document.createElement('div');
+        const actionsContainer = createDiv();
         actionsContainer.classList.add('finance-actions-container-above');
         this.spec.rowActions(item).forEach(a => this.mkActionBtn(actionsContainer, a));
         actionTd.appendChild(actionsContainer);
@@ -461,7 +461,7 @@ export class DataTable<T> {
       }
 
       if (this.bulkMode) {
-        const std = document.createElement('td');
+        const std = createEl('td');
         std.classList.add('finance-td', 'finance-select-td');
         const cb = std.createEl('input', { type: 'checkbox' });
         cb.checked = this.selectedIds.has(id);
@@ -471,7 +471,7 @@ export class DataTable<T> {
 
       cols.forEach(c => {
         const { text, cls } = c.cell(item);
-        const td = document.createElement('td');
+        const td = createEl('td');
         td.classList.add('finance-td');
         if (cls) cls.split(' ').filter(Boolean).forEach(x => td.classList.add(x));
         td.setAttribute('data-label', c.label);
@@ -480,7 +480,7 @@ export class DataTable<T> {
       });
 
       if (this.spec.actionsPosition !== 'above') {
-        const atd = document.createElement('td');
+        const atd = createEl('td');
         atd.classList.add('finance-td', 'finance-actions-td');
         atd.setAttribute('data-label', '');
         this.spec.rowActions(item).forEach(a => this.mkActionBtn(atd, a));
@@ -514,9 +514,9 @@ export class DataTable<T> {
       }
 
       if (this.spec.expandable && this.expandedId === id && this.spec.expandable.hasContent(item)) {
-        const exTr = document.createElement('tr');
+        const exTr = createEl('tr');
         exTr.classList.add('finance-expand-row');
-        const exTd = document.createElement('td');
+        const exTd = createEl('td');
         exTd.classList.add('finance-td');
         exTd.colSpan = colSpan;
         this.spec.expandable.render(exTd, item);
@@ -532,11 +532,11 @@ export class DataTable<T> {
 
   private renderCards(container: HTMLElement, pageItems: T[]): void {
     const list = container.createDiv('finance-records-list');
-    const frag = document.createDocumentFragment();
+    const frag = createFragment();
 
     pageItems.forEach(item => {
       const id = this.spec.itemId(item);
-      const block = document.createElement('div');
+      const block = createDiv();
       block.classList.add('finance-record-block');
       this.spec.rowCls?.(item).forEach(c => block.classList.add(c));
 
@@ -547,7 +547,7 @@ export class DataTable<T> {
       }
 
       if (this.spec.actionsPosition === 'above') {
-        const actionsTop = document.createElement('div');
+        const actionsTop = createDiv();
         actionsTop.classList.add('finance-record-actions', 'finance-actions-above-card');
         this.spec.rowActions(item).forEach(a => this.mkActionBtn(actionsTop, a));
         block.appendChild(actionsTop);

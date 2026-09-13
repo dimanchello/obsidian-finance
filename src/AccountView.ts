@@ -141,12 +141,12 @@ export class AccountView extends MarkdownRenderChild {
     const actions = this.header.actionsContainer;
 
     const incBtn = actions.createEl('button', { cls: 'finance-add-btn finance-income-btn' });
-    incBtn.createEl('span', { text: '↑', cls: 'btn-icon' });
-    incBtn.createEl('span', { text: this.ctx.tr.typeIncome });
+    incBtn.createSpan({ text: '↑', cls: 'btn-icon' });
+    incBtn.createSpan({ text: this.ctx.tr.typeIncome });
 
     const expBtn = actions.createEl('button', { cls: 'finance-add-btn finance-expense-btn' });
-    expBtn.createEl('span', { text: '↓', cls: 'btn-icon' });
-    expBtn.createEl('span', { text: this.ctx.tr.typeExpense });
+    expBtn.createSpan({ text: '↓', cls: 'btn-icon' });
+    expBtn.createSpan({ text: this.ctx.tr.typeExpense });
 
     incBtn.addEventListener('click', () => { this.mode = AccountMode.RECORDS; this.renderBodyContent(); this.openAddModal(RecordType.INCOME); });
     expBtn.addEventListener('click', () => { this.mode = AccountMode.RECORDS; this.renderBodyContent(); this.openAddModal(RecordType.EXPENSE); });

@@ -35,7 +35,7 @@ export class ColumnVisibilityModal extends FinanceBaseModal {
       const cb = item.createEl('input', { type: 'checkbox' });
       cb.checked = this.opts.visibility[col.key] !== false;
       this.checkboxes.set(col.key, cb);
-      const label = item.createEl('span', { text: col.label, cls: 'finance-colvis-label' });
+      const label = item.createSpan({ text: col.label, cls: 'finance-colvis-label' });
       label.addEventListener('click', () => {
         cb.checked = !cb.checked;
       });

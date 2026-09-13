@@ -33,8 +33,8 @@ export function buildAttachmentField(
     openWrap.empty();
     if (!path) return;
     const btn = openWrap.createEl('button', { cls: 'finance-attach-open-btn', type: 'button' });
-    btn.createEl('span', { text: '📎 ' });
-    btn.createEl('span', { text: path.split('/').pop() ?? path, cls: 'finance-attach-open-name' });
+    btn.createSpan({ text: '📎 ' });
+    btn.createSpan({ text: path.split('/').pop() ?? path, cls: 'finance-attach-open-name' });
     btn.addEventListener('click', (e) => {
       e.preventDefault();
       const f = app.vault.getAbstractFileByPath(path);
@@ -53,9 +53,9 @@ export function buildAttachmentField(
   fi.id = uid;
   const lbl = wrap.createEl('label', { cls: 'finance-attach-label' });
   lbl.setAttribute('for', uid);
-  lbl.createEl('span', { text: '📎' });
-  lbl.createEl('span', { text: tr.selectFile });
-  const nameEl = wrap.createEl('span', {
+  lbl.createSpan({ text: '📎' });
+  lbl.createSpan({ text: tr.selectFile });
+  const nameEl = wrap.createSpan({
     text: currentPath
       ? (currentPath.split('/').pop() ?? currentPath)
       : tr.notSelected,
@@ -76,50 +76,52 @@ export function buildAttachmentField(
   }
 
   // ── Upload handler ─────────────────────────────────────────────────────────
-  fi.addEventListener('change', async () => {
-    if (uploadInProgress) return;
-    const file = fi.files?.[0];
-    if (!file) return;
-    uploadInProgress = true;
-    nameEl.textContent = file.name;
+  fi.addEventListener('change', () => {
+    void (async () => {
+      if (uploadInProgress) return;
+      const file = fi.files?.[0];
+      if (!file) return;
+      uploadInProgress = true;
+      nameEl.textContent = file.name;
 
-    if (file.type.startsWith('image/')) {
-      const reader = new FileReader();
-      reader.onload = e => {
-        preview.empty();
-        preview.removeClass('is-hidden');
-        preview.createEl('img', { cls: 'finance-preview-img' }).src = e.target?.result as string;
-      };
-      reader.readAsDataURL(file);
-    }
+      if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = e => {
+          preview.empty();
+          preview.removeClass('is-hidden');
+          preview.createEl('img', { cls: 'finance-preview-img' }).src = e.target?.result as string;
+        };
+        reader.readAsDataURL(file);
+      }
 
-    try {
-      const vaultWithConfig = app.vault as unknown as { getConfig?(key: string): unknown };
-      const vaultCfg = (typeof vaultWithConfig.getConfig === 'function'
-        ? (vaultWithConfig.getConfig('attachmentFolderPath') as string | undefined)
-        : undefined) ?? '/';
-      let folder: string;
-      if (vaultCfg === './' || vaultCfg === '/') {
-        folder = pluginId;
-      } else {
-        folder = normalizePath(`${vaultCfg}/${pluginId}`);
+      try {
+        const vaultWithConfig = app.vault as unknown as { getConfig?(key: string): unknown };
+        const vaultCfg = (typeof vaultWithConfig.getConfig === 'function'
+          ? (vaultWithConfig.getConfig('attachmentFolderPath') as string | undefined)
+          : undefined) ?? '/';
+        let folder: string;
+        if (vaultCfg === './' || vaultCfg === '/') {
+          folder = pluginId;
+        } else {
+          folder = normalizePath(`${vaultCfg}/${pluginId}`);
+        }
+        if (!app.vault.getAbstractFileByPath(folder)) {
+          await app.vault.createFolder(folder);
+        }
+        const dest = normalizePath(
+          `${folder}/${Date.now()}_${file.name.replace(/[<>:"/\\|?*]/g, '_')}`,
+        );
+        await app.vault.createBinary(dest, await file.arrayBuffer());
+        currentPath = dest;
+        onChange(dest);
+        nameEl.textContent = `✓ ${file.name}`;
+        nameEl.classList.add('finance-attach-ok');
+        renderOpenIndicator(dest);
+      } catch {
+        new Notice(tr.saveError);
+      } finally {
+        uploadInProgress = false;
       }
-      if (!app.vault.getAbstractFileByPath(folder)) {
-        await app.vault.createFolder(folder);
-      }
-      const dest = normalizePath(
-        `${folder}/${Date.now()}_${file.name.replace(/[<>:"/\\|?*]/g, '_')}`,
-      );
-      await app.vault.createBinary(dest, await file.arrayBuffer());
-      currentPath = dest;
-      onChange(dest);
-      nameEl.textContent = `✓ ${file.name}`;
-      nameEl.classList.add('finance-attach-ok');
-      renderOpenIndicator(dest);
-    } catch {
-      new Notice(tr.saveError);
-    } finally {
-      uploadInProgress = false;
-    }
+    })();
   });
 }

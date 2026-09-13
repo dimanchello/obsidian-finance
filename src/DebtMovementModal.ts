@@ -60,7 +60,7 @@ export class DebtMovementModal extends EntityModal<DebtMovement> {
     if (this.o.type === DebtMovementType.REPAY && remaining !== undefined && remaining > 0) {
       const cur = this.o.currency ?? '';
       const formatted = remaining.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-      const link = amtG.createEl('span', { cls: 'finance-fill-remaining-link' });
+      const link = amtG.createSpan({ cls: 'finance-fill-remaining-link' });
       link.textContent = `→ ${formatted} ${cur}`;
       link.addEventListener('click', () => { amountHandle.set(remaining); });
     }
@@ -75,7 +75,7 @@ export class DebtMovementModal extends EntityModal<DebtMovement> {
     const noteG = form.createDiv('finance-field-group');
     const noteLabelRow = noteG.createDiv('finance-note-label-row');
     noteLabelRow.createEl('label', { text: this.tr.note, cls: 'finance-field-label' });
-    noteLabelRow.createEl('span', { text: '📝', cls: 'finance-note-icon' });
+    noteLabelRow.createSpan({ text: '📝', cls: 'finance-note-icon' });
     const noteIn = noteG.createEl('textarea', { cls: 'finance-textarea finance-note-field' });
     noteIn.placeholder = this.tr.debtNotePlaceholder;
     noteIn.value = this.entity.note;

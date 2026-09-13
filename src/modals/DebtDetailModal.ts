@@ -61,7 +61,7 @@ export class DebtDetailModal extends FinanceBaseModal {
     const isPaid = isDebtPaidOff(this.debt);
 
     // Subtitle
-    this.bodyContainer.createEl('div', {
+    this.bodyContainer.createDiv({
       text: `${isLent ? this.tr.lent : this.tr.borrowed} · ${isPaid ? this.tr.overviewDebtsPaid : this.tr.unpaid}${hasInterest ? ` · ${this.debt.interestRate}%` : ''}`,
       cls: 'finance-modal-subtitle',
     });

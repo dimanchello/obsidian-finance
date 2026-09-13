@@ -14,10 +14,10 @@ export interface StatCardItem {
  */
 export function renderStatCard(container: HTMLElement, item: StatCardItem): HTMLElement {
   const card = container.createDiv(`finance-stat-card${item.mod ? ` finance-stat-${item.mod}` : ''}`);
-  if (item.icon) card.createEl('div', { text: item.icon, cls: 'finance-stat-icon' });
+  if (item.icon) card.createDiv({ text: item.icon, cls: 'finance-stat-icon' });
   const info = card.createDiv('finance-stat-info');
-  info.createEl('div', { text: item.label, cls: 'finance-stat-label' });
-  info.createEl('div', { text: item.value, cls: 'finance-stat-value' });
+  info.createDiv({ text: item.label, cls: 'finance-stat-label' });
+  info.createDiv({ text: item.value, cls: 'finance-stat-value' });
   return card;
 }
 
@@ -52,10 +52,10 @@ export function renderSummaryCard(
 ): HTMLElement {
   const card = container.createDiv(`finance-stat-card ${opts.mod ?? ''}`);
   const header = card.createDiv('finance-debt-summary-header');
-  header.createEl('span', { text: opts.icon, cls: 'finance-debt-summary-icon' });
-  header.createEl('span', { text: opts.title, cls: 'finance-debt-summary-title' });
+  header.createSpan({ text: opts.icon, cls: 'finance-debt-summary-icon' });
+  header.createSpan({ text: opts.title, cls: 'finance-debt-summary-title' });
   const content = card.createDiv('finance-debt-summary-content');
-  content.createEl('div', { text: opts.main, cls: 'finance-debt-summary-main' });
-  content.createEl('div', { text: opts.sub, cls: 'finance-debt-summary-sub' });
+  content.createDiv({ text: opts.main, cls: 'finance-debt-summary-main' });
+  content.createDiv({ text: opts.sub, cls: 'finance-debt-summary-sub' });
   return card;
 }

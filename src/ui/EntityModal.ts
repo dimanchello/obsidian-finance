@@ -114,7 +114,7 @@ export abstract class EntityModal<T> extends FinanceBaseModal {
     const infoFields = this.getInfoFields();
     if (infoFields) {
       const row = btnRow.querySelector('.finance-modal-btns');
-      const infoBtn = document.createElement('button');
+      const infoBtn = createEl('button');
       infoBtn.textContent = '❓';
       infoBtn.className = 'finance-btn-cancel finance-info-btn-left';
       infoBtn.addEventListener('click', () => new FieldInfoModal(this.app, infoFields).open());

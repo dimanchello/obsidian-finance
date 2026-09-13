@@ -113,7 +113,7 @@ export class Combobox {
     const wrapper = host.createDiv('finance-custom-select');
     this.trigger = wrapper.createDiv('finance-custom-select-trigger');
     this.trigger.setAttribute('tabindex', '0');
-    this.triggerText = this.trigger.createEl('span', { cls: 'finance-custom-select-text' });
+    this.triggerText = this.trigger.createSpan({ cls: 'finance-custom-select-text' });
     this.triggerText.textContent = this.labelFor(opts.value);
 
     this.trigger.addEventListener('click', (e) => { e.stopPropagation(); this.toggle(wrapper); });

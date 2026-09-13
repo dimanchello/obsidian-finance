@@ -99,9 +99,9 @@ export class RecordsTab {
         const fi = filtered.filter(r => r.type === RecordType.INCOME && !r.isInternal).reduce((s, r) => s + r.amount, 0);
         const fe = filtered.filter(r => r.type === RecordType.EXPENSE && !r.isInternal).reduce((s, r) => s + r.amount, 0);
         const sums = host.createDiv('finance-table-sums');
-        sums.createEl('span', { text: `↑\u00a0${this.ctx.fmt(fi)}`, cls: 'finance-sum-income' });
-        sums.createEl('span', { text: '·', cls: 'finance-sum-sep' });
-        sums.createEl('span', { text: `↓\u00a0${this.ctx.fmt(fe)}`, cls: 'finance-sum-expense' });
+        sums.createSpan({ text: `↑\u00a0${this.ctx.fmt(fi)}`, cls: 'finance-sum-income' });
+        sums.createSpan({ text: '·', cls: 'finance-sum-sep' });
+        sums.createSpan({ text: `↓\u00a0${this.ctx.fmt(fe)}`, cls: 'finance-sum-expense' });
       },
       emptyState: { icon: '📊', title: this.tr.noRecords, subtitle: this.tr.noRecordsFilter },
       emptyFiltered: { icon: '📊', title: this.tr.noRecords, subtitle: this.tr.tryChangeFilters },
@@ -425,20 +425,24 @@ export class RecordsTab {
     const acC = acRow.createDiv('finance-settings-controls');
     const acIn = acC.createEl('input', { type: 'color', cls: 'finance-settings-color-input' });
     acIn.value = this.ctx.data.accentColor ?? DEFAULT_ACCENT_COLOR;
-    const hexLabel = acC.createEl('span', { text: acIn.value, cls: 'finance-settings-hex' });
-    acIn.addEventListener('input', async () => {
-      hexLabel.textContent = acIn.value;
-      await this.ctx.storage.updateMeta(this.ctx.accountId, { accentColor: acIn.value });
-      this.ctx.data = await this.ctx.storage.load(this.ctx.accountId);
-      this.applyAccentColor(acIn.value);
+    const hexLabel = acC.createSpan({ text: acIn.value, cls: 'finance-settings-hex' });
+    acIn.addEventListener('input', () => {
+      void (async () => {
+        hexLabel.textContent = acIn.value;
+        await this.ctx.storage.updateMeta(this.ctx.accountId, { accentColor: acIn.value });
+        this.ctx.data = await this.ctx.storage.load(this.ctx.accountId);
+        this.applyAccentColor(acIn.value);
+      })();
     });
     const rstBtn = acC.createEl('button', { text: this.tr.resetColor, cls: 'finance-btn-cancel finance-btn-compact' });
-    rstBtn.addEventListener('click', async () => {
-      await this.ctx.storage.updateMeta(this.ctx.accountId, { accentColor: '' });
-      this.ctx.data = await this.ctx.storage.load(this.ctx.accountId);
-      this.applyAccentColor('');
-      acIn.value = DEFAULT_ACCENT_COLOR;
-      hexLabel.textContent = DEFAULT_ACCENT_COLOR;
+    rstBtn.addEventListener('click', () => {
+      void (async () => {
+        await this.ctx.storage.updateMeta(this.ctx.accountId, { accentColor: '' });
+        this.ctx.data = await this.ctx.storage.load(this.ctx.accountId);
+        this.applyAccentColor('');
+        acIn.value = DEFAULT_ACCENT_COLOR;
+        hexLabel.textContent = DEFAULT_ACCENT_COLOR;
+      })();
     });
 
     const ieRow = row();
@@ -462,14 +466,16 @@ export class RecordsTab {
       type: 'text', cls: 'finance-input finance-input-danger', placeholder: this.tr.enterYes,
     });
     const delBtn = cfRow.createEl('button', { text: this.tr.deleteAllData, cls: 'finance-btn-danger' });
-    delBtn.addEventListener('click', async () => {
-      if (cfIn.value.trim() !== 'Yes') {
-        new Notice(this.tr.enterYes);
-        return;
-      }
-      await this.ctx.storage.resetAllData(this.ctx.accountId);
-      await this.reload();
-      new Notice(this.tr.allDataDeleted);
+    delBtn.addEventListener('click', () => {
+      void (async () => {
+        if (cfIn.value.trim() !== 'Yes') {
+          new Notice(this.tr.enterYes);
+          return;
+        }
+        await this.ctx.storage.resetAllData(this.ctx.accountId);
+        await this.reload();
+        new Notice(this.tr.allDataDeleted);
+      })();
     });
   }
 

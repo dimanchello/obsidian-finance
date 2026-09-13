@@ -94,16 +94,16 @@ export function renderMobileCard(
   }
 ): void {
   const header = block.createDiv('finance-record-header');
-  header.createEl('span', { text: opts.amountText, cls: `finance-record-amount ${opts.amountCls ?? ''}` });
-  header.createEl('span', { text: opts.subtitle, cls: 'finance-record-date' });
+  header.createSpan({ text: opts.amountText, cls: `finance-record-amount ${opts.amountCls ?? ''}` });
+  header.createSpan({ text: opts.subtitle, cls: 'finance-record-date' });
 
   const details = block.createDiv('finance-record-details');
   opts.details.forEach(d => {
-    details.createEl('span', { text: `${d.label} ${d.value}`, cls: 'finance-record-detail' });
+    details.createSpan({ text: `${d.label} ${d.value}`, cls: 'finance-record-detail' });
   });
 
   if (opts.note) {
-    block.createEl('div', { text: opts.note, cls: 'finance-record-note' });
+    block.createDiv({ text: opts.note, cls: 'finance-record-note' });
   }
 }
 
