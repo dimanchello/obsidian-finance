@@ -16,7 +16,7 @@ Obsidian плагин для личного финансового учёта. �
 
 **Plugin initialization**
 - `main.ts:FinanceManagerPlugin.onload()` — loads settings, creates storage, registers code block processors, injects styles
-- `main.ts:28-40` — `registerMarkdownCodeBlockProcessor` for `CODE_BLOCK_LANGUAGES` (`finance-account`, `finance-manager`, `finance-tracker`) creates `AccountView` per block
+- `main.ts:28-40` — `registerMarkdownCodeBlockProcessor` for `CODE_BLOCK_LANGUAGES` (`finance-account`, `finance-manager`) creates `AccountView` per block
 
 **Code block rendering**
 - `main.ts:75-113` — `resolveAccountId()` mints new accountId if absent, writes to note on first render
@@ -855,7 +855,7 @@ Build/test:
 - `MarkdownRenderChild` — AccountView extends this, gets `onunload()` callback
 
 ### Markdown code block processor
-- `registerMarkdownCodeBlockProcessor(lang, callback)` for `CODE_BLOCK_LANGUAGES` (`finance-account`, `finance-manager`, `finance-tracker`) in main.ts
+- `registerMarkdownCodeBlockProcessor(lang, callback)` for `CODE_BLOCK_LANGUAGES` (`finance-account`, `finance-manager`) in main.ts
 - Callback receives `(source, el, ctx)` where ctx has `sourcePath`, `getSectionInfo()`
 - AccountView instantiated as child of MarkdownPostProcessorContext
 

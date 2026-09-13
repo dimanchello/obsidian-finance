@@ -112,6 +112,5 @@ describe('Type definitions', () => {
   it('CODE_BLOCK_LANGUAGES includes finance-account and aliases', () => {
     expect(CODE_BLOCK_LANGUAGES).toContain('finance-account');
     expect(CODE_BLOCK_LANGUAGES).toContain('finance-manager');
-    expect(CODE_BLOCK_LANGUAGES).toContain('finance-tracker');
   });
 });

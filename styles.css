@@ -2250,7 +2250,17 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    Minimal Theme Integration
    ═══════════════════════════════════════════════════════════════════════════ */
-.markdown-source-view.mod-cm6.max .cm-embed-block > div:has(.finance-manager),
+.markdown-source-view.mod-cm6.max .cm-embed-block > div:has(.finance-manager) {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  box-sizing: border-box !important;
+  padding: 0 !important;
+  overflow-x: hidden !important;
+}
+
 .markdown-preview-view.max .block-language-finance-account,
 .max .finance-manager {
   width: 100% !important;
@@ -2283,6 +2293,7 @@
 }
 
 /* ② Reading view — предки внутри sizer, которые оборачивают наш блок */
+.markdown-preview-view.is-readable-line-width .markdown-preview-sizer > div:has(.finance-manager),
 .max .markdown-preview-view.is-readable-line-width .markdown-preview-sizer > div:has(.finance-manager),
 .max .markdown-preview-view.is-readable-line-width .markdown-preview-section:has(.finance-manager),
 .max .markdown-preview-view.is-readable-line-width div:has(> .finance-manager),
@@ -2294,7 +2305,11 @@
   padding-inline: 0 !important;
 }
 
-/* ③ Live Preview — враппер embed-блока */
+/* ③ Live Preview — враппер embed-блока и переопределение стилей таблиц Minimal Theme */
+.markdown-source-view.mod-cm6 .cm-contentContainer.cm-contentContainer > .cm-content > div:has(.finance-manager),
+.markdown-source-view.mod-cm6.is-readable-line-width .cm-contentContainer.cm-contentContainer > .cm-content > div:has(.finance-manager),
+.markdown-source-view.mod-cm6.max.is-readable-line-width .cm-contentContainer.cm-contentContainer > .cm-content > div:has(.finance-manager),
+.max .markdown-source-view.mod-cm6.is-readable-line-width .cm-contentContainer.cm-contentContainer > .cm-content > div:has(.finance-manager),
 .max .markdown-source-view.mod-cm6 .cm-embed-block:has(.finance-manager),
 .max .markdown-source-view.mod-cm6 .cm-table-widget:has(.finance-manager),
 .markdown-source-view.mod-cm6.max .cm-embed-block:has(.finance-manager),
@@ -2302,7 +2317,12 @@
   width: 100% !important;
   max-width: none !important;
   margin-inline: 0 !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
   padding-inline: 0 !important;
+  padding-inline-start: 0 !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
   box-sizing: border-box !important;
 }
 
@@ -3844,10 +3864,14 @@
 }
 
 .modal.finance-deposit-detail-modal,
-.modal.finance-debt-detail-modal,
-.modal.finance-credit-detail-modal {
+.modal.finance-debt-detail-modal {
   max-width: 680px !important;
   width: min(96vw, 680px) !important;
+}
+
+.modal.finance-credit-detail-modal {
+  max-width: 800px !important;
+  width: min(96vw, 800px) !important;
 }
 
 .finance-modal-subtitle {

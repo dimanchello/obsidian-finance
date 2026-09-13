@@ -121,7 +121,6 @@ export default class FinanceManagerPlugin extends Plugin {
     const tr = t(getLocaleFromApp(this.app));
     el.empty();
     el.addClass('finance-manager');
-    el.addClass('finance-tracker');
     const box = el.createDiv('finance-block-error');
     if (resolved.kind === 'invalid') {
       box.createEl('strong', { text: tr.blockInvalidIdTitle });

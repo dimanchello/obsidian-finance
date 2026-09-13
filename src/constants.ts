@@ -121,6 +121,5 @@ export type AccountMode = ValueOf<typeof AccountMode>;
 export const CODE_BLOCK_LANGUAGES = [
   'finance-account',
   'finance-manager',
-  'finance-tracker',
 ] as const;
 export type CodeBlockLanguage = (typeof CODE_BLOCK_LANGUAGES)[number];
