@@ -2,12 +2,12 @@
 
 ---
 
-# 💰 Finance Tracker — плагин для Obsidian
+# 💰 Finance Manager — плагин для Obsidian
 
 Учёт доходов и расходов прямо в заметках Obsidian.  
 Каждая заметка — отдельный **счёт** (наличные, карта, крипто-кошелёк и т.д.).
 
-**Версия:** 2.0.0 | **Минимальная версия Obsidian:** 1.4.0
+**Версия:** 2.1.0 | **Минимальная версия Obsidian:** 1.4.0
 
 ---
 
@@ -20,9 +20,9 @@ npm install
 npm run build
 ```
 
-Содержимое папки `dist/` скопируйте в `.obsidian/plugins/obsidian-finance/`
+Содержимое папки `dist/` скопируйте в `.obsidian/plugins/finance-manager/`
 
-Затем: Настройки Obsidian → Сторонние плагины → включить **Finance Tracker**.
+Затем: Настройки Obsidian → Сторонние плагины → включить **Finance Manager**.
 
 ### Вариант 2: Через BRAT
 

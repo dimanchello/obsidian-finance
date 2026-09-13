@@ -1,7 +1,7 @@
 {
-  "name": "finance-tracker",
+  "name": "finance-manager",
   "version": "2.1.0",
-  "description": "Obsidian Finance Tracker Plugin",
+  "description": "Obsidian Finance Manager Plugin",
   "main": "main.js",
   "scripts": {
     "dev": "node esbuild.config.mjs",

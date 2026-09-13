@@ -1,8 +1,8 @@
-# AGENTS.md — Finance Tracker Plugin
+# AGENTS.md — Finance Manager Plugin
 
 ## Project Overview
 
-**Name:** Finance Tracker  
+**Name:** Finance Manager  
 **Type:** Obsidian plugin (Community plugin for Obsidian.md)  
 **Version:** 2.1.0  
 **Min Obsidian Version:** 1.4.0  
@@ -36,7 +36,7 @@ npm test       # Run unit tests
 2. esbuild bundles `main.ts` → `main.js`
 3. External modules: `obsidian`, `electron`, all `@codemirror/*`, `@lezer/*`, node built-ins
 
-**Output:** `dist/main.js` plus `manifest.json` and `styles.css` — copy `dist/` folder to `.obsidian/plugins/obsidian-finance/`
+**Output:** `dist/main.js` plus `manifest.json` and `styles.css` — copy `dist/` folder to `.obsidian/plugins/finance-manager/`
 
 ---
 
@@ -225,7 +225,7 @@ interface AccountData {
 - **Caching:** one `FileStore<T>` per file type, each with its own cache + dirty set
 - **Lazy loading:** `load(accountId)` returns cached or loads from disk
 - **Debounced writes:** 500ms delay via a shared `FlushScheduler`
-- **Location:** `.obsidian/plugins/obsidian-finance/accounts/{accountId}/` — 7 files per account: `meta.json`, `records.json`, `debts.json`, `credits.json`, `deposits.json`, `exchanges.json`, `state.json`
+- **Location:** `.obsidian/plugins/finance-manager/accounts/{accountId}/` — 7 files per account: `meta.json`, `records.json`, `debts.json`, `credits.json`, `deposits.json`, `exchanges.json`, `state.json`
 - **Identity:** accountId is a 12-hex-char slice of a UUID, written into the code block as `id: <12-hex>`. The note path is NOT identity — it is tracked in `meta.sourcePath` for diagnostics only.
 - **Versioning:** DATA_VERSION = 1 (reset when the storage layer was split); per-field backfill happens in the parsers
 

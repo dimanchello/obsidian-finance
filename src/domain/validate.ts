@@ -135,6 +135,9 @@ function parsePayment(o: Record<string, unknown>): CreditPayment | null {
     status: oneOf(o.status, SCHEDULE_STATUSES, PaymentStatus.PENDING),
     ...(paidDate === undefined ? {} : { paidDate }),
     ...(typeof o.note === 'string' ? { note: o.note } : {}),
+    ...(typeof o.principalPart === 'number' ? { principalPart: num(o.principalPart) } : {}),
+    ...(typeof o.interestPart === 'number' ? { interestPart: num(o.interestPart) } : {}),
+    ...(typeof o.remainingDebt === 'number' ? { remainingDebt: num(o.remainingDebt) } : {}),
   };
 }
 
@@ -164,6 +167,9 @@ export function parseCredit(o: Record<string, unknown>): CreditRecord | null {
     downPaymentValue: num(o.downPaymentValue),
     downPaymentDate: typeof o.downPaymentDate === 'string' && o.downPaymentDate ? normalizeDateStr(o.downPaymentDate) : '',
     ...(typeof o.downPaymentRecordId === 'string' ? { downPaymentRecordId: o.downPaymentRecordId } : {}),
+    ...(typeof o.paymentDay === 'number' ? { paymentDay: num(o.paymentDay) } : {}),
+    ...(typeof o.isEscrow === 'boolean' ? { isEscrow: bool(o.isEscrow) } : {}),
+    ...(typeof o.attachmentPath === 'string' ? { attachmentPath: str(o.attachmentPath) } : {}),
   };
 }
 
@@ -213,6 +219,7 @@ export function parseDeposit(o: Record<string, unknown>): DepositRecord | null {
     accruals: parseList(o.accruals, parseAccrual),
     topUps: parseList(o.topUps, parseTopUp),
     withdrawals: parseList<DepositWithdrawal>(o.withdrawals, parseTopUp),
+    ...(typeof o.attachmentPath === 'string' ? { attachmentPath: str(o.attachmentPath) } : {}),
   };
 }
 
@@ -233,6 +240,7 @@ export function parseExchange(o: Record<string, unknown>): CurrencyExchange | nu
     ...(str(o.category) ? { category: str(o.category) } : {}),
     ...(typeof o.fee === 'number' ? { fee: num(o.fee) } : {}),
     note: str(o.note),
+    ...(typeof o.attachmentPath === 'string' ? { attachmentPath: str(o.attachmentPath) } : {}),
   };
 }
 

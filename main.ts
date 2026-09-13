@@ -11,7 +11,7 @@ type ResolvedAccountId =
   | { kind: 'invalid'; raw: string }
   | { kind: 'unwritable' };
 
-export default class FinanceTrackerPlugin extends Plugin {
+export default class FinanceManagerPlugin extends Plugin {
   settings!: PluginSettings;
   storage!:  FinanceStorage;
   private styleEl?: HTMLStyleElement;
@@ -115,6 +115,7 @@ export default class FinanceTrackerPlugin extends Plugin {
   private renderBlockError(el: HTMLElement, resolved: ResolvedAccountId): void {
     const tr = t(getLocaleFromApp(this.app));
     el.empty();
+    el.addClass('finance-manager');
     el.addClass('finance-tracker');
     const box = el.createDiv('finance-block-error');
     if (resolved.kind === 'invalid') {
@@ -158,11 +159,14 @@ export default class FinanceTrackerPlugin extends Plugin {
 
     // Create new style element
     this.styleEl = document.createElement('style');
-    this.styleEl.id = 'finance-tracker-styles-v4';
+    this.styleEl.id = 'finance-manager-styles-v4';
 
     // Try to load styles from plugin folder
     const configDir = this.app.vault.configDir;
+    const id = this.manifest.id;
     const stylePaths = [
+      `${configDir}/plugins/${id}/styles.css`,
+      `${configDir}/plugins/${id}/dist/styles.css`,
       `${configDir}/plugins/obsidian-finance/styles.css`,
       `${configDir}/plugins/obsidian-finance/dist/styles.css`,
     ];
@@ -181,9 +185,9 @@ export default class FinanceTrackerPlugin extends Plugin {
 }
 
 class FinanceSettingTab extends PluginSettingTab {
-  plugin: FinanceTrackerPlugin;
+  plugin: FinanceManagerPlugin;
 
-  constructor(app: App, plugin: FinanceTrackerPlugin) {
+  constructor(app: App, plugin: FinanceManagerPlugin) {
     super(app, plugin);
     this.plugin = plugin;
   }

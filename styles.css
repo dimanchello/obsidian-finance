@@ -1,9 +1,9 @@
 /* ═══════════════════════════════════════════════════════════════════════════
-   Finance Tracker · styles.css · v4
+   Finance Manager · styles.css · v4
    ═══════════════════════════════════════════════════════════════════════════ */
 
 /* Токены — и в виджете в заметке, и в модальных окнах */
-.finance-tracker,
+.finance-manager,
 .finance-modal,
 .finance-confirm-modal {
   --ft-income:   #22c55e;
@@ -28,21 +28,21 @@
   --ft-input-bg: var(--background-modifier-form-field, var(--background-secondary));
 }
 
-.finance-tracker input:focus,
-.finance-tracker textarea:focus,
-.finance-tracker select:focus,
-.finance-tracker button:focus,
-.finance-tracker a:focus,
-.finance-tracker [role="button"]:focus,
-.finance-tracker .finance-input:focus,
-.finance-tracker .finance-filter-input:focus,
-.finance-tracker .finance-filter-select:focus,
-.finance-tracker .finance-textarea:focus {
+.finance-manager input:focus,
+.finance-manager textarea:focus,
+.finance-manager select:focus,
+.finance-manager button:focus,
+.finance-manager a:focus,
+.finance-manager [role="button"]:focus,
+.finance-manager .finance-input:focus,
+.finance-manager .finance-filter-input:focus,
+.finance-manager .finance-filter-select:focus,
+.finance-manager .finance-textarea:focus {
   outline: none;
   box-shadow: none;
 }
 
-.finance-tracker {
+.finance-manager {
   font-family: var(--font-interface, system-ui, sans-serif);
   color: var(--text-normal);
   line-height: 1.5;
@@ -175,7 +175,7 @@
   border: 2px solid transparent;
 }
 /* Accent-colored button (follows account accent) */
-.finance-tracker .finance-accent-btn {
+.finance-manager .finance-accent-btn {
   background: var(--ft-accent) !important;
   color: #fff;
   border: 2px solid transparent;
@@ -989,7 +989,7 @@
 }
 
 /* ── Семантические кнопки: сохранить / удалить / отмена ─────────────────── */
-.finance-tracker .finance-btn-save,
+.finance-manager .finance-btn-save,
 .finance-modal .finance-btn-save,
 .finance-confirm-modal .finance-btn-save {
   background-color: #16a34a !important;
@@ -1009,7 +1009,7 @@
   justify-content: center !important;
   box-shadow: none !important;
 }
-.finance-tracker .finance-btn-save:hover,
+.finance-manager .finance-btn-save:hover,
 .finance-modal .finance-btn-save:hover,
 .finance-confirm-modal .finance-btn-save:hover {
   background-color: #15803d !important;
@@ -1017,7 +1017,7 @@
   color: #ffffff !important;
 }
 
-.finance-tracker .finance-btn-danger,
+.finance-manager .finance-btn-danger,
 .finance-modal .finance-btn-danger,
 .finance-confirm-modal .finance-btn-danger {
   background-color: #dc2626 !important;
@@ -1037,7 +1037,7 @@
   justify-content: center !important;
   box-shadow: none !important;
 }
-.finance-tracker .finance-btn-danger:hover,
+.finance-manager .finance-btn-danger:hover,
 .finance-modal .finance-btn-danger:hover,
 .finance-confirm-modal .finance-btn-danger:hover {
   background-color: #b91c1c !important;
@@ -1045,7 +1045,7 @@
   color: #ffffff !important;
 }
 
-.finance-tracker .finance-btn-cancel,
+.finance-manager .finance-btn-cancel,
 .finance-modal .finance-btn-cancel,
 .finance-confirm-modal .finance-btn-cancel {
   background-color: var(--background-primary) !important;
@@ -1065,7 +1065,7 @@
   justify-content: center !important;
   box-shadow: none !important;
 }
-.finance-tracker .finance-btn-cancel:hover,
+.finance-manager .finance-btn-cancel:hover,
 .finance-modal .finance-btn-cancel:hover,
 .finance-confirm-modal .finance-btn-cancel:hover {
   background-color: var(--background-modifier-hover) !important;
@@ -1765,7 +1765,7 @@
   .finance-confirm-message { font-size: .9em; line-height: 1.6; }
 
   /* ── FAB spacer ─────────────────────────────────────────────────────── */
-  .finance-tracker--mobile .finance-body { padding-bottom: 80px; }
+  .finance-manager--mobile .finance-body { padding-bottom: 80px; }
 
   /* ── Calculator modal on mobile ────────────────────────────────────── */
   .modal.finance-calculator-modal {
@@ -1813,7 +1813,7 @@
 }
 
 /* Obsidian mobile app: JS renders blocks regardless of viewport width */
-.finance-tracker--mobile .finance-record-actions {
+.finance-manager--mobile .finance-record-actions {
   display: flex; gap: 8px; justify-content: flex-end;
   margin-top: 12px; padding-top: 12px;
   border-top: 1px solid var(--ft-border);
@@ -1824,10 +1824,10 @@
   border-bottom: 1px solid var(--ft-border);
   justify-content: center;
 }
-.finance-tracker--mobile .finance-table-scroll,
-.finance-tracker--mobile .finance-debt-table-scroll { display: none !important; }
-.finance-tracker--mobile .finance-records-list,
-.finance-tracker--mobile .finance-debts-list {
+.finance-manager--mobile .finance-table-scroll,
+.finance-manager--mobile .finance-debt-table-scroll { display: none !important; }
+.finance-manager--mobile .finance-records-list,
+.finance-manager--mobile .finance-debts-list {
   display: flex !important;
   flex-direction: column;
   gap: 8px;
@@ -1927,7 +1927,7 @@
 }
 
 /* ── FAB — sticky bottom quick-add bar ──────────────────────────────────────
-    Rendered by JS only when .finance-tracker--mobile is present
+    Rendered by JS only when .finance-manager--mobile is present
     ─────────────────────────────────────────────────────────────────────────── */
 .finance-fab {
   position: fixed;
@@ -2250,9 +2250,9 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    Minimal Theme Integration
    ═══════════════════════════════════════════════════════════════════════════ */
-.markdown-source-view.mod-cm6.max .cm-embed-block > div:has(.finance-tracker),
+.markdown-source-view.mod-cm6.max .cm-embed-block > div:has(.finance-manager),
 .markdown-preview-view.max .block-language-finance-account,
-.max .finance-tracker {
+.max .finance-manager {
   width: 100% !important;
   max-width: 100% !important;
   min-width: 0 !important;
@@ -2283,11 +2283,11 @@
 }
 
 /* ② Reading view — предки внутри sizer, которые оборачивают наш блок */
-.max .markdown-preview-view.is-readable-line-width .markdown-preview-sizer > div:has(.finance-tracker),
-.max .markdown-preview-view.is-readable-line-width .markdown-preview-section:has(.finance-tracker),
-.max .markdown-preview-view.is-readable-line-width div:has(> .finance-tracker),
-.markdown-preview-view.max.is-readable-line-width .markdown-preview-sizer > div:has(.finance-tracker),
-.markdown-preview-view.max.is-readable-line-width div:has(> .finance-tracker) {
+.max .markdown-preview-view.is-readable-line-width .markdown-preview-sizer > div:has(.finance-manager),
+.max .markdown-preview-view.is-readable-line-width .markdown-preview-section:has(.finance-manager),
+.max .markdown-preview-view.is-readable-line-width div:has(> .finance-manager),
+.markdown-preview-view.max.is-readable-line-width .markdown-preview-sizer > div:has(.finance-manager),
+.markdown-preview-view.max.is-readable-line-width div:has(> .finance-manager) {
   width: 100% !important;
   max-width: 100% !important;
   margin-inline: 0 !important;
@@ -2295,10 +2295,10 @@
 }
 
 /* ③ Live Preview — враппер embed-блока */
-.max .markdown-source-view.mod-cm6 .cm-embed-block:has(.finance-tracker),
-.max .markdown-source-view.mod-cm6 .cm-table-widget:has(.finance-tracker),
-.markdown-source-view.mod-cm6.max .cm-embed-block:has(.finance-tracker),
-.markdown-source-view.mod-cm6.max .cm-table-widget:has(.finance-tracker) {
+.max .markdown-source-view.mod-cm6 .cm-embed-block:has(.finance-manager),
+.max .markdown-source-view.mod-cm6 .cm-table-widget:has(.finance-manager),
+.markdown-source-view.mod-cm6.max .cm-embed-block:has(.finance-manager),
+.markdown-source-view.mod-cm6.max .cm-table-widget:has(.finance-manager) {
   width: 100% !important;
   max-width: none !important;
   margin-inline: 0 !important;
@@ -2307,8 +2307,8 @@
 }
 
 /* ④ Live Preview — readable-line-width вешает padding-inline на .cm-content */
-.max .markdown-source-view.mod-cm6.is-readable-line-width .cm-content:has(.finance-tracker),
-.markdown-source-view.mod-cm6.max.is-readable-line-width .cm-content:has(.finance-tracker) {
+.max .markdown-source-view.mod-cm6.is-readable-line-width .cm-content:has(.finance-manager),
+.markdown-source-view.mod-cm6.max.is-readable-line-width .cm-content:has(.finance-manager) {
   padding-inline: 0 !important;
 }
 .max .finance-stats-container,

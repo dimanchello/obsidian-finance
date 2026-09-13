@@ -2,12 +2,12 @@
 
 ---
 
-# 💰 Finance Tracker — Obsidian plugin
+# 💰 Finance Manager — Obsidian plugin
 
 Track income and expenses directly in your Obsidian notes.  
 Each note is a separate **account** (cash, card, crypto wallet, etc.).
 
-**Version:** 2.0.0 | **Min Obsidian Version:** 1.4.0
+**Version:** 2.1.0 | **Min Obsidian Version:** 1.4.0
 
 ---
 
@@ -20,9 +20,9 @@ npm install
 npm run build
 ```
 
-Copy the contents of `dist/` to `.obsidian/plugins/obsidian-finance/`
+Copy the contents of `dist/` to `.obsidian/plugins/finance-manager/`
 
-Then: Obsidian Settings → Community plugins → enable **Finance Tracker**.
+Then: Obsidian Settings → Community plugins → enable **Finance Manager**.
 
 ### Option 2: Via BRAT
 

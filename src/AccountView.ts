@@ -73,11 +73,15 @@ export class AccountView extends MarkdownRenderChild {
 
   async render(): Promise<void> {
     this.root.empty();
+    this.root.addClass('finance-manager');
     this.root.addClass('finance-tracker');
 
     this.isMobile = Platform.isMobile || window.innerWidth <= MOBILE_BREAKPOINT;
     this.ctx.isMobile = this.isMobile;
-    if (this.isMobile) this.root.addClass('finance-tracker--mobile');
+    if (this.isMobile) {
+      this.root.addClass('finance-manager--mobile');
+      this.root.addClass('finance-tracker--mobile');
+    }
 
     this.ctx.data = await this.storage.load(this.accountId);
 

@@ -15,7 +15,7 @@ Obsidian плагин для личного финансового учёта. �
 ## 2. Entry Points
 
 **Plugin initialization**
-- `main.ts:FinanceTrackerPlugin.onload()` — loads settings, creates storage, registers code block processor, injects styles
+- `main.ts:FinanceManagerPlugin.onload()` — loads settings, creates storage, registers code block processor, injects styles
 - `main.ts:28-40` — `registerMarkdownCodeBlockProcessor('finance-account', ...)` creates `AccountView` per block
 
 **Code block rendering**
@@ -150,14 +150,14 @@ Debts, credits, deposits do NOT have separate ledgers — they materialize Finan
 
 ## 5. Core Modules
 
-### main.ts → FinanceTrackerPlugin
+### main.ts → FinanceManagerPlugin
 
 **Path:** `main.ts`
 
 **Purpose:** Plugin entry point. Registers code block processor, loads settings, creates storage, injects styles, handles note renames.
 
 **Important symbols:**
-- `FinanceTrackerPlugin` (extends Plugin)
+- `FinanceManagerPlugin` (extends Plugin)
 - `resolveAccountId()` — mints accountId on first render
 - `reportOrphanedAccounts()` — finds account folders without live code blocks
 - `injectStyles()` — dynamically loads styles.css
@@ -549,7 +549,7 @@ It owns `onClose()` (empties the body) plus `openHeader(title)` / `openBody()`.
 
 ## 6. Important Symbols
 
-### FinanceTrackerPlugin
+### FinanceManagerPlugin
 **Definition:** `main.ts:14`  
 **Type:** class (extends Plugin)  
 **Purpose:** Plugin entry point, lifecycle owner  
@@ -699,7 +699,7 @@ Editing either date input clears the flag unless both inputs are empty.
 
 ```
 Obsidian plugin system
- → main.ts FinanceTrackerPlugin.onload()
+ → main.ts FinanceManagerPlugin.onload()
  → await loadSettings()
  → FinanceStorage = new FinanceStorage(app, pluginId, defaultCurrency)
  → await injectStyles() — reads styles.css from plugin folder
@@ -778,7 +778,7 @@ AutoTxScheduler fires (every 3600s)
 
 ```
 Obsidian unloads plugin
- → FinanceTrackerPlugin.onunload()
+ → FinanceManagerPlugin.onunload()
  → await storage.flush()
     ├── FlushScheduler.flushNow() — cancel timer
     └── for each FileStore: flush()
@@ -1112,7 +1112,7 @@ FileStore → src/storage/AccountRepo.ts:10
 FinanceBaseModal → src/ui/FinanceBaseModal.ts (~10)
 FinanceRecord → src/types.ts:6
 FinanceStorage → src/storage/index.ts:50
-FinanceTrackerPlugin → main.ts:14
+FinanceManagerPlugin → main.ts:14
 findLinkedRecord → src/domain/linkedRecords.ts (~250)
 FlushScheduler → src/storage/AccountRepo.ts:62
 getLocaleFromApp → src/i18n.ts (~200)

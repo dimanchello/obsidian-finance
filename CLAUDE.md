@@ -31,7 +31,7 @@ npx vitest run -t "нормализует дату"                # single test
 
 `npm run lint && npm run build && npm test` is the expected verification loop after any change — all three must pass.
 
-Install into a vault: copy the contents of `dist/` into `<vault>/.obsidian/plugins/obsidian-finance/`. `dist/` is gitignored and never edited by hand.
+Install into a vault: copy the contents of `dist/` into `<vault>/.obsidian/plugins/finance-manager/`. `dist/` is gitignored and never edited by hand.
 
 ## Architecture
 
@@ -92,7 +92,7 @@ Debts, credits, and deposits do NOT have separate ledgers — they **materialize
 
 ### Styles
 
-`styles.css` (~100KB) is **not** imported by the bundle. `main.ts injectStyles()` reads it from the plugin folder at runtime via `vault.adapter.read()` and injects a `<style>` element, to sidestep Obsidian's CSS caching. Consequence: shipping `main.js` without `styles.css` produces an unstyled plugin, and the `<style>` id (`finance-tracker-styles-v4`) is bumped when the injection scheme changes.
+`styles.css` (~100KB) is **not** imported by the bundle. `main.ts injectStyles()` reads it from the plugin folder at runtime via `vault.adapter.read()` and injects a `<style>` element, to sidestep Obsidian's CSS caching. Consequence: shipping `main.js` without `styles.css` produces an unstyled plugin, and the `<style>` id (`finance-manager-styles-v4`) is bumped when the injection scheme changes.
 
 ## Conventions
 

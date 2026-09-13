@@ -633,7 +633,7 @@ export interface Translations {
 }
 
 const ru: Translations = {
-  pluginTitle: '💰 Finance Tracker',
+  pluginTitle: '💰 Finance Manager',
   pluginDesc: 'Глобальные настройки плагина. Валюта и название счёта настраиваются прямо в заметке.',
   defaultCurrency: 'Валюта по умолчанию',
   defaultCurrencyDesc: 'Используется для новых счетов. Уже существующие счета имеют свою валюту.',
@@ -644,7 +644,7 @@ const ru: Translations = {
   usage1: 'Создайте заметку для каждого счёта (Наличные, Карта, Крипто-кошелёк).',
   usage2: 'Вставьте в заметку блок кода с языком finance-account.',
   usage3: 'Название счёта и валюта редактируются прямо в шапке блока.',
-  usage4: 'Данные хранятся в .obsidian/plugins/obsidian-finance/accounts/',
+  usage4: 'Данные хранятся в .obsidian/plugins/finance-manager/accounts/',
   loading: 'Загрузка…',
   recordAdded: '✅ Запись добавлена',
   recordUpdated: '✅ Запись обновлена',
@@ -1254,7 +1254,7 @@ const ru: Translations = {
 };
 
 const en: Translations = {
-  pluginTitle: '💰 Finance Tracker',
+  pluginTitle: '💰 Finance Manager',
   pluginDesc: 'Global plugin settings. Currency and account name are configured directly in the note.',
   defaultCurrency: 'Default Currency',
   defaultCurrencyDesc: 'Used for new accounts. Existing accounts have their own currency.',
@@ -1265,7 +1265,7 @@ const en: Translations = {
   usage1: 'Create a note for each account (Cash, Card, Crypto wallet).',
   usage2: 'Insert a code block with language finance-account.',
   usage3: 'Account name and currency are edited directly in the block header.',
-  usage4: 'Data is stored in .obsidian/plugins/obsidian-finance/accounts/',
+  usage4: 'Data is stored in .obsidian/plugins/finance-manager/accounts/',
   loading: 'Loading…',
   recordAdded: '✅ Record added',
   recordUpdated: '✅ Record updated',
