@@ -13,7 +13,7 @@ export interface ImportExportOptions {
   noteName: string;
   currency: string;
   records:  FinanceRecord[];
-  onImport: (records: FinanceRecord[]) => void;
+  onImport: (records: FinanceRecord[]) => void | Promise<void>;
   mode:     'export' | 'import';
 }
 
@@ -194,13 +194,16 @@ export class ImportExportModal extends FinanceBaseModal {
   private parseJSON(text: string, container: HTMLElement): void {
     const parsed = JSON.parse(text);
 
-    const tryArr = (obj: unknown): Record<string, string>[] | null => {
-      if (Array.isArray(obj) && obj.length && typeof obj[0] === 'object') return obj as any;
+    const tryArr = (obj: unknown): Record<string, unknown>[] | null => {
+      if (Array.isArray(obj) && obj.length > 0 && typeof obj[0] === 'object' && obj[0] !== null) {
+        return obj as Record<string, unknown>[];
+      }
       return null;
     };
 
-    if (tryArr(parsed)) {
-      this.setRawData(tryArr(parsed)!);
+    const directArr = tryArr(parsed);
+    if (directArr) {
+      this.setRawData(directArr);
       this.renderMappingStep(container);
       return;
     }
@@ -219,7 +222,15 @@ export class ImportExportModal extends FinanceBaseModal {
     btn.addEventListener('click', () => {
       const path  = inp.value.trim();
       let   node: unknown = parsed;
-      if (path) path.split('.').forEach(k => { node = (node as any)?.[k]; });
+      if (path) {
+        path.split('.').forEach(k => {
+          if (node && typeof node === 'object' && k in node) {
+            node = (node as Record<string, unknown>)[k];
+          } else {
+            node = undefined;
+          }
+        });
+      }
       const arr = tryArr(node);
       if (!arr) { new Notice(this.tr.arrayNotFound); return; }
       this.setRawData(arr);
@@ -414,7 +425,7 @@ export class ImportExportModal extends FinanceBaseModal {
     const valid = records.filter(r => r.amount > 0);
     skipped += records.length - valid.length;
 
-    this.o.onImport(valid);
+    void this.o.onImport(valid);
     const skipNote = skipped ? ` — ${this.tpl(this.tr.importSkipped, { count: skipped })}` : '';
     new Notice(`${this.tr.importSuccess} — ${valid.length} ${this.tr.imported}${skipNote}`);
     this.close();

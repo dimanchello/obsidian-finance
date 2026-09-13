@@ -133,7 +133,7 @@ export class AccountView extends MarkdownRenderChild {
       this.header.updateButtons();
       this.renderBodyContent();
     };
-    tab.onUpdate = () => this.refreshAndRender();
+    tab.onUpdate = () => { void this.refreshAndRender(); };
     tab.render();
   }
 
@@ -156,7 +156,7 @@ export class AccountView extends MarkdownRenderChild {
 
   private renderDebtsTab(body: HTMLElement): void {
     const tab = new DebtsTab(this.ctx, body);
-    tab.onUpdate = () => this.refreshAndRender();
+    tab.onUpdate = () => { void this.refreshAndRender(); };
     tab.renderHeaderActions?.(this.header.actionsContainer);
     tab.render();
   }
@@ -169,14 +169,14 @@ export class AccountView extends MarkdownRenderChild {
 
   private renderDepositsTab(body: HTMLElement): void {
     const tab = new DepositsTab(this.ctx, body);
-    tab.onUpdate = () => this.refreshAndRender();
+    tab.onUpdate = () => { void this.refreshAndRender(); };
     tab.renderHeaderActions?.(this.header.actionsContainer);
     tab.render();
   }
 
   private renderCurrencyTab(body: HTMLElement): void {
     const tab = new CurrencyTab(this.ctx, body);
-    tab.onUpdate = () => this.refreshAndRender();
+    tab.onUpdate = () => { void this.refreshAndRender(); };
     tab.renderHeaderActions?.(this.header.actionsContainer);
     tab.render();
   }

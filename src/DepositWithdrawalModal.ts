@@ -10,7 +10,7 @@ export interface DepositWithdrawalOptions {
   deposit: DepositRecord;
   maxAmount: number;
   currency: string;
-  onSave:   (w: DepositWithdrawal) => void;
+  onSave:   (w: DepositWithdrawal) => void | Promise<void>;
 }
 
 export class DepositWithdrawalModal extends EntityModal<DepositWithdrawal> {

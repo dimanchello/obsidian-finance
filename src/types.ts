@@ -288,6 +288,7 @@ export const PAGE_RANGE_THRESHOLD = 7;
 export const FOCUS_DELAY_MS = 20;
 /** Longer than {@link FOCUS_DELAY_MS}: lets the modal finish its open animation first. */
 export const MODAL_FOCUS_DELAY_MS = 50;
+export const MODAL_ERROR_TIMEOUT_MS = 5_000;
 export const AUTOFILL_DEBOUNCE_MS = 350;
 export const AUTOFILL_BADGE_MS = 6_000;
 export const SKELETON_CARD_COUNT = 3;

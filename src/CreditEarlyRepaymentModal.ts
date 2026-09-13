@@ -13,7 +13,7 @@ export interface EarlyRepaymentOptions {
   title: string;
   credit: CreditRecord;
   currency: string;
-  onSave: (credit: CreditRecord) => void;
+  onSave: (credit: CreditRecord) => void | Promise<void>;
 }
 
 export class CreditEarlyRepaymentModal extends FinanceBaseModal {
@@ -172,7 +172,7 @@ export class CreditEarlyRepaymentModal extends FinanceBaseModal {
           this.credit.status = (this.credit.currentAmount <= 0 || stillPending.length === 0) ? CreditStatus.PAID : CreditStatus.ACTIVE;
         }
 
-        this.o.onSave(this.credit);
+        void this.o.onSave(this.credit);
         this.close();
       });
   }

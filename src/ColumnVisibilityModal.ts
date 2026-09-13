@@ -5,7 +5,7 @@ import { FinanceBaseModal } from './ui/FinanceBaseModal';
 export interface ColumnVisibilityModalOptions {
   columns: { key: string; label: string }[];
   visibility: Record<string, boolean>;
-  onSave: (visibility: Record<string, boolean>) => void;
+  onSave: (visibility: Record<string, boolean>) => void | Promise<void>;
   accentColor?: string | undefined;
 }
 
@@ -50,7 +50,7 @@ export class ColumnVisibilityModal extends FinanceBaseModal {
         this.checkboxes.forEach((cb, key) => {
           result[key] = cb.checked;
         });
-        this.opts.onSave(result);
+        void this.opts.onSave(result);
         this.close();
       });
   }

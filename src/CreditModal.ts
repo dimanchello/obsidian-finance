@@ -20,7 +20,7 @@ export interface CreditModalOptions {
   credit?:   CreditRecord;
   banks:     string[];
   pluginId:  string;
-  onSave:    (credit: CreditRecord) => void;
+  onSave:    (credit: CreditRecord) => void | Promise<void>;
 }
 
 export class CreditModal extends EntityModal<CreditRecord> {
@@ -33,7 +33,7 @@ export class CreditModal extends EntityModal<CreditRecord> {
   private downPaymentDateInput!: HTMLInputElement;
   private paymentDayInput!: HTMLInputElement;
   private finalAmountDisplay!: HTMLElement;
-  private calcTimer: ReturnType<typeof setTimeout> | null = null;
+  private calcTimer: number | null = null;
 
   constructor(app: App, opts: CreditModalOptions) {
     const tr = EntityModal.translationsFor(app);
@@ -334,8 +334,8 @@ export class CreditModal extends EntityModal<CreditRecord> {
   }
 
   private scheduleCalc(): void {
-    if (this.calcTimer) clearTimeout(this.calcTimer);
-    this.calcTimer = setTimeout(() => this.calcMonthlyPayment(), CREDIT_CALC_DEBOUNCE_MS);
+    if (this.calcTimer !== null) window.clearTimeout(this.calcTimer);
+    this.calcTimer = window.setTimeout(() => this.calcMonthlyPayment(), CREDIT_CALC_DEBOUNCE_MS);
   }
 
   /** Purchase price − down payment = loan principal, shown live under the amount fields. */

@@ -3,7 +3,7 @@
   "name": "Finance Manager",
   "version": "2.1.1",
   "minAppVersion": "1.4.0",
-  "description": "Учёт доходов и расходов по счетам прямо в заметках Obsidian",
+  "description": "Track income, expenses, debts, credits, and deposits directly in notes with interactive accounts and analytics.",
   "author": "Dimanchello",
   "authorUrl": "https://github.com/dimanchello/",
   "isDesktopOnly": false

@@ -1,4 +1,4 @@
-import { MarkdownPostProcessorContext, Notice, Plugin, PluginSettingTab, App, Setting, TFile } from 'obsidian';
+import { MarkdownPostProcessorContext, Notice, Plugin, PluginSettingTab, App, Setting, TFile, SettingDefinitionItem } from 'obsidian';
 import { FinanceStorage } from './src/storage';
 import { AccountView }    from './src/AccountView';
 import { PluginSettings, DEFAULT_SETTINGS, MINT_GUARD_MS, CODE_BLOCK_LANGUAGES } from './src/types';
@@ -12,18 +12,14 @@ type ResolvedAccountId =
   | { kind: 'unwritable' };
 
 export default class FinanceManagerPlugin extends Plugin {
-  settings!: PluginSettings;
+  override settings!: PluginSettings;
   storage!:  FinanceStorage;
-  private styleEl?: HTMLStyleElement;
   /** Guards against the re-render our own note write triggers. */
   private mintedBlocks = new Set<string>();
 
   override async onload(): Promise<void> {
     await this.loadSettings();
     this.storage = new FinanceStorage(this.app, this.manifest.id, this.settings.defaultCurrency);
-
-    // Inject styles dynamically to avoid Obsidian CSS caching issues
-    await this.injectStyles();
 
     const processAccountBlock = async (source: string, el: HTMLElement, ctx: MarkdownPostProcessorContext) => {
       const resolved = await this.resolveAccountId(source, el, ctx);
@@ -69,7 +65,6 @@ export default class FinanceManagerPlugin extends Plugin {
 
   override async onunload(): Promise<void> {
     await this.storage.flush();
-    this.styleEl?.remove();
   }
 
   /**
@@ -156,36 +151,6 @@ export default class FinanceManagerPlugin extends Plugin {
     await this.saveData(this.settings);
     this.storage?.setDefaultCurrency(this.settings.defaultCurrency);
   }
-
-  private async injectStyles(): Promise<void> {
-    // Remove old style element if exists
-    this.styleEl?.remove();
-
-    // Create new style element
-    this.styleEl = document.createElement('style');
-    this.styleEl.id = 'finance-manager-styles-v4';
-
-    // Try to load styles from plugin folder
-    const configDir = this.app.vault.configDir;
-    const id = this.manifest.id;
-    const stylePaths = [
-      `${configDir}/plugins/${id}/styles.css`,
-      `${configDir}/plugins/${id}/dist/styles.css`,
-      `${configDir}/plugins/obsidian-finance/styles.css`,
-      `${configDir}/plugins/obsidian-finance/dist/styles.css`,
-    ];
-
-    for (const path of stylePaths) {
-      try {
-        const css = await this.app.vault.adapter.read(path);
-        this.styleEl.textContent = css;
-        document.head.appendChild(this.styleEl);
-        return;
-      } catch {
-        // Try next path
-      }
-    }
-  }
 }
 
 class FinanceSettingTab extends PluginSettingTab {
@@ -196,18 +161,71 @@ class FinanceSettingTab extends PluginSettingTab {
     this.plugin = plugin;
   }
 
-  display(): void {
+  override getControlValue(key: string): unknown {
+    if (key === 'defaultPageSize') {
+      return String(this.plugin.settings.defaultPageSize);
+    }
+    return (this.plugin.settings as unknown as Record<string, unknown>)[key];
+  }
+
+  override async setControlValue(key: string, value: unknown): Promise<void> {
+    if (key === 'defaultPageSize') {
+      this.plugin.settings.defaultPageSize = parseInt(value as string, 10) || 50;
+    } else if (key === 'defaultCurrency') {
+      this.plugin.settings.defaultCurrency = (value as string) || '₽';
+    } else {
+      (this.plugin.settings as unknown as Record<string, unknown>)[key] = value;
+    }
+    await this.plugin.saveSettings();
+  }
+
+  override getSettingDefinitions(): SettingDefinitionItem[] {
+    const tr = t(getLocaleFromApp(this.app));
+    return [
+      {
+        name: tr.defaultCurrency,
+        desc: tr.defaultCurrencyDesc,
+        control: {
+          type: 'text',
+          key: 'defaultCurrency',
+          defaultValue: '₽',
+        },
+      },
+      {
+        name: tr.pageSize,
+        control: {
+          type: 'dropdown',
+          key: 'defaultPageSize',
+          defaultValue: String(this.plugin.settings.defaultPageSize),
+          options: { '25': '25', '50': '50', '100': '100', '200': '200', '500': '500' },
+        },
+      },
+      {
+        name: tr.currencyManagement,
+        render: (setting: Setting) => {
+          this.renderCurrencySection(setting.settingEl);
+        },
+      },
+      {
+        name: tr.howToUse,
+        render: (setting: Setting) => {
+          this.renderUsageSection(setting.settingEl);
+        },
+      },
+    ];
+  }
+
+  override display(): void {
     const { containerEl } = this;
     containerEl.empty();
     containerEl.addClass('finance-settings');
 
     const tr = t(getLocaleFromApp(this.app));
 
-    containerEl.createEl('h2', { text: tr.pluginTitle });
-    containerEl.createEl('p', {
-      text: tr.pluginDesc,
-      cls: 'finance-settings-desc',
-    });
+    new Setting(containerEl)
+      .setName(tr.pluginTitle)
+      .setDesc(tr.pluginDesc)
+      .setHeading();
 
     new Setting(containerEl)
       .setName(tr.defaultCurrency)
@@ -220,9 +238,17 @@ class FinanceSettingTab extends PluginSettingTab {
       .addDropdown(d => d
         .addOptions({ '25':'25','50':'50','100':'100','200':'200','500':'500' })
         .setValue(String(this.plugin.settings.defaultPageSize))
-        .onChange(async v => { this.plugin.settings.defaultPageSize = parseInt(v); await this.plugin.saveSettings(); }));
+        .onChange(async v => { this.plugin.settings.defaultPageSize = parseInt(v, 10); await this.plugin.saveSettings(); }));
 
-    containerEl.createEl('h3', { text: tr.currencyManagement });
+    this.renderCurrencySection(containerEl);
+    this.renderUsageSection(containerEl);
+  }
+
+  private renderCurrencySection(containerEl: HTMLElement): void {
+    const tr = t(getLocaleFromApp(this.app));
+    new Setting(containerEl)
+      .setName(tr.currencyManagement)
+      .setHeading();
 
     const currencyListEl = containerEl.createDiv('finance-currency-list');
 
@@ -237,21 +263,25 @@ class FinanceSettingTab extends PluginSettingTab {
         row.createEl('span', { text: '⠿', cls: 'finance-currency-grip' });
         row.createSpan({ text: c });
         const rmBtn = row.createEl('button', { text: '×', cls: 'finance-currency-remove' });
-        rmBtn.addEventListener('click', async () => {
+        rmBtn.addEventListener('click', () => {
           this.plugin.settings.customCurrencies.splice(i, 1);
-          await this.plugin.saveSettings();
+          void this.plugin.saveSettings();
           renderCurrencyList();
         });
 
         row.addEventListener('dragstart', (e) => {
           row.addClass('finance-currency-dragging');
-          e.dataTransfer!.effectAllowed = 'move';
-          e.dataTransfer!.setData('text/plain', String(i));
+          if (e.dataTransfer) {
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', String(i));
+          }
         });
 
         row.addEventListener('dragover', (e) => {
           e.preventDefault();
-          e.dataTransfer!.dropEffect = 'move';
+          if (e.dataTransfer) {
+            e.dataTransfer.dropEffect = 'move';
+          }
           currencyListEl.querySelectorAll('.finance-currency-row').forEach(el => el.removeClass('finance-currency-drop-target'));
           row.addClass('finance-currency-drop-target');
         });
@@ -263,14 +293,16 @@ class FinanceSettingTab extends PluginSettingTab {
         row.addEventListener('drop', (e) => {
           e.preventDefault();
           row.removeClass('finance-currency-drop-target');
-          const fromIdx = parseInt(e.dataTransfer!.getData('text/plain'));
-          const toIdx = parseInt(row.getAttribute('data-index')!);
+          const rawFrom = e.dataTransfer?.getData('text/plain');
+          const fromIdx = rawFrom ? parseInt(rawFrom, 10) : NaN;
+          const rawTo = row.getAttribute('data-index');
+          const toIdx = rawTo !== null ? parseInt(rawTo, 10) : NaN;
           if (isNaN(fromIdx) || isNaN(toIdx) || fromIdx === toIdx) return;
           const currencies = this.plugin.settings.customCurrencies;
           const [moved] = currencies.splice(fromIdx, 1);
           if (!moved) return;
           currencies.splice(toIdx, 0, moved);
-          this.plugin.saveSettings();
+          void this.plugin.saveSettings();
           renderCurrencyList();
         });
 
@@ -287,13 +319,13 @@ class FinanceSettingTab extends PluginSettingTab {
       .addText(t => {
         const input = t;
         t.setPlaceholder(tr.currencyPlaceholder);
-        t.inputEl.addEventListener('keydown', async (e) => {
+        t.inputEl.addEventListener('keydown', (e) => {
           if (e.key === 'Enter') {
             e.preventDefault();
             const v = t.getValue().trim();
             if (v && !this.plugin.settings.customCurrencies.includes(v)) {
               this.plugin.settings.customCurrencies.push(v);
-              await this.plugin.saveSettings();
+              void this.plugin.saveSettings();
               renderCurrencyList();
               t.setValue('');
             }
@@ -301,19 +333,25 @@ class FinanceSettingTab extends PluginSettingTab {
         });
         return input;
       })
-      .addButton(btn => btn.setButtonText('+').onClick(async () => {
+      .addButton(btn => btn.setButtonText('+').onClick(() => {
         const inputEl = btn.buttonEl.parentElement?.querySelector('input');
         const v = inputEl?.value?.trim() || '';
         if (v && !this.plugin.settings.customCurrencies.includes(v)) {
           this.plugin.settings.customCurrencies.push(v);
-          await this.plugin.saveSettings();
+          void this.plugin.saveSettings();
           renderCurrencyList();
           if (inputEl) inputEl.value = '';
         }
       }));
+  }
 
-    containerEl.createEl('h3', { text: tr.howToUse });
+  private renderUsageSection(containerEl: HTMLElement): void {
+    const tr = t(getLocaleFromApp(this.app));
+    new Setting(containerEl)
+      .setName(tr.howToUse)
+      .setHeading();
     const ul = containerEl.createEl('ul', { cls: 'finance-settings-list' });
-    [tr.usage1, tr.usage2, tr.usage3, tr.usage4].forEach(t => ul.createEl('li', { text: t }));
+    const usage4Text = tr.usage4.replace('{configDir}', this.app.vault.configDir);
+    [tr.usage1, tr.usage2, tr.usage3, usage4Text].forEach(text => ul.createEl('li', { text }));
   }
 }

@@ -158,8 +158,8 @@ export class MoneyFlowChart {
             clientX = e.changedTouches[0].clientX;
             clientY = e.changedTouches[0].clientY;
           } else if ('clientX' in e) {
-            clientX = (e as MouseEvent).clientX;
-            clientY = (e as MouseEvent).clientY;
+            clientX = e.clientX;
+            clientY = e.clientY;
           } else {
             return;
           }
@@ -204,8 +204,8 @@ export class MoneyFlowChart {
             clientX = e.changedTouches[0].clientX;
             clientY = e.changedTouches[0].clientY;
           } else if ('clientX' in e) {
-            clientX = (e as MouseEvent).clientX;
-            clientY = (e as MouseEvent).clientY;
+            clientX = e.clientX;
+            clientY = e.clientY;
           } else {
             return;
           }
@@ -287,8 +287,8 @@ export class MoneyFlowChart {
           clientX = e.changedTouches[0].clientX;
           clientY = e.changedTouches[0].clientY;
         } else if ('clientX' in e) {
-          clientX = (e as MouseEvent).clientX;
-          clientY = (e as MouseEvent).clientY;
+          clientX = e.clientX;
+          clientY = e.clientY;
         } else {
           return;
         }

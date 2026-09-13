@@ -99,9 +99,9 @@ export class RecordsTab {
         const fi = filtered.filter(r => r.type === RecordType.INCOME && !r.isInternal).reduce((s, r) => s + r.amount, 0);
         const fe = filtered.filter(r => r.type === RecordType.EXPENSE && !r.isInternal).reduce((s, r) => s + r.amount, 0);
         const sums = host.createDiv('finance-table-sums');
-        sums.createEl('span', { text: `↑ ${this.ctx.fmt(fi)}`, cls: 'finance-sum-income' });
+        sums.createEl('span', { text: `↑\u00a0${this.ctx.fmt(fi)}`, cls: 'finance-sum-income' });
         sums.createEl('span', { text: '·', cls: 'finance-sum-sep' });
-        sums.createEl('span', { text: `↓ ${this.ctx.fmt(fe)}`, cls: 'finance-sum-expense' });
+        sums.createEl('span', { text: `↓\u00a0${this.ctx.fmt(fe)}`, cls: 'finance-sum-expense' });
       },
       emptyState: { icon: '📊', title: this.tr.noRecords, subtitle: this.tr.noRecordsFilter },
       emptyFiltered: { icon: '📊', title: this.tr.noRecords, subtitle: this.tr.tryChangeFilters },

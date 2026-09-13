@@ -11,7 +11,7 @@ export interface DebtModalOptions {
   title:   string;
   debt?:   DebtRecord;
   allPersons: string[];
-  onSave:  (debt: DebtRecord) => void;
+  onSave:  (debt: DebtRecord) => void | Promise<void>;
 }
 
 export class DebtModal extends EntityModal<DebtRecord> {

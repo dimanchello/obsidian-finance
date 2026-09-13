@@ -85,8 +85,7 @@ export class DepositsOverview {
     });
 
     const itemCumulative = legend.createDiv('finance-chart-legend-item');
-    const dotCum = itemCumulative.createSpan({ cls: 'finance-chart-legend-dot' });
-    dotCum.style.background = 'var(--color-green)';
+    itemCumulative.createSpan({ cls: 'finance-chart-legend-dot is-cumulative' });
     itemCumulative.createSpan({ text: tr.overviewDepositCumulativeProfit });
 
     const maxMonthlyValue = Math.max(...interestData.map(d => d.total));

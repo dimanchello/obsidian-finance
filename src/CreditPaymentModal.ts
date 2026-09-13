@@ -9,7 +9,7 @@ import { PaymentStatus } from './constants';
 export interface CreditPaymentOptions {
   title: string;
   credit: CreditRecord;
-  onSave: (payment: CreditPayment) => void;
+  onSave: (payment: CreditPayment) => void | Promise<void>;
 }
 
 export class CreditPaymentModal extends EntityModal<CreditPayment> {

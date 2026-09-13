@@ -60,7 +60,7 @@ export class FileStore<T> {
 
 /** Owns the shared debounce timer across all stores. */
 export class FlushScheduler {
-  private timer: ReturnType<typeof setTimeout> | null = null;
+  private timer: number | null = null;
   private readonly run: () => Promise<void>;
 
   constructor(run: () => Promise<void>) {
@@ -68,12 +68,12 @@ export class FlushScheduler {
   }
 
   schedule(): void {
-    if (this.timer) clearTimeout(this.timer);
-    this.timer = setTimeout(() => { void this.run(); }, FLUSH_DEBOUNCE_MS);
+    if (this.timer !== null) window.clearTimeout(this.timer);
+    this.timer = window.setTimeout(() => { void this.run(); }, FLUSH_DEBOUNCE_MS);
   }
 
   async flushNow(): Promise<void> {
-    if (this.timer) { clearTimeout(this.timer); this.timer = null; }
+    if (this.timer !== null) { window.clearTimeout(this.timer); this.timer = null; }
     await this.run();
   }
 }

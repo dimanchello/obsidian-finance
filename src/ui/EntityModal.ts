@@ -3,6 +3,7 @@ import { getLocaleFromApp, t, Translations } from '../i18n';
 import { FinanceBaseModal } from './FinanceBaseModal';
 import { buildButtonRow } from './formHelpers';
 import { FieldInfoModal, type FieldDef } from '../FieldInfoModal';
+import { MODAL_ERROR_TIMEOUT_MS } from '../types';
 
 /**
  * Base class for entity create/edit modals.
@@ -29,7 +30,7 @@ export abstract class EntityModal<T> extends FinanceBaseModal {
   protected tr: Translations;
   protected entity: T;
   protected isEdit: boolean;
-  protected onSave: (entity: T) => void;
+  protected onSave: (entity: T) => void | Promise<void>;
 
   protected formEl!: HTMLElement;
   private saveBtn!: HTMLButtonElement;
@@ -47,7 +48,7 @@ export abstract class EntityModal<T> extends FinanceBaseModal {
     options: {
       entity: T;
       isEdit: boolean;
-      onSave: (entity: T) => void;
+      onSave: (entity: T) => void | Promise<void>;
     }
   ) {
     super(app);
@@ -142,7 +143,7 @@ export abstract class EntityModal<T> extends FinanceBaseModal {
    */
   protected onFormReady(): void {
     // Default: focus first input
-    const firstInput = this.formEl.querySelector('input, textarea') as HTMLInputElement | null;
+    const firstInput = this.formEl.querySelector<HTMLElement>('input, textarea');
     firstInput?.focus();
   }
 
@@ -154,7 +155,7 @@ export abstract class EntityModal<T> extends FinanceBaseModal {
     }
 
     const entity = this.collectData();
-    this.onSave(entity);
+    void this.onSave(entity);
     this.close();
   }
 
@@ -166,7 +167,7 @@ export abstract class EntityModal<T> extends FinanceBaseModal {
     errorEl.textContent = message;
     this.saveBtn.parentElement?.insertBefore(errorEl, this.saveBtn.parentElement.firstChild);
 
-    setTimeout(() => errorEl.remove(), 5000);
+    window.setTimeout(() => errorEl.remove(), MODAL_ERROR_TIMEOUT_MS);
   }
 
   protected clearError(): void {

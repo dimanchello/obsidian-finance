@@ -3213,7 +3213,8 @@
   flex-shrink: 0;
 }
 
-.finance-chart-legend-dot.target {
+.finance-chart-legend-dot.target,
+.finance-chart-legend-dot.is-cumulative {
   background: var(--color-green);
 }
 

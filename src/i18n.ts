@@ -1,4 +1,4 @@
-import { App } from 'obsidian';
+import { App, getLanguage } from 'obsidian';
 
 export type Locale = 'ru' | 'en';
 
@@ -644,7 +644,7 @@ const ru: Translations = {
   usage1: 'Создайте заметку для каждого счёта (Наличные, Карта, Крипто-кошелёк).',
   usage2: 'Вставьте в заметку блок кода с языком finance-account.',
   usage3: 'Название счёта и валюта редактируются прямо в шапке блока.',
-  usage4: 'Данные хранятся в .obsidian/plugins/finance-manager/accounts/',
+  usage4: 'Данные хранятся в {configDir}/plugins/finance-manager/accounts/',
   loading: 'Загрузка…',
   recordAdded: '✅ Запись добавлена',
   recordUpdated: '✅ Запись обновлена',
@@ -1265,7 +1265,7 @@ const en: Translations = {
   usage1: 'Create a note for each account (Cash, Card, Crypto wallet).',
   usage2: 'Insert a code block with language finance-account.',
   usage3: 'Account name and currency are edited directly in the block header.',
-  usage4: 'Data is stored in .obsidian/plugins/finance-manager/accounts/',
+  usage4: 'Data is stored in {configDir}/plugins/finance-manager/accounts/',
   loading: 'Loading…',
   recordAdded: '✅ Record added',
   recordUpdated: '✅ Record updated',
@@ -1881,20 +1881,23 @@ export function getLocale(lang: string | undefined): Locale {
   return 'ru';
 }
 
-export function getLocaleFromApp(app: App): Locale {
-  try {
-    const fromHtml = document.documentElement.lang;
-    if (fromHtml) return getLocale(fromHtml);
-  } catch {}
-  try {
-    const fromLocal = localStorage.getItem('language');
-    if (fromLocal) return getLocale(fromLocal);
-  } catch {}
-  try {
-    const fromConfig = (app.vault as any).getConfig?.('language');
-    if (fromConfig) return getLocale(fromConfig);
-  } catch {}
-  return getLocale(navigator.language);
+export function getLocaleFromApp(app?: App): Locale {
+  if (typeof getLanguage === 'function') {
+    const lang = getLanguage();
+    if (lang) return getLocale(lang);
+  }
+  if (app) {
+    const fromLocal = app.loadLocalStorage('language');
+    if (typeof fromLocal === 'string' && fromLocal) {
+      return getLocale(fromLocal);
+    }
+  }
+  const fromHtml = typeof document !== 'undefined' ? document.documentElement.lang : '';
+  if (fromHtml) return getLocale(fromHtml);
+  if (typeof navigator !== 'undefined' && navigator.language) {
+    return getLocale(navigator.language);
+  }
+  return 'ru';
 }
 
 export function t(locale: Locale): Translations {

@@ -8,7 +8,7 @@ import { buildDateTimeField, buildNoteField } from './ui/formHelpers';
 export interface DepositTopUpOptions {
   title: string;
   deposit: DepositRecord;
-  onSave:  (topUp: DepositTopUp) => void;
+  onSave:  (topUp: DepositTopUp) => void | Promise<void>;
 }
 
 export class DepositTopUpModal extends EntityModal<DepositTopUp> {

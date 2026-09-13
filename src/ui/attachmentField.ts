@@ -94,7 +94,10 @@ export function buildAttachmentField(
     }
 
     try {
-      const vaultCfg = (app.vault as any).getConfig('attachmentFolderPath') ?? '/';
+      const vaultWithConfig = app.vault as unknown as { getConfig?(key: string): unknown };
+      const vaultCfg = (typeof vaultWithConfig.getConfig === 'function'
+        ? (vaultWithConfig.getConfig('attachmentFolderPath') as string | undefined)
+        : undefined) ?? '/';
       let folder: string;
       if (vaultCfg === './' || vaultCfg === '/') {
         folder = pluginId;

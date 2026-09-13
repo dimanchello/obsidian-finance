@@ -29,3 +29,4 @@ class LocalStorageMock {
 }
 
 global.localStorage = new LocalStorageMock() as Storage;
+(globalThis as unknown as { window: unknown }).window = globalThis;

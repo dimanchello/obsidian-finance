@@ -13,7 +13,7 @@ export interface DepositModalOptions {
   deposit?:  DepositRecord;
   banks:     string[];
   pluginId:  string;
-  onSave:    (deposit: DepositRecord) => void;
+  onSave:    (deposit: DepositRecord) => void | Promise<void>;
 }
 
 export class DepositModal extends EntityModal<DepositRecord> {

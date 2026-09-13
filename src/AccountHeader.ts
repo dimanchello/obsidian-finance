@@ -155,7 +155,7 @@ export class AccountHeader {
       });
 
       const close = (ev: MouseEvent) => {
-        if (!popup.contains(ev.target as Node)) popup.remove();
+        if (!(ev.target instanceof Node) || !popup.contains(ev.target)) popup.remove();
       };
       // registerDomEvent, not addEventListener: the popup can be removed by a
       // re-render before any click lands, and the listener would outlive it.

@@ -103,7 +103,7 @@ export class Combobox {
   private readonly triggerText: HTMLElement;
   private dropdown: HTMLElement | null = null;
   private outsideHandler: ((e: MouseEvent) => void) | null = null;
-  private searchDebounce: ReturnType<typeof setTimeout> | null = null;
+  private searchDebounce: number | null = null;
   private activeIndex = -1;
   private filtered: ComboOption[] = [];
 
@@ -188,8 +188,8 @@ export class Combobox {
     renderList('');
 
     searchInput.addEventListener('input', () => {
-      if (this.searchDebounce) clearTimeout(this.searchDebounce);
-      this.searchDebounce = setTimeout(() => renderList(searchInput.value), SEARCH_DEBOUNCE_MS);
+      if (this.searchDebounce !== null) window.clearTimeout(this.searchDebounce);
+      this.searchDebounce = window.setTimeout(() => renderList(searchInput.value), SEARCH_DEBOUNCE_MS);
     });
 
     searchInput.addEventListener('keydown', (e: KeyboardEvent) => {
@@ -230,8 +230,7 @@ export class Combobox {
       if (!this.dropdown?.contains(t) && !this.trigger.contains(t)) this.close();
     };
     document.addEventListener('mousedown', this.outsideHandler);
-
-    setTimeout(() => searchInput.focus(), FOCUS_DELAY_MS);
+    window.setTimeout(() => searchInput.focus(), FOCUS_DELAY_MS);
   }
 
   private highlight(list: HTMLElement): void {

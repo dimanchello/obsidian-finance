@@ -102,7 +102,7 @@ export class DataTable<T> {
   private filtersOpen = false;
   private bulkMode = false;
   private selectedIds = new Set<string>();
-  private filterDebounce: ReturnType<typeof setTimeout> | null = null;
+  private filterDebounce: number | null = null;
   private expandedId: string | null = null;
   private lastFocusedSearch: HTMLInputElement | null = null;
 
@@ -270,8 +270,8 @@ export class DataTable<T> {
         si.addEventListener('focus', () => { this.lastFocusedSearch = si; });
         si.addEventListener('blur', () => { this.lastFocusedSearch = null; });
         si.addEventListener('input', () => {
-          if (this.filterDebounce) clearTimeout(this.filterDebounce);
-          this.filterDebounce = setTimeout(() => {
+          if (this.filterDebounce !== null) window.clearTimeout(this.filterDebounce);
+          this.filterDebounce = window.setTimeout(() => {
             control.set(si.value);
             apply();
           }, SEARCH_DEBOUNCE_MS);

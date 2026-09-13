@@ -8,7 +8,7 @@ import { AUTO_TX_INTERVAL_MS } from './types';
  * which keeps data ownership in one place.
  */
 export class AutoTxScheduler {
-  private timer: ReturnType<typeof setInterval> | null = null;
+  private timer: number | null = null;
   private readonly onTick: () => void;
 
   constructor(onTick: () => void) {
@@ -18,12 +18,12 @@ export class AutoTxScheduler {
   /** (Re)starts the interval. Safe to call repeatedly — never stacks timers. */
   start(): void {
     this.stop();
-    this.timer = setInterval(() => { this.onTick(); }, AUTO_TX_INTERVAL_MS);
+    this.timer = window.setInterval(() => { this.onTick(); }, AUTO_TX_INTERVAL_MS);
   }
 
   stop(): void {
     if (this.timer !== null) {
-      clearInterval(this.timer);
+      window.clearInterval(this.timer);
       this.timer = null;
     }
   }

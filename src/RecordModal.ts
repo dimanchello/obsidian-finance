@@ -20,7 +20,7 @@ export interface RecordModalOptions {
   currency:   string;
   settings:   PluginSettings;
   pluginId:   string;
-  onSave:     (r: FinanceRecord) => void;
+  onSave:     (r: FinanceRecord) => void | Promise<void>;
 }
 
 export class RecordModal extends EntityModal<FinanceRecord> {
@@ -34,7 +34,7 @@ export class RecordModal extends EntityModal<FinanceRecord> {
   private tagInput!:         HTMLInputElement;
   private payerInput!:       HTMLInputElement;
   private autofillBadge!:    HTMLElement;
-  private autofillTimer:     ReturnType<typeof setTimeout> | null = null;
+  private autofillTimer:     number | null = null;
 
   constructor(app: App, opts: RecordModalOptions) {
     super(app, {
@@ -83,7 +83,7 @@ export class RecordModal extends EntityModal<FinanceRecord> {
     calcIconBtn.title = this.tr.calculatorTitle;
     buildCalculatorIcon(calcIconBtn);
     calcIconBtn.addEventListener('click', () => {
-      const currentValue = this.amountInput.value.replace(/ /g, '').replace(',', '.');
+      const currentValue = this.amountInput.value.replace(/\u00a0/g, '').replace(',', '.');
       new CalculatorModal(this.app, result => {
         amountHandle.set(result);
         this.updateAmountColor();
@@ -141,7 +141,7 @@ export class RecordModal extends EntityModal<FinanceRecord> {
   }
 
   protected override onFormReady(): void {
-    setTimeout(() => this.amountInput.focus(), MODAL_FOCUS_DELAY_MS);
+    window.setTimeout(() => this.amountInput.focus(), MODAL_FOCUS_DELAY_MS);
   }
 
   protected validate(): string | null {
@@ -217,8 +217,8 @@ export class RecordModal extends EntityModal<FinanceRecord> {
   }
 
   private scheduleAutofill(field: 'category' | 'payer', value: string): void {
-    if (this.autofillTimer) clearTimeout(this.autofillTimer);
-    this.autofillTimer = setTimeout(() => this.doAutofill(field, value), AUTOFILL_DEBOUNCE_MS);
+    if (this.autofillTimer !== null) window.clearTimeout(this.autofillTimer);
+    this.autofillTimer = window.setTimeout(() => this.doAutofill(field, value), AUTOFILL_DEBOUNCE_MS);
   }
 
   private doAutofill(field: 'category' | 'payer', value: string): void {
@@ -257,7 +257,7 @@ export class RecordModal extends EntityModal<FinanceRecord> {
       this.autofillBadge.removeClass('is-hidden');
       const d = match.date.split('-');
       this.autofillBadge.textContent = this.tr.autofillFromDate.replace('{date}', `${d[2]}.${d[1]}.${d[0]}`);
-      setTimeout(() => { this.autofillBadge.addClass('is-hidden'); }, AUTOFILL_BADGE_MS);
+      window.setTimeout(() => { this.autofillBadge.addClass('is-hidden'); }, AUTOFILL_BADGE_MS);
     }
   }
 }

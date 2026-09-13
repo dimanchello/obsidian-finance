@@ -32,7 +32,7 @@ import { renderStatCard } from '../ui/statCards';
 export class OverviewTab {
   private el: HTMLElement;
   private ctx: ViewContext;
-  private debounceTimer: ReturnType<typeof setTimeout> | null = null;
+  private debounceTimer: number | null = null;
 
   // Chart components
   private moneyFlowChart: MoneyFlowChart;
@@ -68,9 +68,9 @@ export class OverviewTab {
 
   private debouncedRenderBody(): void {
     if (this.debounceTimer !== null) {
-      clearTimeout(this.debounceTimer);
+      window.clearTimeout(this.debounceTimer);
     }
-    this.debounceTimer = setTimeout(() => {
+    this.debounceTimer = window.setTimeout(() => {
       this.debounceTimer = null;
       this.renderBody();
     }, OVERVIEW_INPUT_DEBOUNCE_MS);
@@ -90,7 +90,7 @@ export class OverviewTab {
 
   destroy(): void {
     if (this.debounceTimer !== null) {
-      clearTimeout(this.debounceTimer);
+      window.clearTimeout(this.debounceTimer);
       this.debounceTimer = null;
     }
     this.breakdownChart.destroy();
@@ -210,7 +210,7 @@ export class OverviewTab {
 
       btn.addEventListener('click', () => {
         if (this.debounceTimer !== null) {
-          clearTimeout(this.debounceTimer);
+          window.clearTimeout(this.debounceTimer);
           this.debounceTimer = null;
         }
         this.state.overviewDateFrom = preset.from;

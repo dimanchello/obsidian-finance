@@ -11,7 +11,7 @@ export interface DebtMovementOptions {
   movement?:       DebtMovement;
   remainingAmount?: number;
   currency?:       string;
-  onSave:          (m: DebtMovement) => void;
+  onSave:          (m: DebtMovement) => void | Promise<void>;
 }
 
 export class DebtMovementModal extends EntityModal<DebtMovement> {
