@@ -11,3 +11,4 @@ export class Setting {}
 export function TextComponent() {}
 export function DropdownComponent() {}
 export const getLanguage = vi.fn(() => 'ru');
+export const requireApiVersion = vi.fn((_version: string) => true);

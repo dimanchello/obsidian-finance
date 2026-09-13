@@ -1,4 +1,4 @@
-import { App, getLanguage } from 'obsidian';
+import { App, getLanguage, requireApiVersion } from 'obsidian';
 
 export type Locale = 'ru' | 'en';
 
@@ -1883,7 +1883,7 @@ export function getLocale(lang: string | undefined): Locale {
 
 export function getLocaleFromApp(app?: App): Locale {
   try {
-    if (typeof getLanguage === 'function') {
+    if (requireApiVersion('1.8.7')) {
       const lang = getLanguage();
       if (lang) return getLocale(lang);
     }

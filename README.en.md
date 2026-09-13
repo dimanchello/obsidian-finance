@@ -1,13 +1,11 @@
-[🇬🇧 English](README.md) | [🇷🇺 Русский](README.ru.md)
-
----
-
-# 💰 Finance Manager — Obsidian plugin
+# 💰 Finance Manager — Obsidian Plugin
 
 Track income and expenses directly in your Obsidian notes.  
 Each note is a separate **account** (cash, card, crypto wallet, etc.).
 
-**Version:** 2.1.0 | **Min Obsidian Version:** 1.4.0
+> **Translations:** [🇷🇺 Документация на русском языке (Russian)](README.ru.md)
+
+**Version:** 2.1.1 | **Min Obsidian Version:** 1.8.7
 
 ---
 
