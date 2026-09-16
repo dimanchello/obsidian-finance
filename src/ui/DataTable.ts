@@ -78,7 +78,9 @@ export interface TableSpec<T> {
   emptyState: { icon: string; title: string; subtitle: string };
   emptyFiltered: { icon: string; title: string; subtitle: string };
   hasAnyItems: () => boolean;
-  actionsPosition?: 'inline' | 'above';
+  actionsPosition?: 'inline' | 'above' | 'custom';
+  cardCls?: string | ((item: T) => string[]);
+  onCardClick?: (item: T) => void;
   /** Replaces the default toolbar content entirely when provided. */
   ownToolbar?: (toolbar: HTMLElement, api: DataTableApi) => void;
   toolbarButtons?: (toolbar: HTMLElement, rerender: () => void, api: DataTableApi) => void;
@@ -514,10 +516,12 @@ export class DataTable<T> {
       }
 
       if (this.spec.expandable && this.expandedId === id && this.spec.expandable.hasContent(item)) {
+        tr.classList.add('finance-row-expanded');
+        itemTbody.classList.add('finance-tbody-expanded');
         const exTr = createEl('tr');
         exTr.classList.add('finance-expand-row');
         const exTd = createEl('td');
-        exTd.classList.add('finance-td');
+        exTd.classList.add('finance-td', 'finance-expand-td');
         exTd.colSpan = colSpan;
         this.spec.expandable.render(exTd, item);
         exTr.appendChild(exTd);
@@ -531,13 +535,18 @@ export class DataTable<T> {
   }
 
   private renderCards(container: HTMLElement, pageItems: T[]): void {
-    const list = container.createDiv('finance-records-list');
+    const isCompact = this.spec.cardCls === 'finance-compact-card';
+    const list = container.createDiv(isCompact ? 'finance-records-list finance-compact-list' : 'finance-records-list');
     const frag = createFragment();
 
     pageItems.forEach(item => {
       const id = this.spec.itemId(item);
       const block = createDiv();
       block.classList.add('finance-record-block');
+      if (this.spec.cardCls) {
+        const extraCls = typeof this.spec.cardCls === 'function' ? this.spec.cardCls(item) : [this.spec.cardCls];
+        extraCls.forEach(c => block.classList.add(c));
+      }
       this.spec.rowCls?.(item).forEach(c => block.classList.add(c));
 
       if (this.bulkMode) {
@@ -563,7 +572,7 @@ export class DataTable<T> {
         }
       }
 
-      if (this.spec.actionsPosition !== 'above') {
+      if (this.spec.actionsPosition !== 'above' && this.spec.actionsPosition !== 'custom') {
         const actions = block.createDiv('finance-record-actions');
         this.spec.rowActions(item).forEach(a => this.mkActionBtn(actions, a));
       }
@@ -572,18 +581,25 @@ export class DataTable<T> {
         block.classList.add('finance-tr-selectable');
         block.addEventListener('click', (e) => {
           const t = e.target as HTMLElement;
-          if (t.tagName === 'INPUT' || t.closest('.finance-action-btn')) return;
+          if (t.tagName === 'INPUT' || t.closest('.finance-action-btn') || t.closest('.finance-compact-del-btn')) return;
           this.toggleSelected(id);
         });
       } else if (this.spec.expandable?.hasContent(item)) {
         block.classList.add('finance-tr-expandable');
         block.addEventListener('click', (e) => {
           const t = e.target as HTMLElement;
-          if (t.closest('.finance-action-btn')) return;
+          if (t.closest('.finance-action-btn') || t.closest('.finance-compact-del-btn')) return;
           this.expandedId = this.expandedId === id ? null : id;
           this.spec.state.setExpandedId?.(this.expandedId);
           if (this.spec.state.setExpandedId) this.ctx.saveState();
           this.spec.rerender();
+        });
+      } else if (this.spec.onCardClick) {
+        block.classList.add('finance-card-clickable');
+        block.addEventListener('click', (e) => {
+          const t = e.target as HTMLElement;
+          if (t.closest('.finance-action-btn') || t.closest('.finance-compact-del-btn') || t.tagName === 'INPUT') return;
+          this.spec.onCardClick?.(item);
         });
       }
 

@@ -27,7 +27,7 @@ export class AccountView extends MarkdownRenderChild {
   private header:   AccountHeader;
   private scheduler: AutoTxScheduler;
 
-  private mode: AccountMode = AccountMode.OVERVIEW;
+  private mode: AccountMode = AccountMode.RECORDS;
   private isMobile = false;
   private isCheckingAutoTransactions = false;
 
@@ -85,6 +85,9 @@ export class AccountView extends MarkdownRenderChild {
     this.ctx.data = await this.storage.load(this.accountId);
 
     await this.ctx.loadStateFromFile();
+    delete this.ctx.state.creditExpandedId;
+    delete this.ctx.state.debtExpandedId;
+    delete this.ctx.state.depositExpandedId;
 
     this.header.render();
 

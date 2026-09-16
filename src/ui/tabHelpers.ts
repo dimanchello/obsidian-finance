@@ -107,6 +107,65 @@ export function renderMobileCard(
   }
 }
 
+export interface CompactTransactionOptions {
+  indicator: string;
+  indicatorCls?: string;
+  title: string;
+  subtitle?: string;
+  amountText: string;
+  amountCls?: string;
+  dateText: string;
+  deleteTitle?: string;
+  onDelete?: () => void;
+  onClick?: () => void;
+}
+
+export function renderCompactTransactionCard(
+  block: HTMLElement,
+  opts: CompactTransactionOptions
+): void {
+  const ind = block.createDiv('finance-compact-indicator');
+  if (opts.indicatorCls) ind.addClass(opts.indicatorCls);
+  ind.textContent = opts.indicator;
+
+  const main = block.createDiv('finance-compact-main');
+  const titleEl = main.createDiv('finance-compact-title');
+  titleEl.textContent = opts.title;
+  if (opts.subtitle) {
+    const subEl = main.createDiv('finance-compact-subtitle');
+    subEl.textContent = opts.subtitle;
+  }
+
+  const right = block.createDiv('finance-compact-right');
+  const amtEl = right.createDiv('finance-compact-amount');
+  if (opts.amountCls) amtEl.addClass(opts.amountCls);
+  amtEl.textContent = opts.amountText;
+
+  const dateEl = right.createDiv('finance-compact-date');
+  dateEl.textContent = opts.dateText;
+
+  if (opts.onDelete) {
+    const delBtn = block.createEl('button', {
+      cls: 'finance-compact-del-btn',
+      text: '🗑️',
+    });
+    if (opts.deleteTitle) delBtn.title = opts.deleteTitle;
+    delBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      opts.onDelete?.();
+    });
+  }
+
+  if (opts.onClick) {
+    block.addClass('finance-card-clickable');
+    block.addEventListener('click', (e) => {
+      const t = e.target as HTMLElement;
+      if (t.closest('.finance-compact-del-btn') || t.closest('.finance-action-btn') || t.tagName === 'INPUT') return;
+      opts.onClick?.();
+    });
+  }
+}
+
 export function dateRangeControls(
   f: { dateFrom: string; dateTo: string },
   tr: Translations

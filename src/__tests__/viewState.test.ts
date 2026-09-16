@@ -93,4 +93,15 @@ describe('parseViewState', () => {
     expect(parseViewState({ overviewDateFrom: '2026-01-01', overviewDateTo: '2026-06-30' }, 25).overviewAllTime).toBe(false);
     expect(parseViewState({ overviewDateFrom: '2026-01-01', overviewAllTime: true }, 25).overviewAllTime).toBe(false);
   });
+
+  it('раскрытые сущности (долги, кредиты, вклады) не восстанавливаются при загрузке (всегда свёрнуты)', () => {
+    const s = parseViewState({
+      debtExpandedId: 'debt-123',
+      creditExpandedId: 'credit-456',
+      depositExpandedId: 'deposit-789',
+    }, 25);
+    expect(s.debtExpandedId).toBeUndefined();
+    expect(s.creditExpandedId).toBeUndefined();
+    expect(s.depositExpandedId).toBeUndefined();
+  });
 });

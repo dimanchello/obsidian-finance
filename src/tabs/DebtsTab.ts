@@ -247,7 +247,9 @@ export class DebtsTab {
   // ── Movements panel (expandable) ─────────────────────────────────────────
 
   private renderDebtMovementsPanel(parent: HTMLElement, debt: DebtRecord): void {
-    const scrollWrapper = parent.createDiv('finance-mov-scroll finance-mov-panel');
+    const wrapper = parent.createDiv('finance-payments-panel');
+    wrapper.createEl('h4', { text: this.tr.movementHistory, cls: 'finance-section-title' });
+    const scrollWrapper = wrapper.createDiv('finance-mov-scroll');
     const movTable = scrollWrapper.createEl('table', { cls: 'finance-mov-table' });
     const movHead = movTable.createEl('thead').createEl('tr');
     [this.tr.type, this.tr.sum, this.tr.date, this.tr.note, ''].forEach(l => {

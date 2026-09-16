@@ -15,7 +15,7 @@ import { AnalyticsView, type BarClickAction } from '../AnalyticsView';
 import { noteFilename } from '../utils';
 import { isoWeekRange, daysInMonth } from '../domain/dateMath';
 import { DataTable, DataTableApi, FilterControl } from '../ui/DataTable';
-import { renderMobileCard, dateRangeControls, compareValues } from '../ui/tabHelpers';
+import { renderCompactTransactionCard, dateRangeControls, compareValues } from '../ui/tabHelpers';
 import { renderStatCard } from '../ui/statCards';
 import { RecordType } from '../constants';
 
@@ -74,6 +74,9 @@ export class RecordsTab {
         { icon: '✏️', title: this.tr.edit, onClick: () => this.openEditModal(r) },
         { icon: '🗑️', title: this.tr.delete, onClick: () => this.confirmDelete(r), cls: 'finance-delete-btn' },
       ],
+      actionsPosition: 'custom',
+      cardCls: 'finance-compact-card',
+      onCardClick: r => this.openEditModal(r),
       renderCard: (block, r) => this.renderCard(block, r),
       filterControls: () => this.filterControls(),
       sortFields: [
@@ -308,18 +311,34 @@ export class RecordsTab {
   // ── Mobile card ──────────────────────────────────────────────────────────
 
   private renderCard(block: HTMLElement, rec: FinanceRecord): void {
-    const details = [];
-    if (rec.category) details.push({ label: '', value: rec.category });
-    if (rec.tag) details.push({ label: '🏷️', value: rec.tag });
-    if (rec.payer) details.push({ label: '👤', value: rec.payer });
-    if (rec.exchangeRate) details.push({ label: '💱 @', value: String(rec.exchangeRate) });
+    const isIncome = rec.type === RecordType.INCOME;
+    const indicator = isIncome ? '+' : (rec.isInternal ? '◆' : '—');
+    const indicatorCls = isIncome
+      ? 'finance-indicator-income'
+      : (rec.isInternal ? 'finance-indicator-internal' : 'finance-indicator-expense');
 
-    renderMobileCard(block, {
-      amountText: (rec.type === RecordType.INCOME ? '+' : '−') + this.ctx.fmt(rec.amount),
-      amountCls: rec.type === RecordType.INCOME ? 'finance-amount-income' : 'finance-amount-expense',
-      subtitle: fmtDate(rec.date, rec.time),
-      details,
-      note: rec.note,
+    const subParts: string[] = [];
+    if (rec.payer) subParts.push(rec.payer);
+    if (rec.tag) subParts.push(rec.tag.startsWith('#') ? rec.tag : `#${rec.tag}`);
+    if (rec.note) subParts.push(rec.note);
+    const subtitle = subParts.join(' · ');
+
+    const rateSuffix = rec.exchangeRate ? ` @ ${rec.exchangeRate}` : '';
+    const amountText = (isIncome ? '+' : '−') + this.ctx.fmt(rec.amount) + rateSuffix;
+    const amountCls = isIncome
+      ? 'finance-amount-income'
+      : (rec.isInternal ? 'finance-amount-internal' : 'finance-amount-expense');
+
+    renderCompactTransactionCard(block, {
+      indicator,
+      indicatorCls,
+      title: rec.category || this.tr.uncategorized,
+      subtitle,
+      amountText,
+      amountCls,
+      dateText: fmtDate(rec.date, rec.time),
+      deleteTitle: this.tr.delete,
+      onDelete: () => this.confirmDelete(rec),
     });
   }
 

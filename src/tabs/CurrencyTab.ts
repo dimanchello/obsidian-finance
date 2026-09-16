@@ -12,6 +12,7 @@ import { DataTable, FilterControl } from '../ui/DataTable';
 import { fmt } from '../utils';
 import { AccountCommands } from '../domain/AccountCommands';
 import { renderSummaryCard } from '../ui/statCards';
+import { renderCompactTransactionCard } from '../ui/tabHelpers';
 
 export class CurrencyTab {
   private ctx: ViewContext;
@@ -52,7 +53,9 @@ export class CurrencyTab {
         { icon: '✏️', title: this.tr.edit, onClick: () => this.openModal(e.type, e) },
         { icon: '🗑️', title: this.tr.delete, onClick: () => this.confirmDeleteExchange(e), cls: 'finance-delete-btn' },
       ],
-      actionsPosition: 'inline',
+      actionsPosition: 'custom',
+      cardCls: 'finance-compact-card',
+      onCardClick: e => this.openModal(e.type, e),
       renderCard: (block, e) => this.renderCard(block, e),
       filterControls: () => this.filterControls(),
       sortFields: [
@@ -315,23 +318,32 @@ export class CurrencyTab {
 
   private renderCard(block: HTMLElement, e: CurrencyExchange): void {
     const isIncome = e.type === CurrencyOperationType.BUY || e.type === CurrencyOperationType.ADD;
-    block.addClass(isIncome ? 'finance-row-income' : 'finance-row-expense');
-    
-    const header = block.createDiv('finance-record-header');
-    const sign = isIncome ? '+' : '−';
-    header.createSpan({
-      text: `${sign}${this.ctx.fmt(e.targetAmount)} ${e.targetCurrency}`,
-      cls: `finance-record-amount ${isIncome ? 'finance-amount-income' : 'finance-amount-expense'}`,
-    });
-    header.createSpan({ text: fmtDate(e.date, e.time), cls: 'finance-record-date' });
-    
-    const details = block.createDiv('finance-record-details');
-    details.createSpan({ text: this.typeLabel(e.type), cls: 'finance-record-detail' });
+    const indicator = isIncome ? '+' : '—';
+    const indicatorCls = isIncome ? 'finance-indicator-income' : 'finance-indicator-expense';
+
+    const subParts: string[] = [];
     if (e.type !== CurrencyOperationType.ADD) {
-      details.createSpan({ text: `${this.tr.sum}: ${this.ctx.fmt(e.amountInAccountCurrency)} ${this.ctx.data?.currency ?? ''}`, cls: 'finance-record-detail' });
-      details.createSpan({ text: `${this.tr.rate}: ${e.exchangeRate}`, cls: 'finance-record-detail' });
+      subParts.push(`${this.ctx.fmt(e.amountInAccountCurrency)} ${this.ctx.data?.currency ?? ''} @ ${e.exchangeRate}`);
     }
-    if (e.provider) details.createSpan({ text: e.provider, cls: 'finance-record-detail' });
+    if (e.provider) subParts.push(e.provider);
+    if (e.note) subParts.push(e.note);
+    const subtitle = subParts.join(' · ');
+
+    const sign = isIncome ? '+' : '−';
+    const amountText = `${sign}${fmt(e.targetAmount, e.targetCurrency)}`;
+    const amountCls = isIncome ? 'finance-amount-income' : 'finance-amount-expense';
+
+    renderCompactTransactionCard(block, {
+      indicator,
+      indicatorCls,
+      title: e.category ?? this.typeLabel(e.type),
+      subtitle,
+      amountText,
+      amountCls,
+      dateText: fmtDate(e.date, e.time),
+      deleteTitle: this.tr.delete,
+      onDelete: () => this.confirmDeleteExchange(e),
+    });
   }
 
   private openModal(type: CurrencyOperationType, initial?: CurrencyExchange): void {

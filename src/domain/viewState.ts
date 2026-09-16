@@ -119,10 +119,6 @@ export function parseViewState(raw: unknown, pageSize: number): ViewState {
   state.overviewDateTo = str(raw.overviewDateTo, '');
   state.overviewAllTime = state.overviewDateFrom === '' && state.overviewDateTo === '';
   state.overviewGroupBy = oneOf(raw.overviewGroupBy, OVERVIEW_GROUP_BY, 'category');
-  
-  if (typeof raw.creditExpandedId === 'string') state.creditExpandedId = raw.creditExpandedId;
-  if (typeof raw.debtExpandedId === 'string') state.debtExpandedId = raw.debtExpandedId;
-  if (typeof raw.depositExpandedId === 'string') state.depositExpandedId = raw.depositExpandedId;
 
   return state;
 }

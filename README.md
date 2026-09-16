@@ -5,7 +5,7 @@ Each note is a separate **account** (cash, card, crypto wallet, etc.).
 
 > **Translations:** [🇷🇺 Документация на русском языке (Russian)](README.ru.md)
 
-**Version:** 2.1.1 | **Min Obsidian Version:** 1.8.7
+**Version:** 2.2.0 | **Min Obsidian Version:** 1.8.7
 
 ---
 

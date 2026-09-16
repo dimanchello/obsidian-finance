@@ -4,7 +4,7 @@ import { ViewContext } from '../context';
 import { FinanceRecord, OVERVIEW_MODAL_PAGE_SIZE } from '../types';
 import { RecordType } from '../constants';
 import { fmtDate } from '../utils';
-import { renderPagination } from '../ui/tabHelpers';
+import { renderPagination, renderCompactTransactionCard } from '../ui/tabHelpers';
 import { RecordModal } from '../RecordModal';
 import { ConfirmModal } from '../ConfirmModal';
 import type { Translations } from '../i18n';
@@ -173,43 +173,43 @@ export class OverviewRecordsModal extends FinanceBaseModal {
   }
 
   private renderMobileList(pageRecords: FinanceRecord[]): void {
-    const listWrap = this.bodyContainer.createDiv('finance-mobile-list');
+    const listWrap = this.bodyContainer.createDiv('finance-mobile-list finance-compact-list');
     pageRecords.forEach(rec => {
       const card = listWrap.createDiv({
-        cls: `finance-record-mobile-card ${rec.type === RecordType.INCOME ? 'finance-row-income' : 'finance-row-expense'}`,
+        cls: `finance-record-block finance-compact-card ${rec.type === RecordType.INCOME ? 'finance-row-income' : 'finance-row-expense'}`,
       });
+      if (rec.isInternal) card.addClass('finance-tr-internal');
 
-      const topRow = card.createDiv('finance-card-top-row');
-      topRow.createSpan({ text: fmtDate(rec.date, rec.time), cls: 'finance-card-date' });
+      const isIncome = rec.type === RecordType.INCOME;
+      const indicator = isIncome ? '+' : (rec.isInternal ? '◆' : '—');
+      const indicatorCls = isIncome
+        ? 'finance-indicator-income'
+        : (rec.isInternal ? 'finance-indicator-internal' : 'finance-indicator-expense');
 
-      const amountPrefix = rec.type === RecordType.INCOME ? '+' : '−';
-      topRow.createSpan({
-        text: amountPrefix + this.ctx.fmt(rec.amount),
-        cls: 'finance-card-amount ' + (rec.type === RecordType.INCOME ? 'finance-amount-income' : 'finance-amount-expense'),
+      const subParts: string[] = [];
+      if (rec.payer) subParts.push(rec.payer);
+      if (rec.tag) subParts.push(rec.tag.startsWith('#') ? rec.tag : `#${rec.tag}`);
+      if (rec.note) subParts.push(rec.note);
+      const subtitle = subParts.join(' · ');
+
+      const rateSuffix = rec.exchangeRate ? ` @ ${rec.exchangeRate}` : '';
+      const amountText = (isIncome ? '+' : '−') + this.ctx.fmt(rec.amount) + rateSuffix;
+      const amountCls = isIncome
+        ? 'finance-amount-income'
+        : (rec.isInternal ? 'finance-amount-internal' : 'finance-amount-expense');
+
+      renderCompactTransactionCard(card, {
+        indicator,
+        indicatorCls,
+        title: rec.category || this.tr.uncategorized,
+        subtitle,
+        amountText,
+        amountCls,
+        dateText: fmtDate(rec.date, rec.time),
+        deleteTitle: this.tr.delete,
+        onDelete: () => this.confirmDelete(rec),
+        onClick: () => this.openEditModal(rec),
       });
-
-      const midRow = card.createDiv('finance-card-mid-row');
-      midRow.createSpan({ text: rec.category || this.tr.uncategorized, cls: 'finance-card-category' });
-      if (rec.payer) {
-        midRow.createSpan({ text: `👤 ${rec.payer}`, cls: 'finance-card-payer' });
-      }
-      if (rec.tag) {
-        const tagText = rec.tag.startsWith('#') ? rec.tag : `#${rec.tag}`;
-        midRow.createSpan({ text: tagText, cls: 'finance-card-tag' });
-      }
-
-      if (rec.note) {
-        card.createDiv({ text: rec.note, cls: 'finance-card-note' });
-      }
-
-      const actionsRow = card.createDiv('finance-card-actions-row');
-      const editBtn = actionsRow.createEl('button', { cls: 'finance-action-btn', text: '✏️' });
-      editBtn.title = this.tr.edit;
-      editBtn.addEventListener('click', () => this.openEditModal(rec));
-
-      const delBtn = actionsRow.createEl('button', { cls: 'finance-action-btn finance-delete-btn', text: '🗑️' });
-      delBtn.title = this.tr.delete;
-      delBtn.addEventListener('click', () => this.confirmDelete(rec));
     });
   }
 

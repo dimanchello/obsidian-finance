@@ -4,7 +4,7 @@
 
 **Name:** Finance Manager  
 **Type:** Obsidian plugin (Community plugin for Obsidian.md)  
-**Version:** 2.1.1  
+**Version:** 2.2.0  
 **Min Obsidian Version:** 1.8.7  
 **Languages:** Russian (default), English (Obsidian setting)
 
