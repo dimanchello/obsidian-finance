@@ -1317,26 +1317,38 @@
   .finance-currency-btn-text  { display: none; }
 
 /* ── Stats: вертикальный столбик вместо горизонтального скролла ─────── */
-  .finance-stats-container {
+  .finance-stats-container,
+  .max .finance-stats-container,
+  .finance-debt-summary,
+  .max .finance-debt-summary,
+  .finance-stats-two-cols,
+  .max .finance-stats-container.finance-stats-two-cols,
+  .finance-stats-container.finance-stats-currency,
+  .max .finance-stats-container.finance-stats-currency {
     display: flex !important;
     flex-direction: column !important;
-    gap: 10px;
-    margin-bottom: 10px;
+    grid-template-columns: unset !important;
+    gap: 10px !important;
+    margin-bottom: 10px !important;
     width: 100% !important;
     max-width: 100% !important;
+    box-sizing: border-box !important;
   }
-  .finance-stats-container:last-of-type {
+  .finance-stats-container:last-of-type,
+  .max .finance-stats-container:last-of-type {
     margin-bottom: 16px !important;
   }
 
-  .finance-stat-card {
+  .finance-stat-card,
+  .max .finance-stat-card {
     flex: none !important;
     width: 100% !important;
     max-width: 100% !important;
+    box-sizing: border-box !important;
     padding: 14px 16px;
     gap: 12px;
     flex-direction: row !important;
-    align-items: center;
+    align-items: center !important;
   }
 
   .finance-stat-icon  { width: 40px; height: 40px; font-size: 1.2em; flex-shrink: 0; }
@@ -1834,9 +1846,52 @@
   padding: 0 0 12px 0;
 }
 
+/* ── Mobile class: stat cards & summary blocks на всю ширину ───────────── */
+.finance-manager--mobile .finance-stats-container,
+.max .finance-manager--mobile .finance-stats-container,
+.finance-manager--mobile .finance-debt-summary,
+.max .finance-manager--mobile .finance-debt-summary,
+.finance-manager--mobile .finance-stats-container.finance-stats-two-cols,
+.max .finance-manager--mobile .finance-stats-container.finance-stats-two-cols,
+.finance-manager--mobile .finance-stats-container.finance-stats-currency,
+.max .finance-manager--mobile .finance-stats-container.finance-stats-currency {
+  display: flex !important;
+  flex-direction: column !important;
+  grid-template-columns: unset !important;
+  gap: 10px !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.finance-manager--mobile .finance-stat-card,
+.max .finance-manager--mobile .finance-stat-card {
+  flex: none !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  flex-direction: row !important;
+  align-items: center !important;
+}
+
+.finance-manager--mobile .finance-overview-cards,
+.max .finance-manager--mobile .finance-overview-cards {
+  grid-template-columns: 1fr !important;
+  gap: 8px !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+
 /* ── Очень маленькие экраны (< 400px) ────────────────────────────────────── */
 @media (max-width: 400px) {
-  .finance-stat-card          { width: 140px; padding: 10px 12px; }
+  .finance-stat-card,
+  .max .finance-stat-card {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    padding: 10px 12px;
+  }
   .finance-add-btn            { padding: 9px 10px; font-size: .82em; }
   .finance-export-grid,
   .finance-ie-modal .finance-export-grid { grid-template-columns: 1fr !important; }
@@ -2752,6 +2807,8 @@
 }
 
 @media (max-width: 480px) {
+  .finance-stats-two-cols,
+  .max .finance-stats-container.finance-stats-two-cols,
   .finance-stats-container.finance-stats-currency,
   .max .finance-stats-container.finance-stats-currency {
     grid-template-columns: 1fr !important;
@@ -3596,9 +3653,9 @@
     gap: 12px;
   }
 
-  /* KPI cards: 2 columns on mobile, stack on very small screens */
+  /* KPI cards: 1 column on mobile so full amounts and titles are visible */
   .finance-overview-cards {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: 1fr !important;
     gap: 8px;
     margin-bottom: 12px;
   }
