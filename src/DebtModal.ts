@@ -1,5 +1,5 @@
 import { App } from 'obsidian';
-import { DebtRecord, PERCENT_100 } from './types';
+import { DebtRecord, PERCENT_100, MODAL_FOCUS_DELAY_MS } from './types';
 import { fmtAmount, getTodayStr, getTodayTime, normalizeDateStr, normalizeTimeStr, parseAmount } from './utils';
 import { DEBT_FIELDS, type FieldDef } from './FieldInfoModal';
 import { createAmountInput } from './ui/AmountInput';
@@ -111,6 +111,10 @@ export class DebtModal extends EntityModal<DebtRecord> {
       rows: 2,
       onChange: v => { this.entity.note = v; },
     });
+  }
+
+  protected override onFormReady(): void {
+    window.setTimeout(() => this.amountInput.focus(), MODAL_FOCUS_DELAY_MS);
   }
 
   protected validate(): string | null {

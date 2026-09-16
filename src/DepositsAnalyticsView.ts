@@ -125,9 +125,11 @@ export class DepositsAnalyticsView {
       if (endDate) sub.createSpan({ text: `До ${fmtDate(endDate)}`, cls: 'finance-credit-progress-date' });
       sub.createSpan({ text: `+${this.fmt(totalProfit)}`, cls: 'finance-credit-progress-amount finance-text-success' });
 
-      const bar = item.createDiv('finance-deposit-progress');
-      const fill = bar.createDiv('finance-deposit-progress-fill');
-      fill.style.width = `${pct}%`;
+      if (d.startDate && endDate) {
+        const bar = item.createDiv('finance-deposit-progress');
+        const fill = bar.createDiv('finance-deposit-progress-fill');
+        fill.style.width = `${pct}%`;
+      }
     });
   }
 }

@@ -173,13 +173,16 @@ export class CreditsOverview {
       val4.textContent = this.fmt(remaining);
 
       // Progress bar
-      const progressWrap = card.createDiv('finance-deposit-progress');
-      const fill = progressWrap.createDiv('finance-deposit-progress-fill');
-      const paidRatio = credit.originalAmount > 0
-        ? Math.min(PERCENT_100, Math.max(0, ((credit.originalAmount - remaining) / credit.originalAmount) * PERCENT_100))
-        : 0;
-      fill.style.width = `${paidRatio}%`;
-      fill.style.background = creditColor;
+      if (credit.originalAmount > 0) {
+        const progressWrap = card.createDiv('finance-deposit-progress');
+        const fill = progressWrap.createDiv('finance-deposit-progress-fill');
+        const paidRatio = Math.min(
+          PERCENT_100,
+          Math.max(0, ((credit.originalAmount - remaining) / credit.originalAmount) * PERCENT_100)
+        );
+        fill.style.width = `${paidRatio}%`;
+        fill.style.background = creditColor;
+      }
     });
   }
 

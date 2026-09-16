@@ -717,6 +717,32 @@
 .finance-page-btn:disabled { opacity: .35; cursor: not-allowed; }
 .finance-page-ellipsis { color: var(--text-muted); padding: 0 4px; }
 
+/* Mobile pagination compact */
+.finance-pagination-mobile,
+.is-mobile .finance-pagination-nav,
+.is-phone .finance-pagination-nav {
+  gap: 3px !important;
+  flex-wrap: nowrap !important;
+  justify-content: center !important;
+}
+.finance-pagination-mobile .finance-page-btn,
+.is-mobile .finance-page-btn,
+.is-phone .finance-page-btn {
+  min-width: 32px !important;
+  min-height: 32px !important;
+  height: 32px !important;
+  padding: 4px 6px !important;
+  font-size: .8em !important;
+  border-radius: 4px !important;
+  line-height: 1 !important;
+}
+.finance-pagination-mobile .finance-page-ellipsis,
+.is-mobile .finance-page-ellipsis,
+.is-phone .finance-page-ellipsis {
+  padding: 0 2px !important;
+  font-size: .8em !important;
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
    RECORD MODAL
    ═══════════════════════════════════════════════════════════════════════════ */
@@ -873,6 +899,9 @@
 .finance-currency-balance-hint {
   font-size: .9em; color: var(--text-muted);
   margin-bottom: 15px; text-align: right;
+}
+.finance-form-compact .finance-currency-balance-hint {
+  margin-bottom: 4px;
 }
 
 /* Attachment */
@@ -1381,7 +1410,10 @@
   .finance-delete-btn  { opacity: 0.6 !important; }
 
 /* ── Pagination ──────────────────────────────────────────────────────── */
-  .finance-page-btn { min-width: 40px; min-height: 40px; padding: 9px 12px; font-size: .85em; }
+  .finance-pagination { margin-top: 10px; }
+  .finance-pagination-nav { gap: 3px !important; flex-wrap: nowrap !important; justify-content: center !important; }
+  .finance-page-btn { min-width: 32px !important; min-height: 32px !important; height: 32px !important; padding: 4px 6px !important; font-size: .8em !important; border-radius: 4px !important; line-height: 1 !important; }
+  .finance-page-ellipsis { padding: 0 2px !important; font-size: .8em !important; }
 
   /* ── Custom select и combobox на мобильных ───────────────────────────── */
   .finance-custom-select-dropdown {
@@ -2141,7 +2173,7 @@
   .finance-amount-input          { font-size: 1.8em !important; padding: 16px !important; border-radius: 6px !important; border: 2px solid #555 !important; background: #222 !important; color: #fff !important; }
 
   .finance-sort-btn              { padding: 8px 16px !important; font-size: .84em !important; min-height: 36px; }
-  .finance-page-btn              { min-width: 44px !important; min-height: 44px !important; padding: 10px 14px !important; }
+  .finance-page-btn              { min-width: 32px !important; min-height: 32px !important; height: 32px !important; padding: 4px 6px !important; font-size: .8em !important; border-radius: 4px !important; line-height: 1 !important; }
   .finance-add-btn               { padding: 11px 16px !important; min-height: 44px !important; }
   .finance-custom-select-item,
   .finance-combobox-item         { padding: 12px !important; min-height: 44px; display: flex; align-items: center; }
@@ -3127,6 +3159,23 @@
 }
 .finance-deposit-progress-fill.is-complete {
   background: #22c55e;
+}
+.finance-deposit-overview-card .finance-deposit-progress,
+.finance-credit-progress-item .finance-deposit-progress {
+  max-width: 100%;
+  margin: 6px 0 0;
+  background: var(--background-secondary);
+  border: none;
+  border-radius: 3px;
+  padding: 0;
+  box-shadow: none;
+  height: 6px;
+  overflow: hidden;
+}
+.finance-deposit-overview-card .finance-deposit-progress .finance-deposit-progress-fill,
+.finance-credit-progress-item .finance-deposit-progress .finance-deposit-progress-fill {
+  height: 100%;
+  border-radius: 3px;
 }
 .finance-deposit-summary {
   font-size: 0.82em;
@@ -4690,16 +4739,20 @@
   .modal.finance-deposit-detail-modal .finance-panel-pagination,
   .modal.finance-credit-detail-modal .finance-panel-pagination {
     margin-top: 10px !important;
-    gap: 4px !important;
-    flex-wrap: wrap !important;
+    gap: 3px !important;
+    flex-wrap: nowrap !important;
+    justify-content: center !important;
   }
 
   .modal.finance-overview-records-modal .finance-panel-pagination .finance-page-btn,
   .modal.finance-deposit-detail-modal .finance-panel-pagination .finance-page-btn,
   .modal.finance-credit-detail-modal .finance-panel-pagination .finance-page-btn {
-    min-width: 36px !important;
-    min-height: 36px !important;
-    padding: 6px 8px !important;
-    font-size: 13px !important;
+    min-width: 32px !important;
+    min-height: 32px !important;
+    height: 32px !important;
+    padding: 4px 6px !important;
+    font-size: 12px !important;
+    border-radius: 4px !important;
+    line-height: 1 !important;
   }
 }

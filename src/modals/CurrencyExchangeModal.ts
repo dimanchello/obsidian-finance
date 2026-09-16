@@ -1,7 +1,7 @@
-import { App } from 'obsidian';
+import { App, Platform } from 'obsidian';
 import { CurrencyExchange, CurrencyOperationType } from '../types';
 import { getCurrencyBalance } from '../domain/currencyBalance';
-import { CURRENCY_ROUNDING_PRECISION, EXCHANGE_RATE_PRECISION } from '../types';
+import { CURRENCY_ROUNDING_PRECISION, EXCHANGE_RATE_PRECISION, MOBILE_BREAKPOINT } from '../types';
 import { getTodayStr, normalizeTimeStr, normalizeDateStr } from '../utils';
 import { Translations } from '../i18n';
 import { createAmountInput, type AmountInputHandle } from '../ui/AmountInput';
@@ -76,23 +76,26 @@ export class CurrencyExchangeModal extends EntityModal<CurrencyExchange> {
   private get type(): CurrencyOperationType { return this.entity.type; }
 
   protected buildForm(form: HTMLElement): void {
+    const isMobile = Platform.isMobile || (typeof window !== 'undefined' && window.innerWidth <= MOBILE_BREAKPOINT);
+    form.addClass('finance-form-grid');
+    if (isMobile) {
+      form.addClass('finance-form-compact');
+    }
     const tr = this.tr;
 
     if (this.type === CurrencyOperationType.SELL || this.type === CurrencyOperationType.SPEND) {
       const balance = getCurrencyBalance(this.options.exchanges, this.entity.targetCurrency);
-      const balanceDiv = form.createDiv('finance-currency-balance-hint');
+      const balanceDiv = form.createDiv('finance-currency-balance-hint finance-full-width');
       balanceDiv.setText(tr.availableBalance
         .replace('{amount}', balance.toFixed(2))
         .replace('{currency}', this.entity.targetCurrency || '?'));
     }
 
-    const amountsContainer = form.createDiv(
-      this.type === CurrencyOperationType.BUY || this.type === CurrencyOperationType.SELL ? 'finance-form-grid' : '');
+    const amountRow = form.createDiv('finance-form-row finance-full-width');
 
-    const tgtAmtG = amountsContainer.createDiv('finance-field-group finance-amount-group');
+    const tgtAmtG = amountRow.createDiv('finance-field-group finance-amount-group');
     tgtAmtG.createEl('label', { text: this.targetAmountLabel(), cls: 'finance-field-label' });
-    const tgtAmtRow = tgtAmtG.createDiv('finance-amount-row');
-    this.targetAmountHandle = createAmountInput(tgtAmtRow, {
+    this.targetAmountHandle = createAmountInput(tgtAmtG, {
       value: this.entity.targetAmount,
       onChange: v => {
         this.entity.targetAmount = v;
@@ -108,10 +111,9 @@ export class CurrencyExchangeModal extends EntityModal<CurrencyExchange> {
         ? `${tr.amountSpent} (${this.options.accountCurrency})`
         : `${tr.amountReceived} (${this.options.accountCurrency})`;
 
-      const accAmtG = amountsContainer.createDiv('finance-field-group finance-amount-group');
+      const accAmtG = amountRow.createDiv('finance-field-group finance-amount-group');
       accAmtG.createEl('label', { text: amountAccLabel, cls: 'finance-field-label' });
-      const accAmtRow = accAmtG.createDiv('finance-amount-row');
-      this.accAmountHandle = createAmountInput(accAmtRow, {
+      this.accAmountHandle = createAmountInput(accAmtG, {
         value: this.entity.amountInAccountCurrency,
         onChange: v => {
           this.entity.amountInAccountCurrency = v;
@@ -122,16 +124,16 @@ export class CurrencyExchangeModal extends EntityModal<CurrencyExchange> {
       this.accAmountHandle.input.classList.add(this.type === CurrencyOperationType.BUY ? 'expense-color' : 'income-color');
     }
 
-    const grid = form.createDiv('finance-form-grid');
+    const rowDateTimeCurrency = form.createDiv('finance-form-row finance-full-width');
 
     const normDate = this.entity.date ? normalizeDateStr(this.entity.date) : getTodayStr();
     const normTime = this.entity.time ? normalizeTimeStr(this.entity.time) : '';
-    buildDateTimeField(grid, tr.dateTime, normDate, normTime, tr, (d, t) => {
+    buildDateTimeField(rowDateTimeCurrency, tr.dateTime, normDate, normTime, tr, (d, t) => {
       this.entity.date = d;
       this.entity.time = t;
     });
 
-    buildComboboxField(grid, tr.currency, this.entity.targetCurrency,
+    buildComboboxField(rowDateTimeCurrency, tr.currency, this.entity.targetCurrency,
       () => this.options.currencies, v => {
         this.entity.targetCurrency = v;
         this.autofillFromHistoryByCurrency();
@@ -139,37 +141,41 @@ export class CurrencyExchangeModal extends EntityModal<CurrencyExchange> {
       });
 
     if (this.type === CurrencyOperationType.BUY || this.type === CurrencyOperationType.SELL) {
-      this.buildRateField(grid);
-      this.buildFeeField(grid);
+      const rowRateFee = form.createDiv('finance-form-row finance-full-width');
+      this.buildRateField(rowRateFee);
+      this.buildFeeField(rowRateFee);
     }
 
+    const rowProvider = form.createDiv('finance-form-row finance-full-width');
     let providerLabel = tr.provider;
     if (this.type === CurrencyOperationType.ADD) providerLabel = tr.sourceLabel;
     if (this.type === CurrencyOperationType.SPEND) providerLabel = tr.whereSpent;
 
-    buildComboboxField(grid, providerLabel, this.entity.provider,
+    buildComboboxField(rowProvider, providerLabel, this.entity.provider,
       () => this.options.providers, v => {
         this.entity.provider = v;
         this.autofillFromHistoryByProvider();
       });
 
     if (this.type === CurrencyOperationType.ADD || this.type === CurrencyOperationType.SPEND) {
-      buildComboboxField(grid, tr.category + (this.type === CurrencyOperationType.SPEND ? ' *' : ''),
+      buildComboboxField(rowProvider, tr.category + (this.type === CurrencyOperationType.SPEND ? ' *' : ''),
         this.entity.category ?? '', () => this.options.categories, v => {
           this.entity.category = v;
         });
     }
 
-    buildNoteField(form, {
+    const rowNote = form.createDiv('finance-form-row finance-full-width');
+    buildNoteField(rowNote, {
       label: tr.note,
       icon: '📝',
       value: this.entity.note,
       placeholder: this.notePlaceholder(),
-      rows: 3,
+      rows: isMobile ? 2 : 3,
       onChange: v => { this.entity.note = v; },
     });
 
-    buildAttachmentField(form, {
+    const rowAttach = form.createDiv('finance-form-row finance-full-width');
+    buildAttachmentField(rowAttach, {
       app: this.app,
       pluginId: this.options.pluginId,
       tr: this.tr,

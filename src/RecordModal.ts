@@ -1,7 +1,8 @@
-import { App } from 'obsidian';
+import { App, Platform } from 'obsidian';
 import {
   FinanceRecord, RecordType, PluginSettings,
   AUTOFILL_BADGE_MS, AUTOFILL_DEBOUNCE_MS, MODAL_FOCUS_DELAY_MS,
+  MOBILE_BREAKPOINT,
 } from './types';
 import { parseAmount, getTodayStr, getTodayTime, normalizeDateStr, normalizeTimeStr } from './utils';
 import { createAmountInput, type AmountInputHandle } from './ui/AmountInput';
@@ -61,9 +62,15 @@ export class RecordModal extends EntityModal<FinanceRecord> {
   }
 
   protected buildForm(form: HTMLElement): void {
+    const isMobile = Platform.isMobile || (typeof window !== 'undefined' && window.innerWidth <= MOBILE_BREAKPOINT);
+    form.addClass('finance-form-grid');
+    if (isMobile) {
+      form.addClass('finance-form-compact');
+    }
     this.buildTypeToggle();
 
-    const amtG = form.createDiv('finance-field-group finance-amount-group');
+    const rowAmt = form.createDiv('finance-form-row finance-full-width');
+    const amtG = rowAmt.createDiv('finance-field-group finance-amount-group');
     amtG.createEl('label', {
       text: this.tr.amountRequired.replace('{currency}', this.o.currency),
       cls: 'finance-field-label',
@@ -90,20 +97,20 @@ export class RecordModal extends EntityModal<FinanceRecord> {
       }, currentValue).open();
     });
 
-    this.autofillBadge = form.createDiv('finance-autofill-badge');
+    this.autofillBadge = form.createDiv('finance-autofill-badge finance-full-width');
     this.autofillBadge.addClass('is-hidden');
 
-    const grid = form.createDiv('finance-form-grid');
+    const rowDatePayer = form.createDiv('finance-form-row finance-full-width');
 
     const normDate = this.entity.date ? normalizeDateStr(this.entity.date) : getTodayStr();
     const normTime = this.entity.time ? normalizeTimeStr(this.entity.time) : '';
-    buildDateTimeField(grid, this.tr.dateTime, normDate, normTime, this.tr, (d, t) => {
+    buildDateTimeField(rowDatePayer, this.tr.dateTime, normDate, normTime, this.tr, (d, t) => {
       this.entity.date = d;
       this.entity.time = t;
     });
 
     this.payerInput = this.buildAutocomplete(
-      grid, this.tr.payer, this.entity.payer, this.o.payers,
+      rowDatePayer, this.tr.payer, this.entity.payer, this.o.payers,
       v => { this.entity.payer = v; this.scheduleAutofill('payer', v); },
       {
         withInternalToggle: true,
@@ -112,26 +119,30 @@ export class RecordModal extends EntityModal<FinanceRecord> {
       },
     );
 
+    const rowCatTag = form.createDiv('finance-form-row finance-full-width');
+
     this.categoryInput = buildComboboxField(
-      grid, this.tr.category, this.entity.category, () => this.o.categories,
+      rowCatTag, this.tr.category, this.entity.category, () => this.o.categories,
       v => { this.entity.category = v; this.scheduleAutofill('category', v); }
     );
 
     this.tagInput = buildComboboxField(
-      grid, this.tr.tag, this.entity.tag, () => this.o.tags,
+      rowCatTag, this.tr.tag, this.entity.tag, () => this.o.tags,
       v => { this.entity.tag = v; }
     );
 
-    buildNoteField(form, {
+    const rowNote = form.createDiv('finance-form-row finance-full-width');
+    buildNoteField(rowNote, {
       label: this.tr.note,
       icon: '📝',
       value: this.entity.note,
       placeholder: this.tr.notePlaceholder,
-      rows: 3,
+      rows: isMobile ? 2 : 3,
       onChange: v => { this.entity.note = v; },
     });
 
-    buildAttachmentField(form, {
+    const rowAttach = form.createDiv('finance-form-row finance-full-width');
+    buildAttachmentField(rowAttach, {
       app: this.app,
       pluginId: this.o.pluginId,
       tr: this.tr,

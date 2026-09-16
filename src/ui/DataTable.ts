@@ -523,6 +523,7 @@ export class DataTable<T> {
         const exTd = createEl('td');
         exTd.classList.add('finance-td', 'finance-expand-td');
         exTd.colSpan = colSpan;
+        exTd.addEventListener('click', (e) => e.stopPropagation());
         this.spec.expandable.render(exTd, item);
         exTr.appendChild(exTd);
         itemTbody.appendChild(exTr);
@@ -568,6 +569,7 @@ export class DataTable<T> {
         const open = this.expandedId === id;
         if (open) {
           const panel = block.createDiv('finance-debt-history-panel finance-debt-history-open');
+          panel.addEventListener('click', (e) => e.stopPropagation());
           this.spec.expandable.render(panel, item);
         }
       }
@@ -588,7 +590,12 @@ export class DataTable<T> {
         block.classList.add('finance-tr-expandable');
         block.addEventListener('click', (e) => {
           const t = e.target as HTMLElement;
-          if (t.closest('.finance-action-btn') || t.closest('.finance-compact-del-btn')) return;
+          if (
+            t.closest('.finance-action-btn') ||
+            t.closest('.finance-compact-del-btn') ||
+            t.closest('.finance-debt-history-panel') ||
+            t.closest('.finance-pagination-nav')
+          ) return;
           this.expandedId = this.expandedId === id ? null : id;
           this.spec.state.setExpandedId?.(this.expandedId);
           if (this.spec.state.setExpandedId) this.ctx.saveState();

@@ -37,11 +37,16 @@ export interface PaginationOptions {
 export function renderPagination(opts: PaginationOptions): HTMLElement | null {
   if (opts.totalPages <= 1) return null;
 
-  const nav = opts.container.createDiv(`finance-pagination-nav${opts.cls ? ` ${opts.cls}` : ''}`);
+  const mobileCls = opts.isMobile ? ' finance-pagination-mobile' : '';
+  const nav = opts.container.createDiv(`finance-pagination-nav${mobileCls}${opts.cls ? ` ${opts.cls}` : ''}`);
+  nav.addEventListener('click', e => e.stopPropagation());
 
   const prev = nav.createEl('button', { cls: 'finance-page-btn', text: '←' });
   prev.disabled = opts.currentPage === 0;
-  prev.addEventListener('click', () => opts.onPageChange(opts.currentPage - 1));
+  prev.addEventListener('click', e => {
+    e.stopPropagation();
+    opts.onPageChange(opts.currentPage - 1);
+  });
 
   pageRange(opts.currentPage, opts.totalPages, opts.isMobile).forEach(p => {
     if (p === -1) {
@@ -52,12 +57,18 @@ export function renderPagination(opts: PaginationOptions): HTMLElement | null {
       text: String(p + 1),
       cls: `finance-page-btn${p === opts.currentPage ? ' active' : ''}`,
     });
-    btn.addEventListener('click', () => opts.onPageChange(p));
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      opts.onPageChange(p);
+    });
   });
 
   const next = nav.createEl('button', { cls: 'finance-page-btn', text: '→' });
   next.disabled = opts.currentPage >= opts.totalPages - 1;
-  next.addEventListener('click', () => opts.onPageChange(opts.currentPage + 1));
+  next.addEventListener('click', e => {
+    e.stopPropagation();
+    opts.onPageChange(opts.currentPage + 1);
+  });
 
   return nav;
 }

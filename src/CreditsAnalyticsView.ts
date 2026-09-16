@@ -384,9 +384,11 @@ export class CreditsAnalyticsView {
       if (endDate) sub.createSpan({ text: fmtDate(endDate), cls: 'finance-credit-progress-date' });
       sub.createSpan({ text: this.fmt(remainingPrincipal), cls: 'finance-credit-progress-amount' });
 
-      const bar = item.createDiv('finance-deposit-progress');
-      const fill = bar.createDiv('finance-deposit-progress-fill');
-      fill.style.width = `${pct}%`;
+      if (c.originalAmount > 0) {
+        const bar = item.createDiv('finance-deposit-progress');
+        const fill = bar.createDiv('finance-deposit-progress-fill');
+        fill.style.width = `${pct}%`;
+      }
     });
   }
 }

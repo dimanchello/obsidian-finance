@@ -1,5 +1,5 @@
 import { ViewContext } from '../../context';
-import { DepositRecord, OVERVIEW_TREND_MONTHS, OVERVIEW_CHART_HEIGHT, OVERVIEW_CHART_PAD_LEFT, OVERVIEW_CHART_PAD_RIGHT, OVERVIEW_CHART_PAD_TOP, OVERVIEW_CHART_PAD_BOTTOM, OVERVIEW_LABEL_OFFSET_Y, OVERVIEW_MIN_GROUP_W, OVERVIEW_MIN_GROUP_W_MOBILE, OVERVIEW_Y_TICKS, OVERVIEW_MAX_BAR_W, OVERVIEW_BAR_SPACING_PAD, OVERVIEW_BAR_RADIUS, OVERVIEW_LINE_STROKE_W, OVERVIEW_POINT_RADIUS, OVERVIEW_POINT_RADIUS_HOVER, CHART_PALETTE, AccountMode } from '../../types';
+import { DepositRecord, OVERVIEW_TREND_MONTHS, OVERVIEW_CHART_HEIGHT, OVERVIEW_CHART_PAD_LEFT, OVERVIEW_CHART_PAD_RIGHT, OVERVIEW_CHART_PAD_TOP, OVERVIEW_CHART_PAD_BOTTOM, OVERVIEW_LABEL_OFFSET_Y, OVERVIEW_MIN_GROUP_W, OVERVIEW_MIN_GROUP_W_MOBILE, OVERVIEW_Y_TICKS, OVERVIEW_MAX_BAR_W, OVERVIEW_BAR_SPACING_PAD, OVERVIEW_BAR_RADIUS, OVERVIEW_LINE_STROKE_W, OVERVIEW_POINT_RADIUS, OVERVIEW_POINT_RADIUS_HOVER, CHART_PALETTE, AccountMode, PERCENT_100 } from '../../types';
 import { createChartTooltip, fmtShort, svg } from '../chartHelpers';
 import { calcDepositInterestOverTime, calcActiveDepositsProgress, DepositInterestMonth, ActiveDepositProgress } from '../../domain/overviewMetrics';
 import { fmtDate } from '../../utils';
@@ -335,10 +335,12 @@ export class DepositsOverview {
       const val4 = col4.createDiv('finance-deposit-stat-val bold');
       val4.textContent = this.fmt(dep.totalEstimatedReturn);
 
-      const progressWrap = card.createDiv('finance-deposit-progress');
-      const fill = progressWrap.createDiv('finance-deposit-progress-fill');
-      fill.style.width = `${dep.progressPercent}%`;
-      fill.style.background = depositColor;
+      if (!dep.isDemand && dep.remainingDays !== null) {
+        const progressWrap = card.createDiv('finance-deposit-progress');
+        const fill = progressWrap.createDiv('finance-deposit-progress-fill');
+        fill.style.width = `${Math.min(PERCENT_100, Math.max(0, dep.progressPercent))}%`;
+        fill.style.background = depositColor;
+      }
     });
   }
 
