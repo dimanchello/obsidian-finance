@@ -1,4 +1,5 @@
 import { App } from 'obsidian';
+import { CSS_CLASS } from './constants';
 import { getLocaleFromApp, t, Translations } from './i18n';
 import { FinanceBaseModal } from './ui/FinanceBaseModal';
 
@@ -42,9 +43,9 @@ export class ColumnVisibilityModal extends FinanceBaseModal {
     });
 
     const btns = contentEl.createDiv('finance-modal-btns');
-    btns.createEl('button', { text: this.tr.cancel, cls: 'finance-btn-cancel' })
+    btns.createEl('button', { text: this.tr.cancel, cls: CSS_CLASS.FINANCE_BTN_CANCEL })
       .addEventListener('click', () => this.close());
-    btns.createEl('button', { text: this.tr.save, cls: 'finance-accent-btn' })
+    btns.createEl('button', { text: this.tr.save, cls: CSS_CLASS.FINANCE_ACCENT_BTN })
       .addEventListener('click', () => {
         const result: Record<string, boolean> = {};
         this.checkboxes.forEach((cb, key) => {

@@ -30,7 +30,7 @@ export function fmtDate(d: string, t = ''): string {
 }
 
 export function fmt(n: number, cur: string): string {
-  return n.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '\u00a0' + cur;
+  return n.toLocaleString(DEFAULT_NUMBER_LOCALE, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '\u00a0' + cur;
 }
 
 /**
@@ -38,7 +38,7 @@ export function fmt(n: number, cur: string): string {
  * labels would otherwise be dominated by ",00" tails.
  */
 export function fmtInteger(n: number, cur: string): string {
-  return n.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + '\u00a0' + cur;
+  return n.toLocaleString(DEFAULT_NUMBER_LOCALE, { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + '\u00a0' + cur;
 }
 
 export function noteFilename(p: string): string {
@@ -49,7 +49,7 @@ export function parseDate(d: string): Date | null {
   if (!d) return null;
   d = d.trim();
   if (/^\d{4}-\d{2}-\d{2}/.test(d)) {
-    const [year, month, day] = d.slice(0, 10).split('-').map(Number) as [number, number, number];
+    const [year, month, day] = d.slice(0, DATE_FORMAT_LENGTH.ISO_DATE).split('-').map(Number) as [number, number, number];
     return new Date(year, month - 1, day);
   }
   const mDot = /^(\d{1,2})\.(\d{1,2})\.(\d{4})/.exec(d);
@@ -66,6 +66,8 @@ export function parseDate(d: string): Date | null {
   }
   return null;
 }
+
+import { DEFAULT_NUMBER_LOCALE, DATE_FORMAT_LENGTH } from './constants';
 
 export function normalizeDateStr(d: string): string {
   const parsed = parseDate(d);
@@ -105,7 +107,7 @@ export function getTodayStr(): string {
 }
 
 export function getTodayTime(): string {
-  return new Date().toTimeString().slice(0, 5);
+  return new Date().toTimeString().slice(0, DATE_FORMAT_LENGTH.TIME);
 }
 
 export function shiftMonths(months: number, baseDate?: string): string;
@@ -121,4 +123,19 @@ export function shiftMonths(a: string | number, b?: string | number): string {
     months = typeof b === 'number' ? b : 0;
   }
   return addMonthsClamped(dateStr, months);
+}
+
+/**
+ * Format a number as a fixed decimal (e.g., for calculations display).
+ */
+export function fmtDecimal(n: number, decimals = 2): string {
+  return n.toFixed(decimals);
+}
+
+/**
+ * Format a percentage from a ratio (value/total).
+ */
+export function fmtPercentage(value: number, total: number, decimals = 1): string {
+  if (total === 0) return '0%';
+  return `${((value / total) * 100).toFixed(decimals)}%`;
 }

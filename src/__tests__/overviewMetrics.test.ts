@@ -14,7 +14,7 @@ import {
   calcDebtsBreakdown, calcDepositInterestOverTime,
   calcActiveDepositsProgress, resolveMonthRange, resolveDepositMonthRange,
   ALL_TIME_MONTHS,
-} from '../domain/overviewMetrics';
+} from '../domain/metrics';
 
 function rec(overrides: Partial<FinanceRecord> = {}): FinanceRecord {
   return { id: 'r1', createdAt: 0, date: '2026-01-15', time: '',

@@ -1,4 +1,5 @@
 import { App, TFile, normalizePath, Notice } from 'obsidian';
+import { CSS_CLASS } from '../constants';
 import type { Translations } from '../i18n';
 
 export interface AttachmentFieldOptions {
@@ -24,7 +25,7 @@ export function buildAttachmentField(
   let uploadInProgress = false;
 
   const g = container.createDiv('finance-field-group');
-  g.createEl('label', { text: tr.attachment, cls: 'finance-field-label' });
+  g.createEl('label', { text: tr.attachment, cls: CSS_CLASS.FINANCE_FIELD_LABEL });
 
   // ── Existing-attachment indicator ──────────────────────────────────────────
   const openWrap = g.createDiv('finance-attach-open-wrap');

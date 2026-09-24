@@ -2,7 +2,7 @@ import { App, Notice } from 'obsidian';
 import { FinanceBaseModal } from '../ui/FinanceBaseModal';
 import { ViewContext } from '../context';
 import { CreditRecord, CREDIT_PAYMENT_PAGE_SIZE } from '../types';
-import { CreditStatus, PaymentStatus } from '../constants';
+import { CreditStatus, PaymentStatus, CSS_CLASS } from '../constants';
 import {
   calculateRemainingPrincipal,
   calculateTotalInterestPaid,
@@ -98,10 +98,10 @@ export class CreditDetailModal extends FinanceBaseModal {
   }
 
   private renderPayments(wrapper: HTMLElement): void {
-    wrapper.createEl('h4', { text: this.tr.creditPayments, cls: 'finance-section-title' });
+    wrapper.createEl('h4', { text: this.tr.creditPayments, cls: CSS_CLASS.FINANCE_SECTION_TITLE });
 
     if (!this.credit.payments.length) {
-      wrapper.createEl('p', { text: this.tr.noScheduledPayments, cls: 'finance-empty-text' });
+      wrapper.createEl('p', { text: this.tr.noScheduledPayments, cls: CSS_CLASS.FINANCE_EMPTY_TEXT });
       return;
     }
 
@@ -162,7 +162,7 @@ export class CreditDetailModal extends FinanceBaseModal {
 
     const closeBtn = btnsWrap.createEl('button', {
       text: this.tr.close,
-      cls: 'finance-btn-cancel',
+      cls: CSS_CLASS.FINANCE_BTN_CANCEL,
     });
     closeBtn.addEventListener('click', () => this.close());
   }

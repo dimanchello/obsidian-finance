@@ -2,7 +2,7 @@ import { App, Notice } from 'obsidian';
 import { FinanceBaseModal } from '../ui/FinanceBaseModal';
 import { ViewContext } from '../context';
 import { DepositRecord, DepositTopUp, DepositWithdrawal, DEPOSIT_ACCRUAL_PAGE_SIZE } from '../types';
-import { DepositAccrualType, DepositStatus, PaymentStatus } from '../constants';
+import { DepositAccrualType, DepositStatus, PaymentStatus, CSS_CLASS } from '../constants';
 import {
   getDepositEndDate,
   getDepositAccrued,
@@ -111,9 +111,9 @@ export class DepositDetailModal extends FinanceBaseModal {
       onDelete: (item: M) => void
     ) => {
       if (!items.length) return;
-      wrapper.createEl('h4', { text: title, cls: 'finance-section-title' });
+      wrapper.createEl('h4', { text: title, cls: CSS_CLASS.FINANCE_SECTION_TITLE });
       const scrollWrapper = wrapper.createDiv('finance-mov-scroll');
-      const table = scrollWrapper.createEl('table', { cls: 'finance-mov-table' });
+      const table = scrollWrapper.createEl('table', { cls: CSS_CLASS.FINANCE_MOV_TABLE });
       const head = table.createEl('thead').createEl('tr');
       [this.tr.date, this.tr.sum, this.tr.note, ''].forEach(l => {
         head.createEl('th', { text: l, cls: 'finance-th finance-mov-th' });
@@ -121,9 +121,9 @@ export class DepositDetailModal extends FinanceBaseModal {
       const body = table.createEl('tbody');
       items.slice().reverse().forEach(item => {
         const tr = body.createEl('tr');
-        tr.createEl('td', { text: fmtDate(item.date, item.time), cls: 'finance-td' });
+        tr.createEl('td', { text: fmtDate(item.date, item.time), cls: CSS_CLASS.FINANCE_TD });
         tr.createEl('td', { text: sign + this.ctx.fmt(item.amount), cls: `finance-td ${movCls}` });
-        tr.createEl('td', { text: item.note || '—', cls: 'finance-td' });
+        tr.createEl('td', { text: item.note || '—', cls: CSS_CLASS.FINANCE_TD });
         const actTd = tr.createEl('td', { cls: 'finance-td finance-actions-td' });
         if (this.deposit.status === DepositStatus.ACTIVE) {
           const btn = actTd.createEl('button', { cls: 'finance-action-btn finance-delete-btn', text: '🗑️' });
@@ -157,10 +157,10 @@ export class DepositDetailModal extends FinanceBaseModal {
   }
 
   private renderAccruals(wrapper: HTMLElement): void {
-    wrapper.createEl('h4', { text: this.tr.accrualsHeader, cls: 'finance-section-title' });
+    wrapper.createEl('h4', { text: this.tr.accrualsHeader, cls: CSS_CLASS.FINANCE_SECTION_TITLE });
 
     if (!this.deposit.accruals.length) {
-      wrapper.createEl('p', { text: this.tr.noScheduledAccruals, cls: 'finance-empty-text' });
+      wrapper.createEl('p', { text: this.tr.noScheduledAccruals, cls: CSS_CLASS.FINANCE_EMPTY_TEXT });
       return;
     }
 
@@ -231,7 +231,7 @@ export class DepositDetailModal extends FinanceBaseModal {
 
     const closeBtn = btnsWrap.createEl('button', {
       text: this.tr.close,
-      cls: 'finance-btn-cancel',
+      cls: CSS_CLASS.FINANCE_BTN_CANCEL,
     });
     closeBtn.addEventListener('click', () => this.close());
   }

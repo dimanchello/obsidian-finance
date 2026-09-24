@@ -1,4 +1,5 @@
 import { App, Notice } from 'obsidian';
+import { CSS_CLASS } from './constants';
 import { getLocaleFromApp, t, Translations } from './i18n';
 import { FinanceRecord, RecordType } from './types';
 import { csvToObjects, resolveRecordType, TypeMap, TypeMode } from './domain/csv';
@@ -214,9 +215,9 @@ export class ImportExportModal extends FinanceBaseModal {
     step.createEl('small', { text: this.tr.importJsonPathHint, cls: 'finance-hint-text' });
 
     const row  = step.createDiv('finance-filters-row');
-    const inp  = row.createEl('input', { type: 'text', cls: 'finance-input', placeholder: 'records' });
+    const inp  = row.createEl('input', { type: 'text', cls: CSS_CLASS.FINANCE_INPUT, placeholder: 'records' });
     inp.addClass('finance-input-grow');
-    const btn  = row.createEl('button', { text: this.tr.importNext, cls: 'finance-btn-save' });
+    const btn  = row.createEl('button', { text: this.tr.importNext, cls: CSS_CLASS.FINANCE_BTN_SAVE });
     btn.addClass('finance-btn-bottom');
 
     btn.addEventListener('click', () => {
@@ -305,7 +306,7 @@ export class ImportExportModal extends FinanceBaseModal {
       row.createDiv({ text: this.tr[f.labelKey], cls: 'finance-mapping-cell finance-mapping-label' });
 
       const selWrapper = row.createDiv('finance-mapping-cell');
-      const sel        = selWrapper.createEl('select', { cls: 'finance-filter-select' });
+      const sel        = selWrapper.createEl('select', { cls: CSS_CLASS.FINANCE_FILTER_SELECT });
       srcOptions.forEach(opt => {
         const o = sel.createEl('option', { text: opt });
         o.value = opt === notImport ? '' : opt;
@@ -341,7 +342,7 @@ export class ImportExportModal extends FinanceBaseModal {
         const row  = extraContainer.createDiv('finance-filters-row');
         const selG = row.createDiv('finance-filter-group');
         selG.createEl('label', { text: this.tr.importTypeField, cls: 'finance-filter-label-sm' });
-        const sel  = selG.createEl('select', { cls: 'finance-filter-select' });
+        const sel  = selG.createEl('select', { cls: CSS_CLASS.FINANCE_FILTER_SELECT });
         this.srcFields.forEach(f => { const o = sel.createEl('option',{text:f}); o.value=f; });
         sel.value      = this.mapping.type ?? this.srcFields[0] ?? '';
         this.typeField = sel.value;
@@ -349,13 +350,13 @@ export class ImportExportModal extends FinanceBaseModal {
 
         const incG = row.createDiv('finance-filter-group');
         incG.createEl('label', { text: this.tr.importIncomeValue, cls: 'finance-filter-label-sm' });
-        const incI = incG.createEl('input', { type: 'text', cls: 'finance-input', placeholder: RecordType.INCOME });
+        const incI = incG.createEl('input', { type: 'text', cls: CSS_CLASS.FINANCE_INPUT, placeholder: RecordType.INCOME });
         incI.value = RecordType.INCOME;
         incI.addEventListener('input', () => { this.typeMap.incomeVal = incI.value; });
 
         const expG = row.createDiv('finance-filter-group');
         expG.createEl('label', { text: this.tr.importExpenseValue, cls: 'finance-filter-label-sm' });
-        const expI = expG.createEl('input', { type: 'text', cls: 'finance-input', placeholder: RecordType.EXPENSE });
+        const expI = expG.createEl('input', { type: 'text', cls: CSS_CLASS.FINANCE_INPUT, placeholder: RecordType.EXPENSE });
         expI.value = RecordType.EXPENSE;
         expI.addEventListener('input', () => { this.typeMap.expenseVal = expI.value; });
       }

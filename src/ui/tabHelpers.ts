@@ -5,7 +5,7 @@ import { PERCENT_100 } from '../types';
 import { ViewContext } from '../context';
 import { daysBetweenStr, safeEndDate } from '../domain/dateMath';
 import { getTodayStr } from '../utils';
-import { PaymentStatus } from '../constants';
+import { CSS_CLASS,  PaymentStatus  } from '../constants';
 
 export function renderProgressBar(
   host: HTMLElement,
@@ -53,7 +53,7 @@ export function renderPaginatedSchedule<T extends { dueDate: string; status: str
   const pageItems = items.slice(start, start + pageSize);
 
   const scrollWrapper = host.createDiv('finance-mov-scroll');
-  const movTable = scrollWrapper.createEl('table', { cls: 'finance-mov-table' });
+  const movTable = scrollWrapper.createEl('table', { cls: CSS_CLASS.FINANCE_MOV_TABLE });
   const movHead = movTable.createEl('thead').createEl('tr');
   columns.forEach(l => movHead.createEl('th', { text: l, cls: 'finance-th finance-mov-th' }));
   const movBody = movTable.createEl('tbody');
@@ -61,10 +61,10 @@ export function renderPaginatedSchedule<T extends { dueDate: string; status: str
   pageItems.forEach((p, idx) => {
     const isPaid = p.status === PaymentStatus.PAID || p.dueDate <= today;
     const mr = movBody.createEl('tr', { cls: isPaid ? 'finance-payment-paid' : 'finance-payment-pending' });
-    mr.createEl('td', { text: String(start + idx + 1), cls: 'finance-td' });
+    mr.createEl('td', { text: String(start + idx + 1), cls: CSS_CLASS.FINANCE_TD });
     const dateText = formatters?.formatDate ? formatters.formatDate(p) : fmtDate(p.dueDate);
-    mr.createEl('td', { text: dateText, cls: 'finance-td' });
-    mr.createEl('td', { text: ctx.fmt(p.amount), cls: 'finance-td' });
+    mr.createEl('td', { text: dateText, cls: CSS_CLASS.FINANCE_TD });
+    mr.createEl('td', { text: ctx.fmt(p.amount), cls: CSS_CLASS.FINANCE_TD });
     const statusText = formatters?.formatStatus
       ? formatters.formatStatus(p, isPaid)
       : (isPaid ? ctx.tr.paidStatus : ctx.tr.pendingStatus);

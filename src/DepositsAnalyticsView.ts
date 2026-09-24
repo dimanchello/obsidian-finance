@@ -1,36 +1,23 @@
-import { fmtDate, fmtInteger } from "./utils";
+import { fmtDate } from "./utils";
 import { ViewContext } from './context';
 import { DepositRecord, PERCENT_100 } from './types';
-import { Translations } from './i18n';
 import { safeEndDate, toDateStr } from './domain/dateMath';
 import { round2 } from './domain/money';
-import { DepositStatus, PaymentStatus } from './constants';
+import { CSS_CLASS, DepositStatus, PaymentStatus} from './constants';
 import { renderStatCards, StatCardItem } from './ui/tabHelpers';
+import { renderDateRangeFilter } from './tabs/tabUtils';
+import { BaseAnalyticsView } from './ui/BaseAnalyticsView';
 
-export class DepositsAnalyticsView {
-  private el: HTMLElement;
+export class DepositsAnalyticsView extends BaseAnalyticsView {
   private deposits: DepositRecord[];
-  private currency: string;
-  private tr: Translations;
-  private ctx: ViewContext;
 
   constructor(el: HTMLElement, deposits: DepositRecord[], ctx: ViewContext) {
-    this.el = el;
+    super(el, ctx);
     this.deposits = deposits;
-    this.currency = ctx.currency;
-    this.tr = ctx.tr;
-    this.ctx = ctx;
-  }
-
-  private get state() { return this.ctx.state; }
-
-  private fmt(n: number): string {
-    return fmtInteger(n, this.currency);
   }
 
   render(): void {
-    this.el.empty();
-    this.el.addClass('finance-analytics');
+    this.setupContainer();
 
     this.renderControls();
     this.renderSummaryCards();
@@ -38,27 +25,16 @@ export class DepositsAnalyticsView {
   }
 
   private renderControls(): void {
-    const row = this.el.createDiv('finance-filters-row finance-analytics-date-row');
-
-    const fromG = row.createDiv('finance-filter-group');
-    fromG.createEl('label', { text: this.tr.from, cls: 'finance-filter-label' });
-    const fromI = fromG.createEl('input', { type: 'date', cls: 'finance-filter-input' });
-    fromI.value = this.state.depositAnalyticsDateFrom ?? '';
-    fromI.addEventListener('change', () => {
-      this.state.depositAnalyticsDateFrom = fromI.value;
-      this.ctx.saveState();
-      this.render();
-    });
-
-    const toG = row.createDiv('finance-filter-group');
-    toG.createEl('label', { text: this.tr.to, cls: 'finance-filter-label' });
-    const toI = toG.createEl('input', { type: 'date', cls: 'finance-filter-input' });
-    toI.value = this.state.depositAnalyticsDateTo ?? '';
-    toI.addEventListener('change', () => {
-      this.state.depositAnalyticsDateTo = toI.value;
-      this.ctx.saveState();
-      this.render();
-    });
+    renderDateRangeFilter(
+      this.el,
+      this.ctx,
+      {
+        from: 'depositAnalyticsDateFrom',
+        to: 'depositAnalyticsDateTo',
+      },
+      this.tr,
+      () => this.render()
+    );
   }
 
   private getFilteredDeposits(): DepositRecord[] {
@@ -86,9 +62,9 @@ export class DepositsAnalyticsView {
     const avgRate = totalWeight > 0 ? round2(weightedRate / totalWeight) : 0;
 
     const cards: StatCardItem[] = [
-      { label: this.tr.depositTotalBalance, value: this.fmt(totalBalance) },
-      { label: this.tr.depositTotalAccrued, value: this.fmt(totalAccrued), mod: 'income' },
-      { label: this.tr.depositProjectedIncome, value: this.fmt(projectedIncome), mod: 'income' },
+      { label: this.tr.depositTotalBalance, value: this.ctx.fmt(totalBalance) },
+      { label: this.tr.depositTotalAccrued, value: this.ctx.fmt(totalAccrued), mod: CSS_CLASS.INCOME },
+      { label: this.tr.depositProjectedIncome, value: this.ctx.fmt(projectedIncome), mod: CSS_CLASS.INCOME },
       { label: this.tr.depositAvgRate, value: `${avgRate}%`, mod: 'neutral' },
     ];
     renderStatCards(this.el, cards, 'finance-credit-analytics-cards');
@@ -118,12 +94,12 @@ export class DepositsAnalyticsView {
       const item = section.createDiv('finance-credit-progress-item');
       const header = item.createDiv('finance-credit-progress-header');
       header.createSpan({ text: d.name || d.bankName || '—', cls: 'finance-credit-progress-name' });
-      header.createSpan({ text: `${d.interestRate}% · ${this.fmt(d.amount)}`, cls: 'finance-credit-progress-pct' });
+      header.createSpan({ text: `${d.interestRate}% · ${this.ctx.fmt(d.amount)}`, cls: 'finance-credit-progress-pct' });
 
       const sub = item.createDiv('finance-credit-progress-sub');
       sub.createSpan({ text: d.bankName || '—', cls: 'finance-credit-progress-bank' });
       if (endDate) sub.createSpan({ text: `До ${fmtDate(endDate)}`, cls: 'finance-credit-progress-date' });
-      sub.createSpan({ text: `+${this.fmt(totalProfit)}`, cls: 'finance-credit-progress-amount finance-text-success' });
+      sub.createSpan({ text: `+${this.ctx.fmt(totalProfit)}`, cls: 'finance-credit-progress-amount finance-text-success' });
 
       if (d.startDate && endDate) {
         const bar = item.createDiv('finance-deposit-progress');

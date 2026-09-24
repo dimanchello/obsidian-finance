@@ -216,6 +216,9 @@ export const COMMON_CURRENCIES = [
   'BTC', 'ETH', 'USDT', 'USDC', 'TON', 'SOL',
 ];
 
+// Date format validation
+export const DATE_FORMAT_LENGTH = 10; // YYYY-MM-DD
+
 export const DEFAULT_ACCENT_COLOR   = '#7c3aed';
 export const CHART_COLOR_INCOME     = '#22c55e';
 export const CHART_COLOR_EXPENSE    = '#ef4444';
@@ -269,6 +272,15 @@ export const CHART_TICK_TEXT_OFFSET_Y     = 4;
 export const CHART_TICK_TEXT_OFFSET_Y_TALL = 6;
 export const CHART_LABEL_OFFSET_Y         = 16;
 export const CHART_LABEL_OFFSET_Y_TALL    = 20;
+export const PIE_CHART_SIZE               = 160;
+export const PIE_CHART_OUTER_RADIUS       = 64;
+export const PIE_CHART_INNER_RADIUS       = 36;
+export const PIE_CHART_MIN_SWEEP          = 0.005;
+export const PIE_CHART_MAX_ITEMS          = 14;
+export const PIE_CHART_CENTER_FONT_SIZE   = 12;
+export const CHART_LABEL_Y_OFFSET         = 20;
+export const CHART_FALLBACK_WIDTH_SMALL   = 400;
+export const TOOLTIP_EDGE_GAP             = 8;
 export const SAVINGS_RATE_TICKS           = [100, 50, 0, -50, -100] as const;
 export const SAVINGS_RATE_RANGE           = 200;
 

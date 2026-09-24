@@ -1,4 +1,5 @@
 import { PluginSettings, AccountMode } from './types';
+import { CSS_CLASS } from './constants';
 import { noteFilename } from './utils';
 import { ViewContext } from './context';
 
@@ -74,7 +75,7 @@ export class AccountHeader {
     const mkItem = (icon: string, label: string, targetMode: AccountMode) => {
       const isActive = this.o.getMode() === targetMode;
       const item = dropdown.createDiv(`finance-dropdown-item${isActive ? ' active' : ''}`);
-      item.createSpan({ text: icon, cls: 'btn-icon' });
+      item.createSpan({ text: icon, cls: CSS_CLASS.BTN_ICON });
       item.createSpan({ text: label });
       if (isActive) return;
       item.addEventListener('click', () => {

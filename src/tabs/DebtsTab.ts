@@ -14,7 +14,9 @@ import { DataTable, FilterControl } from '../ui/DataTable';
 import { renderMobileCard, renderSummaryCard, compareValues, dateRangeControls } from '../ui/tabHelpers';
 import { getDebtOriginal, getDebtWithInterest, getDebtRemaining, isDebtPaidOff } from '../domain/debtCalculations';
 import { AccountCommands } from '../domain/AccountCommands';
-import { DebtDirection, DebtMovementType, PaymentStatus } from '../constants';
+import { CSS_CLASS,  DebtDirection, DebtMovementType, PaymentStatus  } from '../constants';
+import { matchesAnyField, matchesSearchFilter, matchesDateRange, matchesStringFilter } from '../domain/filterUtils';
+import { createExpandableTableStateAdapter } from './tabUtils';
 
 export class DebtsTab {
   private ctx: ViewContext;
@@ -82,7 +84,7 @@ export class DebtsTab {
         { icon: '💰', title: this.tr.repay, onClick: () => this.openRepayModal(d) },
         { icon: '➕', title: this.tr.borrowMore, onClick: () => this.openBorrowMoreModal(d) },
         { icon: '✏️', title: this.tr.edit, onClick: () => this.openEditDebtModal(d) },
-        { icon: '🗑️', title: this.tr.delete, onClick: () => this.confirmDeleteDebt(d), cls: 'finance-delete-btn' },
+        { icon: '🗑️', title: this.tr.delete, onClick: () => this.confirmDeleteDebt(d), cls: CSS_CLASS.FINANCE_DELETE_BTN },
       ],
       expandable: {
         hasContent: d => d.movements.length > 0,
@@ -97,17 +99,19 @@ export class DebtsTab {
         { field: 'amount', label: this.tr.sum },
         { field: 'person', label: this.tr.sortPerson },
       ],
-      state: {
-        getPage: () => this.ctx.state.debtPage ?? 0,
-        setPage: p => { this.ctx.state.debtPage = p; },
-        getSort: () => this.ctx.state.debtSort ?? { field: 'date', dir: 'desc' },
-        setSort: s => { this.ctx.state.debtSort = s as { field: DebtSortField; dir: 'asc' | 'desc' }; },
-        resetFilter: () => { this.ctx.state.debtFilter = { ...DEFAULT_DEBT_FILTER }; },
-        getColumns: () => this.ctx.state.debtsColumns ?? {},
-        setColumns: cols => { this.ctx.state.debtsColumns = cols; },
-        getExpandedId: () => this.ctx.state.debtExpandedId ?? null,
-        setExpandedId: id => { if (id === null) delete this.ctx.state.debtExpandedId; else this.ctx.state.debtExpandedId = id; }
-      },
+      state: createExpandableTableStateAdapter(
+        this.ctx,
+        {
+          page: 'debtPage',
+          sort: 'debtSort',
+          columns: 'debtsColumns',
+          expandedId: 'debtExpandedId',
+        },
+        {
+          sort: { field: 'date', dir: 'desc' },
+        },
+        () => { this.ctx.state.debtFilter = { ...DEFAULT_DEBT_FILTER }; }
+      ),
       renderStats: host => this.renderStats(host),
       emptyState: { icon: '💳', title: this.tr.noDebts, subtitle: this.tr.addNewDebt },
       emptyFiltered: { icon: '🔍', title: this.tr.noDebtsFiltered, subtitle: this.tr.tryChangeFilters },
@@ -123,7 +127,7 @@ export class DebtsTab {
 
   public renderHeaderActions(container: HTMLElement): void {
     const newDebtBtn = container.createEl('button', { cls: 'finance-add-btn finance-accent-btn' });
-    newDebtBtn.createSpan({ text: '＋', cls: 'btn-icon' });
+    newDebtBtn.createSpan({ text: '＋', cls: CSS_CLASS.BTN_ICON });
     newDebtBtn.createSpan({ text: this.tr.newDebt });
     newDebtBtn.addEventListener('click', () => this.openNewDebtModal());
   }
@@ -217,19 +221,14 @@ export class DebtsTab {
     if (!this.ctx.data) return [];
     const f = this.ctx.state.debtFilter ?? DEFAULT_DEBT_FILTER;
     const s = this.ctx.state.debtSort ?? { field: 'date' as DebtSortField, dir: 'desc' as const };
-    const q = f.search.toLowerCase();
 
     const rows = this.ctx.data.debts.filter(d => {
       if (f.status === PaymentStatus.PAID && !isDebtPaidOff(d)) return false;
       if (f.status === 'unpaid' && isDebtPaidOff(d)) return false;
-      if (f.direction !== 'all' && d.direction !== f.direction) return false;
-      if (f.dateFrom && d.date < f.dateFrom) return false;
-      if (f.dateTo && d.date > f.dateTo) return false;
-      if (f.person && !d.person.toLowerCase().includes(f.person.toLowerCase())) return false;
-      if (q) {
-        const hay = [d.person, d.note, String(d.amount)].join(' ').toLowerCase();
-        if (!hay.includes(q)) return false;
-      }
+      if (!matchesStringFilter(d.direction, f.direction === 'all' ? '' : f.direction)) return false;
+      if (!matchesDateRange(d.date, f.dateFrom, f.dateTo)) return false;
+      if (!matchesSearchFilter(d.person, f.person)) return false;
+      if (!matchesAnyField([d.person, d.note, d.amount], f.search)) return false;
       return true;
     });
 
@@ -248,9 +247,9 @@ export class DebtsTab {
 
   private renderDebtMovementsPanel(parent: HTMLElement, debt: DebtRecord): void {
     const wrapper = parent.createDiv('finance-payments-panel');
-    wrapper.createEl('h4', { text: this.tr.movementHistory, cls: 'finance-section-title' });
+    wrapper.createEl('h4', { text: this.tr.movementHistory, cls: CSS_CLASS.FINANCE_SECTION_TITLE });
     const scrollWrapper = wrapper.createDiv('finance-mov-scroll');
-    const movTable = scrollWrapper.createEl('table', { cls: 'finance-mov-table' });
+    const movTable = scrollWrapper.createEl('table', { cls: CSS_CLASS.FINANCE_MOV_TABLE });
     const movHead = movTable.createEl('thead').createEl('tr');
     [this.tr.type, this.tr.sum, this.tr.date, this.tr.note, ''].forEach(l => {
       movHead.createEl('th', { text: l, cls: 'finance-th finance-mov-th' });
@@ -262,16 +261,16 @@ export class DebtsTab {
       const typeLabel = m.type === DebtMovementType.BORROW
         ? (isLent ? this.tr.gaveMore : this.tr.tookMore)
         : (isLent ? this.tr.returned : this.tr.repaymentAct);
-      mr.createEl('td', { text: typeLabel, cls: 'finance-td' });
+      mr.createEl('td', { text: typeLabel, cls: CSS_CLASS.FINANCE_TD });
       mr.createEl('td', {
         text: (m.type === DebtMovementType.BORROW ? '−' : '+') + this.ctx.fmt(m.amount),
         cls: `finance-td finance-td-mov-${m.type}`,
       });
-      mr.createEl('td', { text: fmtDate(m.date, m.time), cls: 'finance-td' });
-      mr.createEl('td', { text: m.note || '—', cls: 'finance-td' });
+      mr.createEl('td', { text: fmtDate(m.date, m.time), cls: CSS_CLASS.FINANCE_TD });
+      mr.createEl('td', { text: m.note || '—', cls: CSS_CLASS.FINANCE_TD });
       const atd = mr.createEl('td', { cls: 'finance-td finance-actions-td' });
       const mkBtn = (icon: string, title: string, onClick: () => void, extra = '') => {
-        const btn = atd.createEl('button', { cls: 'finance-action-btn', text: icon });
+        const btn = atd.createEl('button', { cls: CSS_CLASS.FINANCE_ACTION_BTN, text: icon });
         if (extra) btn.addClass(extra);
         btn.title = title;
         btn.addEventListener('click', onClick);

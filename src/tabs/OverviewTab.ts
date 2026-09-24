@@ -1,5 +1,6 @@
 import { ViewContext } from '../context';
-import {
+import { CSS_CLASS } from '../constants';
+import { 
   FinanceRecord,
   OVERVIEW_BURDEN_WARN,
   OVERVIEW_BURDEN_DANGER,
@@ -9,7 +10,7 @@ import {
   OVERVIEW_TREND_MONTHS,
   AccountMode,
 } from '../types';
-import {
+import { 
   calcNetBalance,
   calcAssets,
   calcLiabilities,
@@ -17,7 +18,7 @@ import {
   calcUpcomingPayments,
   filterRecordsByDateRange,
   ALL_TIME_MONTHS,
-} from '../domain/overviewMetrics';
+} from '../domain/metrics';
 import { shiftMonths, getTodayStr } from '../utils';
 import { MoneyFlowChart } from '../ui/charts/MoneyFlowChart';
 import { AssetsChart } from '../ui/charts/AssetsChart';
@@ -227,8 +228,8 @@ export class OverviewTab {
     const dateRangeWrap = this.filterBarEl.createDiv('finance-overview-date-range');
 
     const fromGroup = dateRangeWrap.createDiv('finance-filter-group');
-    fromGroup.createEl('label', { text: this.tr.from, cls: 'finance-filter-label' });
-    this.fromInput = fromGroup.createEl('input', { type: 'date', cls: 'finance-filter-input' });
+    fromGroup.createEl('label', { text: this.tr.from, cls: CSS_CLASS.FINANCE_FILTER_LABEL });
+    this.fromInput = fromGroup.createEl('input', { type: 'date', cls: CSS_CLASS.FINANCE_FILTER_INPUT });
     this.fromInput.value = this.state.overviewDateFrom ?? '';
 
     const handleFromChange = () => {
@@ -243,8 +244,8 @@ export class OverviewTab {
     this.fromInput.addEventListener('change', handleFromChange);
 
     const toGroup = dateRangeWrap.createDiv('finance-filter-group');
-    toGroup.createEl('label', { text: this.tr.to, cls: 'finance-filter-label' });
-    this.toInput = toGroup.createEl('input', { type: 'date', cls: 'finance-filter-input' });
+    toGroup.createEl('label', { text: this.tr.to, cls: CSS_CLASS.FINANCE_FILTER_LABEL });
+    this.toInput = toGroup.createEl('input', { type: 'date', cls: CSS_CLASS.FINANCE_FILTER_INPUT });
     this.toInput.value = this.state.overviewDateTo ?? '';
 
     const handleToChange = () => {
@@ -328,11 +329,7 @@ export class OverviewTab {
 
 
   private fmt(amount: number): string {
-    return (
-      amount.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) +
-      ' ' +
-      this.ctx.currency
-    );
+    return this.ctx.fmt(amount);
   }
 
 

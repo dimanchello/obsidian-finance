@@ -13,7 +13,8 @@ import { createAmountInput, type AmountInputHandle } from './ui/AmountInput';
 import { buildAttachmentField } from './ui/attachmentField';
 import { EntityModal } from './ui/EntityModal';
 import { buildDateField, buildNoteField, buildComboboxField } from './ui/formHelpers';
-import { CreditStatus } from './constants';
+import { CreditStatus, CSS_CLASS } from './constants';
+import { validatePositiveAmount, validateRequiredString, validatePositiveNumber } from './domain/validators';
 
 export interface CreditModalOptions {
   title:     string;
@@ -90,8 +91,8 @@ export class CreditModal extends EntityModal<CreditRecord> {
     const row1 = form.createDiv('finance-form-row finance-full-width');
 
     const nameG = row1.createDiv('finance-field-group');
-    nameG.createEl('label', { text: this.tr.name, cls: 'finance-field-label' });
-    const nameIn = nameG.createEl('input', { type: 'text', cls: 'finance-input' });
+    nameG.createEl('label', { text: this.tr.name, cls: CSS_CLASS.FINANCE_FIELD_LABEL });
+    const nameIn = nameG.createEl('input', { type: 'text', cls: CSS_CLASS.FINANCE_INPUT });
     nameIn.value = this.entity.name;
     nameIn.addEventListener('input', () => { this.entity.name = nameIn.value; });
 
@@ -101,7 +102,7 @@ export class CreditModal extends EntityModal<CreditRecord> {
     const row2 = form.createDiv('finance-form-row finance-full-width');
 
     const amtG = row2.createDiv('finance-field-group finance-amount-group');
-    amtG.createEl('label', { text: this.tr.purchasePriceLabel, cls: 'finance-field-label' });
+    amtG.createEl('label', { text: this.tr.purchasePriceLabel, cls: CSS_CLASS.FINANCE_FIELD_LABEL });
     this.amountInput = createAmountInput(amtG, {
       value: this.entity.purchasePrice ?? 0,
       onChange: v => { this.entity.purchasePrice = v; this.scheduleCalc(); },
@@ -118,15 +119,15 @@ export class CreditModal extends EntityModal<CreditRecord> {
     const row3 = form.createDiv('finance-form-row finance-full-width');
 
     const paymentG = row3.createDiv('finance-field-group finance-amount-group');
-    paymentG.createEl('label', { text: this.tr.monthlyPayment, cls: 'finance-field-label' });
+    paymentG.createEl('label', { text: this.tr.monthlyPayment, cls: CSS_CLASS.FINANCE_FIELD_LABEL });
     this.paymentHandle = createAmountInput(paymentG, {
       value: this.entity.monthlyPayment,
       onChange: v => { this.entity.monthlyPayment = v; },
     });
 
     const termG = row3.createDiv('finance-field-group');
-    termG.createEl('label', { text: this.tr.termLabel, cls: 'finance-field-label' });
-    this.termInput = termG.createEl('input', { type: 'number', cls: 'finance-input' });
+    termG.createEl('label', { text: this.tr.termLabel, cls: CSS_CLASS.FINANCE_FIELD_LABEL });
+    this.termInput = termG.createEl('input', { type: 'number', cls: CSS_CLASS.FINANCE_INPUT });
     this.termInput.value = String(this.entity.termMonths || DEPOSIT_TERM_DEFAULT_MONTHS);
     this.termInput.setAttribute('min', '1');
     this.termInput.setAttribute('max', String(DEPOSIT_TERM_MAX_MONTHS));
@@ -164,8 +165,8 @@ export class CreditModal extends EntityModal<CreditRecord> {
 
   private buildRateField(parent: HTMLElement): void {
     const rateG = parent.createDiv('finance-field-group');
-    rateG.createEl('label', { text: this.tr.interestRate + ' (%)', cls: 'finance-field-label' });
-    this.rateInput = rateG.createEl('input', { type: 'text', cls: 'finance-input' });
+    rateG.createEl('label', { text: this.tr.interestRate + ' (%)', cls: CSS_CLASS.FINANCE_FIELD_LABEL });
+    this.rateInput = rateG.createEl('input', { type: 'text', cls: CSS_CLASS.FINANCE_INPUT });
     this.rateInput.setAttribute('inputmode', 'decimal');
     this.rateInput.setAttribute('placeholder', '0');
     this.rateInput.setAttribute('autocomplete', 'off');
@@ -190,7 +191,7 @@ export class CreditModal extends EntityModal<CreditRecord> {
 
   private buildTypeSelect(parent: HTMLElement): HTMLSelectElement {
     const typeG = parent.createDiv('finance-field-group');
-    typeG.createEl('label', { text: this.tr.creditTypeLabel, cls: 'finance-field-label' });
+    typeG.createEl('label', { text: this.tr.creditTypeLabel, cls: CSS_CLASS.FINANCE_FIELD_LABEL });
     const typeSel = typeG.createEl('select', { cls: 'finance-input finance-filter-select' });
     const types: { value: CreditType; label: string }[] = [
       { value: CreditType.CONSUMER, label: this.tr.creditTypeConsumer },
@@ -207,8 +208,8 @@ export class CreditModal extends EntityModal<CreditRecord> {
   private buildPaymentDayField(form: HTMLElement): void {
     const row = form.createDiv('finance-form-row finance-full-width');
     const pdG = row.createDiv('finance-field-group');
-    pdG.createEl('label', { text: this.tr.paymentDayLabel, cls: 'finance-field-label' });
-    this.paymentDayInput = pdG.createEl('input', { type: 'number', cls: 'finance-input' });
+    pdG.createEl('label', { text: this.tr.paymentDayLabel, cls: CSS_CLASS.FINANCE_FIELD_LABEL });
+    this.paymentDayInput = pdG.createEl('input', { type: 'number', cls: CSS_CLASS.FINANCE_INPUT });
     this.paymentDayInput.setAttribute('min', '1');
     this.paymentDayInput.setAttribute('max', String(DAY_OF_MONTH_MAX));
 
@@ -227,7 +228,7 @@ export class CreditModal extends EntityModal<CreditRecord> {
     const rowEscrow = form.createDiv('finance-form-row finance-full-width');
     const escrowG = rowEscrow.createDiv('finance-field-group finance-full-width');
     const escrowLabel = escrowG.createEl('label', { cls: 'finance-checkbox-label finance-escrow-label' });
-    const escrowCheck = escrowLabel.createEl('input', { type: 'checkbox', cls: 'finance-checkbox' });
+    const escrowCheck = escrowLabel.createEl('input', { type: 'checkbox', cls: CSS_CLASS.FINANCE_CHECKBOX });
     escrowCheck.checked = this.entity.isEscrow ?? false;
     escrowLabel.createSpan({ text: this.tr.isEscrowLabel });
     escrowG.createEl('p', { text: this.tr.isEscrowDesc, cls: 'finance-field-hint' });
@@ -255,7 +256,7 @@ export class CreditModal extends EntityModal<CreditRecord> {
     const rowDp = form.createDiv('finance-form-row finance-full-width');
 
     const dpValG = rowDp.createDiv('finance-field-group');
-    dpValG.createEl('label', { text: this.tr.downPaymentLabel, cls: 'finance-field-label' });
+    dpValG.createEl('label', { text: this.tr.downPaymentLabel, cls: CSS_CLASS.FINANCE_FIELD_LABEL });
 
     const dpInputWrap = dpValG.createDiv('finance-input-with-select');
 
@@ -288,8 +289,8 @@ export class CreditModal extends EntityModal<CreditRecord> {
     pctBtn.addClass('finance-dp-toggle', 'finance-dp-toggle-pct');
 
     const dpDateG = rowDp.createDiv('finance-field-group');
-    dpDateG.createEl('label', { text: this.tr.downPaymentDateLabel, cls: 'finance-field-label' });
-    this.downPaymentDateInput = dpDateG.createEl('input', { type: 'date', cls: 'finance-input' });
+    dpDateG.createEl('label', { text: this.tr.downPaymentDateLabel, cls: CSS_CLASS.FINANCE_FIELD_LABEL });
+    this.downPaymentDateInput = dpDateG.createEl('input', { type: 'date', cls: CSS_CLASS.FINANCE_INPUT });
     this.downPaymentDateInput.value = this.entity.downPaymentDate
       ? normalizeDateStr(this.entity.downPaymentDate)
       : '';
@@ -363,10 +364,10 @@ export class CreditModal extends EntityModal<CreditRecord> {
   }
 
   protected validate(): string | null {
-    const purchase = parseAmount(this.amountInput.value);
-    if (!purchase || purchase <= 0) {
+    const purchaseResult = validatePositiveAmount(this.amountInput.value, this.tr.invalidAmount);
+    if ('error' in purchaseResult) {
       this.amountInput.focus();
-      return this.tr.invalidAmount;
+      return purchaseResult.error;
     }
 
     // A down payment without a date cannot be mirrored into a record.
@@ -375,12 +376,14 @@ export class CreditModal extends EntityModal<CreditRecord> {
       return this.tr.downPaymentDateRequired;
     }
 
-    if (this.entity.originalAmount <= 0) {
+    const originalAmountResult = validatePositiveNumber(this.entity.originalAmount, this.tr.invalidAmount);
+    if (!originalAmountResult.valid) {
       this.amountInput.focus();
-      return this.tr.invalidAmount;
+      return originalAmountResult.error ?? null;
     }
 
-    if (!this.entity.bankName.trim()) return this.tr.specifyBank;
+    const bankResult = validateRequiredString(this.entity.bankName, this.tr.specifyBank);
+    if (!bankResult.valid) return bankResult.error ?? null;
 
     return null;
   }

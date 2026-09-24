@@ -17,7 +17,9 @@ import { isoWeekRange, daysInMonth } from '../domain/dateMath';
 import { DataTable, DataTableApi, FilterControl } from '../ui/DataTable';
 import { renderCompactTransactionCard, dateRangeControls, compareValues } from '../ui/tabHelpers';
 import { renderStatCard } from '../ui/statCards';
-import { RecordType } from '../constants';
+import { CSS_CLASS,  RecordType  } from '../constants';
+import { matchesAnyField, matchesStringFilter, matchesDateRange } from '../domain/filterUtils';
+import { createTableStateAdapter } from './tabUtils';
 
 type Panel = 'analytics' | 'filters' | 'settings';
 
@@ -72,7 +74,7 @@ export class RecordsTab {
       },
       rowActions: r => [
         { icon: '✏️', title: this.tr.edit, onClick: () => this.openEditModal(r) },
-        { icon: '🗑️', title: this.tr.delete, onClick: () => this.confirmDelete(r), cls: 'finance-delete-btn' },
+        { icon: '🗑️', title: this.tr.delete, onClick: () => this.confirmDelete(r), cls: CSS_CLASS.FINANCE_DELETE_BTN },
       ],
       actionsPosition: 'custom',
       cardCls: 'finance-compact-card',
@@ -86,15 +88,18 @@ export class RecordsTab {
         { field: 'type', label: this.tr.type },
         { field: 'payer', label: this.tr.payer },
       ],
-      state: {
-        getPage: () => this.ctx.state.page,
-        setPage: p => { this.ctx.state.page = p; },
-        getSort: () => this.ctx.state.sort,
-        setSort: s => { this.ctx.state.sort = s as { field: SortField; dir: 'asc' | 'desc' }; },
-        resetFilter: () => { this.ctx.state.filter = { ...DEFAULT_FILTER }; },
-        getColumns: () => (this.ctx.state.recordsColumns ??= {}),
-        setColumns: c => { this.ctx.state.recordsColumns = c; },
-      },
+      state: createTableStateAdapter(
+        this.ctx,
+        {
+          page: 'page',
+          sort: 'sort',
+          columns: 'recordsColumns',
+        },
+        {
+          sort: { field: 'date', dir: 'desc' },
+        },
+        () => { this.ctx.state.filter = { ...DEFAULT_FILTER }; }
+      ),
       renderStats: host => this.renderStats(host),
       ownToolbar: (toolbar, api) => this.renderToolbar(toolbar, api),
       renderPanels: host => this.renderPanels(host),
@@ -114,7 +119,7 @@ export class RecordsTab {
         new Notice(this.tr.deleted);
       },
       confirmBulkDeleteText: count => this.tr.confirmDeleteSelectedRecords.replace('{count}', String(count)),
-      onFilterChange: () => { this.analyticsView?.update(this.ctx.data?.records ?? [], this.ctx.currency); },
+      onFilterChange: () => { this.analyticsView?.update(this.ctx.data?.records ?? []); },
       rerender: () => this.render(),
     });
   }
@@ -178,7 +183,7 @@ export class RecordsTab {
     if (this.openPanel === 'analytics') {
       const panel = host.createDiv('finance-analytics-panel');
       this.analyticsView = new AnalyticsView(
-        panel, this.ctx.data?.records ?? [], this.ctx.currency, this.tr,
+        panel, this.ctx.data?.records ?? [], this.ctx,
         a => this.onAnalyticsBarClick(a),
       );
       this.analyticsView.render();
@@ -203,8 +208,8 @@ export class RecordsTab {
     const bal = totalInc - totalExp;
 
     const cards = [
-      { label: this.tr.incomeStat, value: this.ctx.fmt(inc), mod: 'income', icon: '↑' },
-      { label: this.tr.expenseStat, value: this.ctx.fmt(exp), mod: 'expense', icon: '↓' },
+      { label: this.tr.incomeStat, value: this.ctx.fmt(inc), mod: CSS_CLASS.INCOME, icon: '↑' },
+      { label: this.tr.expenseStat, value: this.ctx.fmt(exp), mod: CSS_CLASS.EXPENSE, icon: '↓' },
       {
         label: this.tr.balance, value: (bal >= 0 ? '+' : '') + this.ctx.fmt(bal),
         mod: bal >= 0 ? 'positive' : 'negative', icon: '＝',
@@ -253,7 +258,7 @@ export class RecordsTab {
         kind: 'custom',
         render: (row, onChange) => {
           const g = row.createDiv('finance-filter-group finance-filter-internal');
-          const label = g.createEl('label', { cls: 'finance-filter-label' });
+          const label = g.createEl('label', { cls: CSS_CLASS.FINANCE_FILTER_LABEL });
           const btn = g.createEl('button', {
             type: 'button', cls: 'finance-internal-btn', text: '🔄',
             attr: { title: this.tr.internalOnly },
@@ -277,20 +282,15 @@ export class RecordsTab {
   private getFiltered(): FinanceRecord[] {
     if (!this.ctx.data) return [];
     const { filter, sort } = this.ctx.state;
-    const q = filter.search.toLowerCase();
 
     const rows = this.ctx.data.records.filter(r => {
       if (filter.showInternal === 'only' && !r.isInternal) return false;
-      if (filter.type !== 'all' && r.type !== filter.type) return false;
-      if (filter.category && r.category !== filter.category) return false;
-      if (filter.tag && r.tag !== filter.tag) return false;
-      if (filter.payer && r.payer !== filter.payer) return false;
-      if (filter.dateFrom && r.date < filter.dateFrom) return false;
-      if (filter.dateTo && r.date > filter.dateTo) return false;
-      if (q) {
-        const hay = [r.category, r.tag, r.payer, r.note, String(r.amount), r.exchangeRate ? String(r.exchangeRate) : ''].join(' ').toLowerCase();
-        if (!hay.includes(q)) return false;
-      }
+      if (!matchesStringFilter(r.type, filter.type === 'all' ? '' : filter.type)) return false;
+      if (!matchesStringFilter(r.category, filter.category)) return false;
+      if (!matchesStringFilter(r.tag, filter.tag)) return false;
+      if (!matchesStringFilter(r.payer, filter.payer)) return false;
+      if (!matchesDateRange(r.date, filter.dateFrom, filter.dateTo)) return false;
+      if (!matchesAnyField([r.category, r.tag, r.payer, r.note, r.amount, r.exchangeRate ?? ''], filter.search)) return false;
       return true;
     });
 
@@ -425,8 +425,8 @@ export class RecordsTab {
     const row = (): HTMLDivElement => el.createDiv('finance-settings-row');
 
     const psRow = row();
-    psRow.createEl('label', { text: this.tr.pageSizeLabel, cls: 'finance-filter-label' });
-    const psSel = psRow.createEl('select', { cls: 'finance-filter-select' });
+    psRow.createEl('label', { text: this.tr.pageSizeLabel, cls: CSS_CLASS.FINANCE_FILTER_LABEL });
+    const psSel = psRow.createEl('select', { cls: CSS_CLASS.FINANCE_FILTER_SELECT });
     PAGE_SIZE_OPTIONS.forEach(n => {
       const o = psSel.createEl('option', { text: String(n) });
       o.value = String(n);
@@ -440,7 +440,7 @@ export class RecordsTab {
     });
 
     const acRow = row();
-    acRow.createEl('label', { text: this.tr.accentColor, cls: 'finance-filter-label' });
+    acRow.createEl('label', { text: this.tr.accentColor, cls: CSS_CLASS.FINANCE_FILTER_LABEL });
     const acC = acRow.createDiv('finance-settings-controls');
     const acIn = acC.createEl('input', { type: 'color', cls: 'finance-settings-color-input' });
     acIn.value = this.ctx.data.accentColor ?? DEFAULT_ACCENT_COLOR;
@@ -466,7 +466,7 @@ export class RecordsTab {
 
     const ieRow = row();
     ieRow.classList.add('finance-settings-sep');
-    ieRow.createEl('label', { text: this.tr.importExport, cls: 'finance-filter-label' });
+    ieRow.createEl('label', { text: this.tr.importExport, cls: CSS_CLASS.FINANCE_FILTER_LABEL });
     const ieC = ieRow.createDiv('finance-settings-controls');
     ieC.createEl('button', { cls: 'finance-add-btn finance-ie-btn', text: this.tr.export })
       .addEventListener('click', () => this.openIEModal('export'));

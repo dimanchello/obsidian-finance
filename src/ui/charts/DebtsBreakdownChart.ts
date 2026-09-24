@@ -1,16 +1,11 @@
-import { ViewContext } from '../../context';
 import { DebtRecord, AccountMode } from '../../types';
-import { createChartTooltip } from '../chartHelpers';
-import { calcDebtsBreakdown } from '../../domain/overviewMetrics';
+import { CSS_CLASS } from '../../constants';
+import { calcDebtsBreakdown } from '../../domain/metrics';
 import { DebtDetailModal } from '../../modals/DebtDetailModal';
+import { formatChartAmount } from '../../domain/formattingHelpers';
+import { BaseChart } from './BaseChart';
 
-export class DebtsBreakdownChart {
-  private ctx: ViewContext;
-  private tooltip = createChartTooltip();
-
-  constructor(ctx: ViewContext) {
-    this.ctx = ctx;
-  }
+export class DebtsBreakdownChart extends BaseChart {
 
   destroy(): void {
     this.tooltip.destroy();
@@ -25,11 +20,11 @@ export class DebtsBreakdownChart {
     const { tr, data } = this.ctx;
     const chartWrap = parent.createDiv('finance-chart-wrap');
 
-    chartWrap.createEl('h3', { text: tr.overviewDebtsSummary, cls: 'finance-chart-title' });
+    chartWrap.createEl('h3', { text: tr.overviewDebtsSummary, cls: CSS_CLASS.FINANCE_CHART_TITLE });
 
     const activeDebts = debts.filter(d => d.amount > 0);
     if (activeDebts.length === 0) {
-      chartWrap.createEl('p', { text: tr.overviewNoDebts, cls: 'finance-no-data' });
+      this.renderNoData(chartWrap, tr.overviewNoDebts);
       return;
     }
 
@@ -77,7 +72,7 @@ export class DebtsBreakdownChart {
       nameEl.title = item.person;
 
       const netEl = header.createDiv(`finance-breakdown-item-net ${item.net >= 0 ? 'income' : 'expense'}`);
-      const netLabel = item.net >= 0 ? `+${this.fmt(item.net)}` : `-${this.fmt(Math.abs(item.net))}`;
+      const netLabel = item.net >= 0 ? `+${formatChartAmount(item.net, this.ctx.currency)}` : `-${formatChartAmount(Math.abs(item.net), this.ctx.currency)}`;
       netEl.textContent = netLabel;
 
       if (item.lent > 0) {
@@ -89,10 +84,10 @@ export class DebtsBreakdownChart {
         const maxLent = Math.max(...breakdown.map(b => b.lent));
         const pct = maxLent > 0 ? (item.lent / maxLent) * 100 : 0;
         fill.style.width = `${pct}%`;
-        row.createDiv({ text: `+${this.fmt(item.lent)}`, cls: 'finance-breakdown-bar-amount income' });
+        row.createDiv({ text: `+${formatChartAmount(item.lent, this.ctx.currency)}`, cls: 'finance-breakdown-bar-amount income' });
 
         const repaidPct = item.lentRepaidPct;
-        const tipText = `${item.person}\n${tr.overviewDebtsLent}: ${this.fmt(item.lent)}\n${tr.overviewDebtsRepaid}: ${this.fmt(item.lentRepaid)} (${repaidPct}%)`;
+        const tipText = `${item.person}\n${tr.overviewDebtsLent}: ${formatChartAmount(item.lent, this.ctx.currency)}\n${tr.overviewDebtsRepaid}: ${formatChartAmount(item.lentRepaid, this.ctx.currency)} (${repaidPct}%)`;
         row.addEventListener('mouseenter', e => this.tooltip.showTip(e, tipText));
         row.addEventListener('mousemove', e => this.tooltip.showTip(e, tipText));
         row.addEventListener('mouseleave', () => this.tooltip.hideTip());
@@ -107,22 +102,14 @@ export class DebtsBreakdownChart {
         const maxBorrowed = Math.max(...breakdown.map(b => b.borrowed));
         const pct = maxBorrowed > 0 ? (item.borrowed / maxBorrowed) * 100 : 0;
         fill.style.width = `${pct}%`;
-        row.createDiv({ text: `-${this.fmt(item.borrowed)}`, cls: 'finance-breakdown-bar-amount expense' });
+        row.createDiv({ text: `-${formatChartAmount(item.borrowed, this.ctx.currency)}`, cls: 'finance-breakdown-bar-amount expense' });
 
         const repaidPct = item.borrowedRepaidPct;
-        const tipText = `${item.person}\n${tr.overviewDebtsBorrowed}: ${this.fmt(item.borrowed)}\n${tr.overviewDebtsPaid}: ${this.fmt(item.borrowedRepaid)} (${repaidPct}%)`;
+        const tipText = `${item.person}\n${tr.overviewDebtsBorrowed}: ${formatChartAmount(item.borrowed, this.ctx.currency)}\n${tr.overviewDebtsPaid}: ${formatChartAmount(item.borrowedRepaid, this.ctx.currency)} (${repaidPct}%)`;
         row.addEventListener('mouseenter', e => this.tooltip.showTip(e, tipText));
         row.addEventListener('mousemove', e => this.tooltip.showTip(e, tipText));
         row.addEventListener('mouseleave', () => this.tooltip.hideTip());
       }
     });
-  }
-
-  private fmt(amount: number): string {
-    return (
-      amount.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) +
-      ' ' +
-      this.ctx.currency
-    );
   }
 }

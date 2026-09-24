@@ -1,9 +1,11 @@
 import { App } from 'obsidian';
+import { CSS_CLASS } from './constants';
 import { DebtMovement, DebtMovementType } from './types';
-import { parseAmount, getTodayStr, getTodayTime } from './utils';
+import { parseAmount, getTodayStr, getTodayTime, fmt } from './utils';
 import { createAmountInput } from './ui/AmountInput';
 import { EntityModal } from './ui/EntityModal';
 import { buildDateTimeField } from './ui/formHelpers';
+import { validatePositiveAmount } from './domain/validators';
 
 export interface DebtMovementOptions {
   title:           string;
@@ -47,7 +49,7 @@ export class DebtMovementModal extends EntityModal<DebtMovement> {
     const labelText = this.o.type === DebtMovementType.BORROW
       ? this.tr.borrowAmountLabel
       : this.tr.repayAmountLabel;
-    amtG.createEl('label', { text: labelText, cls: 'finance-field-label' });
+    amtG.createEl('label', { text: labelText, cls: CSS_CLASS.FINANCE_FIELD_LABEL });
 
     const amountHandle = createAmountInput(amtG, {
       value: this.entity.amount,
@@ -59,9 +61,9 @@ export class DebtMovementModal extends EntityModal<DebtMovement> {
     const remaining = this.o.remainingAmount;
     if (this.o.type === DebtMovementType.REPAY && remaining !== undefined && remaining > 0) {
       const cur = this.o.currency ?? '';
-      const formatted = remaining.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const formatted = fmt(remaining, cur);
       const link = amtG.createSpan({ cls: 'finance-fill-remaining-link' });
-      link.textContent = `→ ${formatted} ${cur}`;
+      link.textContent = `→ ${formatted}`;
       link.addEventListener('click', () => { amountHandle.set(remaining); });
     }
 
@@ -74,7 +76,7 @@ export class DebtMovementModal extends EntityModal<DebtMovement> {
     // ── Note — visually distinct ─────────────────────────────────────────
     const noteG = form.createDiv('finance-field-group');
     const noteLabelRow = noteG.createDiv('finance-note-label-row');
-    noteLabelRow.createEl('label', { text: this.tr.note, cls: 'finance-field-label' });
+    noteLabelRow.createEl('label', { text: this.tr.note, cls: CSS_CLASS.FINANCE_FIELD_LABEL });
     noteLabelRow.createSpan({ text: '📝', cls: 'finance-note-icon' });
     const noteIn = noteG.createEl('textarea', { cls: 'finance-textarea finance-note-field' });
     noteIn.placeholder = this.tr.debtNotePlaceholder;
@@ -84,8 +86,8 @@ export class DebtMovementModal extends EntityModal<DebtMovement> {
   }
 
   protected validate(): string | null {
-    const amount = parseAmount(this.amountInput.value);
-    if (!amount || amount <= 0) return this.tr.invalidAmount;
+    const result = validatePositiveAmount(this.amountInput.value, this.tr.invalidAmount);
+    if ('error' in result) return result.error;
     return null;
   }
 

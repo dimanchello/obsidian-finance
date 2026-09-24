@@ -1,3 +1,9 @@
+import { CSS_CLASS } from '../constants';
+
+function createSvg<K extends keyof SVGElementTagNameMap>(tag: K): SVGElementTagNameMap[K] {
+  return document.createElementNS('http://www.w3.org/2000/svg', tag);
+}
+
 const TOOLTIP_CURSOR_GAP = 12;
 const TOOLTIP_EDGE_GAP = 8;
 
@@ -40,7 +46,7 @@ function getOrCreateTooltipEl(): HTMLDivElement {
       ) {
         return;
       }
-      sharedTooltipEl?.classList.remove('is-visible');
+      sharedTooltipEl?.classList.remove(CSS_CLASS.IS_VISIBLE);
     };
     window.addEventListener('click', hideTip, { capture: true });
     window.addEventListener('touchstart', hideTip, { passive: true });
@@ -56,13 +62,13 @@ export function createChartTooltip(): {
   const tooltip = getOrCreateTooltipEl();
 
   const hide = () => {
-    tooltip.classList.remove('is-visible');
+    tooltip.classList.remove(CSS_CLASS.IS_VISIBLE);
   };
 
   return {
     showTip: (e: MouseEvent, text: string) => {
       tooltip.textContent = text;
-      tooltip.classList.add('is-visible');
+      tooltip.classList.add(CSS_CLASS.IS_VISIBLE);
       const tw = tooltip.offsetWidth;
       const th = tooltip.offsetHeight;
       let left = e.clientX - tw / 2;

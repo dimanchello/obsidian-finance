@@ -1,6 +1,7 @@
 import { App, Notice } from 'obsidian';
+import { CSS_CLASS } from './constants';
 import { getLocaleFromApp, t, Translations } from './i18n';
-import {
+import { 
   CreditRecord, CreditPayment, PaymentStatus, CreditStatus, EarlyRepaymentOption,
 } from './types';
 import { calculateRemainingPrincipal } from './domain/creditCalculations';
@@ -50,8 +51,8 @@ export class CreditEarlyRepaymentModal extends FinanceBaseModal {
     const form = contentEl.createDiv('finance-form');
 
     const dateG = form.createDiv('finance-field-group');
-    dateG.createEl('label', { text: this.tr.repaymentDate, cls: 'finance-field-label' });
-    const dateIn = dateG.createEl('input', { type: 'date', cls: 'finance-input' });
+    dateG.createEl('label', { text: this.tr.repaymentDate, cls: CSS_CLASS.FINANCE_FIELD_LABEL });
+    const dateIn = dateG.createEl('input', { type: 'date', cls: CSS_CLASS.FINANCE_INPUT });
     const today = getTodayStr();
     dateIn.value = today;
 
@@ -67,7 +68,7 @@ export class CreditEarlyRepaymentModal extends FinanceBaseModal {
     });
 
     const amountSection = form.createDiv('finance-early-amount-section');
-    amountSection.createEl('label', { text: this.tr.earlyRepaymentAmount, cls: 'finance-field-label' });
+    amountSection.createEl('label', { text: this.tr.earlyRepaymentAmount, cls: CSS_CLASS.FINANCE_FIELD_LABEL });
 
     this.amountInput = createAmountInput(amountSection, {
       value: this.actualRemaining,
@@ -75,10 +76,10 @@ export class CreditEarlyRepaymentModal extends FinanceBaseModal {
     }).input;
 
     const termSection = form.createDiv('finance-early-term-section is-hidden');
-    termSection.createEl('label', { text: this.tr.reduceTermLabel, cls: 'finance-field-label' });
+    termSection.createEl('label', { text: this.tr.reduceTermLabel, cls: CSS_CLASS.FINANCE_FIELD_LABEL });
     const termInput = termSection.createEl('input', {
       type: 'number',
-      cls: 'finance-input',
+      cls: CSS_CLASS.FINANCE_INPUT,
     });
     termInput.setAttribute('min', '1');
     termInput.setAttribute('max', String(this.pendingPayments.length));
@@ -87,25 +88,25 @@ export class CreditEarlyRepaymentModal extends FinanceBaseModal {
     const selectOption = (option: EarlyRepaymentOption) => {
       this.selectedOption = option;
       const byAmount = option === EarlyRepaymentOption.AMOUNT;
-      amountBtn.classList.toggle('is-active', byAmount);
-      termBtn.classList.toggle('is-active', !byAmount);
-      amountSection.classList.toggle('is-hidden', !byAmount);
-      termSection.classList.toggle('is-hidden', byAmount);
+      amountBtn.classList.toggle(CSS_CLASS.IS_ACTIVE, byAmount);
+      termBtn.classList.toggle(CSS_CLASS.IS_ACTIVE, !byAmount);
+      amountSection.classList.toggle(CSS_CLASS.IS_HIDDEN, !byAmount);
+      termSection.classList.toggle(CSS_CLASS.IS_HIDDEN, byAmount);
     };
 
     amountBtn.addEventListener('click', () => selectOption(EarlyRepaymentOption.AMOUNT));
     termBtn.addEventListener('click', () => selectOption(EarlyRepaymentOption.TERM));
 
     const noteG = form.createDiv('finance-field-group');
-    noteG.createEl('label', { text: this.tr.note, cls: 'finance-field-label' });
+    noteG.createEl('label', { text: this.tr.note, cls: CSS_CLASS.FINANCE_FIELD_LABEL });
     const noteIn = noteG.createEl('textarea', { cls: 'finance-textarea finance-note-field' });
     noteIn.placeholder = this.tr.optional;
     noteIn.rows = 2;
 
     const btnRow = contentEl.createDiv('finance-modal-btns');
-    btnRow.createEl('button', { text: this.tr.cancel, cls: 'finance-btn-cancel' })
+    btnRow.createEl('button', { text: this.tr.cancel, cls: CSS_CLASS.FINANCE_BTN_CANCEL })
       .addEventListener('click', () => this.close());
-    btnRow.createEl('button', { text: this.tr.repay, cls: 'finance-btn-save' })
+    btnRow.createEl('button', { text: this.tr.repay, cls: CSS_CLASS.FINANCE_BTN_SAVE })
       .addEventListener('click', () => {
         const todayStr = getTodayStr();
         const repaymentDate = normalizeDateStr(dateIn.value || todayStr);
@@ -137,7 +138,7 @@ export class CreditEarlyRepaymentModal extends FinanceBaseModal {
               // Partial payment: reduce the amount but keep payment pending
               // The reduced payment will still be due on its original due date
               payment.amount = round2(payment.amount - remainingAmount);
-              const partialNote = `${this.tr.partialPaymentNote} ${repaymentDate}: ${this.o.currency} ${remainingAmount.toFixed(2)}`;
+              const partialNote = `${this.tr.partialPaymentNote} ${repaymentDate}: ${this.o.currency} ${round2(remainingAmount)}`;
               if (noteIn.value) {
                 payment.note = payment.note
                   ? `${payment.note}; ${partialNote}; ${noteIn.value}`

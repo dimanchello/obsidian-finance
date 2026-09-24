@@ -47,6 +47,29 @@ export class FileStore<T> {
     return [...this.dirty];
   }
 
+  /**
+   * Delete a single item by id from an array-based store.
+   * Only works when T is an array of objects with an id property.
+   */
+  deleteById(accountId: string, id: string): void {
+    const cached = this.cache.get(accountId);
+    if (!cached || !Array.isArray(cached)) return;
+    const filtered = (cached as { id: string }[]).filter(x => x.id !== id);
+    this.set(accountId, filtered as unknown as T);
+  }
+
+  /**
+   * Delete multiple items by id from an array-based store.
+   * Only works when T is an array of objects with an id property.
+   */
+  deleteBatch(accountId: string, ids: string[]): void {
+    const cached = this.cache.get(accountId);
+    if (!cached || !Array.isArray(cached)) return;
+    const idSet = new Set(ids);
+    const filtered = (cached as { id: string }[]).filter(x => !idSet.has(x.id));
+    this.set(accountId, filtered as unknown as T);
+  }
+
   async flush(vault: VaultAdapter, files: AccountFiles): Promise<void> {
     for (const accountId of this.dirty) {
       const value = this.cache.get(accountId);

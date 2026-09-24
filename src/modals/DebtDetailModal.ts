@@ -2,7 +2,7 @@ import { App, Notice } from 'obsidian';
 import { FinanceBaseModal } from '../ui/FinanceBaseModal';
 import { ViewContext } from '../context';
 import { DebtRecord, DebtMovement } from '../types';
-import { DebtDirection, DebtMovementType } from '../constants';
+import { DebtDirection, DebtMovementType, CSS_CLASS } from '../constants';
 import {
   getDebtOriginal,
   getDebtWithInterest,
@@ -90,15 +90,15 @@ export class DebtDetailModal extends FinanceBaseModal {
 
     // Movements panel
     const movementsWrapper = this.bodyContainer.createDiv('finance-payments-panel');
-    movementsWrapper.createEl('h4', { text: this.tr.movementHistory, cls: 'finance-section-title' });
+    movementsWrapper.createEl('h4', { text: this.tr.movementHistory, cls: CSS_CLASS.FINANCE_SECTION_TITLE });
 
     if (this.debt.movements.length === 0) {
-      movementsWrapper.createEl('p', { text: this.tr.noRecords, cls: 'finance-empty-text' });
+      movementsWrapper.createEl('p', { text: this.tr.noRecords, cls: CSS_CLASS.FINANCE_EMPTY_TEXT });
       return;
     }
 
     const scrollWrapper = movementsWrapper.createDiv('finance-mov-scroll');
-    const movTable = scrollWrapper.createEl('table', { cls: 'finance-mov-table' });
+    const movTable = scrollWrapper.createEl('table', { cls: CSS_CLASS.FINANCE_MOV_TABLE });
     const movHead = movTable.createEl('thead').createEl('tr');
     [this.tr.type, this.tr.sum, this.tr.date, this.tr.note, ''].forEach(l => {
       movHead.createEl('th', { text: l, cls: 'finance-th finance-mov-th' });
@@ -110,13 +110,13 @@ export class DebtDetailModal extends FinanceBaseModal {
       const typeLabel = m.type === DebtMovementType.BORROW
         ? (isLent ? this.tr.gaveMore : this.tr.tookMore)
         : (isLent ? this.tr.returned : this.tr.repaymentAct);
-      mr.createEl('td', { text: typeLabel, cls: 'finance-td' });
+      mr.createEl('td', { text: typeLabel, cls: CSS_CLASS.FINANCE_TD });
       mr.createEl('td', {
         text: (m.type === DebtMovementType.BORROW ? '−' : '+') + this.ctx.fmt(m.amount),
         cls: `finance-td finance-td-mov-${m.type}`,
       });
-      mr.createEl('td', { text: fmtDate(m.date, m.time), cls: 'finance-td' });
-      mr.createEl('td', { text: m.note || '—', cls: 'finance-td' });
+      mr.createEl('td', { text: fmtDate(m.date, m.time), cls: CSS_CLASS.FINANCE_TD });
+      mr.createEl('td', { text: m.note || '—', cls: CSS_CLASS.FINANCE_TD });
 
       const actTd = mr.createEl('td', { cls: 'finance-td finance-actions-td' });
       const delBtn = actTd.createEl('button', { cls: 'finance-action-btn finance-delete-btn', text: '🗑️' });
@@ -159,7 +159,7 @@ export class DebtDetailModal extends FinanceBaseModal {
 
     const closeBtn = btnsWrap.createEl('button', {
       text: this.tr.close,
-      cls: 'finance-btn-cancel',
+      cls: CSS_CLASS.FINANCE_BTN_CANCEL,
     });
     closeBtn.addEventListener('click', () => this.close());
   }

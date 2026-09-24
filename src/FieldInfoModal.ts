@@ -1,4 +1,5 @@
 import { App } from 'obsidian';
+import { CSS_CLASS } from './constants';
 import { getLocaleFromApp, t, Translations } from './i18n';
 import { FinanceBaseModal } from './ui/FinanceBaseModal';
 
@@ -79,7 +80,7 @@ export class FieldInfoModal extends FinanceBaseModal {
     });
 
     const btnRow = contentEl.createDiv('finance-modal-btns finance-info-btns');
-    btnRow.createEl('button', { text: this.tr.close, cls: 'finance-btn-save' })
+    btnRow.createEl('button', { text: this.tr.close, cls: CSS_CLASS.FINANCE_BTN_SAVE })
       .addEventListener('click', () => this.close());
   }
 }

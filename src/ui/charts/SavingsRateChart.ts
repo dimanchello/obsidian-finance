@@ -1,15 +1,10 @@
-import { ViewContext } from '../../context';
 import {
   FinanceRecord,
   OVERVIEW_TREND_MONTHS,
   OVERVIEW_CHART_HEIGHT,
   OVERVIEW_CHART_PAD_LEFT,
-  OVERVIEW_CHART_PAD_RIGHT,
   OVERVIEW_CHART_PAD_TOP,
-  OVERVIEW_CHART_PAD_BOTTOM,
   OVERVIEW_LABEL_OFFSET_Y,
-  OVERVIEW_MIN_GROUP_W,
-  OVERVIEW_MIN_GROUP_W_MOBILE,
   OVERVIEW_MAX_BAR_W,
   OVERVIEW_BAR_SPACING_PAD,
   OVERVIEW_BAR_RADIUS,
@@ -20,18 +15,14 @@ import {
   DEFAULT_FILTER,
   AccountMode,
 } from '../../types';
-import { createChartTooltip, svg } from '../chartHelpers';
-import { calcSavingsRateOverTime, SavingsRateMonth } from '../../domain/overviewMetrics';
+import { svg } from '../chartHelpers';
+import { calcSavingsRateOverTime, SavingsRateMonth } from '../../domain/metrics';
 import { daysInMonth } from '../../domain/dateMath';
 import { OverviewRecordsModal } from '../../modals/OverviewRecordsModal';
+import { formatChartAmount } from '../../domain/formattingHelpers';
+import { BaseChart } from './BaseChart';
 
-export class SavingsRateChart {
-  private ctx: ViewContext;
-  private tooltip = createChartTooltip();
-
-  constructor(ctx: ViewContext) {
-    this.ctx = ctx;
-  }
+export class SavingsRateChart extends BaseChart {
 
   destroy(): void {
     this.tooltip.destroy();
@@ -44,22 +35,7 @@ export class SavingsRateChart {
     onNavigate?: (mode: AccountMode) => void,
     trendMonths: number = OVERVIEW_TREND_MONTHS
   ): void {
-    const { tr, state, isMobile } = this.ctx;
-    const chartWrap = parent.createDiv('finance-chart-wrap');
-    chartWrap.createEl('h3', { text: tr.overviewSavingsRateChart, cls: 'finance-chart-title' });
-
-    const legend = chartWrap.createDiv('finance-chart-legend');
-    const itemTarget = legend.createDiv('finance-chart-legend-item');
-    itemTarget.createSpan({ cls: 'finance-chart-legend-dot target' });
-    itemTarget.createSpan({ text: tr.savingsTarget });
-
-    const itemMod = legend.createDiv('finance-chart-legend-item');
-    itemMod.createSpan({ cls: 'finance-chart-legend-dot moderate' });
-    itemMod.createSpan({ text: tr.savingsModerate });
-
-    const itemDef = legend.createDiv('finance-chart-legend-item');
-    itemDef.createSpan({ cls: 'finance-chart-legend-dot deficit' });
-    itemDef.createSpan({ text: tr.savingsDeficit });
+    const { tr, state } = this.ctx;
 
     const savingsData = calcSavingsRateOverTime(
       records,
@@ -69,39 +45,36 @@ export class SavingsRateChart {
       trendMonths
     );
 
+    const { chartWrap, scrollWrap } = this.createChartWrapper(parent, tr.overviewSavingsRateChart);
+
+    this.renderLegend(chartWrap, [
+      { label: tr.savingsTarget, cssClass: 'target' },
+      { label: tr.savingsModerate, cssClass: 'moderate' },
+      { label: tr.savingsDeficit, cssClass: 'deficit' },
+    ]);
+
     if (savingsData.length === 0 || savingsData.every(d => d.income === 0 && d.expense === 0)) {
-      chartWrap.createEl('p', { text: tr.noChartData, cls: 'finance-no-data' });
+      this.renderNoData(chartWrap, tr.noChartData);
       return;
     }
 
-    const minGroupW = isMobile ? OVERVIEW_MIN_GROUP_W_MOBILE : OVERVIEW_MIN_GROUP_W;
     const containerWidth = chartWrap.clientWidth || 400;
-    const calculatedWidth = OVERVIEW_CHART_PAD_LEFT + savingsData.length * minGroupW + OVERVIEW_CHART_PAD_RIGHT;
-    const chartWidth = Math.max(containerWidth, calculatedWidth);
+    const dims = this.calculateChartDimensions(containerWidth, savingsData.length);
 
-    const plotWidth = chartWidth - OVERVIEW_CHART_PAD_LEFT - OVERVIEW_CHART_PAD_RIGHT;
-    const plotHeight = OVERVIEW_CHART_HEIGHT - OVERVIEW_CHART_PAD_TOP - OVERVIEW_CHART_PAD_BOTTOM;
-
-    const groupWidth = plotWidth / savingsData.length;
+    const groupWidth = dims.plotWidth / savingsData.length;
     const barWidth = Math.min(OVERVIEW_MAX_BAR_W, Math.max(6, groupWidth - OVERVIEW_BAR_SPACING_PAD));
 
-    const scrollWrap = chartWrap.createDiv('finance-overview-chart-scroll');
-    const svg_el = svg('svg', {
-      width: chartWidth,
-      height: OVERVIEW_CHART_HEIGHT,
-      viewBox: `0 0 ${chartWidth} ${OVERVIEW_CHART_HEIGHT}`,
-      class: 'finance-chart-svg',
-    });
+    const svg_el = this.createSvg(dims.chartWidth, dims.chartHeight);
 
-    const baselineY = OVERVIEW_CHART_PAD_TOP + plotHeight / 2;
+    const baselineY = OVERVIEW_CHART_PAD_TOP + dims.plotHeight / 2;
 
     // Grid lines: +100%, +50%, 0%, -50%, -100%
     SAVINGS_RATE_TICKS.forEach(rate => {
-      const y = OVERVIEW_CHART_PAD_TOP + plotHeight * (1 - (rate + PERCENT_100) / SAVINGS_RATE_RANGE);
+      const y = OVERVIEW_CHART_PAD_TOP + dims.plotHeight * (1 - (rate + PERCENT_100) / SAVINGS_RATE_RANGE);
       const line = svg('line', {
         x1: OVERVIEW_CHART_PAD_LEFT,
         y1: y,
-        x2: OVERVIEW_CHART_PAD_LEFT + plotWidth,
+        x2: OVERVIEW_CHART_PAD_LEFT + dims.plotWidth,
         y2: y,
         stroke: rate === 0 ? 'var(--text-muted)' : 'var(--background-modifier-border)',
         'stroke-width': rate === 0 ? 1.5 : 1,
@@ -121,11 +94,11 @@ export class SavingsRateChart {
     });
 
     // 20% benchmark reference line (golden standard)
-    const benchmarkY = OVERVIEW_CHART_PAD_TOP + plotHeight * (1 - (OVERVIEW_SAVINGS_BENCHMARK + PERCENT_100) / SAVINGS_RATE_RANGE);
+    const benchmarkY = OVERVIEW_CHART_PAD_TOP + dims.plotHeight * (1 - (OVERVIEW_SAVINGS_BENCHMARK + PERCENT_100) / SAVINGS_RATE_RANGE);
     const benchmarkLine = svg('line', {
       x1: OVERVIEW_CHART_PAD_LEFT,
       y1: benchmarkY,
-      x2: OVERVIEW_CHART_PAD_LEFT + plotWidth,
+      x2: OVERVIEW_CHART_PAD_LEFT + dims.plotWidth,
       y2: benchmarkY,
       stroke: 'var(--color-green)',
       'stroke-width': 1,
@@ -137,7 +110,7 @@ export class SavingsRateChart {
     savingsData.forEach((d: SavingsRateMonth, i: number) => {
       const cx = OVERVIEW_CHART_PAD_LEFT + i * groupWidth + groupWidth / 2;
       const clampedRate = Math.max(-PERCENT_100, Math.min(PERCENT_100, d.savingsRate));
-      const rateHeight = (Math.abs(clampedRate) / SAVINGS_RATE_RANGE) * plotHeight;
+      const rateHeight = (Math.abs(clampedRate) / SAVINGS_RATE_RANGE) * dims.plotHeight;
       const barY = clampedRate >= 0 ? baselineY - rateHeight : baselineY;
 
       const barColor =
@@ -172,7 +145,7 @@ export class SavingsRateChart {
 
       const label = svg('text', {
         x: cx,
-        y: OVERVIEW_CHART_PAD_TOP + plotHeight + OVERVIEW_LABEL_OFFSET_Y,
+        y: OVERVIEW_CHART_PAD_TOP + dims.plotHeight + OVERVIEW_LABEL_OFFSET_Y,
         'text-anchor': 'middle',
         fill: 'var(--text-muted)',
         'font-size': '11px',
@@ -180,7 +153,7 @@ export class SavingsRateChart {
       label.textContent = d.label.slice(5);
       colGroup.appendChild(label);
 
-      const tipText = `${d.label}\n${tr.overviewSavingsRate}: ${clampedRate.toFixed(1)}%\n${tr.income}: ${this.fmt(d.income)}\n${tr.expense}: ${this.fmt(d.expense)}\n${tr.balance}: ${(d.savings >= 0 ? '+' : '') + this.fmt(d.savings)}`;
+      const tipText = `${d.label}\n${tr.overviewSavingsRate}: ${clampedRate.toFixed(1)}%\n${tr.income}: ${formatChartAmount(d.income, this.ctx.currency)}\n${tr.expense}: ${formatChartAmount(d.expense, this.ctx.currency)}\n${tr.balance}: ${d.savings >= 0 ? '+' : ''}${formatChartAmount(d.savings, this.ctx.currency)}`;
       colGroup.addEventListener('mouseenter', e => this.tooltip.showTip(e, tipText));
       colGroup.addEventListener('mousemove', e => this.tooltip.showTip(e, tipText));
       colGroup.addEventListener('mouseleave', () => this.tooltip.hideTip());
@@ -218,13 +191,5 @@ export class SavingsRateChart {
     });
 
     scrollWrap.appendChild(svg_el);
-  }
-
-  private fmt(amount: number): string {
-    return (
-      amount.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) +
-      ' ' +
-      this.ctx.currency
-    );
   }
 }

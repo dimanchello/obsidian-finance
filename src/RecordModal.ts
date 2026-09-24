@@ -1,5 +1,6 @@
 import { App, Platform } from 'obsidian';
-import {
+import { CSS_CLASS } from './constants';
+import { 
   FinanceRecord, RecordType, PluginSettings,
   AUTOFILL_BADGE_MS, AUTOFILL_DEBOUNCE_MS, MODAL_FOCUS_DELAY_MS,
   MOBILE_BREAKPOINT,
@@ -11,6 +12,7 @@ import { buildCalculatorIcon } from './ui/icons';
 import { buildAttachmentField } from './ui/attachmentField';
 import { EntityModal } from './ui/EntityModal';
 import { buildDateTimeField, buildComboboxField, buildNoteField } from './ui/formHelpers';
+import { validatePositiveAmount } from './domain/validators';
 
 export interface RecordModalOptions {
   initial:    Partial<FinanceRecord>;
@@ -73,7 +75,7 @@ export class RecordModal extends EntityModal<FinanceRecord> {
     const amtG = rowAmt.createDiv('finance-field-group finance-amount-group');
     amtG.createEl('label', {
       text: this.tr.amountRequired.replace('{currency}', this.o.currency),
-      cls: 'finance-field-label',
+      cls: CSS_CLASS.FINANCE_FIELD_LABEL,
     });
     const amtRow = amtG.createDiv('finance-amount-row');
 
@@ -156,10 +158,10 @@ export class RecordModal extends EntityModal<FinanceRecord> {
   }
 
   protected validate(): string | null {
-    const amount = parseAmount(this.amountInput.value);
-    if (!amount || amount <= 0) {
+    const result = validatePositiveAmount(this.amountInput.value, this.tr.invalidAmount);
+    if ('error' in result) {
       this.amountInput.focus();
-      return this.tr.invalidAmount;
+      return result.error;
     }
     return null;
   }
@@ -189,15 +191,15 @@ export class RecordModal extends EntityModal<FinanceRecord> {
   private applyType(type: RecordType): void {
     this.entity.type = type;
     this.incomeBtn.classList.toggle('active', type === RecordType.INCOME);
-    this.incomeBtn.classList.toggle('income', type === RecordType.INCOME);
+    this.incomeBtn.classList.toggle(CSS_CLASS.INCOME, type === RecordType.INCOME);
     this.expenseBtn.classList.toggle('active', type === RecordType.EXPENSE);
-    this.expenseBtn.classList.toggle('expense', type === RecordType.EXPENSE);
+    this.expenseBtn.classList.toggle(CSS_CLASS.EXPENSE, type === RecordType.EXPENSE);
   }
 
   private updateAmountColor(): void {
     if (!this.amountInput) return;
-    this.amountInput.classList.toggle('income-color', this.entity.type === RecordType.INCOME);
-    this.amountInput.classList.toggle('expense-color', this.entity.type === RecordType.EXPENSE);
+    this.amountInput.classList.toggle(CSS_CLASS.INCOME_COLOR, this.entity.type === RecordType.INCOME);
+    this.amountInput.classList.toggle(CSS_CLASS.EXPENSE_COLOR, this.entity.type === RecordType.EXPENSE);
   }
 
   private buildAutocomplete(
@@ -221,7 +223,7 @@ export class RecordModal extends EntityModal<FinanceRecord> {
       intBtn.addEventListener('click', () => {
         internalState = !internalState;
         opts.onToggleInternal?.(internalState);
-        intBtn.classList.toggle('is-active', internalState);
+        intBtn.classList.toggle(CSS_CLASS.IS_ACTIVE, internalState);
       });
     }
     return input;

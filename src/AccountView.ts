@@ -1,6 +1,7 @@
 import { App, MarkdownRenderChild, Notice, Platform } from 'obsidian';
+import { CSS_CLASS } from './constants';
 import { FinanceStorage } from './storage';
-import {
+import { 
   AccountData, PluginSettings, MOBILE_BREAKPOINT, RecordType, AccountMode,
 } from './types';
 import { getTodayStr, getTodayTime } from './utils';
@@ -147,7 +148,7 @@ export class AccountView extends MarkdownRenderChild {
   }
 
   private renderBodyContent(): void {
-    document.querySelectorAll('.finance-bar-tooltip').forEach(el => el.classList.remove('is-visible'));
+    document.querySelectorAll('.finance-bar-tooltip').forEach(el => el.classList.remove(CSS_CLASS.IS_VISIBLE));
     const body = this.root.querySelector<HTMLElement>('.finance-body');
     if (!body) return;
     body.empty();
@@ -183,11 +184,11 @@ export class AccountView extends MarkdownRenderChild {
     const actions = this.header.actionsContainer;
 
     const incBtn = actions.createEl('button', { cls: 'finance-add-btn finance-income-btn' });
-    incBtn.createSpan({ text: '↑', cls: 'btn-icon' });
+    incBtn.createSpan({ text: '↑', cls: CSS_CLASS.BTN_ICON });
     incBtn.createSpan({ text: this.ctx.tr.typeIncome });
 
     const expBtn = actions.createEl('button', { cls: 'finance-add-btn finance-expense-btn' });
-    expBtn.createSpan({ text: '↓', cls: 'btn-icon' });
+    expBtn.createSpan({ text: '↓', cls: CSS_CLASS.BTN_ICON });
     expBtn.createSpan({ text: this.ctx.tr.typeExpense });
 
     incBtn.addEventListener('click', () => { this.mode = AccountMode.RECORDS; this.renderBodyContent(); this.openAddModal(RecordType.INCOME); });

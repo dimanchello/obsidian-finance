@@ -1,9 +1,10 @@
 import { fmtDate } from "../utils";
+import { CSS_CLASS } from '../constants';
 import { Notice } from 'obsidian';
 import { ViewContext } from '../context';
-import {
+import { 
   CurrencyExchange, CurrencyOperationType, RecordType,
-  CurrencySortField, DEFAULT_CURRENCY_FILTER, SortDir,
+  CurrencySortField, DEFAULT_CURRENCY_FILTER,
 } from '../types';
 import { CurrencyExchangeModal } from '../modals/CurrencyExchangeModal';
 import { ConfirmModal } from '../ConfirmModal';
@@ -13,6 +14,8 @@ import { fmt } from '../utils';
 import { AccountCommands } from '../domain/AccountCommands';
 import { renderSummaryCard } from '../ui/statCards';
 import { renderCompactTransactionCard } from '../ui/tabHelpers';
+import { matchesAnyField, matchesStringFilter, matchesDateRange } from '../domain/filterUtils';
+import { createTableStateAdapter } from './tabUtils';
 
 export class CurrencyTab {
   private ctx: ViewContext;
@@ -51,7 +54,7 @@ export class CurrencyTab {
       rowCls: e => [(e.type === CurrencyOperationType.BUY || e.type === CurrencyOperationType.ADD) ? 'finance-row-income' : 'finance-row-expense'],
       rowActions: e => [
         { icon: '✏️', title: this.tr.edit, onClick: () => this.openModal(e.type, e) },
-        { icon: '🗑️', title: this.tr.delete, onClick: () => this.confirmDeleteExchange(e), cls: 'finance-delete-btn' },
+        { icon: '🗑️', title: this.tr.delete, onClick: () => this.confirmDeleteExchange(e), cls: CSS_CLASS.FINANCE_DELETE_BTN },
       ],
       actionsPosition: 'custom',
       cardCls: 'finance-compact-card',
@@ -64,15 +67,18 @@ export class CurrencyTab {
         { field: 'targetCurrency', label: this.tr.currency },
         { field: 'provider', label: this.tr.provider },
       ],
-      state: {
-        getPage: () => this.ctx.state.currencyPage ?? 0,
-        setPage: p => { this.ctx.state.currencyPage = p; },
-        getSort: () => this.ctx.state.currencySort ?? { field: 'date', dir: 'desc' },
-        setSort: s => { this.ctx.state.currencySort = s as { field: CurrencySortField; dir: SortDir }; },
-        resetFilter: () => { this.ctx.state.currencyFilter = { ...DEFAULT_CURRENCY_FILTER }; },
-        getColumns: () => (this.ctx.state.currencyColumns ??= {}),
-        setColumns: c => { this.ctx.state.currencyColumns = c; },
-      },
+      state: createTableStateAdapter(
+        this.ctx,
+        {
+          page: 'currencyPage',
+          sort: 'currencySort',
+          columns: 'currencyColumns',
+        },
+        {
+          sort: { field: 'date', dir: 'desc' },
+        },
+        () => { this.ctx.state.currencyFilter = { ...DEFAULT_CURRENCY_FILTER }; }
+      ),
       renderStats: host => this.ctx.renderRecordsStats(host),
       renderPanels: host => {
         if (this.openPanel === 'analytics') {
@@ -159,7 +165,7 @@ export class CurrencyTab {
   public renderHeaderActions(container: HTMLElement): void {
     const createBtn = (label: string, icon: string, type: CurrencyOperationType, cls = '') => {
       const btn = container.createEl('button', { cls: `finance-add-btn finance-currency-btn ${cls}`.trim() });
-      btn.createSpan({ text: icon, cls: 'btn-icon' });
+      btn.createSpan({ text: icon, cls: CSS_CLASS.BTN_ICON });
       btn.createSpan({ text: label, cls: 'finance-currency-btn-text' });
       btn.addEventListener('click', () => this.openModal(type));
     };
@@ -283,24 +289,19 @@ export class CurrencyTab {
     if (!this.ctx.data) return [];
     const f = this.ctx.state.currencyFilter ?? DEFAULT_CURRENCY_FILTER;
     const s = this.ctx.state.currencySort ?? { field: 'date', dir: 'desc' };
-    
+
     let result = [...this.ctx.data.exchanges];
-    
-    if (f.search) {
-      const q = f.search.toLowerCase();
-      result = result.filter(e => 
-        e.provider.toLowerCase().includes(q) || 
-        (e.category?.toLowerCase().includes(q) ?? false) ||
-        (e.note?.toLowerCase().includes(q) ?? false)
-      );
-    }
-    if (f.type !== 'all') result = result.filter(e => e.type === f.type);
-    if (f.targetCurrency) result = result.filter(e => e.targetCurrency === f.targetCurrency);
-    if (f.provider) result = result.filter(e => e.provider === f.provider);
-    if (f.category) result = result.filter(e => e.category === f.category);
-    if (f.dateFrom) result = result.filter(e => e.date >= f.dateFrom);
-    if (f.dateTo) result = result.filter(e => e.date <= f.dateTo);
-    
+
+    result = result.filter(e => {
+      if (!matchesAnyField([e.provider, e.category ?? '', e.note ?? ''], f.search)) return false;
+      if (!matchesStringFilter(e.type, f.type === 'all' ? '' : f.type)) return false;
+      if (!matchesStringFilter(e.targetCurrency, f.targetCurrency)) return false;
+      if (!matchesStringFilter(e.provider, f.provider)) return false;
+      if (!matchesStringFilter(e.category ?? '', f.category ?? '')) return false;
+      if (!matchesDateRange(e.date, f.dateFrom, f.dateTo)) return false;
+      return true;
+    });
+
     result.sort((a, b) => {
       let cmp = 0;
       if (s.field === 'amount') cmp = a.amountInAccountCurrency - b.amountInAccountCurrency;
@@ -312,7 +313,7 @@ export class CurrencyTab {
       }
       return s.dir === 'asc' ? cmp : -cmp;
     });
-    
+
     return result;
   }
 

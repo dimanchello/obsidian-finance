@@ -4,7 +4,8 @@ import { parseAmount, getTodayStr, normalizeDateStr } from './utils';
 import { createAmountInput } from './ui/AmountInput';
 import { EntityModal } from './ui/EntityModal';
 import { buildDateField, buildNoteField } from './ui/formHelpers';
-import { PaymentStatus } from './constants';
+import { CSS_CLASS, PaymentStatus} from './constants';
+import { validatePositiveAmount } from './domain/validators';
 
 export interface CreditPaymentOptions {
   title: string;
@@ -40,7 +41,7 @@ export class CreditPaymentModal extends EntityModal<CreditPayment> {
     });
 
     const amtG = form.createDiv('finance-field-group finance-amount-group');
-    amtG.createEl('label', { text: this.tr.sum, cls: 'finance-field-label' });
+    amtG.createEl('label', { text: this.tr.sum, cls: CSS_CLASS.FINANCE_FIELD_LABEL });
     this.amountInput = createAmountInput(amtG, {
       value: this.o.credit.monthlyPayment,
       onChange: () => { /* read on save */ },
@@ -56,8 +57,8 @@ export class CreditPaymentModal extends EntityModal<CreditPayment> {
   }
 
   protected validate(): string | null {
-    const amount = parseAmount(this.amountInput.value);
-    if (!amount || amount <= 0) return this.tr.invalidAmount;
+    const result = validatePositiveAmount(this.amountInput.value, this.tr.invalidAmount);
+    if ('error' in result) return result.error;
     return null;
   }
 

@@ -1,20 +1,13 @@
-import { ViewContext } from '../../context';
 import { CreditRecord, FinanceRecord } from '../../types';
 import {
   calcCreditBurdenOverTime,
   CreditBurdenMonth,
-} from '../../domain/overviewMetrics';
-import { createChartTooltip, fmtShort, svg } from '../chartHelpers';
+} from '../../domain/metrics';
+import { fmtShort, svg } from '../chartHelpers';
 import {
-  OVERVIEW_CHART_HEIGHT,
   OVERVIEW_CHART_PAD_LEFT,
-  OVERVIEW_CHART_PAD_RIGHT,
   OVERVIEW_CHART_PAD_TOP,
-  OVERVIEW_CHART_PAD_BOTTOM,
   OVERVIEW_LABEL_OFFSET_Y,
-  OVERVIEW_MIN_GROUP_W,
-  OVERVIEW_MIN_GROUP_W_MOBILE,
-  OVERVIEW_Y_TICKS,
   OVERVIEW_MAX_BAR_W,
   OVERVIEW_BAR_SPACING_PAD,
   OVERVIEW_BAR_RADIUS,
@@ -24,19 +17,14 @@ import {
   OVERVIEW_TREND_MONTHS,
   PERCENT_100,
 } from '../../types';
+import { BaseChart } from './BaseChart';
 
 /**
  * BurdenChart: визуализация кредитной нагрузки во времени.
  * Показывает основной долг (синий) и проценты (оранжевый) в виде стэков,
  * а также линию процента кредитной нагрузки от дохода.
  */
-export class BurdenChart {
-  private ctx: ViewContext;
-  private tooltip = createChartTooltip();
-
-  constructor(ctx: ViewContext) {
-    this.ctx = ctx;
-  }
+export class BurdenChart extends BaseChart {
 
   /**
    * Рендерит график кредитной нагрузки
@@ -59,9 +47,6 @@ export class BurdenChart {
   ): void {
     const { tr } = this.ctx;
 
-    const chartWrap = parent.createDiv('finance-chart-wrap');
-    chartWrap.createEl('h3', { text: tr.overviewCreditBurdenChart, cls: 'finance-chart-title' });
-
     const burdenData = calcCreditBurdenOverTime(
       credits,
       records,
@@ -71,38 +56,31 @@ export class BurdenChart {
       trendMonths
     );
 
+    const { chartWrap, scrollWrap } = this.createChartWrapper(parent, tr.overviewCreditBurdenChart);
+
     if (burdenData.length === 0 || burdenData.every(d => d.total === 0)) {
-      chartWrap.createEl('p', { text: tr.noChartData, cls: 'finance-no-data' });
+      this.renderNoData(chartWrap, tr.noChartData);
       return;
     }
 
     const maxValue = Math.max(...burdenData.map(d => d.total));
-    const minGroupW = this.ctx.isMobile ? OVERVIEW_MIN_GROUP_W_MOBILE : OVERVIEW_MIN_GROUP_W;
     const containerWidth = chartWrap.clientWidth || 400;
-    const calculatedWidth = OVERVIEW_CHART_PAD_LEFT + burdenData.length * minGroupW + OVERVIEW_CHART_PAD_RIGHT;
-    const chartWidth = Math.max(containerWidth, calculatedWidth);
+    const dims = this.calculateChartDimensions(containerWidth, burdenData.length);
 
-    const plotWidth = chartWidth - OVERVIEW_CHART_PAD_LEFT - OVERVIEW_CHART_PAD_RIGHT;
-    const plotHeight = OVERVIEW_CHART_HEIGHT - OVERVIEW_CHART_PAD_TOP - OVERVIEW_CHART_PAD_BOTTOM;
-
-    const spacing = plotWidth / burdenData.length;
+    const spacing = dims.plotWidth / burdenData.length;
     const barWidth = Math.min(OVERVIEW_MAX_BAR_W, Math.max(4, spacing - OVERVIEW_BAR_SPACING_PAD));
 
-    const scrollWrap = chartWrap.createDiv('finance-overview-chart-scroll');
-    const svg_el = svg('svg', {
-      width: chartWidth,
-      height: OVERVIEW_CHART_HEIGHT,
-      viewBox: `0 0 ${chartWidth} ${OVERVIEW_CHART_HEIGHT}`,
-      class: 'finance-chart-svg',
-    });
+    const svg_el = this.createSvg(dims.chartWidth, dims.chartHeight);
 
-    const baselineY = OVERVIEW_CHART_PAD_TOP + plotHeight;
+    const baselineY = OVERVIEW_CHART_PAD_TOP + dims.plotHeight;
 
     // Y-axis grid
-    this.renderYAxisGrid(svg_el, plotWidth, plotHeight, maxValue);
+    this.renderYAxisGrid(svg_el, dims.plotWidth, dims.plotHeight, maxValue, {
+      formatLabel: (v: number) => fmtShort(v),
+    });
 
     // Stacked bars and burden line
-    const burdenPoints = this.renderStackedBars(svg_el, burdenData, spacing, barWidth, baselineY, plotHeight, maxValue);
+    const burdenPoints = this.renderStackedBars(svg_el, burdenData, spacing, barWidth, baselineY, dims.plotHeight, maxValue);
 
     // Burden percentage trend line
     this.renderBurdenLine(svg_el, burdenPoints);
@@ -111,32 +89,6 @@ export class BurdenChart {
     this.renderBurdenPoints(svg_el, burdenPoints);
 
     scrollWrap.appendChild(svg_el);
-  }
-
-  private renderYAxisGrid(svg_el: SVGElement, plotWidth: number, plotHeight: number, maxValue: number): void {
-    for (let i = 0; i <= OVERVIEW_Y_TICKS; i++) {
-      const y = OVERVIEW_CHART_PAD_TOP + plotHeight * (1 - i / OVERVIEW_Y_TICKS);
-      const line = svg('line', {
-        x1: OVERVIEW_CHART_PAD_LEFT,
-        y1: y,
-        x2: OVERVIEW_CHART_PAD_LEFT + plotWidth,
-        y2: y,
-        stroke: 'var(--background-modifier-border)',
-        'stroke-width': 1,
-        'stroke-dasharray': '2,2',
-      });
-      svg_el.appendChild(line);
-
-      const label = svg('text', {
-        x: OVERVIEW_CHART_PAD_LEFT - 8,
-        y: y + 4,
-        'text-anchor': 'end',
-        fill: 'var(--text-muted)',
-        'font-size': '11px',
-      });
-      label.textContent = fmtShort((maxValue * i) / OVERVIEW_Y_TICKS);
-      svg_el.appendChild(label);
-    }
   }
 
   private renderStackedBars(
@@ -251,9 +203,5 @@ export class BurdenChart {
       });
       svg_el.appendChild(point);
     });
-  }
-
-  private fmt(n: number): string {
-    return this.ctx.fmt(n);
   }
 }

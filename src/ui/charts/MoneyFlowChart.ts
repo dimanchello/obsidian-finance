@@ -1,41 +1,29 @@
-import { ViewContext } from '../../context';
 import { FinanceRecord } from '../../types';
 import {
   groupRecordsByMonth,
   MonthGroup,
-} from '../../domain/overviewMetrics';
-import { createChartTooltip, fmtShort, svg } from '../chartHelpers';
+} from '../../domain/metrics';
+import { fmtShort, svg } from '../chartHelpers';
 import {
-  OVERVIEW_CHART_HEIGHT,
   OVERVIEW_CHART_PAD_LEFT,
-  OVERVIEW_CHART_PAD_RIGHT,
   OVERVIEW_CHART_PAD_TOP,
-  OVERVIEW_CHART_PAD_BOTTOM,
   OVERVIEW_LABEL_OFFSET_Y,
   OVERVIEW_BAR_GAP,
   OVERVIEW_GROUP_GAP,
-  OVERVIEW_MIN_GROUP_W,
-  OVERVIEW_MIN_GROUP_W_MOBILE,
-  OVERVIEW_Y_TICKS,
   OVERVIEW_MAX_BAR_W,
   OVERVIEW_BAR_RADIUS,
   OVERVIEW_LINE_STROKE_W,
   OVERVIEW_POINT_RADIUS,
   OVERVIEW_POINT_RADIUS_HOVER,
 } from '../../types';
+import { BaseChart } from './BaseChart';
 
 /**
  * MoneyFlowChart: визуализация доходов, расходов и чистого баланса по месяцам.
  * Отображает столбчатый график с доходами (зелёный) и расходами (красный),
  * а также линию тренда чистого баланса.
  */
-export class MoneyFlowChart {
-  private ctx: ViewContext;
-  private tooltip = createChartTooltip();
-
-  constructor(ctx: ViewContext) {
-    this.ctx = ctx;
-  }
+export class MoneyFlowChart extends BaseChart {
 
   /**
    * Рендерит график в указанный контейнер.
@@ -45,12 +33,12 @@ export class MoneyFlowChart {
   render(parent: HTMLElement, records: FinanceRecord[]): void {
     const { tr } = this.ctx;
 
-    const chartWrap = parent.createDiv('finance-chart-wrap');
-    chartWrap.createEl('h3', { text: tr.overviewMoneyFlow, cls: 'finance-chart-title' });
-
     const groups = groupRecordsByMonth(records);
+
+    const { chartWrap, scrollWrap } = this.createChartWrapper(parent, tr.overviewMoneyFlow);
+
     if (groups.length === 0) {
-      chartWrap.createEl('p', { text: tr.noChartData, cls: 'finance-no-data' });
+      this.renderNoData(chartWrap, tr.noChartData);
       return;
     }
 
@@ -58,33 +46,24 @@ export class MoneyFlowChart {
       ...groups.map((g: MonthGroup) => Math.max(g.income, g.expense))
     );
 
-    const minGroupW = this.ctx.isMobile ? OVERVIEW_MIN_GROUP_W_MOBILE : OVERVIEW_MIN_GROUP_W;
     const containerWidth = chartWrap.clientWidth || 400;
-    const calculatedWidth = OVERVIEW_CHART_PAD_LEFT + groups.length * minGroupW + OVERVIEW_CHART_PAD_RIGHT;
-    const chartWidth = Math.max(containerWidth, calculatedWidth);
+    const dims = this.calculateChartDimensions(containerWidth, groups.length);
 
-    const plotWidth = chartWidth - OVERVIEW_CHART_PAD_LEFT - OVERVIEW_CHART_PAD_RIGHT;
-    const plotHeight = OVERVIEW_CHART_HEIGHT - OVERVIEW_CHART_PAD_TOP - OVERVIEW_CHART_PAD_BOTTOM;
-
-    const groupWidth = plotWidth / groups.length;
+    const groupWidth = dims.plotWidth / groups.length;
     const rawBarWidth = (groupWidth - OVERVIEW_GROUP_GAP - OVERVIEW_BAR_GAP) / 2;
     const barWidth = Math.min(OVERVIEW_MAX_BAR_W, Math.max(2, rawBarWidth));
 
-    const scrollWrap = chartWrap.createDiv('finance-overview-chart-scroll');
-    const svg_el = svg('svg', {
-      width: chartWidth,
-      height: OVERVIEW_CHART_HEIGHT,
-      viewBox: `0 0 ${chartWidth} ${OVERVIEW_CHART_HEIGHT}`,
-      class: 'finance-chart-svg',
-    });
+    const svg_el = this.createSvg(dims.chartWidth, dims.chartHeight);
 
-    const baselineY = OVERVIEW_CHART_PAD_TOP + plotHeight;
+    const baselineY = OVERVIEW_CHART_PAD_TOP + dims.plotHeight;
 
     // Y-axis grid and labels
-    this.renderYAxisGrid(svg_el, plotWidth, plotHeight, maxValue);
+    this.renderYAxisGrid(svg_el, dims.plotWidth, dims.plotHeight, maxValue, {
+      formatLabel: (v: number) => fmtShort(v),
+    });
 
     // Bars and net line
-    const netPoints = this.renderBars(svg_el, groups, groupWidth, barWidth, baselineY, plotHeight, maxValue);
+    const netPoints = this.renderBars(svg_el, groups, groupWidth, barWidth, baselineY, dims.plotHeight, maxValue);
 
     // Net balance trend line
     this.renderNetLine(svg_el, netPoints);
@@ -93,32 +72,6 @@ export class MoneyFlowChart {
     this.renderNetPoints(svg_el, netPoints);
 
     scrollWrap.appendChild(svg_el);
-  }
-
-  private renderYAxisGrid(svg_el: SVGElement, plotWidth: number, plotHeight: number, maxValue: number): void {
-    for (let i = 0; i <= OVERVIEW_Y_TICKS; i++) {
-      const y = OVERVIEW_CHART_PAD_TOP + plotHeight * (1 - i / OVERVIEW_Y_TICKS);
-      const line = svg('line', {
-        x1: OVERVIEW_CHART_PAD_LEFT,
-        y1: y,
-        x2: OVERVIEW_CHART_PAD_LEFT + plotWidth,
-        y2: y,
-        stroke: 'var(--background-modifier-border)',
-        'stroke-width': 1,
-        'stroke-dasharray': '2,2',
-      });
-      svg_el.appendChild(line);
-
-      const label = svg('text', {
-        x: OVERVIEW_CHART_PAD_LEFT - 8,
-        y: y + 4,
-        'text-anchor': 'end',
-        fill: 'var(--text-muted)',
-        'font-size': '11px',
-      });
-      label.textContent = fmtShort((maxValue * i) / OVERVIEW_Y_TICKS);
-      svg_el.appendChild(label);
-    }
   }
 
   private renderBars(
@@ -314,9 +267,5 @@ export class MoneyFlowChart {
       });
       svg_el.appendChild(point);
     });
-  }
-
-  private fmt(n: number): string {
-    return this.ctx.fmt(n);
   }
 }

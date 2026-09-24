@@ -1,4 +1,5 @@
 import { App } from 'obsidian';
+import { CSS_CLASS } from './constants';
 import { getLocaleFromApp, t, Translations } from './i18n';
 import { FinanceBaseModal } from './ui/FinanceBaseModal';
 
@@ -63,9 +64,9 @@ export class CalculatorModal extends FinanceBaseModal {
     eqBtn.addEventListener('click', () => this.handleEquals());
 
     const btns = contentEl.createDiv('finance-modal-btns');
-    btns.createEl('button', { text: this.tr.cancel, cls: 'finance-btn-cancel' })
+    btns.createEl('button', { text: this.tr.cancel, cls: CSS_CLASS.FINANCE_BTN_CANCEL })
       .addEventListener('click', () => this.close());
-    btns.createEl('button', { text: this.tr.confirm, cls: 'finance-btn-save' })
+    btns.createEl('button', { text: this.tr.confirm, cls: CSS_CLASS.FINANCE_BTN_SAVE })
       .addEventListener('click', () => this.handleOk());
   }
 

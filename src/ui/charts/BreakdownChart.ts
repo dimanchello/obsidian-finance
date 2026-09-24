@@ -1,17 +1,12 @@
-import { ViewContext } from '../../context';
 import { FinanceRecord, OverviewGroupBy, OVERVIEW_MIN_BAR_PCT, PERCENT_100, DEFAULT_FILTER, AccountMode } from '../../types';
-import { createChartTooltip } from '../chartHelpers';
-import { calcGroupBreakdown } from '../../domain/overviewMetrics';
-import { isoWeekRange, daysInMonth } from '../../domain/dateMath';
+import { CSS_CLASS } from '../../constants';
+import { calcGroupBreakdown } from '../../domain/metrics';
 import { OverviewRecordsModal } from '../../modals/OverviewRecordsModal';
+import { formatChartAmount } from '../../domain/formattingHelpers';
+import { filterRecordsByGrouping } from '../../domain/filterUtils';
+import { BaseChart } from './BaseChart';
 
-export class BreakdownChart {
-  private ctx: ViewContext;
-  private tooltip = createChartTooltip();
-
-  constructor(ctx: ViewContext) {
-    this.ctx = ctx;
-  }
+export class BreakdownChart extends BaseChart {
 
   destroy(): void {
     this.tooltip.destroy();
@@ -26,7 +21,7 @@ export class BreakdownChart {
     const { tr, state } = this.ctx;
     const chartWrap = parent.createDiv('finance-chart-wrap');
 
-    chartWrap.createEl('h3', { text: tr.overviewBreakdown, cls: 'finance-chart-title' });
+    chartWrap.createEl('h3', { text: tr.overviewBreakdown, cls: CSS_CLASS.FINANCE_CHART_TITLE });
 
     const controls = chartWrap.createDiv('finance-chart-controls');
     controls.createSpan({ text: tr.groupBy, cls: 'finance-stat-label' });
@@ -57,7 +52,7 @@ export class BreakdownChart {
 
     const breakdown = calcGroupBreakdown(records, currentGroupBy, tr.other);
     if (breakdown.length === 0) {
-      chartWrap.createEl('p', { text: tr.noChartData, cls: 'finance-no-data' });
+      this.renderNoData(chartWrap, tr.noChartData);
       return;
     }
 
@@ -70,55 +65,14 @@ export class BreakdownChart {
 
       card.addEventListener('click', () => {
         this.tooltip.hideTip();
-        const from = state.overviewDateFrom ?? '';
-        const to = state.overviewDateTo ?? '';
 
         const nonInternalRecords = records.filter(r => !r.isInternal);
-        let sliceRecords: FinanceRecord[] = [];
-        let filterDateFrom = from;
-        let filterDateTo = to;
-
-        if (currentGroupBy === 'category') {
-          sliceRecords = nonInternalRecords.filter(r => (item.key === tr.other ? !r.category?.trim() : r.category?.trim() === item.key));
-        } else if (currentGroupBy === 'tag') {
-          sliceRecords = nonInternalRecords.filter(r => (item.key === tr.other ? !r.tag?.trim() : r.tag?.trim() === item.key));
-        } else if (currentGroupBy === 'payer') {
-          sliceRecords = nonInternalRecords.filter(r => (item.key === tr.other ? !r.payer?.trim() : r.payer?.trim() === item.key));
-        } else if (currentGroupBy === 'year') {
-          if (item.key === tr.other) {
-            sliceRecords = nonInternalRecords.filter(r => !r.date);
-            filterDateFrom = '';
-            filterDateTo = '';
-          } else {
-            filterDateFrom = `${item.key}-01-01`;
-            filterDateTo = `${item.key}-12-31`;
-            sliceRecords = nonInternalRecords.filter(r => r.date >= filterDateFrom && r.date <= filterDateTo);
-          }
-        } else if (currentGroupBy === 'month') {
-          if (item.key === tr.other) {
-            sliceRecords = nonInternalRecords.filter(r => !r.date);
-            filterDateFrom = '';
-            filterDateTo = '';
-          } else {
-            const [y, m] = item.key.split('-');
-            const lastDay = daysInMonth(Number(y), Number(m));
-            filterDateFrom = `${item.key}-01`;
-            filterDateTo = `${item.key}-${String(lastDay).padStart(2, '0')}`;
-            sliceRecords = nonInternalRecords.filter(r => r.date >= filterDateFrom && r.date <= filterDateTo);
-          }
-        } else if (currentGroupBy === 'week') {
-          if (item.key === tr.other) {
-            sliceRecords = nonInternalRecords.filter(r => !r.date);
-            filterDateFrom = '';
-            filterDateTo = '';
-          } else {
-            const [yStr, wStr] = item.key.split('-W');
-            const range = isoWeekRange(Number(yStr), Number(wStr));
-            filterDateFrom = range.from;
-            filterDateTo = range.to;
-            sliceRecords = nonInternalRecords.filter(r => r.date >= filterDateFrom && r.date <= filterDateTo);
-          }
-        }
+        const { records: sliceRecords, dateFrom: filterDateFrom, dateTo: filterDateTo } = filterRecordsByGrouping(
+          nonInternalRecords,
+          currentGroupBy,
+          item.key,
+          tr.other
+        );
 
         const handleNavigate = () => {
           this.ctx.state.filter = {
@@ -150,7 +104,7 @@ export class BreakdownChart {
       nameEl.title = item.key;
 
       const netEl = header.createDiv(`finance-breakdown-item-net ${item.net >= 0 ? 'income' : 'expense'}`);
-      netEl.textContent = (item.net > 0 ? '+' : '') + this.fmt(item.net);
+      netEl.textContent = (item.net > 0 ? '+' : '') + formatChartAmount(item.net, this.ctx.currency);
 
       if (item.income > 0) {
         const row = card.createDiv('finance-breakdown-bar-row');
@@ -159,9 +113,9 @@ export class BreakdownChart {
         const fill = track.createDiv('finance-breakdown-bar-fill income');
         const pct = Math.max(OVERVIEW_MIN_BAR_PCT, (item.income / maxVal) * PERCENT_100);
         fill.style.width = `${pct}%`;
-        row.createDiv({ text: `+${this.fmt(item.income)}`, cls: 'finance-breakdown-bar-amount income' });
+        row.createDiv({ text: `+${formatChartAmount(item.income, this.ctx.currency)}`, cls: 'finance-breakdown-bar-amount income' });
 
-        const tipText = `${item.key}\n${tr.income}: ${this.fmt(item.income)}`;
+        const tipText = `${item.key}\n${tr.income}: ${formatChartAmount(item.income, this.ctx.currency)}`;
         row.addEventListener('mouseenter', e => this.tooltip.showTip(e, tipText));
         row.addEventListener('mousemove', e => this.tooltip.showTip(e, tipText));
         row.addEventListener('mouseleave', () => this.tooltip.hideTip());
@@ -174,21 +128,13 @@ export class BreakdownChart {
         const fill = track.createDiv('finance-breakdown-bar-fill expense');
         const pct = Math.max(OVERVIEW_MIN_BAR_PCT, (item.expense / maxVal) * PERCENT_100);
         fill.style.width = `${pct}%`;
-        row.createDiv({ text: `-${this.fmt(item.expense)}`, cls: 'finance-breakdown-bar-amount expense' });
+        row.createDiv({ text: `-${formatChartAmount(item.expense, this.ctx.currency)}`, cls: 'finance-breakdown-bar-amount expense' });
 
-        const tipText = `${item.key}\n${tr.expense}: ${this.fmt(item.expense)}`;
+        const tipText = `${item.key}\n${tr.expense}: ${formatChartAmount(item.expense, this.ctx.currency)}`;
         row.addEventListener('mouseenter', e => this.tooltip.showTip(e, tipText));
         row.addEventListener('mousemove', e => this.tooltip.showTip(e, tipText));
         row.addEventListener('mouseleave', () => this.tooltip.hideTip());
       }
     });
-  }
-
-  private fmt(amount: number): string {
-    return (
-      amount.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) +
-      ' ' +
-      this.ctx.currency
-    );
   }
 }

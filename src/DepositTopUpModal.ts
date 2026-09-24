@@ -1,9 +1,11 @@
 import { App } from 'obsidian';
+import { CSS_CLASS } from './constants';
 import { DepositTopUp, DepositRecord } from './types';
 import { parseAmount, getTodayStr, getTodayTime, normalizeDateStr, normalizeTimeStr } from './utils';
 import { createAmountInput } from './ui/AmountInput';
 import { EntityModal } from './ui/EntityModal';
 import { buildDateTimeField, buildNoteField } from './ui/formHelpers';
+import { validatePositiveAmount } from './domain/validators';
 
 export interface DepositTopUpOptions {
   title: string;
@@ -40,7 +42,7 @@ export class DepositTopUpModal extends EntityModal<DepositTopUp> {
 
     const row1 = grid.createDiv('finance-form-row finance-full-width');
     const amtG = row1.createDiv('finance-field-group finance-amount-group');
-    amtG.createEl('label', { text: this.tr.topUpAmountLabel, cls: 'finance-field-label' });
+    amtG.createEl('label', { text: this.tr.topUpAmountLabel, cls: CSS_CLASS.FINANCE_FIELD_LABEL });
     this.amountInput = createAmountInput(amtG, { onChange: () => { /* read on save */ } }).input;
 
     const row2 = grid.createDiv('finance-form-row finance-full-width');
@@ -60,8 +62,8 @@ export class DepositTopUpModal extends EntityModal<DepositTopUp> {
   }
 
   protected validate(): string | null {
-    const amount = parseAmount(this.amountInput.value);
-    if (!amount || amount <= 0) return this.tr.invalidAmount;
+    const result = validatePositiveAmount(this.amountInput.value, this.tr.invalidAmount);
+    if ('error' in result) return result.error;
     return null;
   }
 

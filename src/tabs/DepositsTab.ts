@@ -21,7 +21,9 @@ import { DataTable, FilterControl } from '../ui/DataTable';
 import { DepositsAnalyticsView } from '../DepositsAnalyticsView';
 import { renderMobileCard, renderSummaryCard, renderProgressBar, renderPaginatedSchedule, renderPagination, dateRangeControls, compareValues } from '../ui/tabHelpers';
 import { AccountCommands } from '../domain/AccountCommands';
-import { DepositAccrualType, DepositStatus, DepositType, PaymentStatus } from '../constants';
+import { CSS_CLASS,  DepositAccrualType, DepositStatus, DepositType, PaymentStatus  } from '../constants';
+import { matchesAnyField, matchesStringFilter, matchesDateRange } from '../domain/filterUtils';
+import { createExpandableTableStateAdapter, createAnalyticsToggleButton } from './tabUtils';
 
 export class DepositsTab {
   private ctx: ViewContext;
@@ -76,7 +78,7 @@ export class DepositsTab {
           { icon: '✅', title: this.tr.closeAccount, onClick: () => this.confirmCloseDeposit(d) },
         ] : []),
         { icon: '✏️', title: this.tr.edit, onClick: () => this.openEditDepositModal(d) },
-        { icon: '🗑️', title: this.tr.delete, onClick: () => this.confirmDeleteDeposit(d), cls: 'finance-delete-btn' },
+        { icon: '🗑️', title: this.tr.delete, onClick: () => this.confirmDeleteDeposit(d), cls: CSS_CLASS.FINANCE_DELETE_BTN },
       ],
       expandable: {
         hasContent: () => true,
@@ -91,30 +93,29 @@ export class DepositsTab {
         { field: 'amount', label: this.tr.sum },
         { field: 'bankName', label: this.tr.bankName },
       ],
-      state: {
-        getPage: () => this.ctx.state.depositPage ?? 0,
-        setPage: p => { this.ctx.state.depositPage = p; },
-        getSort: () => this.ctx.state.depositSort ?? { field: 'date', dir: 'desc' },
-        setSort: s => { this.ctx.state.depositSort = s as { field: DepositSortField; dir: 'asc' | 'desc' }; },
-        resetFilter: () => { this.ctx.state.depositFilter = { ...DEFAULT_DEPOSIT_FILTER }; },
-        getColumns: () => this.ctx.state.depositsColumns ?? {},
-        setColumns: c => { this.ctx.state.depositsColumns = c; },
-        getExpandedId: () => this.ctx.state.depositExpandedId ?? null,
-        setExpandedId: id => { if (id === null) delete this.ctx.state.depositExpandedId; else this.ctx.state.depositExpandedId = id; }
-      },
+      state: createExpandableTableStateAdapter(
+        this.ctx,
+        {
+          page: 'depositPage',
+          sort: 'depositSort',
+          columns: 'depositsColumns',
+          expandedId: 'depositExpandedId',
+        },
+        {
+          sort: { field: 'date', dir: 'desc' },
+        },
+        () => { this.ctx.state.depositFilter = { ...DEFAULT_DEPOSIT_FILTER }; }
+      ),
       renderStats: host => this.renderStats(host),
       toolbarButtons: (toolbar, rerender, api) => {
-        const open = (this.ctx.state.depositActiveTab ?? 'list') === 'analytics';
-        const toggleBtn = toolbar.createEl('button', {
-          cls: `finance-analytics-toggle-btn${open ? ' active' : ''}`,
-          text: `📈 ${this.tr.analytics} ${open ? '▲' : '▼'}`,
-        });
-        toggleBtn.addEventListener('click', () => {
-          this.ctx.state.depositActiveTab = open ? 'list' : 'analytics';
-          if (!open) api.closeFilters();
-          this.ctx.saveState();
-          rerender();
-        });
+        createAnalyticsToggleButton(
+          toolbar,
+          this.ctx,
+          'depositActiveTab',
+          this.tr,
+          rerender,
+          () => api.closeFilters()
+        );
       },
       renderPanels: host => {
         if ((this.ctx.state.depositActiveTab ?? 'list') === 'analytics') {
@@ -143,7 +144,7 @@ export class DepositsTab {
 
   public renderHeaderActions(container: HTMLElement): void {
     const btn = container.createEl('button', { cls: 'finance-add-btn finance-accent-btn' });
-    btn.createSpan({ text: '＋', cls: 'btn-icon' });
+    btn.createSpan({ text: '＋', cls: CSS_CLASS.BTN_ICON });
     btn.createSpan({ text: this.tr.newDeposit });
     btn.addEventListener('click', () => this.openNewDepositModal());
   }
@@ -263,15 +264,14 @@ export class DepositsTab {
     const s = this.ctx.state.depositSort ?? { field: 'date' as DepositSortField, dir: 'desc' as const };
 
     let result = [...this.ctx.data.deposits];
-    if (f.search) {
-      const q = f.search.toLowerCase();
-      result = result.filter(d => d.name.toLowerCase().includes(q) || d.bankName.toLowerCase().includes(q));
-    }
-    if (f.status !== 'all') result = result.filter(d => d.status === f.status);
-    if (f.bankName) result = result.filter(d => d.bankName === f.bankName);
-    if (f.type !== 'all') result = result.filter(d => d.type === f.type);
-    if (f.dateFrom) result = result.filter(d => d.startDate >= f.dateFrom);
-    if (f.dateTo) result = result.filter(d => d.startDate <= f.dateTo);
+    result = result.filter(d => {
+      if (!matchesAnyField([d.name, d.bankName], f.search)) return false;
+      if (!matchesStringFilter(d.status, f.status === 'all' ? '' : f.status)) return false;
+      if (!matchesStringFilter(d.bankName, f.bankName)) return false;
+      if (!matchesStringFilter(d.type, f.type === 'all' ? '' : f.type)) return false;
+      if (!matchesDateRange(d.startDate, f.dateFrom, f.dateTo)) return false;
+      return true;
+    });
 
     result.sort((a, b) => {
       let av: string | number, bv: string | number;
@@ -321,9 +321,9 @@ export class DepositsTab {
       onDelete: (item: M) => void,
     ) => {
       if (!items.length) return;
-      wrapper.createEl('h4', { text: title, cls: 'finance-section-title' });
+      wrapper.createEl('h4', { text: title, cls: CSS_CLASS.FINANCE_SECTION_TITLE });
       const scrollWrapper = wrapper.createDiv('finance-mov-scroll');
-      const table = scrollWrapper.createEl('table', { cls: 'finance-mov-table' });
+      const table = scrollWrapper.createEl('table', { cls: CSS_CLASS.FINANCE_MOV_TABLE });
       const head = table.createEl('thead').createEl('tr');
       [this.tr.date, this.tr.sum, this.tr.note, ''].forEach(l => {
         head.createEl('th', { text: l, cls: 'finance-th finance-mov-th' });
@@ -331,9 +331,9 @@ export class DepositsTab {
       const body = table.createEl('tbody');
       items.slice().reverse().forEach(item => {
         const tr = body.createEl('tr');
-        tr.createEl('td', { text: fmtDate(item.date, item.time), cls: 'finance-td' });
+        tr.createEl('td', { text: fmtDate(item.date, item.time), cls: CSS_CLASS.FINANCE_TD });
         tr.createEl('td', { text: sign + this.ctx.fmt(item.amount), cls: `finance-td ${movCls}` });
-        tr.createEl('td', { text: item.note || '—', cls: 'finance-td' });
+        tr.createEl('td', { text: item.note || '—', cls: CSS_CLASS.FINANCE_TD });
         const actTd = tr.createEl('td', { cls: 'finance-td finance-actions-td' });
         const btn = actTd.createEl('button', { cls: 'finance-action-btn finance-delete-btn', text: '🗑️' });
         btn.title = this.tr.delete;
@@ -358,10 +358,10 @@ export class DepositsTab {
       });
     }
 
-    wrapper.createEl('h4', { text: this.tr.accrualsHeader, cls: 'finance-section-title' });
+    wrapper.createEl('h4', { text: this.tr.accrualsHeader, cls: CSS_CLASS.FINANCE_SECTION_TITLE });
 
     if (!deposit.accruals.length) {
-      wrapper.createEl('p', { text: this.tr.noScheduledAccruals, cls: 'finance-empty-text' });
+      wrapper.createEl('p', { text: this.tr.noScheduledAccruals, cls: CSS_CLASS.FINANCE_EMPTY_TEXT });
       return;
     }
 

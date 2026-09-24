@@ -9,6 +9,7 @@ import { CURRENCY_FIELDS, type FieldDef } from '../FieldInfoModal';
 import { buildAttachmentField } from '../ui/attachmentField';
 import { EntityModal } from '../ui/EntityModal';
 import { buildDateTimeField, buildComboboxField, buildNoteField } from '../ui/formHelpers';
+import { CSS_CLASS } from '../constants';
 
 export interface CurrencyExchangeModalOptions {
   initial?: Partial<CurrencyExchange>;
@@ -94,7 +95,7 @@ export class CurrencyExchangeModal extends EntityModal<CurrencyExchange> {
     const amountRow = form.createDiv('finance-form-row finance-full-width');
 
     const tgtAmtG = amountRow.createDiv('finance-field-group finance-amount-group');
-    tgtAmtG.createEl('label', { text: this.targetAmountLabel(), cls: 'finance-field-label' });
+    tgtAmtG.createEl('label', { text: this.targetAmountLabel(), cls: CSS_CLASS.FINANCE_FIELD_LABEL });
     this.targetAmountHandle = createAmountInput(tgtAmtG, {
       value: this.entity.targetAmount,
       onChange: v => {
@@ -112,7 +113,7 @@ export class CurrencyExchangeModal extends EntityModal<CurrencyExchange> {
         : `${tr.amountReceived} (${this.options.accountCurrency})`;
 
       const accAmtG = amountRow.createDiv('finance-field-group finance-amount-group');
-      accAmtG.createEl('label', { text: amountAccLabel, cls: 'finance-field-label' });
+      accAmtG.createEl('label', { text: amountAccLabel, cls: CSS_CLASS.FINANCE_FIELD_LABEL });
       this.accAmountHandle = createAmountInput(accAmtG, {
         value: this.entity.amountInAccountCurrency,
         onChange: v => {
@@ -213,10 +214,10 @@ export class CurrencyExchangeModal extends EntityModal<CurrencyExchange> {
       text: this.tr.rateLabel
         .replace('{currency}', this.entity.targetCurrency || '?')
         .replace('{accountCurrency}', this.options.accountCurrency),
-      cls: 'finance-field-label',
+      cls: CSS_CLASS.FINANCE_FIELD_LABEL,
     });
     const rateInput = rateG.createEl('input', {
-      type: 'text', cls: 'finance-input', attr: { inputmode: 'decimal' },
+      type: 'text', cls: CSS_CLASS.FINANCE_INPUT, attr: { inputmode: 'decimal' },
     });
     this.rateInput = rateInput;
     rateInput.value = this.entity.exchangeRate ? String(this.entity.exchangeRate) : '';
@@ -233,10 +234,10 @@ export class CurrencyExchangeModal extends EntityModal<CurrencyExchange> {
     const feeG = grid.createDiv('finance-field-group');
     feeG.createEl('label', {
       text: `${this.tr.feeLabel} (${this.options.accountCurrency})`,
-      cls: 'finance-field-label',
+      cls: CSS_CLASS.FINANCE_FIELD_LABEL,
     });
     const feeIn = feeG.createEl('input', {
-      type: 'text', cls: 'finance-input', attr: { inputmode: 'decimal' },
+      type: 'text', cls: CSS_CLASS.FINANCE_INPUT, attr: { inputmode: 'decimal' },
     });
     feeIn.value = this.entity.fee ? String(this.entity.fee) : '';
     feeIn.addEventListener('input', () => {

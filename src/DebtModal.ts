@@ -5,7 +5,8 @@ import { DEBT_FIELDS, type FieldDef } from './FieldInfoModal';
 import { createAmountInput } from './ui/AmountInput';
 import { EntityModal } from './ui/EntityModal';
 import { buildDateField, buildRateInput, buildNoteField, buildComboboxField } from './ui/formHelpers';
-import { DebtDirection } from './constants';
+import { CSS_CLASS, DebtDirection} from './constants';
+import { validatePositiveAmount, validateRequiredString } from './domain/validators';
 
 export interface DebtModalOptions {
   title:   string;
@@ -74,7 +75,7 @@ export class DebtModal extends EntityModal<DebtRecord> {
     personInput.parentElement?.parentElement?.querySelector('label')?.addClass('finance-person-label');
 
     const amtG = row1.createDiv('finance-field-group finance-amount-group');
-    amtG.createEl('label', { text: this.tr.amountLabel, cls: 'finance-field-label' });
+    amtG.createEl('label', { text: this.tr.amountLabel, cls: CSS_CLASS.FINANCE_FIELD_LABEL });
     this.amountInput = createAmountInput(amtG, {
       value: this.entity.amount,
       onChange: v => {
@@ -99,7 +100,7 @@ export class DebtModal extends EntityModal<DebtRecord> {
       text: this.totalLabel(),
       cls: 'finance-field-label finance-total-label',
     });
-    this.totalInput = totalG.createEl('input', { type: 'text', cls: 'finance-input' });
+    this.totalInput = totalG.createEl('input', { type: 'text', cls: CSS_CLASS.FINANCE_INPUT });
     this.totalInput.readOnly = true;
     this.totalInput.value = this.entity.amount > 0 ? fmtAmount(String(this.entity.amount)) : '';
 
@@ -118,12 +119,15 @@ export class DebtModal extends EntityModal<DebtRecord> {
   }
 
   protected validate(): string | null {
-    const amount = parseAmount(this.amountInput.value);
-    if (!amount || amount <= 0) {
+    const amountResult = validatePositiveAmount(this.amountInput.value, this.tr.invalidAmount);
+    if ('error' in amountResult) {
       this.amountInput.focus();
-      return this.tr.invalidAmount;
+      return amountResult.error;
     }
-    if (!this.entity.person.trim()) return this.tr.specifyPerson;
+
+    const personResult = validateRequiredString(this.entity.person, this.tr.specifyPerson);
+    if (!personResult.valid) return personResult.error ?? null;
+
     return null;
   }
 
@@ -166,9 +170,9 @@ export class DebtModal extends EntityModal<DebtRecord> {
       this.entity.direction = dir;
       const isLentDir = dir === DebtDirection.LENT;
       lentBtn.classList.toggle('active', isLentDir);
-      lentBtn.classList.toggle('lent', isLentDir);
+      lentBtn.classList.toggle(CSS_CLASS.LENT, isLentDir);
       borrowedBtn.classList.toggle('active', !isLentDir);
-      borrowedBtn.classList.toggle('borrowed', !isLentDir);
+      borrowedBtn.classList.toggle(CSS_CLASS.BORROWED, !isLentDir);
 
       const personLabel = this.contentEl.querySelector('.finance-person-label');
       const totalLabel = this.contentEl.querySelector('.finance-total-label');

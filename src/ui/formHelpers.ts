@@ -1,4 +1,5 @@
 import { Notice } from 'obsidian';
+import { CSS_CLASS, DATE_FORMAT_LENGTH } from '../constants';
 import { Translations } from '../i18n';
 import { parseAmount, normalizeDateStr, normalizeTimeStr } from '../utils';
 import { toDateTimeLocalStr } from '../domain/dateMath';
@@ -10,7 +11,7 @@ export function buildNoteField(
 ): HTMLTextAreaElement {
   const noteG = parent.createDiv('finance-field-group finance-full-width');
   const labelText = opts.icon ? `${opts.icon} ${opts.label}` : opts.label;
-  noteG.createEl('label', { text: labelText, cls: 'finance-field-label' });
+  noteG.createEl('label', { text: labelText, cls: CSS_CLASS.FINANCE_FIELD_LABEL });
   const noteIn = noteG.createEl('textarea', { cls: 'finance-textarea finance-note-field' });
   if (opts.placeholder) noteIn.placeholder = opts.placeholder;
   noteIn.value = opts.value || '';
@@ -26,8 +27,8 @@ export function buildRateInput(
   callbacks: { onInput?: (v: number) => void; onBlur?: (v: number) => void }
 ): HTMLInputElement {
   const rateG = parent.createDiv('finance-field-group');
-  rateG.createEl('label', { text: label, cls: 'finance-field-label' });
-  const rateInput = rateG.createEl('input', { type: 'text', cls: 'finance-input' });
+  rateG.createEl('label', { text: label, cls: CSS_CLASS.FINANCE_FIELD_LABEL });
+  const rateInput = rateG.createEl('input', { type: 'text', cls: CSS_CLASS.FINANCE_INPUT });
   rateInput.setAttribute('inputmode', 'decimal');
   rateInput.setAttribute('placeholder', '0');
   rateInput.setAttribute('autocomplete', 'off');
@@ -57,8 +58,8 @@ export function buildDateField(
   onChange: (v: string) => void
 ): HTMLInputElement {
   const dateG = parent.createDiv('finance-field-group');
-  dateG.createEl('label', { text: label, cls: 'finance-field-label' });
-  const dateIn = dateG.createEl('input', { type: 'date', cls: 'finance-input' });
+  dateG.createEl('label', { text: label, cls: CSS_CLASS.FINANCE_FIELD_LABEL });
+  const dateIn = dateG.createEl('input', { type: 'date', cls: CSS_CLASS.FINANCE_INPUT });
   dateIn.value = initial;
   dateIn.addEventListener('change', () => onChange(dateIn.value));
   return dateIn;
@@ -73,8 +74,8 @@ export function buildDateTimeField(
   onChange: (date: string, time: string) => void
 ): HTMLInputElement {
   const group = parent.createDiv('finance-field-group');
-  group.createEl('label', { text: label, cls: 'finance-field-label' });
-  const input = group.createEl('input', { type: 'datetime-local', cls: 'finance-input' });
+  group.createEl('label', { text: label, cls: CSS_CLASS.FINANCE_FIELD_LABEL });
+  const input = group.createEl('input', { type: 'datetime-local', cls: CSS_CLASS.FINANCE_INPUT });
 
   const normDate = date ? normalizeDateStr(date) : '';
   const normTime = time ? normalizeTimeStr(time) : '';
@@ -84,7 +85,7 @@ export function buildDateTimeField(
 
   input.addEventListener('change', () => {
     if (!input.value) return;
-    const [d, t] = input.value.slice(0, 16).split('T');
+    const [d, t] = input.value.slice(0, DATE_FORMAT_LENGTH.DATETIME_MIN).split('T');
     onChange(normalizeDateStr(d ?? ''), normalizeTimeStr(t ?? ''));
   });
 
@@ -98,10 +99,10 @@ export function buildButtonRow(
 ): void {
   const btnRow = parent.createDiv('finance-modal-btns');
 
-  btnRow.createEl('button', { text: tr.cancel, cls: 'finance-btn-cancel' })
+  btnRow.createEl('button', { text: tr.cancel, cls: CSS_CLASS.FINANCE_BTN_CANCEL })
     .addEventListener('click', opts.onCancel);
   const saveLabel = opts.saveText ?? (opts.isEdit ? tr.save : tr.addBtn);
-  btnRow.createEl('button', { text: saveLabel, cls: 'finance-btn-save' })
+  btnRow.createEl('button', { text: saveLabel, cls: CSS_CLASS.FINANCE_BTN_SAVE })
     .addEventListener('click', opts.onSave);
 }
 
@@ -123,7 +124,7 @@ export function buildComboboxField(
   onChange: (v: string) => void
 ): HTMLInputElement {
   const group = parent.createDiv('finance-field-group');
-  group.createEl('label', { text: label, cls: 'finance-field-label' });
+  group.createEl('label', { text: label, cls: CSS_CLASS.FINANCE_FIELD_LABEL });
   const wrap = group.createDiv('finance-combobox');
   const input = wrap.createEl('input', { type: 'text', cls: 'finance-input finance-combobox-input' });
   input.value = value;

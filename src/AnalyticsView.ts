@@ -1,16 +1,16 @@
-import {
-  FinanceRecord, MOBILE_BREAKPOINT,
+import { FinanceRecord,
   CHART_PALETTE, CHART_COLOR_INCOME, CHART_COLOR_EXPENSE,
   CHART_SVG_HEIGHT, CHART_SVG_PAD_LEFT, CHART_SVG_PAD_RIGHT, CHART_SVG_PAD_TOP, CHART_SVG_PAD_BOTTOM,
   CHART_MIN_GROUP_MOBILE, CHART_MIN_GROUP_DESKTOP,
   CHART_MAX_BAR_W_MOBILE, CHART_MAX_BAR_W_SMALL, CHART_MAX_BAR_W_MED, CHART_MAX_BAR_W_LARGE,
   CHART_BAR_RATIO_MOBILE, CHART_BAR_RATIO_DESKTOP,
-  CHART_MAX_ITEMS, CHART_BAR_GAP, CHART_BAR_RADIUS, CHART_LABEL_ROTATE_THRESHOLD,
-} from './types';
-import { Translations } from './i18n';
+  CHART_MAX_ITEMS, CHART_BAR_GAP, CHART_BAR_RADIUS, CHART_LABEL_ROTATE_THRESHOLD,} from './types';
+import { ViewContext } from './context';
 import { isoWeek } from './domain/dateMath';
 import { svg, fmtShort, shortMonth, createChartTooltip } from './ui/chartHelpers';
-import { RecordType } from './constants';
+import { CSS_CLASS, RecordType, DATE_FORMAT_LENGTH} from './constants';
+import { BaseAnalyticsView } from './ui/BaseAnalyticsView';
+import { fmtPercentage } from './utils';
 
 type ChartType = 'bar' | 'pie';
 type GroupBy   = 'category' | 'payer' | 'month' | 'week' | 'year';
@@ -22,11 +22,8 @@ export interface BarClickAction { groupBy: GroupBy; rawKey: string; label: strin
 export type OnBarClick = (action: BarClickAction) => void;
 
 // ── Main class ────────────────────────────────────────────────────────────────
-export class AnalyticsView {
-  private el:        HTMLElement;
+export class AnalyticsView extends BaseAnalyticsView {
   private records:   FinanceRecord[];
-  private currency:  string;
-  private tr:        Translations;
   private chartType: ChartType = 'bar';
   private groupBy:   GroupBy   = 'category';
   private showType:  ShowType  = 'both';
@@ -37,34 +34,24 @@ export class AnalyticsView {
   private timeTo = '23:59';
   private onBarClick: OnBarClick | null;
 
-  constructor(el: HTMLElement, records: FinanceRecord[], currency: string, tr: Translations, onBarClick?: OnBarClick) {
-    this.el       = el;
+  constructor(el: HTMLElement, records: FinanceRecord[], ctx: ViewContext, onBarClick?: OnBarClick) {
+    super(el, ctx);
     this.records  = records;
-    this.currency = currency;
-    this.tr       = tr;
     this.onBarClick = onBarClick ?? null;
   }
 
-  private get locale(): string {
-    return this.tr.searchPlaceholder === 'Search...' ? 'en-US' : 'ru-RU';
-  }
-
   /** Call when filter changes outside */
-  update(records: FinanceRecord[], currency: string): void {
+  update(records: FinanceRecord[]): void {
     this.records  = records;
-    this.currency = currency;
     this.redrawChart();
   }
 
   render(): void {
-    this.el.empty();
-    this.el.addClass('finance-analytics');
-
-    const isMobile = window.innerWidth <= MOBILE_BREAKPOINT;
+    this.setupContainer();
 
     // ── controls ──────────────────────────────────────────────────────────
     const ctrl = this.el.createDiv('finance-analytics-controls');
-    this.el.toggleClass('is-mobile', isMobile);
+    this.el.toggleClass('is-mobile', this.isMobile);
 
     // chart type (row 1)
     const tg = ctrl.createDiv('finance-analytics-group');
@@ -72,8 +59,8 @@ export class AnalyticsView {
     const tgBtnWrap = tg.createDiv('finance-analytics-btn-wrap');
     const barBtn = this.mkToggle(tgBtnWrap, this.tr.barChart, this.chartType === 'bar');
     const pieBtn = this.mkToggle(tgBtnWrap, this.tr.pieChart, this.chartType === 'pie');
-    barBtn.addEventListener('click', () => { this.chartType = 'bar'; barBtn.classList.add('active'); pieBtn.classList.remove('active'); this.redrawChart(); });
-    pieBtn.addEventListener('click', () => { this.chartType = 'pie'; pieBtn.classList.add('active'); barBtn.classList.remove('active'); this.redrawChart(); });
+    barBtn.addEventListener('click', () => { this.chartType = 'bar'; barBtn.classList.add(CSS_CLASS.ACTIVE); pieBtn.classList.remove(CSS_CLASS.ACTIVE); this.redrawChart(); });
+    pieBtn.addEventListener('click', () => { this.chartType = 'pie'; pieBtn.classList.add(CSS_CLASS.ACTIVE); barBtn.classList.remove(CSS_CLASS.ACTIVE); this.redrawChart(); });
 
     // row 2: group by + show type
     const ctrl2 = ctrl.createDiv('finance-analytics-group finance-analytics-group-row');
@@ -92,8 +79,8 @@ export class AnalyticsView {
     const dateRow = this.el.createDiv('finance-filters-row finance-analytics-date-row');
 
     const dfG = dateRow.createDiv('finance-filter-group');
-    dfG.createEl('label', { text: this.tr.from, cls: 'finance-filter-label' });
-    const dfI = dfG.createEl('input', { type: 'datetime-local', cls: 'finance-filter-input' });
+    dfG.createEl('label', { text: this.tr.from, cls: CSS_CLASS.FINANCE_FILTER_LABEL });
+    const dfI = dfG.createEl('input', { type: 'datetime-local', cls: CSS_CLASS.FINANCE_FILTER_INPUT });
     if (this.dateFrom) dfI.value = `${this.dateFrom}T${this.timeFrom || '00:00'}`;
     dfI.addEventListener('change', () => {
       if (dfI.value) {
@@ -108,8 +95,8 @@ export class AnalyticsView {
     });
 
     const dtG = dateRow.createDiv('finance-filter-group');
-    dtG.createEl('label', { text: this.tr.to, cls: 'finance-filter-label' });
-    const dtI = dtG.createEl('input', { type: 'datetime-local', cls: 'finance-filter-input' });
+    dtG.createEl('label', { text: this.tr.to, cls: CSS_CLASS.FINANCE_FILTER_LABEL });
+    const dtI = dtG.createEl('input', { type: 'datetime-local', cls: CSS_CLASS.FINANCE_FILTER_INPUT });
     if (this.dateTo) dtI.value = `${this.dateTo}T${this.timeTo || '23:59'}`;
     dtI.addEventListener('change', () => {
       if (dtI.value) {
@@ -141,7 +128,7 @@ export class AnalyticsView {
   }
 
   private fmtNum(n: number): string {
-    return n.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + '\u00a0' + this.currency;
+    return this.fmt(n);
   }
 
   // ── data aggregation ─────────────────────────────────────────────────────
@@ -166,7 +153,7 @@ export class AnalyticsView {
       else if (this.groupBy === 'payer')    key = r.payer    || this.tr.notSpecified;
       else if (this.groupBy === 'year') {
         if (!r.date) return;
-        key = r.date.slice(0, 4);
+        key = r.date.slice(0, DATE_FORMAT_LENGTH.YEAR);
       } else if (this.groupBy === 'week') {
         const iso = r.date ? isoWeek(r.date) : null;
         if (!iso) return;
@@ -216,7 +203,7 @@ export class AnalyticsView {
     const data = this.aggregate();
     if (!data.length) {
       const e = this.chartEl.createDiv('finance-empty-state finance-empty-chart');
-      e.createEl('p', { text: this.tr.noChartData, cls: 'finance-empty-sub' });
+      e.createEl('p', { text: this.tr.noChartData, cls: CSS_CLASS.FINANCE_EMPTY_SUB });
       return;
     }
 
@@ -242,7 +229,6 @@ export class AnalyticsView {
       ];
     }
 
-    const isMobile = window.innerWidth <= MOBILE_BREAKPOINT;
     const containerW = this.chartEl.clientWidth || 600;
     const MIN_GROUP = data.length > 12 ? CHART_MIN_GROUP_MOBILE : data.length > 6 ? 50 : data.length > 3 ? 55 : CHART_MIN_GROUP_DESKTOP;
     const PL = CHART_SVG_PAD_LEFT, PR = CHART_SVG_PAD_RIGHT;
@@ -261,8 +247,8 @@ export class AnalyticsView {
     });
 
     const groupW = (W - PL - PR) / data.length;
-    const maxBarW = isMobile ? CHART_MAX_BAR_W_MOBILE : (data.length <= 4 ? CHART_MAX_BAR_W_SMALL : data.length <= 8 ? CHART_MAX_BAR_W_MED : CHART_MAX_BAR_W_LARGE);
-    const barRatio = isMobile ? CHART_BAR_RATIO_MOBILE : CHART_BAR_RATIO_DESKTOP;
+    const maxBarW = this.isMobile ? CHART_MAX_BAR_W_MOBILE : (data.length <= 4 ? CHART_MAX_BAR_W_SMALL : data.length <= 8 ? CHART_MAX_BAR_W_MED : CHART_MAX_BAR_W_LARGE);
+    const barRatio = this.isMobile ? CHART_BAR_RATIO_MOBILE : CHART_BAR_RATIO_DESKTOP;
     const barW   = Math.max(2, Math.min(groupW * barRatio, maxBarW));
 
     const root = svg('svg', { viewBox: `0 0 ${W} ${CH}` });
@@ -293,7 +279,7 @@ export class AnalyticsView {
         const h = (d.income / maxVal) * chartH;
         const x = this.showType === 'both' ? cx - barW - gap / 2 : cx - barW / 2;
         const rect = svg('rect', { x, y: PT + chartH - h, width: barW, height: h, fill: CHART_COLOR_INCOME, rx: CHART_BAR_RADIUS });
-        rect.classList.add('finance-chart-clickable');
+        rect.classList.add(CSS_CLASS.FINANCE_CHART_CLICKABLE);
         rect.addEventListener('click', fireClick);
         rect.addEventListener('mouseenter', (e) => showTip(e, `${d.label} — ${this.tr.incomeStat.toLowerCase()}: ${this.fmtNum(d.income)}`));
         rect.addEventListener('mousemove', (e) => showTip(e, `${d.label} — ${this.tr.incomeStat.toLowerCase()}: ${this.fmtNum(d.income)}`));
@@ -305,7 +291,7 @@ export class AnalyticsView {
         const h = (d.expense / maxVal) * chartH;
         const x = this.showType === 'both' ? cx + gap / 2 : cx - barW / 2;
         const rect = svg('rect', { x, y: PT + chartH - h, width: barW, height: h, fill: CHART_COLOR_EXPENSE, rx: CHART_BAR_RADIUS });
-        rect.classList.add('finance-chart-clickable');
+        rect.classList.add(CSS_CLASS.FINANCE_CHART_CLICKABLE);
         rect.addEventListener('click', fireClick);
         rect.addEventListener('mouseenter', (e) => showTip(e, `${d.label} — ${this.tr.expenseStat.toLowerCase()}: ${this.fmtNum(d.expense)}`));
         rect.addEventListener('mousemove', (e) => showTip(e, `${d.label} — ${this.tr.expenseStat.toLowerCase()}: ${this.fmtNum(d.expense)}`));
@@ -367,7 +353,7 @@ export class AnalyticsView {
 
     const total = items.reduce((s, d) => s + d.value, 0);
     if (!total) {
-      this.chartEl.createEl('p', { text: this.tr.noData, cls: 'finance-empty-sub' });
+      this.chartEl.createEl('p', { text: this.tr.noData, cls: CSS_CLASS.FINANCE_EMPTY_SUB });
       return;
     }
 
@@ -392,15 +378,16 @@ export class AnalyticsView {
       const ix1= cx + iR * cos1, iy1= cy + iR * sin1;
       const ix2= cx + iR * cos2, iy2= cy + iR * sin2;
 
+      const f = (n: number) => n.toFixed(2); // SVG coordinate precision
       const path = svg('path', {
         d:   `M ${f(ix1)} ${f(iy1)} L ${f(x1)} ${f(y1)} A ${R} ${R} 0 ${large} 1 ${f(x2)} ${f(y2)} L ${f(ix2)} ${f(iy2)} A ${iR} ${iR} 0 ${large} 0 ${f(ix1)} ${f(iy1)} Z`,
         fill: CHART_PALETTE[idx % CHART_PALETTE.length]!,
         stroke: 'var(--background-primary)',
         'stroke-width': 2,
       });
-      path.classList.add('finance-chart-clickable');
-      path.addEventListener('mouseenter', (e) => showTip(e, `${d.label}: ${this.fmtNum(d.value)} (${pct(d.value, total)})`));
-      path.addEventListener('mousemove', (e) => showTip(e, `${d.label}: ${this.fmtNum(d.value)} (${pct(d.value, total)})`));
+      path.classList.add(CSS_CLASS.FINANCE_CHART_CLICKABLE);
+      path.addEventListener('mouseenter', (e) => showTip(e, `${d.label}: ${this.fmtNum(d.value)} (${fmtPercentage(d.value, total)})`));
+      path.addEventListener('mousemove', (e) => showTip(e, `${d.label}: ${this.fmtNum(d.value)} (${fmtPercentage(d.value, total)})`));
       path.addEventListener('mouseleave', hideTip);
       root.appendChild(path);
 
@@ -426,10 +413,7 @@ export class AnalyticsView {
       const dot = row.createDiv('finance-pie-dot');
       dot.style.setProperty('--ft-dot-color', CHART_PALETTE[idx % CHART_PALETTE.length]!);
       row.createSpan({ text: d.label,                      cls: 'finance-pie-label' });
-      row.createSpan({ text: `${this.fmtNum(d.value)} · ${pct(d.value, total)}`, cls: 'finance-pie-val' });
+      row.createSpan({ text: `${this.fmtNum(d.value)} · ${fmtPercentage(d.value, total)}`, cls: 'finance-pie-val' });
     });
   }
 }
-
-const f   = (n: number) => n.toFixed(2);
-const pct = (v: number, t: number) => `${((v / t) * 100).toFixed(1)}%`;

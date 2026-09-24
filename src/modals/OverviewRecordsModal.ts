@@ -2,7 +2,7 @@ import { App, Notice } from 'obsidian';
 import { FinanceBaseModal } from '../ui/FinanceBaseModal';
 import { ViewContext } from '../context';
 import { FinanceRecord, OVERVIEW_MODAL_PAGE_SIZE } from '../types';
-import { RecordType } from '../constants';
+import { RecordType, CSS_CLASS } from '../constants';
 import { fmtDate } from '../utils';
 import { renderPagination, renderCompactTransactionCard } from '../ui/tabHelpers';
 import { RecordModal } from '../RecordModal';
@@ -92,7 +92,7 @@ export class OverviewRecordsModal extends FinanceBaseModal {
     if (this.records.length === 0) {
       this.bodyContainer.createEl('p', {
         text: this.tr.overviewNoRecordsInPeriod,
-        cls: 'finance-empty-text',
+        cls: CSS_CLASS.FINANCE_EMPTY_TEXT,
       });
       return;
     }
@@ -130,7 +130,7 @@ export class OverviewRecordsModal extends FinanceBaseModal {
       this.tr.payer,
       this.tr.note,
       '',
-    ].forEach(text => headRow.createEl('th', { text, cls: 'finance-th' }));
+    ].forEach(text => headRow.createEl('th', { text, cls: CSS_CLASS.FINANCE_TH }));
 
     const tbody = table.createEl('tbody');
     pageRecords.forEach(rec => {
@@ -140,7 +140,7 @@ export class OverviewRecordsModal extends FinanceBaseModal {
 
       tr.createEl('td', { text: fmtDate(rec.date, rec.time), cls: 'finance-td finance-td-date' });
 
-      const typeTd = tr.createEl('td', { cls: 'finance-td' });
+      const typeTd = tr.createEl('td', { cls: CSS_CLASS.FINANCE_TD });
       typeTd.createSpan({
         text: rec.type === RecordType.INCOME ? this.tr.typeIncome : this.tr.typeExpense,
         cls: rec.type === RecordType.INCOME ? 'finance-type-income' : 'finance-type-expense',
@@ -152,7 +152,7 @@ export class OverviewRecordsModal extends FinanceBaseModal {
         cls: 'finance-td finance-amount-cell ' + (rec.type === RecordType.INCOME ? 'finance-amount-income' : 'finance-amount-expense'),
       });
 
-      tr.createEl('td', { text: rec.category || '—', cls: 'finance-td' });
+      tr.createEl('td', { text: rec.category || '—', cls: CSS_CLASS.FINANCE_TD });
 
       const payerTag = rec.payer
         ? (rec.tag ? `${rec.payer} · #${rec.tag}` : rec.payer)
@@ -162,7 +162,7 @@ export class OverviewRecordsModal extends FinanceBaseModal {
       tr.createEl('td', { text: rec.note || '—', cls: 'finance-td finance-note-cell' });
 
       const actTd = tr.createEl('td', { cls: 'finance-td finance-actions-td' });
-      const editBtn = actTd.createEl('button', { cls: 'finance-action-btn', text: '✏️' });
+      const editBtn = actTd.createEl('button', { cls: CSS_CLASS.FINANCE_ACTION_BTN, text: '✏️' });
       editBtn.title = this.tr.edit;
       editBtn.addEventListener('click', () => this.openEditModal(rec));
 
@@ -243,7 +243,7 @@ export class OverviewRecordsModal extends FinanceBaseModal {
 
     const closeBtn = btnsWrap.createEl('button', {
       text: this.tr.close,
-      cls: 'finance-btn-cancel',
+      cls: CSS_CLASS.FINANCE_BTN_CANCEL,
     });
     closeBtn.addEventListener('click', () => this.close());
   }

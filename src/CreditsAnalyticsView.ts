@@ -1,7 +1,6 @@
-import { fmtDate, fmtInteger } from "./utils";
+import { fmtDate } from "./utils";
 import { ViewContext } from './context';
-import {
-  CreditRecord, FinanceRecord, CreditAnalyticsGroupBy, CreditType,
+import { CreditRecord, FinanceRecord, CreditAnalyticsGroupBy, CreditType,
   CHART_SVG_HEIGHT_COMPACT, CHART_SVG_PAD_LEFT, CHART_SVG_PAD_RIGHT,
   CHART_SVG_PAD_TOP, CHART_SVG_PAD_BOTTOM_COMPACT, CHART_MIN_GROUP_MOBILE, CHART_MIN_GROUP_DESKTOP,
   CHART_MAX_BAR_W_MOBILE, CHART_MAX_BAR_W_SMALL, CHART_MAX_BAR_W_MED, CHART_MAX_BAR_W_LARGE,
@@ -13,9 +12,8 @@ import {
   CHART_FONT_SIZE_AXIS, CHART_AXIS_LABEL_GAP, CHART_AXIS_BASELINE_WIDTH,
   CHART_TICK_TEXT_OFFSET_Y, CHART_LABEL_OFFSET_Y,
   CHART_LABEL_ROTATE_THRESHOLD, CHART_LABEL_ROTATE_ANGLE,
-  PERCENT_100,
-} from './types';
-import { Translations } from './i18n';
+  PERCENT_100,} from './types';
+import { DATE_FORMAT_LENGTH } from './constants';
 import { safeEndDate } from './domain/dateMath';
 import { round2 } from './domain/money';
 import {
@@ -25,7 +23,9 @@ import {
 } from './domain/creditCalculations';
 import { svg, fmtShort, shortMonth, createChartTooltip } from './ui/chartHelpers';
 import { renderStatCards, StatCardItem } from './ui/tabHelpers';
-import { CreditStatus, PaymentStatus } from './constants';
+import { CSS_CLASS, CreditStatus, PaymentStatus} from './constants';
+import { renderDateRangeFilter } from './tabs/tabUtils';
+import { BaseAnalyticsView } from './ui/BaseAnalyticsView';
 
 interface PaymentBarItem {
   label: string;
@@ -34,37 +34,17 @@ interface PaymentBarItem {
   total: number;
 }
 
-export class CreditsAnalyticsView {
-  private el: HTMLElement;
+export class CreditsAnalyticsView extends BaseAnalyticsView {
   private credits: CreditRecord[];
-  private currency: string;
-  private tr: Translations;
-  private isMobile: boolean;
-  private ctx: ViewContext;
   private chartEl!: HTMLElement;
 
   constructor(el: HTMLElement, credits: CreditRecord[], _records: FinanceRecord[], ctx: ViewContext) {
-    this.el = el;
+    super(el, ctx);
     this.credits = credits;
-    this.currency = ctx.currency;
-    this.tr = ctx.tr;
-    this.isMobile = ctx.isMobile;
-    this.ctx = ctx;
-  }
-
-  private get state() { return this.ctx.state; }
-
-  private get locale(): string {
-    return this.tr.income === '↑ Доход' ? 'ru' : 'en';
-  }
-
-  private fmt(n: number): string {
-    return fmtInteger(n, this.currency);
   }
 
   render(): void {
-    this.el.empty();
-    this.el.addClass('finance-analytics');
+    this.setupContainer();
 
     this.renderControls();
     this.renderSummaryCards();
@@ -83,29 +63,20 @@ export class CreditsAnalyticsView {
   private renderControls(): void {
     const row = this.el.createDiv('finance-filters-row finance-analytics-date-row');
 
-    const fromG = row.createDiv('finance-filter-group');
-    fromG.createEl('label', { text: this.tr.from, cls: 'finance-filter-label' });
-    const fromI = fromG.createEl('input', { type: 'date', cls: 'finance-filter-input' });
-    fromI.value = this.state.creditAnalyticsDateFrom ?? '';
-    fromI.addEventListener('change', () => {
-      this.state.creditAnalyticsDateFrom = fromI.value;
-      this.ctx.saveState();
-      this.render();
-    });
-
-    const toG = row.createDiv('finance-filter-group');
-    toG.createEl('label', { text: this.tr.to, cls: 'finance-filter-label' });
-    const toI = toG.createEl('input', { type: 'date', cls: 'finance-filter-input' });
-    toI.value = this.state.creditAnalyticsDateTo ?? '';
-    toI.addEventListener('change', () => {
-      this.state.creditAnalyticsDateTo = toI.value;
-      this.ctx.saveState();
-      this.render();
-    });
+    renderDateRangeFilter(
+      this.el,
+      this.ctx,
+      {
+        from: 'creditAnalyticsDateFrom',
+        to: 'creditAnalyticsDateTo',
+      },
+      this.tr,
+      () => this.render()
+    );
 
     const grpG = row.createDiv('finance-filter-group');
-    grpG.createEl('label', { text: this.tr.groupBy, cls: 'finance-filter-label' });
-    const grpSel = grpG.createEl('select', { cls: 'finance-filter-select' });
+    grpG.createEl('label', { text: this.tr.groupBy, cls: CSS_CLASS.FINANCE_FILTER_LABEL });
+    const grpSel = grpG.createEl('select', { cls: CSS_CLASS.FINANCE_FILTER_SELECT });
     const grpOpts: [CreditAnalyticsGroupBy, string][] = [
       ['month', this.tr.byMonth],
       ['quarter', this.tr.groupByQuarter],
@@ -144,10 +115,10 @@ export class CreditsAnalyticsView {
     const totalInterest = credits.reduce((s, c) => s + calculateTotalInterestPaid(c), 0);
 
     const cards: StatCardItem[] = [
-      { label: this.tr.creditTotalBorrowed, value: this.fmt(totalBorrowed) },
-      { label: this.tr.creditTotalRemaining, value: this.fmt(totalRemaining), mod: 'expense' },
-      { label: this.tr.creditPrincipalPaid, value: this.fmt(totalPaidPrincipal), mod: 'income' },
-      { label: this.tr.creditInterestPaid, value: this.fmt(totalInterest), mod: 'neutral' },
+      { label: this.tr.creditTotalBorrowed, value: this.ctx.fmt(totalBorrowed) },
+      { label: this.tr.creditTotalRemaining, value: this.ctx.fmt(totalRemaining), mod: CSS_CLASS.EXPENSE },
+      { label: this.tr.creditPrincipalPaid, value: this.ctx.fmt(totalPaidPrincipal), mod: CSS_CLASS.INCOME },
+      { label: this.tr.creditInterestPaid, value: this.ctx.fmt(totalInterest), mod: 'neutral' },
     ];
     renderStatCards(this.el, cards, 'finance-credit-analytics-cards');
   }
@@ -182,13 +153,13 @@ export class CreditsAnalyticsView {
 
         let key: string;
         if (groupBy === 'month') {
-          key = d.slice(0, 7);
+          key = d.slice(0, DATE_FORMAT_LENGTH.YEAR_MONTH);
         } else if (groupBy === 'quarter') {
           const [y, m] = d.split('-');
           const q = Math.ceil(parseInt(m ?? '1') / 3);
           key = `${y}-Q${q}`;
         } else if (groupBy === 'year') {
-          key = d.slice(0, 4);
+          key = d.slice(0, DATE_FORMAT_LENGTH.YEAR);
         } else if (groupBy === 'type') {
           key = this.creditTypeLabel(c.type);
         } else {
@@ -230,7 +201,7 @@ export class CreditsAnalyticsView {
     const data = this.buildBarData();
     if (!data.length) {
       const e = this.chartEl.createDiv('finance-empty-state finance-empty-chart');
-      e.createEl('p', { text: this.tr.creditNoAnalyticsData, cls: 'finance-empty-sub' });
+      e.createEl('p', { text: this.tr.creditNoAnalyticsData, cls: CSS_CLASS.FINANCE_EMPTY_SUB });
       return;
     }
 
@@ -318,7 +289,7 @@ export class CreditsAnalyticsView {
           x, y: PT + chartH - totalH, width: barW, height: totalH,
           fill: 'transparent',
         });
-        const tipText = `${d.label}\n${this.tr.creditPrincipal}: ${this.fmt(d.principal)}\n${this.tr.creditInterest}: ${this.fmt(d.interest)}\n${this.tr.sum}: ${this.fmt(d.total)}`;
+        const tipText = `${d.label}\n${this.tr.creditPrincipal}: ${this.ctx.fmt(d.principal)}\n${this.tr.creditInterest}: ${this.ctx.fmt(d.interest)}\n${this.tr.sum}: ${this.ctx.fmt(d.total)}`;
         hitRect.addEventListener('mouseenter', e => showTip(e, tipText));
         hitRect.addEventListener('mousemove', e => showTip(e, tipText));
         hitRect.addEventListener('mouseleave', hideTip);
@@ -382,7 +353,7 @@ export class CreditsAnalyticsView {
       const sub = item.createDiv('finance-credit-progress-sub');
       sub.createSpan({ text: c.bankName || '—', cls: 'finance-credit-progress-bank' });
       if (endDate) sub.createSpan({ text: fmtDate(endDate), cls: 'finance-credit-progress-date' });
-      sub.createSpan({ text: this.fmt(remainingPrincipal), cls: 'finance-credit-progress-amount' });
+      sub.createSpan({ text: this.ctx.fmt(remainingPrincipal), cls: 'finance-credit-progress-amount' });
 
       if (c.originalAmount > 0) {
         const bar = item.createDiv('finance-deposit-progress');

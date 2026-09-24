@@ -1,4 +1,5 @@
 import { App } from 'obsidian';
+import { CSS_CLASS } from './constants';
 import { DepositRecord, DepositType, DepositAccrualType, DepositStatus } from './types';
 import { getTodayStr, normalizeDateStr, normalizeTimeStr, parseAmount, parseDate } from './utils';
 import { DEPOSIT_FIELDS, type FieldDef } from './FieldInfoModal';
@@ -7,6 +8,7 @@ import { buildAttachmentField } from './ui/attachmentField';
 import { EntityModal } from './ui/EntityModal';
 import { buildDateField, buildNoteField, buildComboboxField, buildRateInput } from './ui/formHelpers';
 import { DEPOSIT_TERM_DEFAULT_MONTHS, DEPOSIT_TERM_MAX_MONTHS } from './types';
+import { validatePositiveAmount, validateRequiredString } from './domain/validators';
 
 export interface DepositModalOptions {
   title:     string;
@@ -76,8 +78,8 @@ export class DepositModal extends EntityModal<DepositRecord> {
     const row1 = form.createDiv('finance-form-row finance-full-width');
 
     const nameG = row1.createDiv('finance-field-group');
-    nameG.createEl('label', { text: this.tr.name, cls: 'finance-field-label' });
-    const nameIn = nameG.createEl('input', { type: 'text', cls: 'finance-input' });
+    nameG.createEl('label', { text: this.tr.name, cls: CSS_CLASS.FINANCE_FIELD_LABEL });
+    const nameIn = nameG.createEl('input', { type: 'text', cls: CSS_CLASS.FINANCE_INPUT });
     nameIn.value = this.entity.name;
     nameIn.addEventListener('input', () => { this.entity.name = nameIn.value; });
 
@@ -87,7 +89,7 @@ export class DepositModal extends EntityModal<DepositRecord> {
     const row2 = form.createDiv('finance-form-row finance-full-width');
 
     const amtG = row2.createDiv('finance-field-group finance-amount-group');
-    amtG.createEl('label', { text: this.tr.sum, cls: 'finance-field-label' });
+    amtG.createEl('label', { text: this.tr.sum, cls: CSS_CLASS.FINANCE_FIELD_LABEL });
     this.amountInput = createAmountInput(amtG, {
       value: this.entity.amount,
       onChange: v => { this.entity.amount = v; },
@@ -103,8 +105,8 @@ export class DepositModal extends EntityModal<DepositRecord> {
     buildDateField(row3, this.tr.startDate, this.entity.startDate, v => { this.entity.startDate = v; });
 
     const termG = row3.createDiv('finance-field-group');
-    termG.createEl('label', { text: this.tr.termLabel, cls: 'finance-field-label' });
-    const termIn = termG.createEl('input', { type: 'number', cls: 'finance-input' });
+    termG.createEl('label', { text: this.tr.termLabel, cls: CSS_CLASS.FINANCE_FIELD_LABEL });
+    const termIn = termG.createEl('input', { type: 'number', cls: CSS_CLASS.FINANCE_INPUT });
     termIn.value = String(this.entity.termMonths || DEPOSIT_TERM_DEFAULT_MONTHS);
     termIn.setAttribute('min', '1');
     termIn.setAttribute('max', String(DEPOSIT_TERM_MAX_MONTHS));
@@ -115,7 +117,7 @@ export class DepositModal extends EntityModal<DepositRecord> {
     const row4 = form.createDiv('finance-form-row finance-full-width');
 
     const typeG = row4.createDiv('finance-field-group');
-    typeG.createEl('label', { text: this.tr.depositType, cls: 'finance-field-label' });
+    typeG.createEl('label', { text: this.tr.depositType, cls: CSS_CLASS.FINANCE_FIELD_LABEL });
     const typeSel = typeG.createEl('select', { cls: 'finance-input finance-filter-select' });
     const types: { value: DepositType; label: string }[] = [
       { value: DepositType.TERM, label: this.tr.depositTypeTerm },
@@ -129,7 +131,7 @@ export class DepositModal extends EntityModal<DepositRecord> {
     typeSel.addEventListener('change', () => { this.entity.type = typeSel.value as DepositType; });
 
     const accrualG = row4.createDiv('finance-field-group');
-    accrualG.createEl('label', { text: this.tr.accrualType, cls: 'finance-field-label' });
+    accrualG.createEl('label', { text: this.tr.accrualType, cls: CSS_CLASS.FINANCE_FIELD_LABEL });
     const accrualSel = accrualG.createEl('select', { cls: 'finance-input finance-filter-select' });
     const accrualTypes: { value: DepositAccrualType; label: string }[] = [
       { value: DepositAccrualType.TO_ACCOUNT, label: this.tr.accrualToAccount },
@@ -163,13 +165,17 @@ export class DepositModal extends EntityModal<DepositRecord> {
   }
 
   protected validate(): string | null {
-    const amount = parseAmount(this.amountInput.value);
-    if (!amount || amount <= 0) {
+    const amountResult = validatePositiveAmount(this.amountInput.value, this.tr.invalidAmount);
+    if ('error' in amountResult) {
       this.amountInput.focus();
-      return this.tr.invalidAmount;
+      return amountResult.error;
     }
-    if (!this.entity.bankName.trim()) return this.tr.specifyBank;
+
+    const bankResult = validateRequiredString(this.entity.bankName, this.tr.specifyBank);
+    if (!bankResult.valid) return bankResult.error ?? null;
+
     if (!this.entity.startDate || !parseDate(this.entity.startDate)) return this.tr.specifyValidDate;
+
     return null;
   }
 

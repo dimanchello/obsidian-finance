@@ -21,7 +21,9 @@ import { DataTable, FilterControl } from '../ui/DataTable';
 import { CreditsAnalyticsView } from '../CreditsAnalyticsView';
 import { renderMobileCard, renderSummaryCard, renderProgressBar, renderPaginatedSchedule, renderPagination, dateRangeControls, compareValues } from '../ui/tabHelpers';
 import { AccountCommands, type CreditNoteTranslations } from '../domain/AccountCommands';
-import { CreditStatus, CreditType, PaymentStatus } from '../constants';
+import { CSS_CLASS,  CreditStatus, CreditType, PaymentStatus  } from '../constants';
+import { matchesAnyField, matchesStringFilter, matchesDateRange } from '../domain/filterUtils';
+import { createExpandableTableStateAdapter, createAnalyticsToggleButton } from './tabUtils';
 
 export class CreditsTab {
   private ctx: ViewContext;
@@ -65,7 +67,7 @@ export class CreditsTab {
           { icon: '⚡', title: this.tr.earlyRepayment, onClick: () => this.openEarlyRepaymentModal(c) },
         ] : []),
         { icon: '✏️', title: this.tr.edit, onClick: () => this.openEditCreditModal(c) },
-        { icon: '🗑️', title: this.tr.delete, onClick: () => this.confirmDeleteCredit(c), cls: 'finance-delete-btn' },
+        { icon: '🗑️', title: this.tr.delete, onClick: () => this.confirmDeleteCredit(c), cls: CSS_CLASS.FINANCE_DELETE_BTN },
       ],
       expandable: {
         hasContent: () => true,
@@ -80,30 +82,29 @@ export class CreditsTab {
         { field: 'amount', label: this.tr.sum },
         { field: 'bankName', label: this.tr.bankName },
       ],
-      state: {
-        getPage: () => this.ctx.state.creditPage ?? 0,
-        setPage: p => { this.ctx.state.creditPage = p; },
-        getSort: () => this.ctx.state.creditSort ?? { field: 'date', dir: 'desc' },
-        setSort: s => { this.ctx.state.creditSort = s as { field: CreditSortField; dir: 'asc' | 'desc' }; },
-        resetFilter: () => { this.ctx.state.creditFilter = { ...DEFAULT_CREDIT_FILTER }; },
-        getColumns: () => (this.ctx.state.creditsColumns ??= {}),
-        setColumns: c => { this.ctx.state.creditsColumns = c; },
-        getExpandedId: () => this.ctx.state.creditExpandedId ?? null,
-        setExpandedId: id => { if (id === null) delete this.ctx.state.creditExpandedId; else this.ctx.state.creditExpandedId = id; }
-      },
+      state: createExpandableTableStateAdapter(
+        this.ctx,
+        {
+          page: 'creditPage',
+          sort: 'creditSort',
+          columns: 'creditsColumns',
+          expandedId: 'creditExpandedId',
+        },
+        {
+          sort: { field: 'date', dir: 'desc' },
+        },
+        () => { this.ctx.state.creditFilter = { ...DEFAULT_CREDIT_FILTER }; }
+      ),
       renderStats: host => this.renderStats(host),
       toolbarButtons: (toolbar, rerender, api) => {
-        const open = (this.ctx.state.creditActiveTab ?? 'list') === 'analytics';
-        const toggleBtn = toolbar.createEl('button', {
-          cls: `finance-analytics-toggle-btn${open ? ' active' : ''}`,
-          text: `📈 ${this.tr.analytics} ${open ? '▲' : '▼'}`,
-        });
-        toggleBtn.addEventListener('click', () => {
-          this.ctx.state.creditActiveTab = open ? 'list' : 'analytics';
-          if (!open) api.closeFilters();
-          this.ctx.saveState();
-          rerender();
-        });
+        createAnalyticsToggleButton(
+          toolbar,
+          this.ctx,
+          'creditActiveTab',
+          this.tr,
+          rerender,
+          () => api.closeFilters()
+        );
       },
       renderPanels: host => {
         if ((this.ctx.state.creditActiveTab ?? 'list') === 'analytics') {
@@ -133,7 +134,7 @@ export class CreditsTab {
 
   public renderHeaderActions(container: HTMLElement): void {
     const btn = container.createEl('button', { cls: 'finance-add-btn finance-accent-btn' });
-    btn.createSpan({ text: '＋', cls: 'btn-icon' });
+    btn.createSpan({ text: '＋', cls: CSS_CLASS.BTN_ICON });
     btn.createSpan({ text: this.tr.newCredit });
     btn.addEventListener('click', () => this.openNewCreditModal());
   }
@@ -240,15 +241,14 @@ export class CreditsTab {
     const s = this.ctx.state.creditSort ?? { field: 'date' as CreditSortField, dir: 'desc' as const };
 
     let result = [...this.ctx.data.credits];
-    if (f.search) {
-      const q = f.search.toLowerCase();
-      result = result.filter(c => c.name.toLowerCase().includes(q) || c.bankName.toLowerCase().includes(q));
-    }
-    if (f.status !== 'all') result = result.filter(c => c.status === f.status);
-    if (f.bankName) result = result.filter(c => c.bankName === f.bankName);
-    if (f.type !== 'all') result = result.filter(c => c.type === f.type);
-    if (f.dateFrom) result = result.filter(c => c.startDate >= f.dateFrom);
-    if (f.dateTo) result = result.filter(c => c.startDate <= f.dateTo);
+    result = result.filter(c => {
+      if (!matchesAnyField([c.name, c.bankName], f.search)) return false;
+      if (!matchesStringFilter(c.status, f.status === 'all' ? '' : f.status)) return false;
+      if (!matchesStringFilter(c.bankName, f.bankName)) return false;
+      if (!matchesStringFilter(c.type, f.type === 'all' ? '' : f.type)) return false;
+      if (!matchesDateRange(c.startDate, f.dateFrom, f.dateTo)) return false;
+      return true;
+    });
 
     result.sort((a, b) => {
       let av: string | number, bv: string | number;
@@ -296,10 +296,10 @@ export class CreditsTab {
     
     renderProgressBar(wrapper, credit.startDate, endDate, this.tr, fmtDate.bind(this.ctx));
 
-    wrapper.createEl('h4', { text: this.tr.creditPayments, cls: 'finance-section-title' });
+    wrapper.createEl('h4', { text: this.tr.creditPayments, cls: CSS_CLASS.FINANCE_SECTION_TITLE });
 
     if (!credit.payments.length) {
-      wrapper.createEl('p', { text: this.tr.noScheduledPayments, cls: 'finance-empty-text' });
+      wrapper.createEl('p', { text: this.tr.noScheduledPayments, cls: CSS_CLASS.FINANCE_EMPTY_TEXT });
       return;
     }
 

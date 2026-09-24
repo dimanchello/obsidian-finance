@@ -1,4 +1,5 @@
 import { normalizeDateStr, normalizeTimeStr } from '../utils';
+import { CSS_CLASS, DATE_FORMAT_LENGTH } from '../constants';
 import { toDateTimeLocalStr } from '../domain/dateMath';
 
 export interface DateTimeFieldOptions {
@@ -11,8 +12,8 @@ export interface DateTimeFieldOptions {
 /** Labelled `datetime-local` field, defaulting to now — previously ~10 copies. */
 export function createDateTimeField(parent: HTMLElement, opts: DateTimeFieldOptions): HTMLInputElement {
   const g = parent.createDiv('finance-field-group');
-  g.createEl('label', { text: opts.label, cls: 'finance-field-label' });
-  const input = g.createEl('input', { type: 'datetime-local', cls: 'finance-input' });
+  g.createEl('label', { text: opts.label, cls: CSS_CLASS.FINANCE_FIELD_LABEL });
+  const input = g.createEl('input', { type: 'datetime-local', cls: CSS_CLASS.FINANCE_INPUT });
 
   const normDate = opts.date ? normalizeDateStr(opts.date) : '';
   const normTime = opts.time ? normalizeTimeStr(opts.time) : '';
@@ -22,7 +23,7 @@ export function createDateTimeField(parent: HTMLElement, opts: DateTimeFieldOpti
 
   input.addEventListener('change', () => {
     if (!input.value) return;
-    const [d, t] = input.value.slice(0, 16).split('T');
+    const [d, t] = input.value.slice(0, DATE_FORMAT_LENGTH.DATETIME_MIN).split('T');
     opts.onChange(normalizeDateStr(d ?? ''), normalizeTimeStr(t ?? ''));
   });
 
@@ -38,8 +39,8 @@ export interface DateFieldOptions {
 /** Labelled `date` field. */
 export function createDateField(parent: HTMLElement, opts: DateFieldOptions): HTMLInputElement {
   const g = parent.createDiv('finance-field-group');
-  g.createEl('label', { text: opts.label, cls: 'finance-field-label' });
-  const input = g.createEl('input', { type: 'date', cls: 'finance-input' });
+  g.createEl('label', { text: opts.label, cls: CSS_CLASS.FINANCE_FIELD_LABEL });
+  const input = g.createEl('input', { type: 'date', cls: CSS_CLASS.FINANCE_INPUT });
   input.value = opts.value ? normalizeDateStr(opts.value) : '';
   input.addEventListener('change', () => {
     opts.onChange(input.value ? normalizeDateStr(input.value) : '');

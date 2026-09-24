@@ -1,7 +1,6 @@
-import { ViewContext } from '../../context';
 import { CreditRecord, CHART_PALETTE, PERCENT_100, AccountMode } from '../../types';
+import { CSS_CLASS } from '../../constants';
 import { MS_PER_DAY } from '../../domain/dateMath';
-import { createChartTooltip } from '../chartHelpers';
 import {
   calculateRemainingPrincipal,
   calculateCreditEndDate,
@@ -11,14 +10,10 @@ import { sumMoney } from '../../domain/money';
 import { fmtDate, getTodayStr } from '../../utils';
 import { CreditStatus, PaymentStatus } from '../../constants';
 import { CreditDetailModal } from '../../modals/CreditDetailModal';
+import { formatChartAmount } from '../../domain/formattingHelpers';
+import { BaseChart } from './BaseChart';
 
-export class CreditsOverview {
-  private ctx: ViewContext;
-  private tooltip = createChartTooltip();
-
-  constructor(ctx: ViewContext) {
-    this.ctx = ctx;
-  }
+export class CreditsOverview extends BaseChart {
 
   destroy(): void {
     this.tooltip.destroy();
@@ -33,10 +28,10 @@ export class CreditsOverview {
   ): void {
     const { tr } = this.ctx;
     const chartWrap = parent.createDiv('finance-chart-wrap finance-chart-wrap-full');
-    chartWrap.createEl('h3', { text: tr.overviewCreditsSummary, cls: 'finance-chart-title' });
+    chartWrap.createEl('h3', { text: tr.overviewCreditsSummary, cls: CSS_CLASS.FINANCE_CHART_TITLE });
 
     if (credits.length === 0) {
-      chartWrap.createEl('p', { text: tr.overviewNoCredits, cls: 'finance-no-data' });
+      this.renderNoData(chartWrap, tr.overviewNoCredits);
       return;
     }
 
@@ -44,7 +39,7 @@ export class CreditsOverview {
     const section = chartWrap.createDiv('finance-deposits-overview-section');
 
     if (activeCredits.length === 0) {
-      section.createEl('p', { text: tr.overviewNoActiveCredits, cls: 'finance-no-data' });
+      this.renderNoData(section, tr.overviewNoActiveCredits);
       return;
     }
 
@@ -143,7 +138,7 @@ export class CreditsOverview {
       const col1 = bodyRow.createDiv('finance-deposit-stat-col');
       col1.createDiv({ text: tr.overviewInitialAmount, cls: 'finance-deposit-stat-lbl' });
       const val1 = col1.createDiv('finance-deposit-stat-val');
-      val1.createSpan({ text: this.fmt(credit.originalAmount) });
+      val1.createSpan({ text: formatChartAmount(credit.originalAmount, this.ctx.currency) });
       val1.createSpan({ text: ` (${credit.interestRate}%)`, cls: 'finance-deposit-rate-tag' });
 
       // Col 2: След. платёж
@@ -151,7 +146,7 @@ export class CreditsOverview {
       col2.createDiv({ text: tr.overviewCreditNextPayment, cls: 'finance-deposit-stat-lbl' });
       const val2 = col2.createDiv('finance-deposit-stat-val');
       if (nextPayment) {
-        val2.textContent = `${fmtDate(nextPayment.dueDate)} · ${this.fmt(nextPayment.amount)}`;
+        val2.textContent = `${fmtDate(nextPayment.dueDate)} · ${formatChartAmount(nextPayment.amount, this.ctx.currency)}`;
       } else {
         val2.textContent = '—';
       }
@@ -160,7 +155,7 @@ export class CreditsOverview {
       const col3 = bodyRow.createDiv('finance-deposit-stat-col');
       col3.createDiv({ text: tr.overviewCreditPaid, cls: 'finance-deposit-stat-lbl' });
       const val3 = col3.createDiv('finance-deposit-stat-val success');
-      val3.createSpan({ text: this.fmt(paidSum) });
+      val3.createSpan({ text: formatChartAmount(paidSum, this.ctx.currency) });
       col3.createDiv({
         text: `${paidPayments.length} / ${credit.payments.length} ${tr.overviewCreditPaymentsCount}`,
         cls: 'finance-deposit-stat-sub',
@@ -170,7 +165,7 @@ export class CreditsOverview {
       const col4 = bodyRow.createDiv('finance-deposit-stat-col');
       col4.createDiv({ text: tr.overviewCreditRemaining, cls: 'finance-deposit-stat-lbl' });
       const val4 = col4.createDiv('finance-deposit-stat-val bold');
-      val4.textContent = this.fmt(remaining);
+      val4.textContent = formatChartAmount(remaining, this.ctx.currency);
 
       // Progress bar
       if (credit.originalAmount > 0) {
@@ -184,13 +179,5 @@ export class CreditsOverview {
         fill.style.background = creditColor;
       }
     });
-  }
-
-  private fmt(amount: number): string {
-    return (
-      amount.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) +
-      ' ' +
-      this.ctx.currency
-    );
   }
 }
