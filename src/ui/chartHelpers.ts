@@ -1,8 +1,5 @@
 import { CSS_CLASS } from '../constants';
 
-function createSvg<K extends keyof SVGElementTagNameMap>(tag: K): SVGElementTagNameMap[K] {
-  return document.createElementNS('http://www.w3.org/2000/svg', tag);
-}
 
 const TOOLTIP_CURSOR_GAP = 12;
 const TOOLTIP_EDGE_GAP = 8;

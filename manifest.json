@@ -1,7 +1,7 @@
 {
   "id": "finance-manager",
   "name": "Finance Manager",
-  "version": "2.2.0",
+  "version": "2.2.1",
   "minAppVersion": "1.8.7",
   "description": "Track income, expenses, debts, credits, and deposits directly in notes with interactive accounts and analytics.",
   "author": "Dimanchello",

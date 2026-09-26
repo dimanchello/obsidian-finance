@@ -132,7 +132,7 @@ export function renderDateRangeFilter(
   const fromI = fromG.createEl('input', { type: 'date', cls: CSS_CLASS.FINANCE_FILTER_INPUT });
   fromI.value = (ctx.state[stateKeys.from] as string | undefined) ?? '';
   fromI.addEventListener('change', () => {
-    (ctx.state[stateKeys.from] as any) = fromI.value;
+    (ctx.state[stateKeys.from] as unknown) = fromI.value;
     ctx.saveState();
     onChange();
   });
@@ -142,7 +142,7 @@ export function renderDateRangeFilter(
   const toI = toG.createEl('input', { type: 'date', cls: CSS_CLASS.FINANCE_FILTER_INPUT });
   toI.value = (ctx.state[stateKeys.to] as string | undefined) ?? '';
   toI.addEventListener('change', () => {
-    (ctx.state[stateKeys.to] as any) = toI.value;
+    (ctx.state[stateKeys.to] as unknown) = toI.value;
     ctx.saveState();
     onChange();
   });
