@@ -353,7 +353,7 @@
   background: var(--background-modifier-border);
 }
 .finance-list-subtab.is-active .finance-list-subtab-count { background: rgba(255, 255, 255, .25); }
-.finance-debt-toolbar:has(> .finance-list-subtabs) { align-items: center; }
+.finance-debt-toolbar.finance-debt-toolbar--with-subtabs { align-items: center; }
 .finance-debt-toolbar .finance-list-subtabs { margin-bottom: 0; }
 @media (max-width: 480px) {
   .finance-list-subtabs { display: flex; width: 100%; }

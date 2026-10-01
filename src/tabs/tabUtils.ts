@@ -2,6 +2,10 @@ import { ViewContext } from '../context';
 import { CSS_CLASS, EntityListTab } from '../constants';
 import { SortDir, ViewState } from '../types';
 
+type PlainStringStateKey = {
+  [K in keyof ViewState]-?: string extends Exclude<ViewState[K], undefined> ? K : never;
+}[keyof ViewState];
+
 /**
  * Factory functions for DataTable state adapters.
  * Extracts common patterns from all tabs that use DataTable.
@@ -106,6 +110,7 @@ export function renderListSubTabs(
     { value: EntityListTab.OPEN, label: ctx.tr.listTabOpen, count: counts.open },
     { value: EntityListTab.CLOSED, label: ctx.tr.listTabClosed, count: counts.closed },
   ];
+  host.addClass('finance-debt-toolbar--with-subtabs');
   const bar = host.createDiv('finance-list-subtabs');
   for (const tab of tabs) {
     const btn = bar.createEl('button', {
@@ -158,8 +163,8 @@ export function renderDateRangeFilter(
   container: HTMLElement,
   ctx: ViewContext,
   stateKeys: {
-    from: keyof ViewContext['state'];
-    to: keyof ViewContext['state'];
+    from: PlainStringStateKey;
+    to: PlainStringStateKey;
   },
   tr: { from: string; to: string },
   onChange: () => void
@@ -171,7 +176,7 @@ export function renderDateRangeFilter(
   const fromI = fromG.createEl('input', { type: 'date', cls: CSS_CLASS.FINANCE_FILTER_INPUT });
   fromI.value = (ctx.state[stateKeys.from] as string | undefined) ?? '';
   fromI.addEventListener('change', () => {
-    (ctx.state[stateKeys.from] as any) = fromI.value;
+    ctx.state[stateKeys.from] = fromI.value;
     ctx.saveState();
     onChange();
   });
@@ -181,7 +186,7 @@ export function renderDateRangeFilter(
   const toI = toG.createEl('input', { type: 'date', cls: CSS_CLASS.FINANCE_FILTER_INPUT });
   toI.value = (ctx.state[stateKeys.to] as string | undefined) ?? '';
   toI.addEventListener('change', () => {
-    (ctx.state[stateKeys.to] as any) = toI.value;
+    ctx.state[stateKeys.to] = toI.value;
     ctx.saveState();
     onChange();
   });
