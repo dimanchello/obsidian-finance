@@ -174,7 +174,7 @@ export function renderDateRangeFilter(
   const fromG = row.createDiv('finance-filter-group');
   fromG.createEl('label', { text: tr.from, cls: CSS_CLASS.FINANCE_FILTER_LABEL });
   const fromI = fromG.createEl('input', { type: 'date', cls: CSS_CLASS.FINANCE_FILTER_INPUT });
-  fromI.value = (ctx.state[stateKeys.from] as string | undefined) ?? '';
+  fromI.value = ctx.state[stateKeys.from] ?? '';
   fromI.addEventListener('change', () => {
     ctx.state[stateKeys.from] = fromI.value;
     ctx.saveState();
@@ -184,7 +184,7 @@ export function renderDateRangeFilter(
   const toG = row.createDiv('finance-filter-group');
   toG.createEl('label', { text: tr.to, cls: CSS_CLASS.FINANCE_FILTER_LABEL });
   const toI = toG.createEl('input', { type: 'date', cls: CSS_CLASS.FINANCE_FILTER_INPUT });
-  toI.value = (ctx.state[stateKeys.to] as string | undefined) ?? '';
+  toI.value = ctx.state[stateKeys.to] ?? '';
   toI.addEventListener('change', () => {
     ctx.state[stateKeys.to] = toI.value;
     ctx.saveState();
