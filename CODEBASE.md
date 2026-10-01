@@ -51,6 +51,7 @@ Obsidian плагин для личного финансового учёта. �
   `isoWeekRange`, `daysInYear`, `safeEndDate`, `MS_PER_DAY`, `MONTHS_IN_YEAR`)
 - `validate.ts` — parses/validates AccountData structures
 - `viewState.ts` — ViewState parsing and defaults
+- `entityLifecycle.ts` — `isDebtOpen`/`isCreditOpen`/`isDepositOpen`, `matchesListTab`, `listTabFor` (inner All/Open/Closed tabs; `EntityListTab` in `constants.ts`, persisted as `debtListTab`/`creditListTab`/`depositListTab`)
 - `accountId.ts` — accountId mint/parse/insert into code block
 
 **`src/storage/`**
@@ -346,7 +347,7 @@ every call site. `CreditModal` no longer touches records at all.
 
 ### DataTable
 
-**Path:** `src/ui/DataTable.ts`
+**Path:** `src/ui/DataTable/DataTable.ts` (spec types in `src/ui/DataTable/types.ts`)
 
 **Purpose:** Generic table component with sort/filter/pagination/mobile cards. Used by all tabs.
 
@@ -354,6 +355,7 @@ every call site. `CreditModal` no longer touches records at all.
 - `DataTable<T>` class
 - `render()` — entry point
 - `DataTableApi` — API exposed to parent (pageSize setter, selectedRows getter)
+- `TableSpec.renderSubTabs` — optional hook: inside the toolbar row after the buttons on desktop, own row above the toolbar on mobile; `emptyState` may be a function (per-segment message)
 
 **Depends on:**
 - `ViewContext`, `pagination`, `tabHelpers`
@@ -417,6 +419,7 @@ every call site. `CreditModal` no longer touches records at all.
 - `onUpdate: () => void` — callback to trigger `refreshAndRender()`
 - `render()`
 - `renderHeaderActions()` — renders "Add Debt" button
+- `listTabDebts()` — debts of the active inner tab (All/Open/Closed), base for `getFilteredDebts()`; switch rendered by `tabUtils.renderListSubTabs()` (same pattern in CreditsTab/DepositsTab)
 
 **Depends on:**
 - `ViewContext`, `DataTable`, `DebtModal`, `DebtMovementModal`, `AccountCommands`

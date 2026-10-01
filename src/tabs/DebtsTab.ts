@@ -14,9 +14,10 @@ import { DataTable, FilterControl } from '../ui/DataTable';
 import { renderMobileCard, renderSummaryCard, compareValues, dateRangeControls } from '../ui/tabHelpers';
 import { getDebtOriginal, getDebtWithInterest, getDebtRemaining, isDebtPaidOff } from '../domain/debtCalculations';
 import { AccountCommands } from '../domain/AccountCommands';
-import { CSS_CLASS,  DebtDirection, DebtMovementType, PaymentStatus  } from '../constants';
+import { CSS_CLASS, DebtDirection, DebtMovementType, EntityListTab } from '../constants';
+import { isDebtOpen, matchesListTab } from '../domain/entityLifecycle';
 import { matchesAnyField, matchesSearchFilter, matchesDateRange, matchesStringFilter } from '../domain/filterUtils';
-import { createExpandableTableStateAdapter } from './tabUtils';
+import { createExpandableTableStateAdapter, renderListSubTabs } from './tabUtils';
 
 export class DebtsTab {
   private ctx: ViewContext;
@@ -36,7 +37,7 @@ export class DebtsTab {
       ctx,
       items: () => this.getFilteredDebts(),
       itemId: d => d.id,
-      hasAnyItems: () => (this.ctx.data?.debts.length ?? 0) > 0,
+      hasAnyItems: () => this.listTabDebts().length > 0,
       columns: [
         {
           key: 'direction', label: this.tr.type,
@@ -113,7 +114,19 @@ export class DebtsTab {
         () => { this.ctx.state.debtFilter = { ...DEFAULT_DEBT_FILTER }; }
       ),
       renderStats: host => this.renderStats(host),
-      emptyState: { icon: '💳', title: this.tr.noDebts, subtitle: this.tr.addNewDebt },
+      renderSubTabs: (host, api) => {
+        const debts = this.ctx.data?.debts ?? [];
+        const open = debts.filter(isDebtOpen).length;
+        renderListSubTabs(host, this.ctx, { tab: 'debtListTab', page: 'debtPage' },
+          { open, closed: debts.length - open }, () => this.render(), api);
+      },
+      emptyState: () => {
+        switch (this.ctx.state.debtListTab) {
+          case EntityListTab.CLOSED: return { icon: '✅', title: this.tr.noClosedDebts, subtitle: this.tr.closedListHint };
+          case EntityListTab.ALL: return { icon: '💳', title: this.tr.noDebts, subtitle: this.tr.addNewDebt };
+          default: return { icon: '💳', title: this.tr.noOpenDebts, subtitle: this.tr.addNewDebt };
+        }
+      },
       emptyFiltered: { icon: '🔍', title: this.tr.noDebtsFiltered, subtitle: this.tr.tryChangeFilters },
       onBulkDelete: async ids => {
         await this.commands.deleteDebts(ids);
@@ -188,15 +201,6 @@ export class DebtsTab {
         get: () => f.search, set: v => { f.search = v; },
       },
       {
-        kind: 'select', label: this.tr.status,
-        options: [
-          { value: 'all', label: this.tr.all },
-          { value: 'unpaid', label: this.tr.unpaid },
-          { value: PaymentStatus.PAID, label: this.tr.paid },
-        ],
-        get: () => f.status, set: v => { f.status = v as typeof f.status; },
-      },
-      {
         kind: 'select', label: this.tr.direction,
         options: [
           { value: 'all', label: this.tr.all },
@@ -217,14 +221,17 @@ export class DebtsTab {
     ];
   }
 
+  private listTabDebts(): DebtRecord[] {
+    const tab = this.ctx.state.debtListTab ?? EntityListTab.OPEN;
+    return (this.ctx.data?.debts ?? []).filter(d => matchesListTab(isDebtOpen(d), tab));
+  }
+
   private getFilteredDebts(): DebtRecord[] {
     if (!this.ctx.data) return [];
     const f = this.ctx.state.debtFilter ?? DEFAULT_DEBT_FILTER;
     const s = this.ctx.state.debtSort ?? { field: 'date' as DebtSortField, dir: 'desc' as const };
 
-    const rows = this.ctx.data.debts.filter(d => {
-      if (f.status === PaymentStatus.PAID && !isDebtPaidOff(d)) return false;
-      if (f.status === 'unpaid' && isDebtPaidOff(d)) return false;
+    const rows = this.listTabDebts().filter(d => {
       if (!matchesStringFilter(d.direction, f.direction === 'all' ? '' : f.direction)) return false;
       if (!matchesDateRange(d.date, f.dateFrom, f.dateTo)) return false;
       if (!matchesSearchFilter(d.person, f.person)) return false;

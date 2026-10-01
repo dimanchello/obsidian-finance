@@ -331,6 +331,37 @@
 .finance-analytics-toggle-btn:hover { background: var(--background-modifier-hover); color: var(--ft-accent); border-color: var(--ft-accent); }
 .finance-analytics-toggle-btn.active { background: var(--ft-accent); color: #fff; border-color: var(--ft-accent); }
 
+/* ── Inner list tabs (All / Open / Closed) ─────────────────────────────────── */
+.finance-list-subtabs {
+  display: inline-flex; gap: 2px; padding: 3px; margin-bottom: 12px;
+  border: 1.5px solid var(--ft-border); border-radius: var(--ft-radius-sm);
+  background: var(--background-secondary);
+}
+.finance-list-subtab {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  background: none !important; border: none; box-shadow: none !important;
+  border-radius: var(--ft-radius-sm); color: var(--text-muted);
+  padding: 5px 14px; font-size: .82em; font-weight: 600;
+  cursor: pointer; transition: all .15s; font-family: inherit;
+  min-width: 0; text-overflow: ellipsis; white-space: nowrap; overflow: hidden;
+}
+.finance-list-subtab:hover { background: var(--background-modifier-hover); color: var(--text-normal); }
+.finance-list-subtab.is-active { background: var(--ft-accent); color: #fff; }
+.finance-list-subtab-count {
+  min-width: 18px; padding: 0 5px; border-radius: 9px;
+  font-size: .85em; line-height: 18px; text-align: center;
+  background: var(--background-modifier-border);
+}
+.finance-list-subtab.is-active .finance-list-subtab-count { background: rgba(255, 255, 255, .25); }
+.finance-debt-toolbar:has(> .finance-list-subtabs) { align-items: center; }
+.finance-debt-toolbar .finance-list-subtabs { margin-bottom: 0; }
+@media (max-width: 480px) {
+  .finance-list-subtabs { display: flex; width: 100%; }
+  .finance-list-subtab { flex: 1; padding: 6px 8px; }
+}
+.is-mobile .finance-list-subtabs { display: flex; width: 100%; }
+.is-mobile .finance-list-subtab { flex: 1; padding: 6px 8px; }
+
 /* ── Analytics panel ────────────────────────────────────────────────────────── */
 .finance-analytics-panel {
   background: var(--background-secondary);
@@ -2243,7 +2274,7 @@
   border: none !important;
 }
 .finance-debt-toolbar {
-  display: flex; gap: 8px; margin-bottom: 16px;
+  display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap;
 }
 .finance-debt-block-actions {
   display: flex; gap: 6px; margin-top: 4px; flex-wrap: wrap;

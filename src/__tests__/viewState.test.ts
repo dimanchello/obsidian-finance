@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { defaultViewState, parseViewState } from '../domain/viewState';
+import { EntityListTab } from '../types';
 
 describe('defaultViewState', () => {
   it('заполняет все разделы и берёт pageSize из настроек', () => {
@@ -103,5 +104,25 @@ describe('parseViewState', () => {
     expect(s.debtExpandedId).toBeUndefined();
     expect(s.creditExpandedId).toBeUndefined();
     expect(s.depositExpandedId).toBeUndefined();
+  });
+});
+
+describe('parseViewState: внутренние вкладки списков', () => {
+  it('по умолчанию открыты «Открытые»', () => {
+    const s = defaultViewState(25);
+    expect(s.debtListTab).toBe(EntityListTab.OPEN);
+    expect(s.creditListTab).toBe(EntityListTab.OPEN);
+    expect(s.depositListTab).toBe(EntityListTab.OPEN);
+  });
+
+  it('сохраняет ALL и CLOSED, мусор превращает в OPEN', () => {
+    const s = parseViewState({
+      debtListTab: EntityListTab.ALL,
+      creditListTab: EntityListTab.CLOSED,
+      depositListTab: 'мусор',
+    }, 25);
+    expect(s.debtListTab).toBe(EntityListTab.ALL);
+    expect(s.creditListTab).toBe(EntityListTab.CLOSED);
+    expect(s.depositListTab).toBe(EntityListTab.OPEN);
   });
 });

@@ -4,6 +4,7 @@ import { calcDebtsBreakdown } from '../../domain/metrics';
 import { DebtDetailModal } from '../../modals/DebtDetailModal';
 import { formatChartAmount } from '../../domain/formattingHelpers';
 import { BaseChart } from './BaseChart';
+import { isDebtOpen, listTabFor } from '../../domain/entityLifecycle';
 
 export class DebtsBreakdownChart extends BaseChart {
 
@@ -38,19 +39,20 @@ export class DebtsBreakdownChart extends BaseChart {
       card.addEventListener('click', () => {
         this.tooltip.hideTip();
         const person = item.person.trim();
-        const match = (data?.debts ?? []).find(d => (d.person.trim() || '—') === person);
+        const personDebts = (data?.debts ?? []).filter(d => (d.person.trim() || '—') === person);
+        const match = personDebts.find(isDebtOpen) ?? personDebts[0];
         if (!match) return;
 
         const handleNavigate = () => {
           this.ctx.state.debtFilter = {
             search: '',
-            status: 'all',
             direction: 'all',
             dateFrom: '',
             dateTo: '',
             person: person === '—' ? '' : person,
           };
 
+          this.ctx.state.debtListTab = listTabFor(isDebtOpen(match));
           this.ctx.state.debtExpandedId = match.id;
           this.ctx.state.debtPage = 0;
           this.ctx.saveState();

@@ -8,6 +8,7 @@ import {
   DownPaymentType,
   DepositType,
   DepositStatus,
+  EntityListTab,
   DepositAccrualType,
   PaymentStatus,
   CurrencyOperationType,
@@ -26,6 +27,7 @@ export {
   DownPaymentType,
   DepositType,
   DepositStatus,
+  EntityListTab,
   DepositAccrualType,
   PaymentStatus,
   CurrencyOperationType,
@@ -111,7 +113,6 @@ export interface SortState { field: SortField; dir: SortDir; }
 export type DebtSortField = 'date' | 'amount' | 'person';
 export interface DebtFilterState {
   search: string;
-  status: 'all' | 'paid' | 'unpaid';
   direction: 'all' | DebtDirection;
   dateFrom: string;
   dateTo: string;
@@ -127,12 +128,15 @@ export interface ViewState {
   debtPage?: number;
   debtSort?: { field: DebtSortField; dir: SortDir };
   debtFilter?: DebtFilterState;
+  debtListTab?: EntityListTab;
   creditPage?: number;
   creditSort?: { field: CreditSortField; dir: SortDir };
   creditFilter?: CreditFilterState;
+  creditListTab?: EntityListTab;
   depositPage?: number;
   depositSort?: { field: DepositSortField; dir: SortDir };
   depositFilter?: DepositFilterState;
+  depositListTab?: EntityListTab;
   currencyPage?: number;
   currencySort?: { field: CurrencySortField; dir: SortDir };
   currencyFilter?: CurrencyFilterState;
@@ -180,13 +184,12 @@ export const DEFAULT_FILTER: FilterState = {
 export const DEFAULT_SORT: SortState = { field: 'date', dir: 'desc' };
 
 export const DEFAULT_DEBT_FILTER: DebtFilterState = {
-  search: '', status: 'all', direction: 'all', dateFrom: '', dateTo: '', person: '',
+  search: '', direction: 'all', dateFrom: '', dateTo: '', person: '',
 };
 
 export type CreditSortField = 'date' | 'amount' | 'bankName';
 export interface CreditFilterState {
   search: string;
-  status: 'all' | CreditStatus;
   bankName: string;
   type: 'all' | CreditType;
   dateFrom: string;
@@ -196,7 +199,6 @@ export interface CreditFilterState {
 export type DepositSortField = 'date' | 'amount' | 'bankName';
 export interface DepositFilterState {
   search: string;
-  status: 'all' | DepositStatus;
   bankName: string;
   type: 'all' | DepositType;
   dateFrom: string;
@@ -204,11 +206,11 @@ export interface DepositFilterState {
 }
 
 export const DEFAULT_CREDIT_FILTER: CreditFilterState = {
-  search: '', status: 'all', bankName: '', type: 'all', dateFrom: '', dateTo: '',
+  search: '', bankName: '', type: 'all', dateFrom: '', dateTo: '',
 };
 
 export const DEFAULT_DEPOSIT_FILTER: DepositFilterState = {
-  search: '', status: 'all', bankName: '', type: 'all', dateFrom: '', dateTo: '',
+  search: '', bankName: '', type: 'all', dateFrom: '', dateTo: '',
 };
 
 export const COMMON_CURRENCIES = [

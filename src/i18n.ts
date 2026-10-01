@@ -159,6 +159,16 @@ export interface Translations {
   noDebts: string;
   addNewDebt: string;
   noDebtsFiltered: string;
+  listTabAll: string;
+  listTabOpen: string;
+  listTabClosed: string;
+  noOpenDebts: string;
+  noClosedDebts: string;
+  noActiveCredits: string;
+  noPaidCredits: string;
+  noActiveDeposits: string;
+  noClosedDeposits: string;
+  closedListHint: string;
   selectCurrency: string;
   ownCurrency: string;
   analytics: string;
@@ -202,9 +212,6 @@ export interface Translations {
   partialRepayment: string;
   partialPaymentNote: string;
   fullRepayment: string;
-  creditActive: string;
-  creditPaid: string;
-  depositActive: string;
   depositClosed: string;
   creditTypeCredit: string;
   creditTypeAuto: string;
@@ -740,6 +747,16 @@ const ru: Translations = {
   noDebts: 'Нет долгов',
   addNewDebt: 'Новый долг',
   noDebtsFiltered: 'Долгов не найдено',
+  listTabAll: 'Все',
+  listTabOpen: 'Открытые',
+  listTabClosed: 'Закрытые',
+  noOpenDebts: 'Нет открытых долгов',
+  noClosedDebts: 'Нет погашенных долгов',
+  noActiveCredits: 'Нет активных кредитов',
+  noPaidCredits: 'Нет погашенных кредитов',
+  noActiveDeposits: 'Нет активных вкладов',
+  noClosedDeposits: 'Нет закрытых вкладов',
+  closedListHint: 'Здесь появятся погашенные и закрытые записи',
   selectCurrency: 'Изменить валюту',
   ownCurrency: 'Своя…',
   analytics: 'Аналитика',
@@ -783,9 +800,6 @@ const ru: Translations = {
   partialRepayment: 'Частичное',
   partialPaymentNote: 'Частичная оплата',
   fullRepayment: 'Полное',
-  creditActive: 'Активен',
-  creditPaid: 'Погашен',
-  depositActive: 'Активен',
   depositClosed: 'Закрыт',
   creditTypeCredit: 'Кредит',
   creditTypeAuto: 'Автокредит',
@@ -1361,6 +1375,16 @@ const en: Translations = {
   noDebts: 'No debts',
   addNewDebt: 'Add new debt',
   noDebtsFiltered: 'No debts found',
+  listTabAll: 'All',
+  listTabOpen: 'Open',
+  listTabClosed: 'Closed',
+  noOpenDebts: 'No open debts',
+  noClosedDebts: 'No repaid debts',
+  noActiveCredits: 'No active credits',
+  noPaidCredits: 'No repaid credits',
+  noActiveDeposits: 'No active deposits',
+  noClosedDeposits: 'No closed deposits',
+  closedListHint: 'Repaid and closed items will appear here',
   selectCurrency: 'Change currency',
   ownCurrency: 'Custom…',
   analytics: 'Analytics',
@@ -1404,9 +1428,6 @@ const en: Translations = {
   partialRepayment: 'Partial',
   partialPaymentNote: 'Partial payment',
   fullRepayment: 'Full',
-  creditActive: 'Active',
-  creditPaid: 'Paid',
-  depositActive: 'Active',
   depositClosed: 'Closed',
   creditTypeCredit: 'Credit',
   creditTypeAuto: 'Auto loan',

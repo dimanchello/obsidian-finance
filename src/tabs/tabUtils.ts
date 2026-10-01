@@ -1,5 +1,5 @@
 import { ViewContext } from '../context';
-import { CSS_CLASS } from '../constants';
+import { CSS_CLASS, EntityListTab } from '../constants';
 import { SortDir, ViewState } from '../types';
 
 /**
@@ -83,6 +83,45 @@ export function createExpandableTableStateAdapter(
       }
     },
   };
+}
+
+type ListTabStateKey = 'debtListTab' | 'creditListTab' | 'depositListTab';
+type ListPageStateKey = 'debtPage' | 'creditPage' | 'depositPage';
+
+/**
+ * Renders the inner «All / Open / Closed» switch of the Debts, Credits and Deposits tabs.
+ * Switching resets the page: a page index from another segment may be out of range.
+ */
+export function renderListSubTabs(
+  host: HTMLElement,
+  ctx: ViewContext,
+  keys: { tab: ListTabStateKey; page: ListPageStateKey },
+  counts: { open: number; closed: number },
+  rerender: () => void,
+  api?: { clearSelection?: () => void }
+): void {
+  const active = ctx.state[keys.tab] ?? EntityListTab.OPEN;
+  const tabs = [
+    { value: EntityListTab.ALL, label: ctx.tr.listTabAll, count: counts.open + counts.closed },
+    { value: EntityListTab.OPEN, label: ctx.tr.listTabOpen, count: counts.open },
+    { value: EntityListTab.CLOSED, label: ctx.tr.listTabClosed, count: counts.closed },
+  ];
+  const bar = host.createDiv('finance-list-subtabs');
+  for (const tab of tabs) {
+    const btn = bar.createEl('button', {
+      cls: `finance-list-subtab${tab.value === active ? ' is-active' : ''}`,
+    });
+    btn.createSpan({ text: tab.label });
+    btn.createSpan({ text: String(tab.count), cls: 'finance-list-subtab-count' });
+    btn.addEventListener('click', () => {
+      if (tab.value === active) return;
+      api?.clearSelection?.();
+      ctx.state[keys.tab] = tab.value;
+      ctx.state[keys.page] = 0;
+      ctx.saveState();
+      rerender();
+    });
+  }
 }
 
 /**

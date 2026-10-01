@@ -21,9 +21,10 @@ import { DataTable, FilterControl } from '../ui/DataTable';
 import { DepositsAnalyticsView } from '../DepositsAnalyticsView';
 import { renderMobileCard, renderSummaryCard, renderProgressBar, renderPaginatedSchedule, renderPagination, dateRangeControls, compareValues } from '../ui/tabHelpers';
 import { AccountCommands } from '../domain/AccountCommands';
-import { CSS_CLASS,  DepositAccrualType, DepositStatus, DepositType, PaymentStatus  } from '../constants';
+import { CSS_CLASS,  DepositAccrualType, DepositStatus, DepositType, EntityListTab, PaymentStatus  } from '../constants';
+import { isDepositOpen, matchesListTab } from '../domain/entityLifecycle';
 import { matchesAnyField, matchesStringFilter, matchesDateRange } from '../domain/filterUtils';
-import { createExpandableTableStateAdapter, createAnalyticsToggleButton } from './tabUtils';
+import { createExpandableTableStateAdapter, createAnalyticsToggleButton, renderListSubTabs } from './tabUtils';
 
 export class DepositsTab {
   private ctx: ViewContext;
@@ -44,7 +45,7 @@ export class DepositsTab {
       ctx,
       items: () => this.getFilteredDeposits(),
       itemId: d => d.id,
-      hasAnyItems: () => (this.ctx.data?.deposits.length ?? 0) > 0,
+      hasAnyItems: () => this.listTabDeposits().length > 0,
       columns: [
         { key: 'name', label: this.tr.name, cell: d => ({ text: d.name || '—' }) },
         { key: 'bank', label: this.tr.bankName, cell: d => ({ text: d.bankName || '—' }) },
@@ -107,6 +108,12 @@ export class DepositsTab {
         () => { this.ctx.state.depositFilter = { ...DEFAULT_DEPOSIT_FILTER }; }
       ),
       renderStats: host => this.renderStats(host),
+      renderSubTabs: (host, api) => {
+        const deposits = this.ctx.data?.deposits ?? [];
+        const open = deposits.filter(isDepositOpen).length;
+        renderListSubTabs(host, this.ctx, { tab: 'depositListTab', page: 'depositPage' },
+          { open, closed: deposits.length - open }, () => this.render(), api);
+      },
       toolbarButtons: (toolbar, rerender, api) => {
         createAnalyticsToggleButton(
           toolbar,
@@ -124,7 +131,13 @@ export class DepositsTab {
           new DepositsAnalyticsView(panel, deposits, this.ctx).render();
         }
       },
-      emptyState: { icon: '📈', title: this.tr.noDeposits, subtitle: this.tr.addNewDebt },
+      emptyState: () => {
+        switch (this.ctx.state.depositListTab) {
+          case EntityListTab.CLOSED: return { icon: '✅', title: this.tr.noClosedDeposits, subtitle: this.tr.closedListHint };
+          case EntityListTab.ALL: return { icon: '📈', title: this.tr.noDeposits, subtitle: this.tr.newDeposit };
+          default: return { icon: '📈', title: this.tr.noActiveDeposits, subtitle: this.tr.newDeposit };
+        }
+      },
       emptyFiltered: { icon: '🔍', title: this.tr.noDepositsFiltered, subtitle: this.tr.tryChangeFilters },
       onBulkDelete: async ids => {
         await this.commands.deleteDeposits(ids, this.tr.depositDefaultCat, this.tr.depositRefundNote);
@@ -228,15 +241,6 @@ export class DepositsTab {
         get: () => f.search, set: v => { f.search = v; },
       },
       {
-        kind: 'select', label: this.tr.status,
-        options: [
-          { value: 'all', label: this.tr.all },
-          { value: DepositStatus.ACTIVE, label: this.tr.depositActive },
-          { value: DepositStatus.CLOSED, label: this.tr.depositClosed },
-        ],
-        get: () => f.status, set: v => { f.status = v as typeof f.status; },
-      },
-      {
         kind: 'searchSelect', label: this.tr.bankName,
         options: () => [
           { value: '', label: this.tr.allBanks },
@@ -258,15 +262,18 @@ export class DepositsTab {
     ];
   }
 
+  private listTabDeposits(): DepositRecord[] {
+    const tab = this.ctx.state.depositListTab ?? EntityListTab.OPEN;
+    return (this.ctx.data?.deposits ?? []).filter(d => matchesListTab(isDepositOpen(d), tab));
+  }
+
   private getFilteredDeposits(): DepositRecord[] {
     if (!this.ctx.data) return [];
     const f = this.ctx.state.depositFilter ?? DEFAULT_DEPOSIT_FILTER;
     const s = this.ctx.state.depositSort ?? { field: 'date' as DepositSortField, dir: 'desc' as const };
 
-    let result = [...this.ctx.data.deposits];
-    result = result.filter(d => {
+    const result = this.listTabDeposits().filter(d => {
       if (!matchesAnyField([d.name, d.bankName], f.search)) return false;
-      if (!matchesStringFilter(d.status, f.status === 'all' ? '' : f.status)) return false;
       if (!matchesStringFilter(d.bankName, f.bankName)) return false;
       if (!matchesStringFilter(d.type, f.type === 'all' ? '' : f.type)) return false;
       if (!matchesDateRange(d.startDate, f.dateFrom, f.dateTo)) return false;

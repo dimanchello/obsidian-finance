@@ -21,9 +21,10 @@ import { DataTable, FilterControl } from '../ui/DataTable';
 import { CreditsAnalyticsView } from '../CreditsAnalyticsView';
 import { renderMobileCard, renderSummaryCard, renderProgressBar, renderPaginatedSchedule, renderPagination, dateRangeControls, compareValues } from '../ui/tabHelpers';
 import { AccountCommands, type CreditNoteTranslations } from '../domain/AccountCommands';
-import { CSS_CLASS,  CreditStatus, CreditType, PaymentStatus  } from '../constants';
+import { CSS_CLASS,  CreditStatus, CreditType, EntityListTab, PaymentStatus  } from '../constants';
+import { isCreditOpen, matchesListTab } from '../domain/entityLifecycle';
 import { matchesAnyField, matchesStringFilter, matchesDateRange } from '../domain/filterUtils';
-import { createExpandableTableStateAdapter, createAnalyticsToggleButton } from './tabUtils';
+import { createExpandableTableStateAdapter, createAnalyticsToggleButton, renderListSubTabs } from './tabUtils';
 
 export class CreditsTab {
   private ctx: ViewContext;
@@ -43,7 +44,7 @@ export class CreditsTab {
       ctx,
       items: () => this.getFilteredCredits(),
       itemId: c => c.id,
-      hasAnyItems: () => (this.ctx.data?.credits.length ?? 0) > 0,
+      hasAnyItems: () => this.listTabCredits().length > 0,
       columns: [
         { key: 'name', label: this.tr.name, cell: c => ({ text: c.name || '—' }) },
         { key: 'bank', label: this.tr.bankName, cell: c => ({ text: c.bankName || '—' }) },
@@ -96,6 +97,12 @@ export class CreditsTab {
         () => { this.ctx.state.creditFilter = { ...DEFAULT_CREDIT_FILTER }; }
       ),
       renderStats: host => this.renderStats(host),
+      renderSubTabs: (host, api) => {
+        const credits = this.ctx.data?.credits ?? [];
+        const open = credits.filter(isCreditOpen).length;
+        renderListSubTabs(host, this.ctx, { tab: 'creditListTab', page: 'creditPage' },
+          { open, closed: credits.length - open }, () => this.render(), api);
+      },
       toolbarButtons: (toolbar, rerender, api) => {
         createAnalyticsToggleButton(
           toolbar,
@@ -114,7 +121,13 @@ export class CreditsTab {
           new CreditsAnalyticsView(panel, credits, records, this.ctx).render();
         }
       },
-      emptyState: { icon: '🏦', title: this.tr.noCredits, subtitle: this.tr.addNewDebt },
+      emptyState: () => {
+        switch (this.ctx.state.creditListTab) {
+          case EntityListTab.CLOSED: return { icon: '✅', title: this.tr.noPaidCredits, subtitle: this.tr.closedListHint };
+          case EntityListTab.ALL: return { icon: '🏦', title: this.tr.noCredits, subtitle: this.tr.newCredit };
+          default: return { icon: '🏦', title: this.tr.noActiveCredits, subtitle: this.tr.newCredit };
+        }
+      },
       emptyFiltered: { icon: '🔍', title: this.tr.noCreditsFiltered, subtitle: this.tr.tryChangeFilters },
       onBulkDelete: async ids => {
         await this.commands.deleteCredits(ids);
@@ -205,15 +218,6 @@ export class CreditsTab {
         get: () => f.search, set: v => { f.search = v; },
       },
       {
-        kind: 'select', label: this.tr.status,
-        options: [
-          { value: 'all', label: this.tr.all },
-          { value: CreditStatus.ACTIVE, label: this.tr.creditActive },
-          { value: CreditStatus.PAID, label: this.tr.creditPaid },
-        ],
-        get: () => f.status, set: v => { f.status = v as typeof f.status; },
-      },
-      {
         kind: 'searchSelect', label: this.tr.bankName,
         options: () => [
           { value: '', label: this.tr.all },
@@ -235,15 +239,18 @@ export class CreditsTab {
     ];
   }
 
+  private listTabCredits(): CreditRecord[] {
+    const tab = this.ctx.state.creditListTab ?? EntityListTab.OPEN;
+    return (this.ctx.data?.credits ?? []).filter(c => matchesListTab(isCreditOpen(c), tab));
+  }
+
   private getFilteredCredits(): CreditRecord[] {
     if (!this.ctx.data) return [];
     const f = this.ctx.state.creditFilter ?? DEFAULT_CREDIT_FILTER;
     const s = this.ctx.state.creditSort ?? { field: 'date' as CreditSortField, dir: 'desc' as const };
 
-    let result = [...this.ctx.data.credits];
-    result = result.filter(c => {
+    const result = this.listTabCredits().filter(c => {
       if (!matchesAnyField([c.name, c.bankName], f.search)) return false;
-      if (!matchesStringFilter(c.status, f.status === 'all' ? '' : f.status)) return false;
       if (!matchesStringFilter(c.bankName, f.bankName)) return false;
       if (!matchesStringFilter(c.type, f.type === 'all' ? '' : f.type)) return false;
       if (!matchesDateRange(c.startDate, f.dateFrom, f.dateTo)) return false;
