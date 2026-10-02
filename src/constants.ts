@@ -80,6 +80,14 @@ export const DepositStatus = {
 } as const;
 export type DepositStatus = ValueOf<typeof DepositStatus>;
 
+/** Inner list tab on the Debts / Credits / Deposits tabs. */
+export const EntityListTab = {
+  ALL: 'all',
+  OPEN: 'open',
+  CLOSED: 'closed',
+} as const;
+export type EntityListTab = ValueOf<typeof EntityListTab>;
+
 export const DepositAccrualType = {
   TO_ACCOUNT: 'to_account',
   CAPITALIZATION: 'capitalization',

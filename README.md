@@ -135,7 +135,8 @@ Each account has four tabs, switched via the `•••` menu:
 - Payment tracking: borrow → repay
 - Auto-calculated balance accounting for all additional disbursements
 - Interest rate and due date
-- Filters by status (paid/unpaid), direction, person, dates
+- Inner tabs **All / Open / Closed** — open debts (both directions) are shown by default, repaid ones live in «Closed»
+- Filters by direction, person, dates
 - Movement history for each debt
 
 <img src="assets/screenshots/debt_usage_en.png" width="600" alt="Debt list">
@@ -147,7 +148,7 @@ Each account has four tabs, switched via the `•••` menu:
 - Monthly payment schedule
 - Automatic payment creation and expense records
 - Early repayment (reduce amount or term)
-- Status tracking: active / paid
+- Inner tabs **All / Open / Closed** — active credits by default, repaid ones in «Closed»
 
 <img src="assets/screenshots/credit_view_en.png" width="700" alt="Credit list">
 <br>
@@ -162,6 +163,7 @@ Each account has four tabs, switched via the `•••` menu:
 - Top-ups and partial withdrawals
 - Automatic income records on interest accrual
 - Automatic deposit closure at term end
+- Inner tabs **All / Open / Closed** — active deposits by default, closed ones in «Closed»
 
 <img src="assets/screenshots/deposits_usage_en.png" width="700" alt="Deposit list">
 <br>

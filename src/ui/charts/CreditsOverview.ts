@@ -12,6 +12,7 @@ import { CreditStatus, PaymentStatus } from '../../constants';
 import { CreditDetailModal } from '../../modals/CreditDetailModal';
 import { formatChartAmount } from '../../domain/formattingHelpers';
 import { BaseChart } from './BaseChart';
+import { isCreditOpen, listTabFor } from '../../domain/entityLifecycle';
 
 export class CreditsOverview extends BaseChart {
 
@@ -74,6 +75,7 @@ export class CreditsOverview extends BaseChart {
         if (!fullCredit) return;
 
         const handleNavigate = () => {
+          this.ctx.state.creditListTab = listTabFor(isCreditOpen(fullCredit));
           this.ctx.state.creditExpandedId = credit.id;
           this.ctx.state.creditPage = 0;
           this.ctx.saveState();

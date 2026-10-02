@@ -1,6 +1,7 @@
 import {
   SortDir, ViewState,
   DEFAULT_FILTER, DEFAULT_SORT, DEFAULT_DEBT_FILTER, DEFAULT_CREDIT_FILTER, DEFAULT_DEPOSIT_FILTER,
+  EntityListTab,
   CreditAnalyticsGroupBy, DepositAnalyticsGroupBy, OverviewGroupBy,
 } from '../types';
 
@@ -29,6 +30,9 @@ function sortState<F extends string>(v: unknown, fields: readonly F[], fallbackF
   return { field: oneOf(v.field, fields, fallbackField), dir: sortDir(v.dir) };
 }
 
+function listTab(v: unknown): EntityListTab {
+  return oneOf(v, Object.values(EntityListTab), EntityListTab.OPEN);
+}
 
 function columns(v: unknown): Record<string, boolean> | undefined {
   if (!isObject(v)) return undefined;
@@ -45,10 +49,13 @@ export function defaultViewState(pageSize: number): ViewState {
     filter: { ...DEFAULT_FILTER },
     debtSort: { field: 'date', dir: 'desc' },
     debtFilter: { ...DEFAULT_DEBT_FILTER },
+    debtListTab: EntityListTab.OPEN,
     creditSort: { field: 'date', dir: 'desc' },
     creditFilter: { ...DEFAULT_CREDIT_FILTER },
+    creditListTab: EntityListTab.OPEN,
     depositSort: { field: 'date', dir: 'desc' },
     depositFilter: { ...DEFAULT_DEPOSIT_FILTER },
+    depositListTab: EntityListTab.OPEN,
     page: 0,
     debtPage: 0,
     creditPage: 0,
@@ -83,10 +90,13 @@ export function parseViewState(raw: unknown, pageSize: number): ViewState {
     filter: { ...DEFAULT_FILTER },
     debtSort: sortState(raw.debtSort, ['date', 'amount', 'person'] as const, 'date'),
     debtFilter: { ...DEFAULT_DEBT_FILTER },
+    debtListTab: listTab(raw.debtListTab),
     creditSort: sortState(raw.creditSort, ['date', 'amount', 'bankName'] as const, 'date'),
     creditFilter: { ...DEFAULT_CREDIT_FILTER },
+    creditListTab: listTab(raw.creditListTab),
     depositSort: sortState(raw.depositSort, ['date', 'amount', 'bankName'] as const, 'date'),
     depositFilter: { ...DEFAULT_DEPOSIT_FILTER },
+    depositListTab: listTab(raw.depositListTab),
     page: 0,
     debtPage: 0,
     creditPage: 0,

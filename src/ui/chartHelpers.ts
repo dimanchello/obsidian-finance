@@ -1,6 +1,5 @@
 import { CSS_CLASS } from '../constants';
 
-
 const TOOLTIP_CURSOR_GAP = 12;
 const TOOLTIP_EDGE_GAP = 8;
 

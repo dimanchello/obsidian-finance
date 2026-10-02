@@ -1,6 +1,10 @@
 import { ViewContext } from '../context';
-import { CSS_CLASS } from '../constants';
+import { CSS_CLASS, EntityListTab } from '../constants';
 import { SortDir, ViewState } from '../types';
+
+type PlainStringStateKey = {
+  [K in keyof ViewState]-?: string extends Exclude<ViewState[K], undefined> ? K : never;
+}[keyof ViewState];
 
 /**
  * Factory functions for DataTable state adapters.
@@ -85,6 +89,46 @@ export function createExpandableTableStateAdapter(
   };
 }
 
+type ListTabStateKey = 'debtListTab' | 'creditListTab' | 'depositListTab';
+type ListPageStateKey = 'debtPage' | 'creditPage' | 'depositPage';
+
+/**
+ * Renders the inner «All / Open / Closed» switch of the Debts, Credits and Deposits tabs.
+ * Switching resets the page: a page index from another segment may be out of range.
+ */
+export function renderListSubTabs(
+  host: HTMLElement,
+  ctx: ViewContext,
+  keys: { tab: ListTabStateKey; page: ListPageStateKey },
+  counts: { open: number; closed: number },
+  rerender: () => void,
+  api?: { clearSelection?: () => void }
+): void {
+  const active = ctx.state[keys.tab] ?? EntityListTab.OPEN;
+  const tabs = [
+    { value: EntityListTab.ALL, label: ctx.tr.listTabAll, count: counts.open + counts.closed },
+    { value: EntityListTab.OPEN, label: ctx.tr.listTabOpen, count: counts.open },
+    { value: EntityListTab.CLOSED, label: ctx.tr.listTabClosed, count: counts.closed },
+  ];
+  host.addClass('finance-debt-toolbar--with-subtabs');
+  const bar = host.createDiv('finance-list-subtabs');
+  for (const tab of tabs) {
+    const btn = bar.createEl('button', {
+      cls: `finance-list-subtab${tab.value === active ? ' is-active' : ''}`,
+    });
+    btn.createSpan({ text: tab.label, cls: 'finance-list-subtab-label' });
+    btn.createSpan({ text: String(tab.count), cls: 'finance-list-subtab-count' });
+    btn.addEventListener('click', () => {
+      if (tab.value === active) return;
+      api?.clearSelection?.();
+      ctx.state[keys.tab] = tab.value;
+      ctx.state[keys.page] = 0;
+      ctx.saveState();
+      rerender();
+    });
+  }
+}
+
 /**
  * Creates a toolbar button for toggling analytics panel.
  * Common pattern across Credits, Deposits, and Currency tabs.
@@ -119,8 +163,8 @@ export function renderDateRangeFilter(
   container: HTMLElement,
   ctx: ViewContext,
   stateKeys: {
-    from: keyof ViewContext['state'];
-    to: keyof ViewContext['state'];
+    from: PlainStringStateKey;
+    to: PlainStringStateKey;
   },
   tr: { from: string; to: string },
   onChange: () => void
@@ -130,9 +174,9 @@ export function renderDateRangeFilter(
   const fromG = row.createDiv('finance-filter-group');
   fromG.createEl('label', { text: tr.from, cls: CSS_CLASS.FINANCE_FILTER_LABEL });
   const fromI = fromG.createEl('input', { type: 'date', cls: CSS_CLASS.FINANCE_FILTER_INPUT });
-  fromI.value = (ctx.state[stateKeys.from] as string | undefined) ?? '';
+  fromI.value = ctx.state[stateKeys.from] ?? '';
   fromI.addEventListener('change', () => {
-    (ctx.state[stateKeys.from] as unknown) = fromI.value;
+    ctx.state[stateKeys.from] = fromI.value;
     ctx.saveState();
     onChange();
   });
@@ -140,9 +184,9 @@ export function renderDateRangeFilter(
   const toG = row.createDiv('finance-filter-group');
   toG.createEl('label', { text: tr.to, cls: CSS_CLASS.FINANCE_FILTER_LABEL });
   const toI = toG.createEl('input', { type: 'date', cls: CSS_CLASS.FINANCE_FILTER_INPUT });
-  toI.value = (ctx.state[stateKeys.to] as string | undefined) ?? '';
+  toI.value = ctx.state[stateKeys.to] ?? '';
   toI.addEventListener('change', () => {
-    (ctx.state[stateKeys.to] as unknown) = toI.value;
+    ctx.state[stateKeys.to] = toI.value;
     ctx.saveState();
     onChange();
   });

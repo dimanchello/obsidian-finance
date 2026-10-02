@@ -7,6 +7,7 @@ import { DepositAccrualType, PaymentStatus } from '../../constants';
 import { DepositDetailModal } from '../../modals/DepositDetailModal';
 import { formatChartAmount } from '../../domain/formattingHelpers';
 import { BaseChart } from './BaseChart';
+import { isDepositOpen, listTabFor } from '../../domain/entityLifecycle';
 
 export class DepositsOverview extends BaseChart {
 
@@ -215,6 +216,7 @@ export class DepositsOverview extends BaseChart {
         if (!fullDeposit) return;
 
         const handleNavigate = () => {
+          this.ctx.state.depositListTab = listTabFor(isDepositOpen(fullDeposit));
           this.ctx.state.depositExpandedId = dep.id;
           this.ctx.state.depositPage = 0;
           this.ctx.saveState();

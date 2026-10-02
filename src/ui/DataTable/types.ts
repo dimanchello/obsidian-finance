@@ -61,6 +61,13 @@ export interface DataTableApi {
   closeFilters: () => void;
   bulkMode: boolean;
   toggleBulkMode: () => void;
+  clearSelection: () => void;
+}
+
+export interface EmptyStateSpec {
+  icon: string;
+  title: string;
+  subtitle: string;
 }
 
 export interface TableSpec<T> {
@@ -74,10 +81,13 @@ export interface TableSpec<T> {
   sortFields: SortFieldSpec[];
   state: TableStateAdapter;
   renderStats: (host: HTMLElement) => void;
+  /** Inner list tabs: in the toolbar row on desktop, a separate row above it on mobile. */
+  renderSubTabs?: (host: HTMLElement, api: DataTableApi) => void;
   renderCard: (block: HTMLElement, item: T) => void;
   expandable?: ExpandableSpec<T>;
-  emptyState: { icon: string; title: string; subtitle: string };
-  emptyFiltered: { icon: string; title: string; subtitle: string };
+  /** A function lets the message depend on the current state (e.g. the inner list tab). */
+  emptyState: EmptyStateSpec | (() => EmptyStateSpec);
+  emptyFiltered: EmptyStateSpec;
   hasAnyItems: () => boolean;
   actionsPosition?: 'inline' | 'above' | 'custom';
   cardCls?: string | ((item: T) => string[]);

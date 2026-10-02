@@ -27,3 +27,4 @@ npm-debug.log*
 
 # Agent scratch (subagent-driven-development ledger, briefs, review packages)
 .superpowers/
+.codex/

@@ -1,6 +1,6 @@
 import { CSS_CLASS } from '../../constants';
 import type { ViewContext } from '../../context';
-import type { TableSpec, DataTableApi } from './types';
+import type { TableSpec, DataTableApi, EmptyStateSpec } from './types';
 import { FilterPanel } from './FilterPanel';
 import { TableRenderer } from './TableRenderer';
 import { CardRenderer } from './CardRenderer';
@@ -41,6 +41,8 @@ export class DataTable<T> {
 
   render(host: HTMLElement): void {
     this.spec.renderStats(host);
+    // Mobile: sub-tabs take their own full-width row; desktop: they sit in the toolbar row.
+    if (this.ctx.isMobile) this.spec.renderSubTabs?.(host, this.api());
     this.renderToolbar(host);
     this.spec.renderPanels?.(host);
 
@@ -49,7 +51,8 @@ export class DataTable<T> {
     if (this.filtersOpen) this.filterPanel.render(filtersEl);
 
     if (!this.spec.hasAnyItems()) {
-      this.renderEmpty(host, this.spec.emptyState);
+      const { emptyState } = this.spec;
+      this.renderEmpty(host, typeof emptyState === 'function' ? emptyState() : emptyState);
       return;
     }
 
@@ -101,7 +104,7 @@ export class DataTable<T> {
     }
   }
 
-  private renderEmpty(host: HTMLElement, spec: { icon: string; title: string; subtitle: string }): void {
+  private renderEmpty(host: HTMLElement, spec: EmptyStateSpec): void {
     const e = host.createDiv('finance-empty-state');
     e.createDiv({ text: spec.icon, cls: 'finance-empty-icon' });
     e.createEl('p', { text: spec.title, cls: 'finance-empty-title' });
@@ -115,6 +118,7 @@ export class DataTable<T> {
       closeFilters: () => { if (this.filtersOpen) { this.filtersOpen = false; this.spec.rerender(); } },
       bulkMode: this.bulkMode,
       toggleBulkMode: () => this.toggleBulkMode(),
+      clearSelection: () => { this.selectedIds.clear(); },
     };
   }
 
@@ -146,6 +150,8 @@ export class DataTable<T> {
       bulkToggleBtn.addEventListener('click', () => {
         this.toggleBulkMode();
       });
+    } else {
+      this.spec.renderSubTabs?.(toolbar, this.api());
     }
   }
 

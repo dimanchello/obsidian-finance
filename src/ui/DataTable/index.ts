@@ -15,4 +15,5 @@ export type {
   ExpandableSpec,
   DataTableApi,
   TableSpec,
+  EmptyStateSpec,
 } from './types';
