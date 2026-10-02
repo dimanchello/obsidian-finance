@@ -116,7 +116,7 @@ export function renderListSubTabs(
     const btn = bar.createEl('button', {
       cls: `finance-list-subtab${tab.value === active ? ' is-active' : ''}`,
     });
-    btn.createSpan({ text: tab.label });
+    btn.createSpan({ text: tab.label, cls: 'finance-list-subtab-label' });
     btn.createSpan({ text: String(tab.count), cls: 'finance-list-subtab-count' });
     btn.addEventListener('click', () => {
       if (tab.value === active) return;
