@@ -105,11 +105,20 @@ export class DebtDetailModal extends FinanceBaseModal {
     });
 
     const movBody = movTable.createEl('tbody');
+    const initialMov = this.debt.movements[0];
     this.debt.movements.slice().reverse().forEach(m => {
       const mr = movBody.createEl('tr', { cls: `finance-mov-${m.type}` });
-      const typeLabel = m.type === DebtMovementType.BORROW
-        ? (isLent ? this.tr.gaveMore : this.tr.tookMore)
-        : (isLent ? this.tr.returned : this.tr.repaymentAct);
+      const isInitial = m.id === initialMov?.id;
+      let typeLabel: string;
+      if (m.type === DebtMovementType.BORROW) {
+        if (isInitial) {
+          typeLabel = isLent ? this.tr.lentGiven : this.tr.borrowedTaken;
+        } else {
+          typeLabel = isLent ? this.tr.gaveMore : this.tr.tookMore;
+        }
+      } else {
+        typeLabel = isLent ? this.tr.returned : this.tr.repaymentAct;
+      }
       mr.createEl('td', { text: typeLabel, cls: CSS_CLASS.FINANCE_TD });
       mr.createEl('td', {
         text: (m.type === DebtMovementType.BORROW ? '−' : '+') + this.ctx.fmt(m.amount),
@@ -135,13 +144,13 @@ export class DebtDetailModal extends FinanceBaseModal {
     if (!isPaid) {
       const repayBtn = leftGroup.createEl('button', {
         text: isLent ? this.tr.returned : this.tr.repaymentAct,
-        cls: 'finance-btn-secondary',
+        cls: CSS_CLASS.FINANCE_BTN_SECONDARY,
       });
       repayBtn.addEventListener('click', () => this.openRepayModal());
 
       const borrowBtn = leftGroup.createEl('button', {
-        text: isLent ? this.tr.gaveMore : this.tr.borrowMore,
-        cls: 'finance-btn-secondary',
+        text: isLent ? this.tr.giveMore : this.tr.borrowMore,
+        cls: CSS_CLASS.FINANCE_BTN_SECONDARY,
       });
       borrowBtn.addEventListener('click', () => this.openBorrowMoreModal());
     }
@@ -149,7 +158,7 @@ export class DebtDetailModal extends FinanceBaseModal {
     if (this.opts.onNavigateToDebts) {
       const navBtn = leftGroup.createEl('button', {
         text: `↗️ ${this.tr.overviewOpenInDebtsTab}`,
-        cls: 'finance-btn-secondary',
+        cls: CSS_CLASS.FINANCE_BTN_SECONDARY,
       });
       navBtn.addEventListener('click', () => {
         this.close();
@@ -183,15 +192,17 @@ export class DebtDetailModal extends FinanceBaseModal {
   }
 
   private openBorrowMoreModal(): void {
+    const isLent = this.debt.direction === DebtDirection.LENT;
     new DebtMovementModal(this.ctx.app, {
-      title: `${this.tr.borrowMore} — ${this.debt.person}`,
+      title: `${isLent ? this.tr.giveMore : this.tr.borrowMore} — ${this.debt.person}`,
       type: DebtMovementType.BORROW,
       onSave: async mov => {
+        const note = `${isLent ? this.tr.debtGiveMoreNote : this.tr.debtBorrowMoreNote}: ${this.debt.person}`;
         await this.commands.addDebtMovement(
           this.debt.id,
           mov,
           this.tr.debtDefaultCat,
-          `${this.tr.debtBorrowMoreNote}: ${this.debt.person}`
+          note
         );
         await this.reload();
       },

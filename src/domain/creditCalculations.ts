@@ -202,3 +202,48 @@ export function getCreditTypeLabel(type: CreditType, tr: Translations): string {
     default: return tr.creditTypeConsumer;
   }
 }
+
+export interface CreditScheduleChartItem {
+  id: string;
+  label: string;
+  dueDate: string;
+  principalPart: number;
+  interestPart: number;
+  total: number;
+  remainingDebt: number;
+  status: string;
+}
+
+/**
+ * Builds schedule chart data for a single credit: breakdown of each payment into
+ * principal and interest, plus remaining debt after payment.
+ */
+export function buildCreditScheduleChartData(credit: CreditRecord): CreditScheduleChartItem[] {
+  let runningPrincipal = credit.originalAmount;
+  return credit.payments.map((p, i) => {
+    let principalPart = p.principalPart;
+    let interestPart = p.interestPart;
+    let remainingDebt = p.remainingDebt;
+
+    if (principalPart === undefined || interestPart === undefined || remainingDebt === undefined) {
+      const isLast = i === credit.payments.length - 1;
+      const breakdown = calculatePaymentBreakdown(runningPrincipal, p.amount, credit.interestRate, isLast);
+      principalPart = breakdown.principalPart;
+      interestPart = breakdown.interestPart;
+      remainingDebt = breakdown.remainingDebt;
+    }
+    runningPrincipal = remainingDebt;
+
+    return {
+      id: p.id,
+      label: p.dueDate.slice(0, 7),
+      dueDate: p.dueDate,
+      principalPart,
+      interestPart,
+      total: p.amount,
+      remainingDebt,
+      status: p.status,
+    };
+  });
+}
+

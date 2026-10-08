@@ -344,6 +344,9 @@ export const OVERVIEW_SAVINGS_BENCHMARK = 20;
 export const OVERVIEW_INPUT_DEBOUNCE_MS = 600;
 export const OVERVIEW_DEPOSIT_CARD_MIN_W = 280;
 export const OVERVIEW_DEPOSIT_TREND_MONTHS = 6;
+export const OVERVIEW_SPLIT_TABLE_MAX_HEIGHT = 260;
+export const OVERVIEW_COMPACT_BAR_MIN_W = 4;
+export const OVERVIEW_COMPACT_BAR_MAX_W = 28;
 export const CURRENCY_ROUNDING_PRECISION = 100;      // 2 decimal places
 export const EXCHANGE_RATE_PRECISION = 10000;        // 4 decimal places
 

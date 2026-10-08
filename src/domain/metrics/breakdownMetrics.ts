@@ -5,6 +5,7 @@ import type { FinanceRecord, DebtRecord, OverviewGroupBy } from '../../types';
 import { RecordType, DebtDirection, DATE_FORMAT_LENGTH } from '../../constants';
 import { getDebtRepaid, getDebtWithInterest } from '../debtCalculations';
 import { isoWeek } from '../dateMath';
+import { isFutureTransaction } from '../records';
 
 export function getISOWeekString(dateStr: string): string {
   const iso = isoWeek(dateStr);
@@ -120,11 +121,12 @@ export function calcGroupBreakdown(
   records: FinanceRecord[],
   groupBy: OverviewGroupBy,
   emptyLabel = '—',
+  now = new Date(),
 ): BreakdownItem[] {
   const map = new Map<string, { income: number; expense: number }>();
 
   records.forEach(r => {
-    if (r.isInternal) return;
+    if (r.isInternal || isFutureTransaction(r, now)) return;
     let key = '';
     if (groupBy === 'category') {
       key = r.category.trim();

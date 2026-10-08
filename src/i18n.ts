@@ -371,6 +371,13 @@ export interface Translations {
   debtLentNote: string;
   debtRepayNote: string;
   debtBorrowMoreNote: string;
+  planned: string;
+  recalculate: string;
+  giveMore: string;
+  debtGiveMoreNote: string;
+  recalculateConfirmCredit: string;
+  recalculateConfirmDeposit: string;
+  recalculatedNotice: string;
   remainingCreditLabel: string;
   monthlyPaymentLabel: string;
   remainingPaymentsLabel: string;
@@ -637,6 +644,33 @@ export interface Translations {
   overviewCreditRemaining: string;
   overviewCreditPaymentsCount: string;
   overviewOpenInCreditsTab: string;
+  overviewAssetsModalTitle: string;
+  overviewAssetsModalDesc: string;
+  overviewLiabilitiesModalTitle: string;
+  overviewLiabilitiesModalDesc: string;
+  overviewBurdenModalTitle: string;
+  overviewBurdenModalDesc: string;
+  overviewBurdenMonthDesc: string;
+  overviewBurdenMonthPayments: string;
+  overviewBurdenMonthIncome: string;
+  overviewBurdenNoPaymentsInMonth: string;
+  overviewBurdenMonthlyPayments: string;
+  overviewBurdenAvgIncome: string;
+  overviewBurdenTotal3MoIncome: string;
+  overviewBurdenFormula: string;
+  overviewBurdenScale: string;
+  overviewBurdenLevelSafe: string;
+  overviewBurdenLevelWarning: string;
+  overviewBurdenLevelDanger: string;
+  overviewUpcomingPaymentsModalTitle: string;
+  overviewUpcomingPaymentsModalDesc: string;
+  overviewUpcomingPeriod: string;
+  overviewNoUpcomingPayments: string;
+  overviewSelectedDeposit: string;
+  overviewSelectedCredit: string;
+  overviewScheduleTable: string;
+  overviewAccrualsTable: string;
+  overviewCurrencyBalances: string;
 }
 
 const ru: Translations = {
@@ -959,6 +993,13 @@ const ru: Translations = {
   debtLentNote: 'Дано в долг',
   debtRepayNote: 'Возврат долга',
   debtBorrowMoreNote: 'Дополнительно взято',
+  planned: 'Запланировано',
+  recalculate: 'Пересчитать',
+  giveMore: '➕ Дать ещё',
+  debtGiveMoreNote: 'Дополнительно дано',
+  recalculateConfirmCredit: 'Вы уверены, что хотите пересчитать график платежей по кредиту «{name}»? Все текущие платежи будут удалены и созданы заново в соответствии с календарем.',
+  recalculateConfirmDeposit: 'Вы уверены, что хотите пересчитать начисления по вкладу «{name}»? Все начисления процентов будут удалены и созданы заново в соответствии с календарем.',
+  recalculatedNotice: 'Перерасчет успешно выполнен',
   remainingCreditLabel: 'Остаток кредита',
   monthlyPaymentLabel: 'Ежемесячный платёж',
   remainingPaymentsLabel: 'Осталось платежей',
@@ -1265,6 +1306,33 @@ const ru: Translations = {
   overviewCreditRemaining: 'Остаток долга',
   overviewCreditPaymentsCount: 'платежей',
   overviewOpenInCreditsTab: 'Перейти во вкладку «Кредиты»',
+  overviewAssetsModalTitle: 'Состав активов',
+  overviewAssetsModalDesc: 'Активы состоят из средств на вкладах, валютных остатков и выданных долгов (вам должны).',
+  overviewLiabilitiesModalTitle: 'Состав обязательств',
+  overviewLiabilitiesModalDesc: 'Обязательства состоят из остатка основного долга по кредитам и взятых долгов (вы должны).',
+  overviewBurdenModalTitle: 'Кредитная нагрузка',
+  overviewBurdenModalDesc: 'Показатель отношения ежемесячных платежей по кредитам к среднему доходу за последние 3 месяца.',
+  overviewBurdenMonthDesc: 'Разбивка платежей по кредитам и отношение к доходу за выбранный месяц.',
+  overviewBurdenMonthPayments: 'Платежи за месяц',
+  overviewBurdenMonthIncome: 'Доход за месяц',
+  overviewBurdenNoPaymentsInMonth: 'В этом месяце нет платежей по кредитам',
+  overviewBurdenMonthlyPayments: 'Платежи по кредитам в месяц',
+  overviewBurdenAvgIncome: 'Среднемесячный доход (за 3 мес.)',
+  overviewBurdenTotal3MoIncome: 'Доход за 3 месяца',
+  overviewBurdenFormula: 'Формула: (Платежи в месяц / Среднемесячный доход) × 100%',
+  overviewBurdenScale: 'Оценка нагрузки:',
+  overviewBurdenLevelSafe: 'До 30% — Низкая (безопасный уровень)',
+  overviewBurdenLevelWarning: '30% – 50% — Умеренная (требует внимания)',
+  overviewBurdenLevelDanger: 'Свыше 50% — Высокая (повышенный риск)',
+  overviewUpcomingPaymentsModalTitle: 'Ближайшие платежи',
+  overviewUpcomingPaymentsModalDesc: 'Плановые платежи по кредитам и возвраты взятых долгов на ближайший месяц.',
+  overviewUpcomingPeriod: 'Период расчёта: ближайшие 30 дней',
+  overviewNoUpcomingPayments: 'Нет предстоящих платежей в ближайшие 30 дней',
+  overviewSelectedDeposit: 'Выбранный вклад',
+  overviewSelectedCredit: 'Выбранный кредит',
+  overviewScheduleTable: 'График платежей',
+  overviewAccrualsTable: 'График начислений',
+  overviewCurrencyBalances: 'Валютные остатки',
 };
 
 const en: Translations = {
@@ -1587,6 +1655,13 @@ const en: Translations = {
   debtLentNote: 'Lent',
   debtRepayNote: 'Debt repayment',
   debtBorrowMoreNote: 'Additional borrowing',
+  planned: 'Planned',
+  recalculate: 'Recalculate',
+  giveMore: '➕ Lend more',
+  debtGiveMoreNote: 'Additional lending',
+  recalculateConfirmCredit: 'Are you sure you want to recalculate the payment schedule for credit "{name}"? All existing payments will be deleted and recreated according to the calendar.',
+  recalculateConfirmDeposit: 'Are you sure you want to recalculate accruals for deposit "{name}"? All existing accruals will be deleted and recreated according to the calendar.',
+  recalculatedNotice: 'Recalculated successfully',
   remainingCreditLabel: 'Remaining credit',
   monthlyPaymentLabel: 'Monthly payment',
   remainingPaymentsLabel: 'Remaining payments',
@@ -1893,6 +1968,33 @@ const en: Translations = {
   overviewCreditRemaining: 'Remaining debt',
   overviewCreditPaymentsCount: 'payments',
   overviewOpenInCreditsTab: 'Open in Credits tab',
+  overviewAssetsModalTitle: 'Assets Breakdown',
+  overviewAssetsModalDesc: 'Assets consist of deposits, foreign currency balances, and debts owed to you.',
+  overviewLiabilitiesModalTitle: 'Liabilities Breakdown',
+  overviewLiabilitiesModalDesc: 'Liabilities consist of remaining credit principal and debts you owe to others.',
+  overviewBurdenModalTitle: 'Credit Burden',
+  overviewBurdenModalDesc: 'Ratio of monthly credit payments to average monthly income over the last 3 months.',
+  overviewBurdenMonthDesc: 'Breakdown of credit payments and debt burden ratio for the selected month.',
+  overviewBurdenMonthPayments: 'Monthly payments',
+  overviewBurdenMonthIncome: 'Monthly income',
+  overviewBurdenNoPaymentsInMonth: 'No credit payments in this month',
+  overviewBurdenMonthlyPayments: 'Monthly credit payments',
+  overviewBurdenAvgIncome: 'Avg. monthly income (3 mo.)',
+  overviewBurdenTotal3MoIncome: 'Income over 3 months',
+  overviewBurdenFormula: 'Formula: (Monthly payments / Avg. monthly income) × 100%',
+  overviewBurdenScale: 'Burden assessment:',
+  overviewBurdenLevelSafe: 'Under 30% — Low (safe level)',
+  overviewBurdenLevelWarning: '30% – 50% — Moderate (attention required)',
+  overviewBurdenLevelDanger: 'Over 50% — High (elevated risk)',
+  overviewUpcomingPaymentsModalTitle: 'Upcoming Payments',
+  overviewUpcomingPaymentsModalDesc: 'Scheduled credit payments and debt repayments for the next 30 days.',
+  overviewUpcomingPeriod: 'Calculation window: next 30 days',
+  overviewNoUpcomingPayments: 'No upcoming payments in the next 30 days',
+  overviewSelectedDeposit: 'Selected Deposit',
+  overviewSelectedCredit: 'Selected Credit',
+  overviewScheduleTable: 'Payment schedule',
+  overviewAccrualsTable: 'Accrual schedule',
+  overviewCurrencyBalances: 'Currency balances',
 };
 
 const translations: Record<Locale, Translations> = { ru, en };

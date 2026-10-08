@@ -132,4 +132,21 @@ export function safeEndDate(startDate?: string, termMonths?: number): string {
   }
 }
 
+/**
+ * Adds a specified number of days to a date string.
+ * @param dateStr - Date string in YYYY-MM-DD format
+ * @param days - Number of days to add (can be negative)
+ * @returns New date string in YYYY-MM-DD format
+ */
+export function addDays(dateStr: string, days: number): string {
+  const parsed = parseDateStr(dateStr);
+  if (!parsed) return dateStr;
+  const d = new Date(parsed.year, parsed.month - 1, parsed.day);
+  d.setDate(d.getDate() + days);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 

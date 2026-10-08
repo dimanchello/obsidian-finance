@@ -72,6 +72,14 @@ describe('calcAssets', () => {
   it('долг borrowed не входит в активы', () => {
     expect(calcAssets([], [], [debt({ direction: DebtDirection.BORROWED })])).toBe(0);
   });
+  it('проданная валюта с нулевым остатком не учитывается в активах', () => {
+    const buy = exchange({ id: 'e1', targetAmount: 100, exchangeRate: 95, amountInAccountCurrency: 9500, type: CurrencyOperationType.BUY });
+    const sell = exchange({ id: 'e2', targetAmount: 100, exchangeRate: 100, amountInAccountCurrency: 10000, type: CurrencyOperationType.SELL });
+    expect(calcAssets([], [buy, sell], [])).toBe(0);
+  });
+  it('выданный долг с нулевой суммой не входит в активы', () => {
+    expect(calcAssets([], [], [debt({ direction: DebtDirection.LENT, amount: 0 })])).toBe(0);
+  });
 });
 
 describe('calcLiabilities', () => {

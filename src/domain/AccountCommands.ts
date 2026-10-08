@@ -17,7 +17,10 @@ import {
   createDepositRefundRecord,
   findLinkedRecord,
 } from './linkedRecords';
-import { RecordType, DebtDirection, DebtMovementType, CreditType, PaymentStatus, DepositStatus } from '../constants';
+import { RecordType, DebtDirection, DebtMovementType, CreditType, CreditStatus, PaymentStatus, DepositStatus, DepositAccrualType } from '../constants';
+import { generateAnnuitySchedule } from './creditCalculations';
+import { applyAutoTransactions, type AutoTxDeps } from './autoTransactions';
+import { sumMoney, round2 } from './money';
 
 /**
  * AccountCommands provides transactional operations for account entities.
@@ -159,6 +162,43 @@ export class AccountCommands {
    */
   async deleteDebts(debtIds: string[]): Promise<void> {
     await this.storage.deleteDebtsWithLinkedRecords(this.accountId, debtIds);
+  }
+
+  /**
+   * Updates an existing debt, ensuring its initial movement and mirrored linked record are synchronized.
+   */
+  async updateDebt(
+    updatedDebt: DebtRecord,
+    category: string,
+    translations: { lentNote: string; borrowedNote: string }
+  ): Promise<void> {
+    await this.storage.updateDebt(this.accountId, updatedDebt);
+
+    const initialMovement = updatedDebt.movements[0];
+    if (!initialMovement) return;
+
+    const data = await this.storage.load(this.accountId);
+    const recordType = updatedDebt.direction === DebtDirection.LENT ? RecordType.EXPENSE : RecordType.INCOME;
+    const note = updatedDebt.direction === DebtDirection.LENT ? translations.lentNote : translations.borrowedNote;
+
+    const linkedRec = findLinkedRecord(
+      data.records,
+      updatedDebt.id,
+      initialMovement.date,
+      initialMovement.amount,
+      initialMovement.id
+    ) ?? data.records.find(r => r.linkedId === updatedDebt.id && (r.isInternal ?? true));
+
+    if (linkedRec) {
+      linkedRec.date = initialMovement.date;
+      linkedRec.time = initialMovement.time || '';
+      linkedRec.amount = initialMovement.amount;
+      linkedRec.type = recordType;
+      linkedRec.payer = updatedDebt.person;
+      linkedRec.note = note;
+      linkedRec.category = category;
+      await this.storage.updateRecord(this.accountId, linkedRec);
+    }
   }
 
   // ── Credit Commands ───────────────────────────────────────────────────────
@@ -305,6 +345,44 @@ export class AccountCommands {
    */
   async deleteCredits(creditIds: string[]): Promise<void> {
     await this.storage.deleteCreditsWithLinkedRecords(this.accountId, creditIds);
+  }
+
+  /**
+   * Recalculates credit payment schedule from scratch according to calendar dates,
+   * marks past payments as paid, and rebuilds mirrored records in records.json.
+   */
+  async recalculateCredit(
+    creditId: string,
+    category: string,
+    translations: CreditNoteTranslations
+  ): Promise<void> {
+    const data = await this.storage.load(this.accountId);
+    const credit = data.credits.find(c => c.id === creditId);
+    if (!credit) return;
+
+    // Remove all existing linked records for this credit before rebuilding
+    const remainingRecords = data.records.filter(r => r.linkedId !== credit.id);
+    await this.storage.saveAllRecords(this.accountId, remainingRecords);
+
+    const schedule = generateAnnuitySchedule({
+      originalAmount: credit.originalAmount,
+      interestRate: credit.interestRate,
+      termMonths: credit.termMonths,
+      monthlyPayment: credit.monthlyPayment,
+      startDate: credit.startDate,
+      paymentDay: credit.paymentDay,
+      existingPayments: [], // Generate completely fresh schedule
+    });
+
+    const isAllPaid = schedule.payments.length > 0 && schedule.payments.every(p => p.status === PaymentStatus.PAID);
+    const updatedCredit: CreditRecord = {
+      ...credit,
+      payments: schedule.payments,
+      currentAmount: schedule.currentAmount,
+      status: (schedule.currentAmount <= 0 || isAllPaid) ? CreditStatus.PAID : CreditStatus.ACTIVE,
+    };
+
+    await this.updateCredit(updatedCredit, category, translations);
   }
 
   // ── Deposit Commands ──────────────────────────────────────────────────────
@@ -474,6 +552,54 @@ export class AccountCommands {
 
     if (linkedRec?.type === RecordType.INCOME) {
       await this.storage.deleteRecord(this.accountId, linkedRec.id);
+    }
+  }
+
+  /**
+   * Recalculates deposit accruals from scratch according to calendar dates,
+   * advances past accruals, compounds/refunds, and rebuilds mirrored records.
+   */
+  async recalculateDeposit(
+    depositId: string,
+    deps: AutoTxDeps
+  ): Promise<void> {
+    const data = await this.storage.load(this.accountId);
+    const deposit = data.deposits.find(d => d.id === depositId);
+    if (!deposit) return;
+
+    // Detect starting deposit body
+    const openingRec = data.records.find(
+      r => r.linkedId === deposit.id && r.category === deps.labels.depositOpeningCat
+    );
+    const startingAmount = openingRec ? openingRec.amount : (
+      deposit.accrualType === DepositAccrualType.CAPITALIZATION
+        ? round2(deposit.amount - sumMoney(deposit.accruals.filter(a => a.status === PaymentStatus.PAID).map(a => a.amount)))
+        : deposit.amount
+    );
+
+    // Remove all mirrored records for this deposit
+    const remainingRecords = data.records.filter(r => r.linkedId !== deposit.id);
+
+    // Reset deposit
+    const freshDeposit: DepositRecord = {
+      ...deposit,
+      amount: Math.max(0, startingAmount),
+      accruals: [],
+      status: DepositStatus.ACTIVE,
+    };
+
+    const updatedDeposits = data.deposits.map(d => d.id === depositId ? freshDeposit : d);
+
+    // Apply auto-transactions on fresh deposit
+    const result = applyAutoTransactions(
+      { ...data, records: remainingRecords, deposits: updatedDeposits },
+      deps
+    );
+
+    await this.storage.saveAllRecords(this.accountId, result.records);
+    await this.storage.saveAllDeposits(this.accountId, result.deposits);
+    if (result.changed.credits) {
+      await this.storage.saveAllCredits(this.accountId, result.credits);
     }
   }
 

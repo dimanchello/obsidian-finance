@@ -83,7 +83,7 @@ export class DebtsTab {
       ],
       rowActions: d => [
         { icon: '💰', title: this.tr.repay, onClick: () => this.openRepayModal(d) },
-        { icon: '➕', title: this.tr.borrowMore, onClick: () => this.openBorrowMoreModal(d) },
+        { icon: '➕', title: d.direction === DebtDirection.LENT ? this.tr.giveMore : this.tr.borrowMore, onClick: () => this.openBorrowMoreModal(d) },
         { icon: '✏️', title: this.tr.edit, onClick: () => this.openEditDebtModal(d) },
         { icon: '🗑️', title: this.tr.delete, onClick: () => this.confirmDeleteDebt(d), cls: CSS_CLASS.FINANCE_DELETE_BTN },
       ],
@@ -255,6 +255,7 @@ export class DebtsTab {
   private renderDebtMovementsPanel(parent: HTMLElement, debt: DebtRecord): void {
     const wrapper = parent.createDiv('finance-payments-panel');
     wrapper.createEl('h4', { text: this.tr.movementHistory, cls: CSS_CLASS.FINANCE_SECTION_TITLE });
+
     const scrollWrapper = wrapper.createDiv('finance-mov-scroll');
     const movTable = scrollWrapper.createEl('table', { cls: CSS_CLASS.FINANCE_MOV_TABLE });
     const movHead = movTable.createEl('thead').createEl('tr');
@@ -263,11 +264,20 @@ export class DebtsTab {
     });
     const movBody = movTable.createEl('tbody');
     const isLent = debt.direction === DebtDirection.LENT;
+    const initialMov = debt.movements[0];
     debt.movements.forEach(m => {
       const mr = movBody.createEl('tr', { cls: `finance-mov-${m.type}` });
-      const typeLabel = m.type === DebtMovementType.BORROW
-        ? (isLent ? this.tr.gaveMore : this.tr.tookMore)
-        : (isLent ? this.tr.returned : this.tr.repaymentAct);
+      const isInitial = m.id === initialMov?.id;
+      let typeLabel: string;
+      if (m.type === DebtMovementType.BORROW) {
+        if (isInitial) {
+          typeLabel = isLent ? this.tr.lentGiven : this.tr.borrowedTaken;
+        } else {
+          typeLabel = isLent ? this.tr.gaveMore : this.tr.tookMore;
+        }
+      } else {
+        typeLabel = isLent ? this.tr.returned : this.tr.repaymentAct;
+      }
       mr.createEl('td', { text: typeLabel, cls: CSS_CLASS.FINANCE_TD });
       mr.createEl('td', {
         text: (m.type === DebtMovementType.BORROW ? '−' : '+') + this.ctx.fmt(m.amount),
@@ -359,7 +369,11 @@ export class DebtsTab {
       debt,
       allPersons: unique,
       onSave: async updated => {
-        await this.ctx.storage.updateDebt(this.ctx.accountId, updated);
+        await this.commands.updateDebt(
+          updated,
+          this.tr.debtDefaultCat,
+          { lentNote: this.tr.debtLentNote, borrowedNote: this.tr.debtBorrowedNote }
+        );
         await this.reload(this.tr.debtUpdated);
       },
     }).open();
@@ -384,15 +398,17 @@ export class DebtsTab {
   }
 
   private openBorrowMoreModal(debt: DebtRecord): void {
+    const isLent = debt.direction === DebtDirection.LENT;
     new DebtMovementModal(this.ctx.app, {
-      title: `${this.tr.borrowMore} — ${debt.person}`,
+      title: `${isLent ? this.tr.giveMore : this.tr.borrowMore} — ${debt.person}`,
       type: DebtMovementType.BORROW,
       onSave: async mov => {
+        const note = `${isLent ? this.tr.debtGiveMoreNote : this.tr.debtBorrowMoreNote}: ${debt.person}`;
         await this.commands.addDebtMovement(
           debt.id,
           mov,
           this.tr.debtDefaultCat,
-          `${this.tr.debtBorrowMoreNote}: ${debt.person}`
+          note
         );
         await this.reload(this.tr.debtAmountIncreased);
       },

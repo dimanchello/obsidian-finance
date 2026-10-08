@@ -11,6 +11,7 @@ import { getTodayStr } from '../../utils';
 import { RecordType, CreditStatus, DebtDirection, DepositStatus, DATE_FORMAT_LENGTH } from '../../constants';
 import { calcAssets } from './balanceMetrics';
 import { calculatePaymentBreakdown, calculateRemainingPrincipal } from '../creditCalculations';
+import { isFutureTransaction } from '../records';
 
 /**
  * Sentinel span: "all time" is a real selection, distinct from "no filter chosen yet".
@@ -100,11 +101,11 @@ export interface MonthGroup {
 /**
  * Group records by month (YYYY-MM) for chart display
  */
-export function groupRecordsByMonth(records: FinanceRecord[]): MonthGroup[] {
+export function groupRecordsByMonth(records: FinanceRecord[], now = new Date()): MonthGroup[] {
 	const map = new Map<string, { income: number; expense: number }>();
 
 	records.forEach(r => {
-		if (r.isInternal) return;
+		if (r.isInternal || isFutureTransaction(r, now)) return;
 		const key = r.date.slice(0, DATE_FORMAT_LENGTH.YEAR_MONTH); // YYYY-MM
 		const existing = map.get(key) ?? { income: 0, expense: 0 };
 		if (r.type === RecordType.INCOME) {
@@ -273,6 +274,7 @@ export function calcAssetsLiabilitiesOverTime(
 	}
 
 	const today = getTodayStr();
+	const now = new Date();
 
 	return monthsList.map(month => {
 		const monthStart = `${month}-01`;
@@ -281,8 +283,9 @@ export function calcAssetsLiabilitiesOverTime(
 
 		const assets = calcAssets(
 			deposits.filter(d => d.status === DepositStatus.ACTIVE && d.startDate <= checkDate),
-			exchanges.filter(e => e.date <= checkDate),
-			debts.filter(d => d.direction === DebtDirection.LENT && d.date <= checkDate)
+			exchanges.filter(e => e.date <= checkDate && !isFutureTransaction(e, now)),
+			debts.filter(d => d.direction === DebtDirection.LENT && d.date <= checkDate),
+			now
 		);
 
 		const activeCreditsPrincipal = credits
@@ -323,14 +326,15 @@ export function calcSavingsRateOverTime(
 	dateFrom?: string,
 	dateTo?: string,
 	asOfDate: string = getTodayStr(),
-	defaultMonths = 6
+	defaultMonths = 6,
+	now = new Date()
 ): SavingsRateMonth[] {
 	const monthsList = resolveMonthRange(
 		dateFrom,
 		dateTo,
 		asOfDate,
 		defaultMonths,
-		earliestDate(records.filter(r => !r.isInternal).map(r => r.date))
+		earliestDate(records.filter(r => !r.isInternal && !isFutureTransaction(r, now)).map(r => r.date))
 	);
 
 	return monthsList.map(month => {
@@ -338,7 +342,7 @@ export function calcSavingsRateOverTime(
 		const monthEnd = addMonthsClamped(monthStart, 1);
 
 		const monthRecords = records.filter(
-			r => !r.isInternal && r.date >= monthStart && r.date < monthEnd
+			r => !r.isInternal && !isFutureTransaction(r, now) && r.date >= monthStart && r.date < monthEnd
 		);
 		const income = monthRecords
 			.filter(r => r.type === RecordType.INCOME)

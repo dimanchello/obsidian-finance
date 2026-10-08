@@ -11,7 +11,7 @@ import {
   OVERVIEW_MIN_GROUP_W_MOBILE,
   OVERVIEW_Y_TICKS,
 } from '../../types';
-import { CSS_CLASS } from '../../constants';
+import { CSS_CLASS, DATE_FORMAT_LENGTH } from '../../constants';
 
 /**
  * Base class for all chart components.
@@ -192,4 +192,35 @@ export abstract class BaseChart {
 
     return legend;
   }
+
+  /**
+   * Scroll chart horizontal container to current month if in range, or to the end
+   */
+  protected scrollToCurrentOrEnd(
+    scrollWrap: HTMLElement,
+    containerWidth: number,
+    labels: string[],
+    today: string
+  ): void {
+    if (labels.length === 0) return;
+    const currentMonthKey = today.slice(0, DATE_FORMAT_LENGTH.YEAR_MONTH);
+    const curIndex = labels.findIndex(lbl => lbl.startsWith(currentMonthKey));
+
+    const applyScroll = () => {
+      const maxScroll = Math.max(0, scrollWrap.scrollWidth - scrollWrap.clientWidth);
+      if (maxScroll <= 0) return;
+      if (curIndex >= 0) {
+        const groupWidth = scrollWrap.scrollWidth / labels.length;
+        const cx = curIndex * groupWidth + groupWidth / 2;
+        const targetScroll = Math.max(0, cx - containerWidth / 2);
+        scrollWrap.scrollLeft = Math.min(maxScroll, targetScroll);
+      } else {
+        scrollWrap.scrollLeft = maxScroll;
+      }
+    };
+
+    applyScroll();
+    requestAnimationFrame(applyScroll);
+  }
 }
+

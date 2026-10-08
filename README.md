@@ -59,8 +59,9 @@ Use `Insert account template` command from the command palette.
 ## Features
 
 ### Tab Navigation
-Each account has four tabs, switched via the `•••` menu:
+Each account has tabs, switched via the `•••` menu:
 
+- **Overview** — financial dashboard, interactive KPI cards (assets, liabilities, credit burden, upcoming payments), compact charts & schedules
 - **Records** — income and expenses
 - **Debts** — debt tracking
 - **Credits** — loans with payment schedules
@@ -268,6 +269,8 @@ npm run lint    # ESLint check
 - [x] Auto-accruals for deposits and payments for credits
 - [x] Table column visibility
 - [x] Built-in calculator
+- [x] Future scheduled transactions (excluded from statistics until due)
+- [x] One-click recalculation of credit and deposit schedules
 
 ---
 

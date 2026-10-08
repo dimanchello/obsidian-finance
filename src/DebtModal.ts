@@ -5,8 +5,10 @@ import { DEBT_FIELDS, type FieldDef } from './FieldInfoModal';
 import { createAmountInput } from './ui/AmountInput';
 import { EntityModal } from './ui/EntityModal';
 import { buildDateField, buildRateInput, buildNoteField, buildComboboxField } from './ui/formHelpers';
-import { CSS_CLASS, DebtDirection} from './constants';
+import { CSS_CLASS, DebtDirection, DebtMovementType } from './constants';
 import { validatePositiveAmount, validateRequiredString } from './domain/validators';
+import { getDebtOriginal } from './domain/debtCalculations';
+import { sumMoney } from './domain/money';
 
 export interface DebtModalOptions {
   title:   string;
@@ -19,6 +21,7 @@ export class DebtModal extends EntityModal<DebtRecord> {
   private o: DebtModalOptions;
   private amountInput!: HTMLInputElement;
   private totalInput!: HTMLInputElement;
+  private displayedDebtAmount: number;
 
   constructor(app: App, opts: DebtModalOptions) {
     super(app, {
@@ -53,6 +56,7 @@ export class DebtModal extends EntityModal<DebtRecord> {
       onSave: opts.onSave,
     });
     this.o = opts;
+    this.displayedDebtAmount = opts.debt ? (getDebtOriginal(opts.debt) || opts.debt.originalAmount || opts.debt.amount || 0) : 0;
   }
 
   protected getTitle(): string { return this.o.title; }
@@ -77,10 +81,9 @@ export class DebtModal extends EntityModal<DebtRecord> {
     const amtG = row1.createDiv('finance-field-group finance-amount-group');
     amtG.createEl('label', { text: this.tr.amountLabel, cls: CSS_CLASS.FINANCE_FIELD_LABEL });
     this.amountInput = createAmountInput(amtG, {
-      value: this.entity.amount,
+      value: this.displayedDebtAmount,
       onChange: v => {
-        this.entity.originalAmount = v;
-        this.entity.amount = v;
+        this.displayedDebtAmount = v;
         this.updateTotalReadonly();
       },
     }).input;
@@ -102,7 +105,7 @@ export class DebtModal extends EntityModal<DebtRecord> {
     });
     this.totalInput = totalG.createEl('input', { type: 'text', cls: CSS_CLASS.FINANCE_INPUT });
     this.totalInput.readOnly = true;
-    this.totalInput.value = this.entity.amount > 0 ? fmtAmount(String(this.entity.amount)) : '';
+    this.updateTotalReadonly();
 
     const row4 = form.createDiv('finance-form-row finance-full-width');
     buildNoteField(row4, {
@@ -132,12 +135,47 @@ export class DebtModal extends EntityModal<DebtRecord> {
   }
 
   protected collectData(): DebtRecord {
-    const amount = parseAmount(this.amountInput.value);
+    const newAmount = parseAmount(this.amountInput.value);
+    const updatedMovements = [...this.entity.movements];
+
+    if (updatedMovements.length > 0) {
+      const otherBorrows = sumMoney(
+        updatedMovements.slice(1).filter(m => m.type === DebtMovementType.BORROW).map(m => m.amount)
+      );
+      const newInitialBorrow = Math.max(0, newAmount - otherBorrows);
+      const firstMov = updatedMovements[0]!;
+      updatedMovements[0] = {
+        ...firstMov,
+        amount: newInitialBorrow,
+        date: this.entity.date,
+        time: this.entity.time || '',
+      };
+    } else {
+      updatedMovements.push({
+        id: crypto.randomUUID(),
+        type: DebtMovementType.BORROW,
+        amount: newAmount,
+        date: this.entity.date,
+        time: this.entity.time || '',
+        createdAt: this.entity.createdAt || Date.now(),
+        note: this.entity.direction === DebtDirection.LENT ? this.tr.lentGiven : this.tr.borrowedTaken,
+      });
+    }
+
+    const totalBorrows = sumMoney(
+      updatedMovements.filter(m => m.type === DebtMovementType.BORROW).map(m => m.amount)
+    );
+    const totalRepays = sumMoney(
+      updatedMovements.filter(m => m.type === DebtMovementType.REPAY).map(m => m.amount)
+    );
+    const remainingAmount = Math.max(0, totalBorrows - totalRepays);
+
     return {
       ...this.entity,
-      originalAmount: amount,
-      amount,
+      originalAmount: totalBorrows,
+      amount: remainingAmount,
       person: this.entity.person.trim(),
+      movements: updatedMovements,
     };
   }
 
@@ -188,7 +226,7 @@ export class DebtModal extends EntityModal<DebtRecord> {
   }
 
   private updateTotalReadonly(): void {
-    const original = this.entity.originalAmount;
+    const original = this.displayedDebtAmount;
     const rate = this.entity.interestRate;
     const total = rate > 0 ? original + (original * rate / PERCENT_100) : original;
     this.totalInput.value = total > 0 ? fmtAmount(String(total)) : '';

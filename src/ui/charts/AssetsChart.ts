@@ -91,6 +91,7 @@ export class AssetsChart extends BaseChart {
     this.renderPoints(svg_el, assetPoints, liabilityPoints);
 
     scrollWrap.appendChild(svg_el);
+    this.scrollToCurrentOrEnd(scrollWrap, containerWidth, trendData.map(d => d.label), today);
   }
 
   private renderAreaPaths(
@@ -131,7 +132,7 @@ export class AssetsChart extends BaseChart {
         fill: 'var(--text-muted)',
         'font-size': '11px',
       });
-      label.textContent = d.label.slice(5);
+      label.textContent = d.label;
       svg_el.appendChild(label);
     });
 

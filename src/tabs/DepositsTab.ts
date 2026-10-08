@@ -1,6 +1,7 @@
-import { fmtDate } from "../utils";
+import { fmtDate, getTodayStr, getTodayTime } from "../utils";
 import { Notice } from 'obsidian';
 import { ViewContext } from '../context';
+import type { AutoTxDeps } from '../domain/autoTransactions';
 import {
   DepositRecord, DepositTopUp, DepositWithdrawal,
   DepositSortField, PLURAL_THRESHOLD,
@@ -78,6 +79,7 @@ export class DepositsTab {
           { icon: '📤', title: this.tr.withdraw, onClick: () => this.openDepositWithdrawalModal(d) },
           { icon: '✅', title: this.tr.closeAccount, onClick: () => this.confirmCloseDeposit(d) },
         ] : []),
+        { icon: '🔄', title: this.tr.recalculate, onClick: () => this.confirmRecalculateDeposit(d) },
         { icon: '✏️', title: this.tr.edit, onClick: () => this.openEditDepositModal(d) },
         { icon: '🗑️', title: this.tr.delete, onClick: () => this.confirmDeleteDeposit(d), cls: CSS_CLASS.FINANCE_DELETE_BTN },
       ],
@@ -410,6 +412,39 @@ export class DepositsTab {
   }
 
   // ── Modals ──────────────────────────────────────────────────────────────
+
+  private getAutoTxDeps(): AutoTxDeps {
+    return {
+      today: getTodayStr(),
+      now: Date.now(),
+      nowTime: getTodayTime(),
+      newId: () => crypto.randomUUID(),
+      labels: {
+        depositInterestCat: this.tr.depositInterestCat,
+        depositInterestNote: this.tr.depositInterestNote,
+        depositRefundCat: this.tr.depositRefundCat,
+        depositRefundNote: this.tr.depositRefundNote,
+        depositOpeningCat: this.tr.depositOpeningCat,
+        depositOpenNote: this.tr.depositOpenNote,
+        creditDefaultCat: this.tr.creditDefaultCat,
+        creditPaymentNote: this.tr.creditPaymentNote,
+      },
+    };
+  }
+
+  private confirmRecalculateDeposit(deposit: DepositRecord): void {
+    const displayName = deposit.name?.trim() || deposit.bankName?.trim() || this.typeLabel(deposit);
+    new ConfirmModal(
+      this.ctx.app,
+      this.tr.recalculateConfirmDeposit.replace(/\{name\}/g, displayName),
+      async () => {
+        await this.commands.recalculateDeposit(deposit.id, this.getAutoTxDeps());
+        await this.reload(this.tr.recalculatedNotice);
+      },
+      this.tr.recalculate,
+      false
+    ).open();
+  }
 
   private openNewDepositModal(): void {
     if (!this.ctx.data) { new Notice(this.tr.loading); return; }

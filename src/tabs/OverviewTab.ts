@@ -29,6 +29,12 @@ import { DebtsBreakdownChart } from '../ui/charts/DebtsBreakdownChart';
 import { DepositsOverview } from '../ui/charts/DepositsOverview';
 import { CreditsOverview } from '../ui/charts/CreditsOverview';
 import { renderStatCard } from '../ui/statCards';
+import {
+  OverviewAssetsModal,
+  OverviewLiabilitiesModal,
+  OverviewBurdenModal,
+  OverviewUpcomingPaymentsModal,
+} from '../modals/OverviewMetricModals';
 
 export class OverviewTab {
   private el: HTMLElement;
@@ -304,8 +310,22 @@ export class OverviewTab {
       netBalance >= 0 ? 'income' : 'expense',
       '💰'
     );
-    this.createKPICard(cardsWrap, this.tr.overviewAssets, this.fmt(assets), 'income', '📈');
-    this.createKPICard(cardsWrap, this.tr.overviewLiabilities, this.fmt(liabilities), 'expense', '📉');
+
+    const assetsCard = this.createKPICard(cardsWrap, this.tr.overviewAssets, this.fmt(assets), 'income', '📈');
+    assetsCard.addClass(CSS_CLASS.IS_CLICKABLE);
+    assetsCard.setAttribute('role', 'button');
+    assetsCard.title = `${this.tr.overviewAssets} (${this.tr.overviewViewDetails})`;
+    assetsCard.addEventListener('click', () => {
+      new OverviewAssetsModal(this.ctx.app, this.ctx, data.deposits, data.exchanges, data.debts).open();
+    });
+
+    const liabilitiesCard = this.createKPICard(cardsWrap, this.tr.overviewLiabilities, this.fmt(liabilities), 'expense', '📉');
+    liabilitiesCard.addClass(CSS_CLASS.IS_CLICKABLE);
+    liabilitiesCard.setAttribute('role', 'button');
+    liabilitiesCard.title = `${this.tr.overviewLiabilities} (${this.tr.overviewViewDetails})`;
+    liabilitiesCard.addEventListener('click', () => {
+      new OverviewLiabilitiesModal(this.ctx.app, this.ctx, data.credits, data.debts).open();
+    });
 
     const burdenValue = burden !== null ? `${Math.round(burden)}%` : this.tr.noData;
     const burdenMod =
@@ -317,14 +337,27 @@ export class OverviewTab {
         ? 'warning'
         : 'income';
 
-    this.createKPICard(cardsWrap, this.tr.overviewCreditBurden, burdenValue, burdenMod, '⚖️');
-    this.createKPICard(
+    const burdenCard = this.createKPICard(cardsWrap, this.tr.overviewCreditBurden, burdenValue, burdenMod, '⚖️');
+    burdenCard.addClass(CSS_CLASS.IS_CLICKABLE);
+    burdenCard.setAttribute('role', 'button');
+    burdenCard.title = `${this.tr.overviewCreditBurden} (${this.tr.overviewViewDetails})`;
+    burdenCard.addEventListener('click', () => {
+      new OverviewBurdenModal(this.ctx.app, this.ctx, data.credits, data.records, today).open();
+    });
+
+    const upcomingCard = this.createKPICard(
       cardsWrap,
       this.tr.overviewUpcomingPayments,
       this.fmt(upcoming),
       upcoming > 0 ? 'expense' : 'neutral',
       '📅'
     );
+    upcomingCard.addClass(CSS_CLASS.IS_CLICKABLE);
+    upcomingCard.setAttribute('role', 'button');
+    upcomingCard.title = `${this.tr.overviewUpcomingPayments} (${this.tr.overviewViewDetails})`;
+    upcomingCard.addEventListener('click', () => {
+      new OverviewUpcomingPaymentsModal(this.ctx.app, this.ctx, data.credits, data.debts, today).open();
+    });
   }
 
 

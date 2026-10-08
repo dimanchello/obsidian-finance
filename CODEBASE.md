@@ -93,10 +93,10 @@ Chart components used by `OverviewTab`: `MoneyFlowChart`, `AssetsChart`, `Burden
 The four trend charts (`AssetsChart`, `BurdenChart`, `SavingsRateChart`, `DepositsOverview`)
 take a trailing `trendMonths` argument; `OverviewTab` passes `ALL_TIME_MONTHS` when
 `state.overviewAllTime` is set, otherwise `OVERVIEW_TREND_MONTHS`. Clicking items in
-`BreakdownChart`, `SavingsRateChart`, `DepositsOverview`, `CreditsOverview`, and `DebtsBreakdownChart` opens
-detail modals (`OverviewRecordsModal`, `DepositDetailModal`, `CreditDetailModal`, `DebtDetailModal`) showing
-filtered records, deposit accruals, credit payments or debt movements, with deep-link navigation buttons
-to the corresponding tabs.
+`BreakdownChart`, `SavingsRateChart`, `BurdenChart`, `DepositsOverview`, `CreditsOverview`, and `DebtsBreakdownChart` opens
+detail modals (`OverviewRecordsModal`, `OverviewBurdenModal`, `DepositDetailModal`, `CreditDetailModal`, `DebtDetailModal`) showing
+filtered records, monthly burden calculation breakdown, deposit accruals, credit payments or debt movements, with deep-link navigation buttons
+to the corresponding tabs. Top KPI badges in `OverviewTab` open breakdown modals (`OverviewAssetsModal`, `OverviewLiabilitiesModal`, `OverviewBurdenModal`, `OverviewUpcomingPaymentsModal`).
 
 **`src/__tests__/`**
 Vitest tests:
@@ -286,11 +286,11 @@ Debts, credits, deposits do NOT have separate ledgers — they materialize Finan
 **Important symbols:**
 - `AccountCommands` class
 - `CreditNoteTranslations` — `receiptNote` / `paymentNote` / `downPaymentNote`, all required
-- `addDebt()`, `addDebtMovement()`, `updateDebtMovement()`, `deleteDebtMovement()`, `deleteDebt()`, `deleteDebts()`
-- `addCredit()`, `updateCredit()`, `deleteCredit()`, `deleteCredits()`
+- `addDebt()`, `updateDebt()`, `addDebtMovement()`, `updateDebtMovement()`, `deleteDebtMovement()`, `deleteDebt()`, `deleteDebts()`
+- `addCredit()`, `updateCredit()`, `recalculateCredit()`, `deleteCredit()`, `deleteCredits()`
 - `buildDownPaymentRecord()` (private) — mints/clears `credit.downPaymentRecordId` and builds the
   down-payment mirror record; called by `addCredit`/`updateCredit` *before* the credit is stored
-- `closeDeposit()`, `deleteDeposit()`, `deleteDeposits()`, `addDepositTopUp()`, `deleteDepositTopUp()`, `addDepositWithdrawal()`, `deleteDepositWithdrawal()`
+- `closeDeposit()`, `deleteDeposit()`, `deleteDeposits()`, `recalculateDeposit()`, `addDepositTopUp()`, `deleteDepositTopUp()`, `addDepositWithdrawal()`, `deleteDepositWithdrawal()`
 - `deleteExchange()`, `deleteExchanges()`
 
 **Note:** `addCredit`/`updateCredit` take a `CreditNoteTranslations` (all three notes

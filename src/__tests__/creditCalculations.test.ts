@@ -7,6 +7,7 @@ import {
   calculateTotalInterestPaid,
   calculateCreditEndDate,
   getCreditTypeLabel,
+  buildCreditScheduleChartData,
 } from '../domain/creditCalculations';
 import { CreditRecord, CreditType, CreditStatus, PaymentStatus } from '../types';
 import { t } from '../i18n';
@@ -328,5 +329,56 @@ describe('creditCalculations', () => {
       expect(getCreditTypeLabel(CreditType.CONSUMER, ru)).toBe(ru.creditTypeConsumer);
     });
   });
+
+  describe('buildCreditScheduleChartData', () => {
+    it('builds schedule chart items with breakdown and remaining debt', () => {
+      const credit: CreditRecord = {
+        id: 'c1',
+        name: 'Credit 1',
+        type: CreditType.CONSUMER,
+        bankName: 'Bank',
+        originalAmount: 100000,
+        currentAmount: 100000,
+        interestRate: 12,
+        monthlyPayment: 8884.88,
+        termMonths: 2,
+        startDate: '2026-01-01',
+        createdAt: 1000,
+        note: '',
+        status: CreditStatus.ACTIVE,
+        earlyRepaymentOption: null,
+        payments: [
+          {
+            id: 'p1',
+            amount: 8884.88,
+            dueDate: '2026-02-01',
+            status: PaymentStatus.PAID,
+          },
+          {
+            id: 'p2',
+            amount: 8884.88,
+            dueDate: '2026-03-01',
+            status: PaymentStatus.PENDING,
+          },
+        ],
+      };
+
+      const chartData = buildCreditScheduleChartData(credit);
+      expect(chartData).toHaveLength(2);
+      expect(chartData[0]?.id).toBe('p1');
+      expect(chartData[0]?.label).toBe('2026-02');
+      expect(chartData[0]?.dueDate).toBe('2026-02-01');
+      expect(chartData[0]?.total).toBe(8884.88);
+      expect(chartData[0]?.interestPart).toBe(1000);
+      expect(chartData[0]?.principalPart).toBe(7884.88);
+      expect(chartData[0]?.remainingDebt).toBe(92115.12);
+      expect(chartData[0]?.status).toBe(PaymentStatus.PAID);
+
+      expect(chartData[1]?.id).toBe('p2');
+      expect(chartData[1]?.label).toBe('2026-03');
+      expect(chartData[1]?.status).toBe(PaymentStatus.PENDING);
+    });
+  });
 });
+
 

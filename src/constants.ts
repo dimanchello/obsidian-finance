@@ -146,6 +146,8 @@ export const CSS_CLASS = {
   IS_ACTIVE: 'is-active',
   IS_VISIBLE: 'is-visible',
   IS_HIDDEN: 'is-hidden',
+  IS_CLICKABLE: 'is-clickable',
+  IS_SELECTED: 'is-selected',
 
   // Type modifiers
   INCOME: 'income',
@@ -177,6 +179,13 @@ export const CSS_CLASS = {
   FINANCE_TH: 'finance-th',
   FINANCE_CHECKBOX: 'finance-checkbox',
   BTN_ICON: 'btn-icon',
+  FINANCE_TR_FUTURE: 'finance-tr-future',
+  FINANCE_FUTURE_BADGE: 'finance-future-badge',
+  FINANCE_BTN_RECALC: 'finance-btn-recalc',
+  FINANCE_PANEL_HEADER: 'finance-panel-header',
+  FINANCE_BTN_SECONDARY: 'finance-btn-secondary',
+  FINANCE_BTN_PRIMARY: 'finance-btn-primary',
+  FINANCE_BTN_DANGER: 'finance-btn-danger',
 } as const;
 
 // ── Date Format Lengths ───────────────────────────────────────────────────
