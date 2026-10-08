@@ -11,6 +11,7 @@ import { svg, fmtShort, shortMonth, createChartTooltip } from './ui/chartHelpers
 import { CSS_CLASS, RecordType, DATE_FORMAT_LENGTH} from './constants';
 import { BaseAnalyticsView } from './ui/BaseAnalyticsView';
 import { fmtPercentage } from './utils';
+import { isFutureTransaction } from './domain/records';
 
 type ChartType = 'bar' | 'pie';
 type GroupBy   = 'category' | 'payer' | 'month' | 'week' | 'year';
@@ -137,7 +138,7 @@ export class AnalyticsView extends BaseAnalyticsView {
     const map = new Map<string, { income: number; expense: number }>();
 
     this.records.forEach(r => {
-      if (r.isInternal) return;
+      if (r.isInternal || isFutureTransaction(r)) return;
 
       // Filter by analytics date range
       if (this.dateFrom && r.date < this.dateFrom) return;

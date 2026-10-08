@@ -5,6 +5,7 @@ import { DebtDetailModal } from '../../modals/DebtDetailModal';
 import { formatChartAmount } from '../../domain/formattingHelpers';
 import { BaseChart } from './BaseChart';
 import { isDebtOpen, listTabFor } from '../../domain/entityLifecycle';
+import { getDebtAmountAsOf } from '../../domain/debtCalculations';
 
 export class DebtsBreakdownChart extends BaseChart {
 
@@ -23,13 +24,14 @@ export class DebtsBreakdownChart extends BaseChart {
 
     chartWrap.createEl('h3', { text: tr.overviewDebtsSummary, cls: CSS_CLASS.FINANCE_CHART_TITLE });
 
-    const activeDebts = debts.filter(d => d.amount > 0);
+    const now = new Date();
+    const activeDebts = debts.filter(d => getDebtAmountAsOf(d, now) > 0);
     if (activeDebts.length === 0) {
       this.renderNoData(chartWrap, tr.overviewNoDebts);
       return;
     }
 
-    const breakdown = calcDebtsBreakdown(activeDebts);
+    const breakdown = calcDebtsBreakdown(activeDebts, now);
     const list = chartWrap.createDiv('finance-breakdown-list');
 
     breakdown.forEach(item => {

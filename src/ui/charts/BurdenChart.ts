@@ -18,6 +18,7 @@ import {
   PERCENT_100,
 } from '../../types';
 import { BaseChart } from './BaseChart';
+import { OverviewBurdenModal } from '../../modals/OverviewMetricModals';
 
 /**
  * BurdenChart: визуализация кредитной нагрузки во времени.
@@ -25,6 +26,9 @@ import { BaseChart } from './BaseChart';
  * а также линию процента кредитной нагрузки от дохода.
  */
 export class BurdenChart extends BaseChart {
+  private credits: CreditRecord[] = [];
+  private records: FinanceRecord[] = [];
+  private today = '';
 
   /**
    * Рендерит график кредитной нагрузки
@@ -46,6 +50,10 @@ export class BurdenChart extends BaseChart {
     trendMonths: number = OVERVIEW_TREND_MONTHS
   ): void {
     const { tr } = this.ctx;
+
+    this.credits = credits;
+    this.records = records;
+    this.today = today;
 
     const burdenData = calcCreditBurdenOverTime(
       credits,
@@ -89,6 +97,7 @@ export class BurdenChart extends BaseChart {
     this.renderBurdenPoints(svg_el, burdenPoints);
 
     scrollWrap.appendChild(svg_el);
+    this.scrollToCurrentOrEnd(scrollWrap, containerWidth, burdenData.map(d => d.label), today);
   }
 
   private renderStackedBars(
@@ -106,6 +115,23 @@ export class BurdenChart extends BaseChart {
     burdenData.forEach((d: CreditBurdenMonth, i: number) => {
       const x = OVERVIEW_CHART_PAD_LEFT + i * spacing + (spacing - barWidth) / 2;
 
+      const openModal = () => {
+        this.tooltip.hideTip();
+        new OverviewBurdenModal(this.ctx.app, this.ctx, this.credits, this.records, this.today, d.label).open();
+      };
+
+      // Hit area covering the whole month column
+      const colHit = svg('rect', {
+        x: x - OVERVIEW_BAR_SPACING_PAD / 2,
+        y: OVERVIEW_CHART_PAD_TOP,
+        width: barWidth + OVERVIEW_BAR_SPACING_PAD,
+        height: plotHeight,
+        fill: 'transparent',
+        class: 'finance-chart-col-hit',
+      });
+      colHit.addEventListener('click', openModal);
+      svg_el.appendChild(colHit);
+
       // Principal bar (bottom)
       if (d.principal > 0) {
         const principalHeight = maxValue > 0 ? (d.principal / maxValue) * plotHeight : 0;
@@ -116,12 +142,13 @@ export class BurdenChart extends BaseChart {
           height: principalHeight,
           fill: 'var(--color-blue)',
           rx: OVERVIEW_BAR_RADIUS,
-          class: 'finance-chart-bar-hover',
+          class: 'finance-chart-bar-hover finance-chart-bar-clickable',
         });
         const tipText = `${d.label}\n${tr.creditPrincipal ?? 'Основной долг'}: ${this.fmt(d.principal)}`;
         principalBar.addEventListener('mouseenter', e => this.tooltip.showTip(e, tipText));
         principalBar.addEventListener('mousemove', e => this.tooltip.showTip(e, tipText));
         principalBar.addEventListener('mouseleave', () => this.tooltip.hideTip());
+        principalBar.addEventListener('click', openModal);
         svg_el.appendChild(principalBar);
       }
 
@@ -136,12 +163,13 @@ export class BurdenChart extends BaseChart {
           height: interestHeight,
           fill: 'var(--color-orange)',
           rx: OVERVIEW_BAR_RADIUS,
-          class: 'finance-chart-bar-hover',
+          class: 'finance-chart-bar-hover finance-chart-bar-clickable',
         });
         const tipText = `${d.label}\n${tr.creditInterest ?? 'Проценты'}: ${this.fmt(d.interest)}`;
         interestBar.addEventListener('mouseenter', e => this.tooltip.showTip(e, tipText));
         interestBar.addEventListener('mousemove', e => this.tooltip.showTip(e, tipText));
         interestBar.addEventListener('mouseleave', () => this.tooltip.hideTip());
+        interestBar.addEventListener('click', openModal);
         svg_el.appendChild(interestBar);
       }
 
@@ -159,7 +187,7 @@ export class BurdenChart extends BaseChart {
         fill: 'var(--text-muted)',
         'font-size': '11px',
       });
-      label.textContent = d.label.slice(5);
+      label.textContent = d.label;
       svg_el.appendChild(label);
     });
 
@@ -189,7 +217,7 @@ export class BurdenChart extends BaseChart {
         cy: p.y,
         r: OVERVIEW_POINT_RADIUS,
         fill: 'var(--text-accent)',
-        class: 'finance-chart-point',
+        class: 'finance-chart-point finance-chart-point-clickable',
       });
       const tipText = `${p.item.label}\n${tr.overviewCreditBurden}: ${p.item.burdenPercent !== null ? p.item.burdenPercent.toFixed(1) + '%' : '—'}\n${tr.total}: ${this.fmt(p.item.total)}`;
       point.addEventListener('mouseenter', e => {
@@ -200,6 +228,10 @@ export class BurdenChart extends BaseChart {
       point.addEventListener('mouseleave', () => {
         point.setAttribute('r', String(OVERVIEW_POINT_RADIUS));
         this.tooltip.hideTip();
+      });
+      point.addEventListener('click', () => {
+        this.tooltip.hideTip();
+        new OverviewBurdenModal(this.ctx.app, this.ctx, this.credits, this.records, this.today, p.item.label).open();
       });
       svg_el.appendChild(point);
     });

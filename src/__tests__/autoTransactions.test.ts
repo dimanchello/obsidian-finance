@@ -146,6 +146,19 @@ describe('applyAutoTransactions — дедупликация', () => {
     expect(res.records.filter(r => r.type === RecordType.EXPENSE)).toHaveLength(1);
   });
 
+  it('помечает автоматически созданный платёж по кредиту внутренним', () => {
+    const data = mkData({
+      credits: [mkCredit({ payments: [
+        { id: 'p1', amount: 9_000, dueDate: '2026-02-15', status: PaymentStatus.PAID, paidDate: '2026-02-15' },
+      ] })],
+    });
+
+    const res = applyAutoTransactions(data, mkDeps('2026-02-20'));
+    const payment = res.records.find(r => r.category === LABELS.creditDefaultCat);
+
+    expect(payment?.isInternal).toBe(true);
+  });
+
   it('не считает дублем запись без linkedId', () => {
     const manual: FinanceRecord = {
       id: 'manual', createdAt: 0, date: '2026-02-15', time: '', type: RecordType.INCOME,
@@ -174,9 +187,11 @@ describe('applyAutoTransactions — вклады', () => {
     const opening = res.records.find(r => r.type === RecordType.EXPENSE);
     expect(opening).toBeDefined();
     expect(opening!.date).toBe('2026-01-15');
+    expect(opening!.isInternal).toBe(true);
     const incomes = res.records.filter(r => r.type === RecordType.INCOME);
     expect(incomes.map(r => r.date)).toEqual(['2026-02-15', '2026-03-15']);
     expect(incomes.every(r => r.linkedId === 'dep-1')).toBe(true);
+    expect(incomes.every(r => r.isInternal === false)).toBe(true);
     expect(res.changed).toEqual({ records: true, deposits: true, credits: false });
   });
 
@@ -216,6 +231,7 @@ describe('applyAutoTransactions — вклады', () => {
     expect(deposit.status).toBe(DepositStatus.CLOSED);
     expect(refund).toBeDefined();
     expect(refund!.amount).toBe(deposit.amount);
+    expect(refund!.isInternal).toBe(true);
   });
 
   it('возврат датируется концом срока, а не днём открытия заметки', () => {
@@ -225,6 +241,7 @@ describe('applyAutoTransactions — вклады', () => {
     const refund = res.records.find(r => r.category === LABELS.depositRefundCat);
 
     expect(refund!.date).toBe('2026-04-15');
+    expect(refund!.isInternal).toBe(true);
   });
 
   it('срок ещё не вышел — вклад остаётся активным', () => {

@@ -7,8 +7,11 @@ import {
   calculateTotalInterestPaid,
   calculateCreditEndDate,
   getCreditTypeLabel,
+  buildCreditScheduleChartData,
+  calculatePeriodInterest,
+  getLastPaidPaymentDate,
 } from '../domain/creditCalculations';
-import { CreditRecord, CreditType, CreditStatus, PaymentStatus } from '../types';
+import { CreditRecord, CreditType, CreditStatus, PaymentStatus, DayCountConvention } from '../types';
 import { t } from '../i18n';
 
 describe('creditCalculations', () => {
@@ -328,5 +331,198 @@ describe('creditCalculations', () => {
       expect(getCreditTypeLabel(CreditType.CONSUMER, ru)).toBe(ru.creditTypeConsumer);
     });
   });
-});
 
+  describe('buildCreditScheduleChartData', () => {
+    it('builds schedule chart items with breakdown and remaining debt', () => {
+      const credit: CreditRecord = {
+        id: 'c1',
+        name: 'Credit 1',
+        type: CreditType.CONSUMER,
+        bankName: 'Bank',
+        originalAmount: 100000,
+        currentAmount: 100000,
+        interestRate: 12,
+        monthlyPayment: 8884.88,
+        termMonths: 2,
+        startDate: '2026-01-01',
+        createdAt: 1000,
+        note: '',
+        status: CreditStatus.ACTIVE,
+        earlyRepaymentOption: null,
+        payments: [
+          {
+            id: 'p1',
+            amount: 8884.88,
+            dueDate: '2026-02-01',
+            status: PaymentStatus.PAID,
+          },
+          {
+            id: 'p2',
+            amount: 8884.88,
+            dueDate: '2026-03-01',
+            status: PaymentStatus.PENDING,
+          },
+        ],
+      };
+
+      const chartData = buildCreditScheduleChartData(credit);
+      expect(chartData).toHaveLength(2);
+      expect(chartData[0]?.id).toBe('p1');
+      expect(chartData[0]?.label).toBe('2026-02');
+      expect(chartData[0]?.dueDate).toBe('2026-02-01');
+      expect(chartData[0]?.total).toBe(8884.88);
+      expect(chartData[0]?.interestPart).toBe(1000);
+      expect(chartData[0]?.principalPart).toBe(7884.88);
+      expect(chartData[0]?.remainingDebt).toBe(92115.12);
+      expect(chartData[0]?.status).toBe(PaymentStatus.PAID);
+
+      expect(chartData[1]?.id).toBe('p2');
+      expect(chartData[1]?.label).toBe('2026-03');
+      expect(chartData[1]?.status).toBe(PaymentStatus.PENDING);
+    });
+  });
+
+  describe('calculatePeriodInterest', () => {
+    it('calculates interest for 31 days in a non-leap year (ACT/365)', () => {
+      // 1 000 000 * 0.12 * (31 / 365) = 10191.78
+      const interest = calculatePeriodInterest(1000000, 12, '2025-01-01', '2025-02-01');
+      expect(interest).toBe(10191.78);
+    });
+
+    it('calculates interest for 29 days in a leap year (ACT/366)', () => {
+      // 2024 is a leap year (366 days). Feb 1 to March 1 = 29 days.
+      // 1 000 000 * 0.12 * (29 / 366) = 9508.20
+      const interest = calculatePeriodInterest(1000000, 12, '2024-02-01', '2024-03-01');
+      expect(interest).toBe(9508.2);
+    });
+
+    it('calculates interest crossing leap and non-leap year boundary properly', () => {
+      // 2024-12-15 to 2025-01-15:
+      // 17 days in 2024 (/366) + 14 days in 2025 (/365)
+      // 1 000 000 * 0.12 * (17 / 366 + 14 / 365) = 1 000 000 * 0.12 * (0.046448087 + 0.038356164)
+      // = 120 000 * 0.084804251 = 10176.51
+      const interest = calculatePeriodInterest(1000000, 12, '2024-12-15', '2025-01-15');
+      expect(interest).toBe(10176.51);
+    });
+
+    it('returns 0 for non-positive principal or rate or inverted dates', () => {
+      expect(calculatePeriodInterest(0, 12, '2025-01-01', '2025-02-01')).toBe(0);
+      expect(calculatePeriodInterest(1000000, 0, '2025-01-01', '2025-02-01')).toBe(0);
+      expect(calculatePeriodInterest(1000000, 12, '2025-02-01', '2025-01-01')).toBe(0);
+    });
+  });
+
+  describe('calculatePaymentBreakdown with period', () => {
+    it('uses period interest when period is specified', () => {
+      const period = { fromDate: '2025-01-01', toDate: '2025-02-01' };
+      const breakdown = calculatePaymentBreakdown(1000000, 20000, 12, false, period);
+      expect(breakdown.interestPart).toBe(10191.78);
+      expect(breakdown.principalPart).toBe(9808.22);
+      expect(breakdown.remainingDebt).toBe(990191.78);
+    });
+  });
+
+  describe('generateAnnuitySchedule with DayCountConvention.ACTUAL', () => {
+    it('calculates different interest for 31-day vs 28-day months under actual convention', () => {
+      const schedule = generateAnnuitySchedule({
+        originalAmount: 1000000,
+        interestRate: 12,
+        termMonths: 3,
+        monthlyPayment: 340000,
+        startDate: '2025-01-15',
+        paymentDay: 15,
+        dayCountConvention: DayCountConvention.ACTUAL,
+      });
+
+      // Payment 1: 2025-01-15 to 2025-02-15 = 31 days -> interest = 10191.78
+      expect(schedule.payments[0]?.interestPart).toBe(10191.78);
+
+      // Payment 2: 2025-02-15 to 2025-03-15 = 28 days (non-leap Feb) -> interest on reduced principal
+      const remainingP1 = schedule.payments[0]!.remainingDebt!;
+      const expectedP2Interest = calculatePeriodInterest(remainingP1, 12, '2025-02-15', '2025-03-15');
+      expect(schedule.payments[1]?.interestPart).toBe(expectedP2Interest);
+    });
+
+    it('preserves existing paid payments and their remaining debt', () => {
+      const existingPaid = {
+        id: 'p-paid',
+        amount: 50000,
+        dueDate: '2025-02-15',
+        status: PaymentStatus.PAID,
+        paidDate: '2025-02-15',
+        principalPart: 40000,
+        interestPart: 10000,
+        remainingDebt: 960000,
+      };
+
+      const schedule = generateAnnuitySchedule({
+        originalAmount: 1000000,
+        interestRate: 12,
+        termMonths: 2,
+        monthlyPayment: 50000,
+        startDate: '2025-01-15',
+        paymentDay: 15,
+        existingPayments: [existingPaid],
+        dayCountConvention: DayCountConvention.ACTUAL,
+      });
+
+      expect(schedule.payments[0]?.remainingDebt).toBe(960000);
+      expect(schedule.payments[0]?.principalPart).toBe(40000);
+      expect(schedule.payments[0]?.interestPart).toBe(10000);
+
+      // Next payment calculates from 960000
+      const expectedNextInterest = calculatePeriodInterest(960000, 12, '2025-02-15', '2025-03-15');
+      expect(schedule.payments[1]?.interestPart).toBe(expectedNextInterest);
+    });
+  });
+
+  describe('getLastPaidPaymentDate', () => {
+    it('returns credit startDate when there are no payments or no paid payments', () => {
+      const credit: CreditRecord = {
+        id: 'c1',
+        name: 'Credit',
+        type: CreditType.CONSUMER,
+        bankName: 'Bank',
+        originalAmount: 100000,
+        currentAmount: 100000,
+        interestRate: 10,
+        monthlyPayment: 1000,
+        termMonths: 12,
+        startDate: '2025-01-15',
+        createdAt: 1000,
+        note: '',
+        status: CreditStatus.ACTIVE,
+        earlyRepaymentOption: null,
+        payments: [
+          { id: 'p1', amount: 1000, dueDate: '2025-02-15', status: PaymentStatus.PENDING },
+        ],
+      };
+      expect(getLastPaidPaymentDate(credit)).toBe('2025-01-15');
+    });
+
+    it('returns the latest paid payment date', () => {
+      const credit: CreditRecord = {
+        id: 'c1',
+        name: 'Credit',
+        type: CreditType.CONSUMER,
+        bankName: 'Bank',
+        originalAmount: 100000,
+        currentAmount: 100000,
+        interestRate: 10,
+        monthlyPayment: 1000,
+        termMonths: 12,
+        startDate: '2025-01-15',
+        createdAt: 1000,
+        note: '',
+        status: CreditStatus.ACTIVE,
+        earlyRepaymentOption: null,
+        payments: [
+          { id: 'p1', amount: 1000, dueDate: '2025-02-15', status: PaymentStatus.PAID, paidDate: '2025-02-14' },
+          { id: 'p2', amount: 1000, dueDate: '2025-03-15', status: PaymentStatus.PAID, paidDate: '2025-03-15' },
+          { id: 'p3', amount: 1000, dueDate: '2025-04-15', status: PaymentStatus.PENDING },
+        ],
+      };
+      expect(getLastPaidPaymentDate(credit)).toBe('2025-03-15');
+    });
+  });
+});

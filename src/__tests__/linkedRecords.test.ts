@@ -11,6 +11,7 @@ import {
   updateLinkedRecord,
   removeLinkedRecord,
   createDebtMovementRecord,
+  createDebtMovementRecords,
   createCreditReceiptRecord,
   createCreditPaymentRecord,
   createDepositRefundRecord,
@@ -610,6 +611,53 @@ describe('linkedRecords', () => {
       expect(record.type).toBe(RecordType.EXPENSE);
       expect(record.amount).toBe(100);
       expect(record.payer).toBe('John');
+      expect(record.isInternal).toBe(true);
+    });
+
+    it('splits repayment principal from interest', () => {
+      const debt: DebtRecord = {
+        id: 'debt-1',
+        person: 'John',
+        amount: 1100,
+        originalAmount: 1000,
+        interestRate: 10,
+        direction: DebtDirection.LENT,
+        date: '2026-01-01',
+        time: '',
+        dueDate: '',
+        createdAt: Date.now(),
+        note: '',
+        movements: [],
+      };
+      const movement: DebtMovement = {
+        id: 'mov-interest',
+        type: DebtMovementType.REPAY,
+        amount: 110,
+        interestAmount: 10,
+        date: '2026-01-15',
+        time: '14:00',
+        createdAt: Date.now(),
+        note: '',
+      };
+
+      const records = createDebtMovementRecords(
+        debt,
+        movement,
+        RecordType.INCOME,
+        'Repayment',
+        'Debt',
+        'Debt interest',
+        'Debt interest'
+      );
+
+      expect(records).toHaveLength(2);
+      expect(records[0]).toMatchObject({ type: RecordType.INCOME, amount: 100, isInternal: true });
+      expect(records[1]).toMatchObject({
+        type: RecordType.INCOME,
+        amount: 10,
+        category: 'Debt interest',
+        isInternal: false,
+      });
     });
 
     it('creates credit receipt record', () => {
@@ -637,6 +685,7 @@ describe('linkedRecords', () => {
       expect(record.type).toBe(RecordType.INCOME);
       expect(record.amount).toBe(500000);
       expect(record.payer).toBe('Bank');
+      expect(record.isInternal).toBe(true);
     });
 
     it('creates credit payment record', () => {
@@ -690,6 +739,7 @@ describe('linkedRecords', () => {
       expect(record.type).toBe(RecordType.INCOME);
       expect(record.amount).toBe(100000);
       expect(record.payer).toBe('Bank');
+      expect(record.isInternal).toBe(true);
     });
 
     it('creates exchange record', () => {

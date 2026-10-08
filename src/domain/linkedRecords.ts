@@ -1,5 +1,6 @@
 import { FinanceRecord, RecordType, CreditRecord, DebtRecord, DepositRecord, DebtMovement, CurrencyExchange } from '../types';
 import { getTodayTime } from '../utils';
+import { DebtDirection, DebtMovementType } from '../constants';
 
 /**
  * Centralized logic for managing linkedId records.
@@ -197,8 +198,62 @@ export function createDebtMovementRecord(
     category,
     payer: debt.person,
     note,
+    isInternal: true,
     linkedMovementId: movement.id,
   });
+}
+
+/**
+ * Creates the ledger mirrors for a debt movement. Repayment principal is an
+ * internal transfer; an explicitly recorded interest portion is external income
+ * or expense depending on the debt direction.
+ */
+export function createDebtMovementRecords(
+  debt: DebtRecord,
+  movement: DebtMovement,
+  type: RecordType,
+  note: string,
+  category: string,
+  interestNote = note,
+  interestCategory = category
+): FinanceRecord[] {
+  const interestAmount = movement.type === DebtMovementType.REPAY
+    ? Math.max(0, Math.min(movement.amount, movement.interestAmount ?? 0))
+    : 0;
+  const principalAmount = movement.amount - interestAmount;
+  const records: FinanceRecord[] = [];
+
+  if (principalAmount > 0) {
+    records.push(createLinkedRecord({
+      entityId: debt.id,
+      date: movement.date,
+      time: movement.time,
+      type,
+      amount: principalAmount,
+      category,
+      payer: debt.person,
+      note,
+      isInternal: true,
+      linkedMovementId: movement.id,
+    }));
+  }
+
+  if (interestAmount > 0) {
+    records.push(createLinkedRecord({
+      entityId: debt.id,
+      date: movement.date,
+      time: movement.time,
+      type: debt.direction === DebtDirection.LENT ? RecordType.INCOME : RecordType.EXPENSE,
+      amount: interestAmount,
+      category: interestCategory,
+      payer: debt.person,
+      note: interestNote,
+      isInternal: false,
+      linkedMovementId: movement.id,
+    }));
+  }
+
+  return records;
 }
 
 /**
@@ -217,6 +272,7 @@ export function createCreditReceiptRecord(
     category,
     payer: credit.bankName,
     note,
+    isInternal: true,
   });
 }
 
@@ -268,6 +324,7 @@ export function createCreditDownPaymentRecord(
       category,
       payer: credit.bankName,
       note,
+      isInternal: false,
     }),
     id: recordId,
   };
@@ -289,6 +346,7 @@ export function createDepositRefundRecord(
     category,
     payer: deposit.bankName,
     note,
+    isInternal: true,
   });
 }
 

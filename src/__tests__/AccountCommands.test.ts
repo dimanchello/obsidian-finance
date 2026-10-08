@@ -127,6 +127,53 @@ describe('AccountCommands', () => {
       expect(linkedRecords[0].linkedMovementId).toBe('mov-1');
     });
 
+    it('addDebtMovement separates internal principal from external interest', async () => {
+      const debt: DebtRecord = {
+        id: 'debt-interest',
+        person: 'Jane Smith',
+        amount: 110,
+        originalAmount: 100,
+        interestRate: 10,
+        direction: DebtDirection.LENT,
+        date: '2026-01-01',
+        time: '',
+        dueDate: '',
+        createdAt: Date.now(),
+        note: '',
+        movements: [],
+      };
+      await storage.addDebt(accountId, debt);
+
+      const movement: DebtMovement = {
+        id: 'mov-interest',
+        type: DebtMovementType.REPAY,
+        amount: 110,
+        interestAmount: 10,
+        date: '2026-02-01',
+        time: '14:00',
+        createdAt: Date.now(),
+        note: '',
+      };
+
+      await commands.addDebtMovement(
+        debt.id,
+        movement,
+        'Debt',
+        'Repayment from Jane',
+        'Debt interest',
+        'Interest'
+      );
+
+      const records = findLinkedRecords((await storage.load(accountId)).records, debt.id);
+      expect(records).toHaveLength(2);
+      expect(records.find(record => record.isInternal)?.amount).toBe(100);
+      expect(records.find(record => !record.isInternal)).toMatchObject({
+        type: RecordType.INCOME,
+        amount: 10,
+        category: 'Interest',
+      });
+    });
+
     it('deleteDebt удаляет долг и все связанные записи', async () => {
       const debt: DebtRecord = {
         id: 'debt-1',

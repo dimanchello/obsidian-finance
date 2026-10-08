@@ -16,12 +16,14 @@ import {
   calculateRemainingPrincipal,
   calculateCreditEndDate,
   getCreditTypeLabel,
+  getLastPaidPaymentDate,
+  type PaymentPeriod,
 } from '../domain/creditCalculations';
 import { DataTable, FilterControl } from '../ui/DataTable';
 import { CreditsAnalyticsView } from '../CreditsAnalyticsView';
 import { renderMobileCard, renderSummaryCard, renderProgressBar, renderPaginatedSchedule, renderPagination, dateRangeControls, compareValues } from '../ui/tabHelpers';
 import { AccountCommands, type CreditNoteTranslations } from '../domain/AccountCommands';
-import { CSS_CLASS,  CreditStatus, CreditType, EntityListTab, PaymentStatus  } from '../constants';
+import { CSS_CLASS, CreditStatus, CreditType, EntityListTab, PaymentStatus, DayCountConvention } from '../constants';
 import { isCreditOpen, matchesListTab } from '../domain/entityLifecycle';
 import { matchesAnyField, matchesStringFilter, matchesDateRange } from '../domain/filterUtils';
 import { createExpandableTableStateAdapter, createAnalyticsToggleButton, renderListSubTabs } from './tabUtils';
@@ -67,6 +69,7 @@ export class CreditsTab {
           { icon: '💰', title: this.tr.addMovement, onClick: () => this.openAddCreditPaymentModal(c) },
           { icon: '⚡', title: this.tr.earlyRepayment, onClick: () => this.openEarlyRepaymentModal(c) },
         ] : []),
+        { icon: '🔄', title: this.tr.recalculate, onClick: () => this.confirmRecalculateCredit(c) },
         { icon: '✏️', title: this.tr.edit, onClick: () => this.openEditCreditModal(c) },
         { icon: '🗑️', title: this.tr.delete, onClick: () => this.confirmDeleteCredit(c), cls: CSS_CLASS.FINANCE_DELETE_BTN },
       ],
@@ -353,6 +356,20 @@ export class CreditsTab {
     };
   }
 
+  private confirmRecalculateCredit(credit: CreditRecord): void {
+    const displayName = credit.name?.trim() || credit.bankName?.trim() || this.typeLabel(credit);
+    new ConfirmModal(
+      this.ctx.app,
+      this.tr.recalculateConfirmCredit.replace(/\{name\}/g, displayName),
+      async () => {
+        await this.commands.recalculateCredit(credit.id, this.tr.creditDefaultCat, this.creditNotes());
+        await this.reload(this.tr.recalculatedNotice);
+      },
+      this.tr.recalculate,
+      false
+    ).open();
+  }
+
   private openNewCreditModal(): void {
     if (!this.ctx.data) { new Notice(this.tr.loading); return; }
     const allBanks = this.ctx.data.credits.map(c => c.bankName).filter(Boolean);
@@ -387,7 +404,22 @@ export class CreditsTab {
       title: `💰 ${this.tr.paymentLabel} — ${credit.name}`,
       credit,
       onSave: async payment => {
-        const breakdown = calculatePaymentBreakdown(credit.currentAmount, payment.amount, credit.interestRate);
+        let period: PaymentPeriod | undefined;
+        const convention = credit.dayCountConvention ?? DayCountConvention.ACTUAL;
+        if (convention === DayCountConvention.ACTUAL) {
+          const fromDate = getLastPaidPaymentDate(credit);
+          const toDate = payment.dueDate;
+          if (fromDate < toDate) {
+            period = { fromDate, toDate };
+          }
+        }
+        const breakdown = calculatePaymentBreakdown(
+          credit.currentAmount,
+          payment.amount,
+          credit.interestRate,
+          false,
+          period
+        );
         payment.principalPart = breakdown.principalPart;
         payment.interestPart = breakdown.interestPart;
         payment.remainingDebt = breakdown.remainingDebt;

@@ -6,6 +6,7 @@ import { OVERVIEW_TREND_MONTHS, OVERVIEW_MAX_TREND_MONTHS } from '../../types';
 import { addMonthsClamped, MS_PER_DAY } from '../dateMath';
 import { getTodayStr } from '../../utils';
 import { DepositStatus, PaymentStatus, DepositType, DepositAccrualType, DATE_FORMAT_LENGTH } from '../../constants';
+import { getDepositCurrentAmount } from '../depositCalculations';
 
 /**
  * Sentinel span: "all time" is a real selection, distinct from "no filter chosen yet".
@@ -240,7 +241,8 @@ export function calcActiveDepositsProgress(
 		const totalProfit = (d.accruals ?? []).reduce((s, a) => s + a.amount, 0);
 		const accruedProfit = paidProfit;
 		const pendingProfit = totalProfit - paidProfit;
-		const totalEstimatedReturn = d.amount + totalProfit;
+    const currentAmount = getDepositCurrentAmount(d);
+    const totalEstimatedReturn = currentAmount + totalProfit;
 
 		const pendingAccruals = (d.accruals ?? [])
 			.filter(a => a.status === PaymentStatus.PENDING && a.dueDate >= asOfDate)
@@ -254,7 +256,7 @@ export function calcActiveDepositsProgress(
 			id: d.id,
 			name: d.name || d.bankName || '—',
 			bankName: d.bankName || '—',
-			amount: d.amount,
+      amount: currentAmount,
 			interestRate: d.interestRate,
 			startDate: d.startDate,
 			endDate,
