@@ -262,3 +262,101 @@ export const SVG_ATTR = {
 export const JSON_INDENT_SPACES = 2;
 export const EXPORT_PREVIEW_MAX_LENGTH = 600;
 export const ZERO_TIMEOUT_MS = 0;
+
+// ── SQLite Schema Constants ───────────────────────────────────────────────
+
+/** SQL table names — single source of truth */
+export const SQL_TABLE = {
+  ACCOUNTS: 'accounts',
+  RECORDS: 'records',
+  DEBTS: 'debts',
+  DEBT_MOVEMENTS: 'debt_movements',
+  CREDITS: 'credits',
+  CREDIT_PAYMENTS: 'credit_payments',
+  DEPOSITS: 'deposits',
+  DEPOSIT_ACCRUALS: 'deposit_accruals',
+  DEPOSIT_TOPUPS: 'deposit_topups',
+  DEPOSIT_WITHDRAWALS: 'deposit_withdrawals',
+  CURRENCY_EXCHANGES: 'currency_exchanges',
+  RECORD_CATEGORIES: 'record_categories',
+  RECORD_TAGS: 'record_tags',
+  RECORD_PAYERS: 'record_payers',
+  VIEW_STATES: 'view_states',
+} as const;
+
+/** SQL column names — mapped from interface field names */
+export const SQL_COLUMN = {
+  // Universal
+  ID: 'id',
+  ACCOUNT_ID: 'account_id',
+  CREATED_AT: 'created_at',
+  DATE: 'date',
+  TIME: 'time',
+  AMOUNT: 'amount',
+  NOTE: 'note',
+  STATUS: 'status',
+
+  // Records
+  TYPE: 'type',
+  CATEGORY: 'category',
+  TAG: 'tag',
+  PAYER: 'payer',
+  ATTACHMENT_PATH: 'attachment_path',
+  LINKED_ID: 'linked_id',
+  LINKED_MOVEMENT_ID: 'linked_movement_id',
+  IS_INTERNAL: 'is_internal',
+  EXCHANGE_RATE: 'exchange_rate',
+
+  // Debts
+  PERSON: 'person',
+  DIRECTION: 'direction',
+  DUE_DATE: 'due_date',
+  INTEREST_RATE: 'interest_rate',
+  ORIGINAL_AMOUNT: 'original_amount',
+  INTEREST_AMOUNT: 'interest_amount',
+  MOVEMENT_TYPE: 'movement_type',
+  DEBT_ID: 'debt_id',
+
+  // Credits
+  NAME: 'name',
+  BANK_NAME: 'bank_name',
+  CURRENT_AMOUNT: 'current_amount',
+  MONTHLY_PAYMENT: 'monthly_payment',
+  TERM_MONTHS: 'term_months',
+  START_DATE: 'start_date',
+  PAYMENT_DAY: 'payment_day',
+  EARLY_REPAYMENT_OPTION: 'early_repayment_option',
+  PURCHASE_PRICE: 'purchase_price',
+  DOWN_PAYMENT: 'down_payment',
+  DOWN_PAYMENT_TYPE: 'down_payment_type',
+  DOWN_PAYMENT_VALUE: 'down_payment_value',
+  DOWN_PAYMENT_DATE: 'down_payment_date',
+  DOWN_PAYMENT_RECORD_ID: 'down_payment_record_id',
+  IS_ESCROW: 'is_escrow',
+  DAY_COUNT_CONVENTION: 'day_count_convention',
+  CREDIT_ID: 'credit_id',
+  PRINCIPAL_PART: 'principal_part',
+  INTEREST_PART: 'interest_part',
+  REMAINING_DEBT: 'remaining_debt',
+  PAID_DATE: 'paid_date',
+
+  // Deposits
+  ACCRUAL_TYPE: 'accrual_type',
+  DEPOSIT_ID: 'deposit_id',
+
+  // Currency
+  TARGET_CURRENCY: 'target_currency',
+  TARGET_AMOUNT: 'target_amount',
+  AMOUNT_IN_ACCOUNT_CURRENCY: 'amount_in_account_currency',
+  PROVIDER: 'provider',
+  FEE: 'fee',
+
+  // Meta
+  CURRENCY: 'currency',
+  ACCENT_COLOR: 'accent_color',
+  SOURCE_PATH: 'source_path',
+  VERSION: 'version',
+
+  // State
+  STATE: 'state',
+} as const;

@@ -167,16 +167,41 @@ export interface ViewState {
   overviewGroupBy?:          OverviewGroupBy;
 }
 
+// ── Storage Backend ───────────────────────────────────────────────────────
+
+type ValueOf<T> = T[keyof T];
+
+/** Storage backend types */
+export const StorageBackendType = {
+  JSON: 'json',
+  SQLITE: 'sqlite',
+} as const;
+export type StorageBackendType = ValueOf<typeof StorageBackendType>;
+
+/** SQLite database configuration */
+export const SQLITE_DB_FILENAME = 'finance.db';
+export const SQLITE_SCHEMA_VERSION = 1;
+export const SQLITE_BATCH_SIZE = 100;
+export const SQLITE_CACHE_ENABLED_DEFAULT = true;
+
+/** Migration progress */
+export const MIGRATION_PROGRESS_UPDATE_INTERVAL = 100; // ms
+export const MIGRATION_BATCH_SIZE = 10; // accounts per batch
+
+// ── Plugin Settings ───────────────────────────────────────────────────────
+
 export interface PluginSettings {
   defaultCurrency: string;
   defaultPageSize: number;
   customCurrencies: string[];
+  storageBackend: StorageBackendType;
 }
 
 export const DEFAULT_SETTINGS: PluginSettings = {
   defaultCurrency: '₽',
   defaultPageSize: 25,
   customCurrencies: ['₽'],
+  storageBackend: StorageBackendType.JSON,
 };
 
 export const DEFAULT_FILTER: FilterState = {
