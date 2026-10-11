@@ -108,6 +108,15 @@ describe('calcCreditBurden', () => {
     // monthlyBurden=5000, burden=5000/10000*100=50%
     expect(calcCreditBurden([credit({ monthlyPayment: 5000 })], incomeRecords, '2026-08-21')).toBe(50);
   });
+  it('не включает внутренние поступления в доход для кредитной нагрузки', () => {
+    const incomeRecords = [
+      rec({ date: '2026-07-22', amount: 10_000 }),
+      rec({ id: 'borrowed', date: '2026-07-22', amount: 100_000, isInternal: true, linkedId: 'debt-1' }),
+      rec({ id: 'deposit-return', date: '2026-07-22', amount: 50_000, isInternal: true, linkedId: 'deposit-1' }),
+    ];
+
+    expect(calcCreditBurden([credit({ monthlyPayment: 1_000 })], incomeRecords, '2026-08-21')).toBe(30);
+  });
 });
 
 describe('calcUpcomingPayments', () => {
@@ -802,4 +811,3 @@ describe('"за всё время" (ALL_TIME_MONTHS)', () => {
       ['2025-10', '2025-11', '2025-12', '2026-01', '2026-02', '2026-03']);
   });
 });
-

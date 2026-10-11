@@ -8,6 +8,8 @@ import { calculateRemainingPrincipal } from '../creditCalculations';
 import { RecordType, DebtDirection, CreditStatus, DepositStatus, PaymentStatus } from '../../constants';
 import { isFutureTransaction } from '../records';
 import { getCurrencyBalances } from '../currencyBalance';
+import { getDepositCurrentAmount } from '../depositCalculations';
+import { getDebtAmountAsOf } from '../debtCalculations';
 
 /**
  * Net balance = sum(income) - sum(expense), excluding isInternal and future records
@@ -29,8 +31,8 @@ export function calcAssets(
   now = new Date(),
 ): number {
   const depositSum = deposits
-    .filter(d => d.status === DepositStatus.ACTIVE && d.amount > 0)
-    .reduce((s, d) => s + d.amount, 0);
+    .filter(d => d.status === DepositStatus.ACTIVE)
+    .reduce((s, d) => s + getDepositCurrentAmount(d, now), 0);
 
   const currencyMap = getCurrencyBalances(exchanges, now);
   let exchangeSum = 0;
@@ -44,8 +46,8 @@ export function calcAssets(
   });
 
   const lentDebts = debts
-    .filter(d => d.direction === DebtDirection.LENT && d.amount > 0)
-    .reduce((s, d) => s + d.amount, 0);
+    .filter(d => d.direction === DebtDirection.LENT)
+    .reduce((s, d) => s + getDebtAmountAsOf(d, now), 0);
 
   return depositSum + exchangeSum + lentDebts;
 }
@@ -56,6 +58,7 @@ export function calcAssets(
 export function calcLiabilities(
   credits: CreditRecord[],
   debts: DebtRecord[],
+  now = new Date(),
 ): number {
   const creditPrincipal = credits
     .filter(c => c.status === CreditStatus.ACTIVE)
@@ -66,7 +69,7 @@ export function calcLiabilities(
 
   const borrowedDebts = debts
     .filter(d => d.direction === DebtDirection.BORROWED)
-    .reduce((s, d) => s + d.amount, 0);
+    .reduce((s, d) => s + getDebtAmountAsOf(d, now), 0);
 
   return creditPrincipal + borrowedDebts;
 }
@@ -105,6 +108,7 @@ export function calcUpcomingPayments(
   credits: CreditRecord[],
   debts: DebtRecord[],
   asOfDate: string,
+  now = new Date(),
 ): number {
   const endDate = addDays(asOfDate, OVERVIEW_UPCOMING_DAYS);
 
@@ -116,7 +120,7 @@ export function calcUpcomingPayments(
 
   const debtPayments = debts
     .filter(d => d.direction === DebtDirection.BORROWED && d.dueDate >= asOfDate && d.dueDate <= endDate)
-    .reduce((s, d) => s + d.amount, 0);
+    .reduce((s, d) => s + getDebtAmountAsOf(d, now), 0);
 
   return creditPayments + debtPayments;
 }

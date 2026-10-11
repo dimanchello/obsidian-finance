@@ -27,11 +27,19 @@ import {
   calcUpcomingPayments,
 } from '../domain/metrics';
 import { calculateRemainingPrincipal, calculatePaymentBreakdown } from '../domain/creditCalculations';
+import { getDepositCurrentAmount } from '../domain/depositCalculations';
+import { getDebtAmountAsOf } from '../domain/debtCalculations';
 import { fmtDate, fmt } from '../utils';
 import { addMonthsClamped, addDays } from '../domain/dateMath';
 import { isFutureTransaction } from '../domain/records';
 import { getCurrencyBalances } from '../domain/currencyBalance';
 import type { Translations } from '../i18n';
+
+function createMetricCell(row: HTMLElement, label: string, text: string, cls: string = CSS_CLASS.FINANCE_TD): HTMLElement {
+  const cell = row.createEl('td', { text, cls });
+  cell.setAttribute('data-label', label);
+  return cell;
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 1. Assets Breakdown Modal
@@ -70,10 +78,12 @@ export class OverviewAssetsModal extends FinanceBaseModal {
 
     const body = this.contentEl.createDiv('finance-overview-modal-body');
 
-    const activeDeposits = this.deposits.filter(d => d.status === DepositStatus.ACTIVE && d.amount > 0);
-    const depositSum = activeDeposits.reduce((s, d) => s + d.amount, 0);
-
     const now = new Date();
+    const activeDeposits = this.deposits.filter(
+      d => d.status === DepositStatus.ACTIVE && getDepositCurrentAmount(d, now) > 0
+    );
+    const depositSum = activeDeposits.reduce((s, d) => s + getDepositCurrentAmount(d, now), 0);
+
     const currencyMap = getCurrencyBalances(this.exchanges, now);
     const positiveCurrencies: {
       currency: string;
@@ -98,8 +108,10 @@ export class OverviewAssetsModal extends FinanceBaseModal {
 
     const exchangeSum = positiveCurrencies.reduce((s, c) => s + c.value, 0);
 
-    const lentDebts = this.debts.filter(d => d.direction === DebtDirection.LENT && d.amount > 0);
-    const lentSum = lentDebts.reduce((s, d) => s + d.amount, 0);
+    const lentDebts = this.debts.filter(
+      d => d.direction === DebtDirection.LENT && getDebtAmountAsOf(d, now) > 0
+    );
+    const lentSum = lentDebts.reduce((s, d) => s + getDebtAmountAsOf(d, now), 0);
 
     const totalAssets = calcAssets(this.deposits, this.exchanges, this.debts, now);
 
@@ -124,9 +136,9 @@ export class OverviewAssetsModal extends FinanceBaseModal {
       const table = listWrap.createEl('table', { cls: 'finance-table finance-metric-breakdown-table' });
       activeDeposits.forEach(d => {
         const row = table.createEl('tr');
-        row.createEl('td', { text: d.name || d.bankName || '—', cls: CSS_CLASS.FINANCE_TD });
-        row.createEl('td', { text: `${d.interestRate}%`, cls: 'finance-td finance-td-muted' });
-        row.createEl('td', { text: this.ctx.fmt(d.amount), cls: 'finance-td finance-amount-cell finance-amount-income' });
+        createMetricCell(row, this.tr.name, d.name || d.bankName || '—');
+        createMetricCell(row, this.tr.interestRate, `${d.interestRate}%`, 'finance-td finance-td-muted');
+        createMetricCell(row, this.tr.sum, this.ctx.fmt(getDepositCurrentAmount(d, now)), 'finance-td finance-amount-cell finance-amount-income');
       });
     }
 
@@ -135,15 +147,9 @@ export class OverviewAssetsModal extends FinanceBaseModal {
       const table = listWrap.createEl('table', { cls: 'finance-table finance-metric-breakdown-table' });
       positiveCurrencies.forEach(c => {
         const row = table.createEl('tr');
-        row.createEl('td', { text: c.currency, cls: CSS_CLASS.FINANCE_TD });
-        row.createEl('td', {
-          text: c.avgRate > 0 ? `@ ${c.avgRate.toFixed(2)}` : '—',
-          cls: 'finance-td finance-td-muted',
-        });
-        row.createEl('td', {
-          text: `${fmt(c.balance, c.currency)} (~${this.ctx.fmt(c.value)})`,
-          cls: 'finance-td finance-amount-cell finance-amount-income',
-        });
+        createMetricCell(row, this.tr.currency, c.currency);
+        createMetricCell(row, this.tr.rate, c.avgRate > 0 ? `@ ${c.avgRate.toFixed(2)}` : '—', 'finance-td finance-td-muted');
+        createMetricCell(row, this.tr.sum, `${fmt(c.balance, c.currency)} (~${this.ctx.fmt(c.value)})`, 'finance-td finance-amount-cell finance-amount-income');
       });
     }
 
@@ -152,9 +158,9 @@ export class OverviewAssetsModal extends FinanceBaseModal {
       const table = listWrap.createEl('table', { cls: 'finance-table finance-metric-breakdown-table' });
       lentDebts.forEach(d => {
         const row = table.createEl('tr');
-        row.createEl('td', { text: d.person || '—', cls: CSS_CLASS.FINANCE_TD });
-        row.createEl('td', { text: d.dueDate ? fmtDate(d.dueDate) : '—', cls: 'finance-td finance-td-muted' });
-        row.createEl('td', { text: this.ctx.fmt(d.amount), cls: 'finance-td finance-amount-cell finance-amount-income' });
+        createMetricCell(row, this.tr.person, d.person || '—');
+        createMetricCell(row, this.tr.dueDate, d.dueDate ? fmtDate(d.dueDate) : '—', 'finance-td finance-td-muted');
+        createMetricCell(row, this.tr.sum, this.ctx.fmt(getDebtAmountAsOf(d, now)), 'finance-td finance-amount-cell finance-amount-income');
       });
     }
 
@@ -197,13 +203,16 @@ export class OverviewLiabilitiesModal extends FinanceBaseModal {
 
     const body = this.contentEl.createDiv('finance-overview-modal-body');
 
+    const now = new Date();
     const activeCredits = this.credits.filter(c => c.status === CreditStatus.ACTIVE);
     const creditPrincipal = activeCredits.reduce((s, c) => s + calculateRemainingPrincipal(c), 0);
 
-    const borrowedDebts = this.debts.filter(d => d.direction === DebtDirection.BORROWED && d.amount > 0);
-    const borrowedSum = borrowedDebts.reduce((s, d) => s + d.amount, 0);
+    const borrowedDebts = this.debts.filter(
+      d => d.direction === DebtDirection.BORROWED && getDebtAmountAsOf(d, now) > 0
+    );
+    const borrowedSum = borrowedDebts.reduce((s, d) => s + getDebtAmountAsOf(d, now), 0);
 
-    const totalLiabilities = calcLiabilities(this.credits, this.debts);
+    const totalLiabilities = calcLiabilities(this.credits, this.debts, now);
 
     // Summary cards
     const statBar = body.createDiv('finance-modal-stat-bar');
@@ -226,9 +235,9 @@ export class OverviewLiabilitiesModal extends FinanceBaseModal {
       activeCredits.forEach(c => {
         const remaining = calculateRemainingPrincipal(c);
         const row = table.createEl('tr');
-        row.createEl('td', { text: c.name || c.bankName || '—', cls: CSS_CLASS.FINANCE_TD });
-        row.createEl('td', { text: `${c.interestRate}% · ${this.ctx.fmt(c.monthlyPayment)}/${this.tr.overviewDepositRemainingDays.toLowerCase()}`, cls: 'finance-td finance-td-muted' });
-        row.createEl('td', { text: this.ctx.fmt(remaining), cls: 'finance-td finance-amount-cell finance-amount-expense' });
+        createMetricCell(row, this.tr.name, c.name || c.bankName || '—');
+        createMetricCell(row, this.tr.interestRate, `${c.interestRate}% · ${this.ctx.fmt(c.monthlyPayment)} ${this.tr.perMonth}`, 'finance-td finance-td-muted');
+        createMetricCell(row, this.tr.overviewCreditRemaining, this.ctx.fmt(remaining), 'finance-td finance-amount-cell finance-amount-expense');
       });
     }
 
@@ -237,9 +246,9 @@ export class OverviewLiabilitiesModal extends FinanceBaseModal {
       const table = listWrap.createEl('table', { cls: 'finance-table finance-metric-breakdown-table' });
       borrowedDebts.forEach(d => {
         const row = table.createEl('tr');
-        row.createEl('td', { text: d.person || '—', cls: CSS_CLASS.FINANCE_TD });
-        row.createEl('td', { text: d.dueDate ? fmtDate(d.dueDate) : '—', cls: 'finance-td finance-td-muted' });
-        row.createEl('td', { text: this.ctx.fmt(d.amount), cls: 'finance-td finance-amount-cell finance-amount-expense' });
+        createMetricCell(row, this.tr.person, d.person || '—');
+        createMetricCell(row, this.tr.dueDate, d.dueDate ? fmtDate(d.dueDate) : '—', 'finance-td finance-td-muted');
+        createMetricCell(row, this.tr.sum, this.ctx.fmt(getDebtAmountAsOf(d, now)), 'finance-td finance-amount-cell finance-amount-expense');
       });
     }
 
@@ -305,9 +314,10 @@ export class OverviewBurdenModal extends FinanceBaseModal {
 
     const monthStart = `${month}-01`;
     const monthEnd = addMonthsClamped(monthStart, 1);
+    const now = new Date();
 
     const monthIncome = this.records
-      .filter(r => r.type === RecordType.INCOME && !r.isInternal && r.date >= monthStart && r.date < monthEnd)
+      .filter(r => r.type === RecordType.INCOME && !r.isInternal && !isFutureTransaction(r, now) && r.date >= monthStart && r.date < monthEnd)
       .reduce((s, r) => s + r.amount, 0);
 
     let totalPrincipal = 0;
@@ -393,7 +403,7 @@ export class OverviewBurdenModal extends FinanceBaseModal {
     addStatPill(`⚖️ ${this.tr.overviewCreditBurden}`, burdenValue, burdenMod);
     addStatPill(`💳 ${this.tr.overviewBurdenMonthPayments}`, this.ctx.fmt(totalPayments), 'finance-stat-expense');
     addStatPill(`💵 ${this.tr.overviewBurdenMonthIncome}`, this.ctx.fmt(monthIncome), 'finance-stat-income');
-    addStatPill(`🏦 ${this.tr.creditPrincipal ?? 'Основной долг'}`, this.ctx.fmt(totalPrincipal), 'finance-stat-neutral');
+    addStatPill(`🏦 ${this.tr.creditPrincipal}`, this.ctx.fmt(totalPrincipal), 'finance-stat-neutral');
     addStatPill(`📈 ${this.tr.creditInterest ?? 'Проценты'}`, this.ctx.fmt(totalInterest), 'finance-stat-neutral');
 
     // Credit breakdown table
@@ -406,17 +416,18 @@ export class OverviewBurdenModal extends FinanceBaseModal {
       const table = listWrap.createEl('table', { cls: 'finance-table finance-metric-breakdown-table' });
       const thead = table.createEl('thead');
       const trHead = thead.createEl('tr');
-      [this.tr.name, this.tr.creditPrincipal ?? 'Осн. долг', this.tr.creditInterest ?? 'Проценты', this.tr.sum, this.tr.status].forEach(h =>
+      const labels = [this.tr.name, this.tr.creditPrincipal, this.tr.creditInterest, this.tr.sum, this.tr.status];
+      labels.forEach(h =>
         trHead.createEl('th', { text: h })
       );
       const tbody = table.createEl('tbody');
       creditRows.forEach(r => {
         const row = tbody.createEl('tr');
-        row.createEl('td', { text: r.name, cls: CSS_CLASS.FINANCE_TD });
-        row.createEl('td', { text: this.ctx.fmt(r.principal), cls: 'finance-td finance-td-muted' });
-        row.createEl('td', { text: this.ctx.fmt(r.interest), cls: 'finance-td finance-td-muted' });
-        row.createEl('td', { text: this.ctx.fmt(r.total), cls: 'finance-td finance-amount-cell' });
-        row.createEl('td', { text: r.statusText, cls: 'finance-td finance-td-muted' });
+        createMetricCell(row, labels[0]!, r.name);
+        createMetricCell(row, labels[1]!, this.ctx.fmt(r.principal), 'finance-td finance-td-muted');
+        createMetricCell(row, labels[2]!, this.ctx.fmt(r.interest), 'finance-td finance-td-muted');
+        createMetricCell(row, labels[3]!, this.ctx.fmt(r.total), 'finance-td finance-amount-cell');
+        createMetricCell(row, labels[4]!, r.statusText, 'finance-td finance-td-muted');
       });
     }
 
@@ -434,12 +445,12 @@ export class OverviewBurdenModal extends FinanceBaseModal {
 
     const body = this.contentEl.createDiv('finance-overview-modal-body');
 
-    const burden = calcCreditBurden(this.credits, this.records, this.asOfDate);
+    const now = new Date();
+    const burden = calcCreditBurden(this.credits, this.records, this.asOfDate, now);
     const activeCredits = this.credits.filter(c => c.status === CreditStatus.ACTIVE);
     const monthlyBurden = activeCredits.reduce((s, c) => s + c.monthlyPayment, 0);
 
     const startDate = addMonthsClamped(this.asOfDate, -OVERVIEW_BURDEN_MONTHS);
-    const now = new Date();
     const relevantIncome = this.records.filter(r =>
       r.type === RecordType.INCOME && !r.isInternal && !isFutureTransaction(r, now) && r.date >= startDate && r.date <= this.asOfDate
     );
@@ -476,17 +487,18 @@ export class OverviewBurdenModal extends FinanceBaseModal {
       const table = listWrap.createEl('table', { cls: 'finance-table finance-metric-breakdown-table' });
       const thead = table.createEl('thead');
       const trHead = thead.createEl('tr');
-      [this.tr.name, this.tr.monthlyPayment, this.tr.interestRate, this.tr.overviewCreditRemaining ?? 'Остаток'].forEach(h =>
+      const labels = [this.tr.name, this.tr.monthlyPayment, this.tr.interestRate, this.tr.overviewCreditRemaining];
+      labels.forEach(h =>
         trHead.createEl('th', { text: h })
       );
       const tbody = table.createEl('tbody');
       activeCredits.forEach(c => {
         const remaining = calculateRemainingPrincipal(c);
         const row = tbody.createEl('tr');
-        row.createEl('td', { text: c.name || c.bankName || this.tr.credits, cls: CSS_CLASS.FINANCE_TD });
-        row.createEl('td', { text: this.ctx.fmt(c.monthlyPayment), cls: 'finance-td finance-amount-cell finance-amount-expense' });
-        row.createEl('td', { text: `${c.interestRate}%`, cls: 'finance-td finance-td-muted' });
-        row.createEl('td', { text: this.ctx.fmt(remaining), cls: 'finance-td finance-td-muted' });
+        createMetricCell(row, labels[0]!, c.name || c.bankName || this.tr.credits);
+        createMetricCell(row, labels[1]!, this.ctx.fmt(c.monthlyPayment), 'finance-td finance-amount-cell finance-amount-expense');
+        createMetricCell(row, labels[2]!, `${c.interestRate}%`, 'finance-td finance-td-muted');
+        createMetricCell(row, labels[3]!, this.ctx.fmt(remaining), 'finance-td finance-td-muted');
       });
     }
 
@@ -552,7 +564,8 @@ export class OverviewUpcomingPaymentsModal extends FinanceBaseModal {
 
     const body = this.contentEl.createDiv('finance-overview-modal-body');
 
-    const totalUpcoming = calcUpcomingPayments(this.credits, this.debts, this.asOfDate);
+    const now = new Date();
+    const totalUpcoming = calcUpcomingPayments(this.credits, this.debts, this.asOfDate, now);
 
     // Filter upcoming credit payments
     interface UpcomingItem {
@@ -582,13 +595,13 @@ export class OverviewUpcomingPaymentsModal extends FinanceBaseModal {
 
     // Filter upcoming debts
     this.debts
-      .filter(d => d.direction === DebtDirection.BORROWED && d.dueDate >= this.asOfDate && d.dueDate <= endDate)
+      .filter(d => d.direction === DebtDirection.BORROWED && d.dueDate >= this.asOfDate && d.dueDate <= endDate && getDebtAmountAsOf(d, now) > 0)
       .forEach(d => {
         items.push({
           title: d.person || this.tr.overviewDebtsBorrowed,
           subtitle: this.tr.overviewDebtsBorrowed,
           date: d.dueDate,
-          amount: d.amount,
+          amount: getDebtAmountAsOf(d, now),
           icon: '🤝',
         });
       });
@@ -620,9 +633,9 @@ export class OverviewUpcomingPaymentsModal extends FinanceBaseModal {
       const table = listWrap.createEl('table', { cls: 'finance-table finance-metric-breakdown-table' });
       items.forEach(it => {
         const row = table.createEl('tr');
-        row.createEl('td', { text: `${it.icon} ${it.title}`, cls: CSS_CLASS.FINANCE_TD });
-        row.createEl('td', { text: fmtDate(it.date), cls: 'finance-td finance-td-muted' });
-        row.createEl('td', { text: this.ctx.fmt(it.amount), cls: 'finance-td finance-amount-cell finance-amount-expense' });
+        createMetricCell(row, this.tr.name, `${it.icon} ${it.title}`);
+        createMetricCell(row, this.tr.date, fmtDate(it.date), 'finance-td finance-td-muted');
+        createMetricCell(row, this.tr.sum, this.ctx.fmt(it.amount), 'finance-td finance-amount-cell finance-amount-expense');
       });
     }
 

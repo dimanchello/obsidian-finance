@@ -143,12 +143,13 @@ export function calcCreditBurdenOverTime(
 	dateFromOrAsOfDate?: string,
 	dateToOrMonths?: string | number,
 	asOfDate: string = getTodayStr(),
-	defaultMonths: number = OVERVIEW_BURDEN_MONTHS
+	defaultMonths: number = OVERVIEW_BURDEN_MONTHS,
+	now = new Date()
 ): CreditBurdenMonth[] {
 	let monthsList: string[];
 	const allTimeStart = earliestDate(
 		credits.map(c => c.startDate),
-		records.map(r => r.date)
+		records.filter(r => !isFutureTransaction(r, now)).map(r => r.date)
 	);
 
 	if (typeof dateToOrMonths === 'number') {
@@ -175,7 +176,7 @@ export function calcCreditBurdenOverTime(
 		const label = month;
 
 		const monthIncome = records
-			.filter(r => r.type === RecordType.INCOME && !r.isInternal && r.date >= monthStart && r.date < monthEnd)
+			.filter(r => r.type === RecordType.INCOME && !r.isInternal && !isFutureTransaction(r, now) && r.date >= monthStart && r.date < monthEnd)
 			.reduce((s, r) => s + r.amount, 0);
 
 		let principal = 0;

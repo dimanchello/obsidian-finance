@@ -1,6 +1,6 @@
 import { ViewContext } from '../context';
 import { CSS_CLASS, EntityListTab } from '../constants';
-import { SortDir, ViewState } from '../types';
+import { SortDir, ViewState, SEARCH_DEBOUNCE_MS } from '../types';
 
 type PlainStringStateKey = {
   [K in keyof ViewState]-?: string extends Exclude<ViewState[K], undefined> ? K : never;
@@ -175,20 +175,52 @@ export function renderDateRangeFilter(
   fromG.createEl('label', { text: tr.from, cls: CSS_CLASS.FINANCE_FILTER_LABEL });
   const fromI = fromG.createEl('input', { type: 'date', cls: CSS_CLASS.FINANCE_FILTER_INPUT });
   fromI.value = ctx.state[stateKeys.from] ?? '';
-  fromI.addEventListener('change', () => {
-    ctx.state[stateKeys.from] = fromI.value;
-    ctx.saveState();
-    onChange();
+  let fromDebounce: number | null = null;
+  const triggerFrom = () => {
+    if (fromDebounce !== null) window.clearTimeout(fromDebounce);
+    fromDebounce = window.setTimeout(() => {
+      fromDebounce = null;
+      ctx.state[stateKeys.from] = fromI.value;
+      ctx.saveState();
+      onChange();
+    }, SEARCH_DEBOUNCE_MS);
+  };
+  fromI.addEventListener('input', triggerFrom);
+  fromI.addEventListener('change', triggerFrom);
+  fromI.addEventListener('blur', () => {
+    if (fromDebounce !== null) {
+      window.clearTimeout(fromDebounce);
+      fromDebounce = null;
+      ctx.state[stateKeys.from] = fromI.value;
+      ctx.saveState();
+      onChange();
+    }
   });
 
   const toG = row.createDiv('finance-filter-group');
   toG.createEl('label', { text: tr.to, cls: CSS_CLASS.FINANCE_FILTER_LABEL });
   const toI = toG.createEl('input', { type: 'date', cls: CSS_CLASS.FINANCE_FILTER_INPUT });
   toI.value = ctx.state[stateKeys.to] ?? '';
-  toI.addEventListener('change', () => {
-    ctx.state[stateKeys.to] = toI.value;
-    ctx.saveState();
-    onChange();
+  let toDebounce: number | null = null;
+  const triggerTo = () => {
+    if (toDebounce !== null) window.clearTimeout(toDebounce);
+    toDebounce = window.setTimeout(() => {
+      toDebounce = null;
+      ctx.state[stateKeys.to] = toI.value;
+      ctx.saveState();
+      onChange();
+    }, SEARCH_DEBOUNCE_MS);
+  };
+  toI.addEventListener('input', triggerTo);
+  toI.addEventListener('change', triggerTo);
+  toI.addEventListener('blur', () => {
+    if (toDebounce !== null) {
+      window.clearTimeout(toDebounce);
+      toDebounce = null;
+      ctx.state[stateKeys.to] = toI.value;
+      ctx.saveState();
+      onChange();
+    }
   });
 
   return { fromInput: fromI, toInput: toI };

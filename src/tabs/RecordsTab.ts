@@ -212,9 +212,7 @@ export class RecordsTab {
     const recs = this.ctx.data.records.filter(r => !isFutureTransaction(r));
     const inc = recs.filter(r => r.type === RecordType.INCOME && !r.isInternal).reduce((s, r) => s + r.amount, 0);
     const exp = recs.filter(r => r.type === RecordType.EXPENSE && !r.isInternal).reduce((s, r) => s + r.amount, 0);
-    const totalInc = recs.filter(r => r.type === RecordType.INCOME).reduce((s, r) => s + r.amount, 0);
-    const totalExp = recs.filter(r => r.type === RecordType.EXPENSE).reduce((s, r) => s + r.amount, 0);
-    const bal = totalInc - totalExp;
+    const bal = inc - exp;
 
     const cards = [
       { label: this.tr.incomeStat, value: this.ctx.fmt(inc), mod: CSS_CLASS.INCOME, icon: '↑' },

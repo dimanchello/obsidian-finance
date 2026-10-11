@@ -34,8 +34,10 @@ import { isCreditOpen, listTabFor } from '../../domain/entityLifecycle';
 export class CreditsOverview extends BaseChart {
   private selectedCreditId: string | null = null;
   private containerEl: HTMLElement | null = null;
+  private selectedChartHostEl: HTMLElement | null = null;
+  private selectedDetailHostEl: HTMLElement | null = null;
+  private creditCards = new Map<string, HTMLElement>();
 
-  private lastParent: HTMLElement | null = null;
   private lastCredits: CreditRecord[] = [];
   private lastToday = '';
   private lastOnNavigate: ((mode: AccountMode) => void) | undefined = undefined;
@@ -52,7 +54,6 @@ export class CreditsOverview extends BaseChart {
     onNavigate?: (mode: AccountMode) => void,
     onUpdate?: () => void
   ): void {
-    this.lastParent = parent;
     this.lastCredits = credits;
     this.lastToday = today;
     this.lastOnNavigate = onNavigate;
@@ -62,6 +63,9 @@ export class CreditsOverview extends BaseChart {
       this.containerEl.remove();
       this.containerEl = null;
     }
+    this.selectedChartHostEl = null;
+    this.selectedDetailHostEl = null;
+    this.creditCards.clear();
 
     if (credits.length === 0) {
       // Hide section if no credits exist
@@ -87,34 +91,44 @@ export class CreditsOverview extends BaseChart {
     });
 
     if (selectedCredit) {
-      const selectedColor = creditColorMap.get(selectedCredit.id) ?? 'var(--color-orange)';
-
       // 2-column split row: 50% compact chart, 50% schedule table & summary
       const splitRow = this.containerEl.createDiv('finance-overview-split-row');
-      const leftCol = splitRow.createDiv('finance-overview-split-col finance-overview-chart-col');
-      const rightCol = splitRow.createDiv('finance-overview-split-col finance-overview-detail-col');
-
-      this.renderCreditPaymentsChart(leftCol, selectedCredit, selectedColor, today);
-      this.renderCreditDetailPanel(rightCol, selectedCredit, selectedColor, onNavigate, onUpdate);
+      this.selectedChartHostEl = splitRow.createDiv('finance-overview-split-col finance-overview-chart-col');
+      this.selectedDetailHostEl = splitRow.createDiv('finance-overview-split-col finance-overview-detail-col');
+      this.renderSelectedCredit();
     }
 
     // List of active credit cards below
     if (activeCredits.length > 0) {
       const section = this.containerEl.createDiv('finance-deposits-overview-section');
-      this.renderActiveCredits(section, activeCredits, creditColorMap, onNavigate, credits, onUpdate, today);
+      this.renderActiveCredits(section, activeCredits, creditColorMap, today);
     }
   }
 
-  private rerender(): void {
-    if (this.lastParent) {
-      this.render(
-        this.lastParent,
-        this.lastCredits,
-        this.lastToday,
-        this.lastOnNavigate,
-        this.lastOnUpdate
-      );
-    }
+  private renderSelectedCredit(): void {
+    const chartHost = this.selectedChartHostEl;
+    const detailHost = this.selectedDetailHostEl;
+    const credit = this.lastCredits.find(item => item.id === this.selectedCreditId);
+    if (!chartHost || !detailHost || !credit) return;
+
+    chartHost.empty();
+    detailHost.empty();
+    const creditIndex = this.lastCredits.findIndex(item => item.id === credit.id);
+    const color = CHART_PALETTE[creditIndex % CHART_PALETTE.length] ?? 'var(--color-orange)';
+    this.renderCreditPaymentsChart(chartHost, credit, color, this.lastToday);
+    this.renderCreditDetailPanel(
+      detailHost,
+      credit,
+      color,
+      this.lastOnNavigate,
+      this.lastOnUpdate
+    );
+    this.creditCards.forEach((card, id) => {
+      const isSelected = id === credit.id;
+      if (isSelected) card.addClass('is-selected');
+      else card.removeClass('is-selected');
+      card.setAttribute('aria-pressed', String(isSelected));
+    });
   }
 
   private renderCreditPaymentsChart(
@@ -129,7 +143,7 @@ export class CreditsOverview extends BaseChart {
 
     const legendItems: { label: string; color?: string; cssClass?: string }[] = [
       {
-        label: tr.creditPrincipal ?? 'Основной долг',
+        label: tr.creditPrincipal,
         color: 'var(--color-blue)',
       },
       {
@@ -137,7 +151,7 @@ export class CreditsOverview extends BaseChart {
         color,
       },
       {
-        label: tr.overviewCreditRemaining ?? 'Остаток долга',
+        label: tr.overviewCreditRemaining,
         cssClass: 'is-cumulative',
       },
     ];
@@ -195,7 +209,7 @@ export class CreditsOverview extends BaseChart {
           rx: OVERVIEW_BAR_RADIUS,
           class: 'finance-chart-bar-hover',
         });
-        const tipText = `${fmtDate(it.dueDate)}\n${tr.creditPrincipal ?? 'Основной долг'}: ${this.fmt(it.principalPart)}\n${tr.creditInterest ?? 'Проценты'}: ${this.fmt(it.interestPart)}\n${tr.total}: ${this.fmt(it.total)}\n${tr.overviewCreditRemaining}: ${this.fmt(it.remainingDebt)}`;
+        const tipText = `${fmtDate(it.dueDate)}\n${tr.creditPrincipal}: ${this.fmt(it.principalPart)}\n${tr.creditInterest}: ${this.fmt(it.interestPart)}\n${tr.total}: ${this.fmt(it.total)}\n${tr.overviewCreditRemaining}: ${this.fmt(it.remainingDebt)}`;
         principalBar.addEventListener('mouseenter', e => this.tooltip.showTip(e, tipText));
         principalBar.addEventListener('mousemove', e => this.tooltip.showTip(e, tipText));
         principalBar.addEventListener('mouseleave', () => this.tooltip.hideTip());
@@ -220,7 +234,7 @@ export class CreditsOverview extends BaseChart {
           rx: OVERVIEW_BAR_RADIUS,
           class: 'finance-chart-bar-hover',
         });
-        const tipText = `${fmtDate(it.dueDate)}\n${tr.creditPrincipal ?? 'Основной долг'}: ${this.fmt(it.principalPart)}\n${tr.creditInterest ?? 'Проценты'}: ${this.fmt(it.interestPart)}\n${tr.total}: ${this.fmt(it.total)}\n${tr.overviewCreditRemaining}: ${this.fmt(it.remainingDebt)}`;
+        const tipText = `${fmtDate(it.dueDate)}\n${tr.creditPrincipal}: ${this.fmt(it.principalPart)}\n${tr.creditInterest}: ${this.fmt(it.interestPart)}\n${tr.total}: ${this.fmt(it.total)}\n${tr.overviewCreditRemaining}: ${this.fmt(it.remainingDebt)}`;
         interestBar.addEventListener('mouseenter', e => this.tooltip.showTip(e, tipText));
         interestBar.addEventListener('mousemove', e => this.tooltip.showTip(e, tipText));
         interestBar.addEventListener('mouseleave', () => this.tooltip.hideTip());
@@ -348,27 +362,36 @@ export class CreditsOverview extends BaseChart {
     // Payments schedule table
     const tableScroll = panel.createDiv('finance-overview-table-scroll');
     if (!credit.payments || credit.payments.length === 0) {
-      tableScroll.createEl('p', { text: tr.noScheduledPayments ?? 'Нет платежей', cls: CSS_CLASS.FINANCE_EMPTY_TEXT });
+      tableScroll.createEl('p', { text: tr.noScheduledPayments, cls: CSS_CLASS.FINANCE_EMPTY_TEXT });
     } else {
       const table = tableScroll.createEl('table', { cls: 'finance-table' });
       const thead = table.createEl('thead');
       const trHead = thead.createEl('tr');
-      ['#', tr.date, tr.sum, tr.creditPrincipal ?? 'Осн. долг', tr.creditInterest ?? 'Проценты', tr.status].forEach((h, i) =>
+      const labels = ['#', tr.date, tr.sum, tr.creditPrincipal, tr.creditInterest, tr.status];
+      labels.forEach((h, i) =>
         trHead.createEl('th', { text: h, cls: i === 0 ? 'finance-overview-col-idx' : '' })
       );
       const tbody = table.createEl('tbody');
       const scheduleItems = buildCreditScheduleChartData(credit);
       scheduleItems.forEach((p, idx) => {
-        const row = tbody.createEl('tr');
-        row.createEl('td', { text: String(idx + 1), cls: 'finance-td finance-td-muted finance-overview-col-idx' });
-        row.createEl('td', { text: fmtDate(p.dueDate), cls: `${CSS_CLASS.FINANCE_TD} finance-overview-col-date` });
-        row.createEl('td', { text: this.ctx.fmt(p.total), cls: 'finance-td finance-amount-cell' });
-        row.createEl('td', { text: this.ctx.fmt(p.principalPart), cls: 'finance-td finance-td-muted' });
-        row.createEl('td', { text: this.ctx.fmt(p.interestPart), cls: 'finance-td finance-td-muted' });
         const isPaid = p.status === PaymentStatus.PAID;
+        const row = tbody.createEl('tr', {
+          cls: isPaid ? 'finance-payment-paid' : 'finance-payment-pending',
+        });
+        const createCell = (labelIndex: number, text: string, cls: string) => {
+          const cell = row.createEl('td', { text, cls });
+          cell.setAttribute('data-label', labels[labelIndex]!);
+          return cell;
+        };
+        createCell(0, String(idx + 1), 'finance-td finance-td-muted finance-overview-col-idx');
+        createCell(1, fmtDate(p.dueDate), `${CSS_CLASS.FINANCE_TD} finance-overview-col-date`);
+        createCell(2, this.ctx.fmt(p.total), 'finance-td finance-amount-cell');
+        createCell(3, this.ctx.fmt(p.principalPart), 'finance-td finance-td-muted');
+        createCell(4, this.ctx.fmt(p.interestPart), 'finance-td finance-td-muted');
         const statusTd = row.createEl('td', { cls: `${CSS_CLASS.FINANCE_TD} finance-overview-col-status` });
+        statusTd.setAttribute('data-label', labels[5]!);
         statusTd.createSpan({
-          text: isPaid ? tr.overviewCreditPaid : tr.pendingStatus,
+          text: isPaid ? tr.paidStatus : tr.pendingStatus,
           cls: isPaid ? 'finance-badge-paid' : 'finance-badge-pending',
         });
       });
@@ -379,9 +402,6 @@ export class CreditsOverview extends BaseChart {
     parent: HTMLElement,
     activeCredits: CreditRecord[],
     creditColorMap: Map<string, string>,
-    _onNavigate?: (mode: AccountMode) => void,
-    _credits?: CreditRecord[],
-    _onUpdate?: () => void,
     today: string = getTodayStr()
   ): void {
     const { tr } = this.ctx;
@@ -391,10 +411,21 @@ export class CreditsOverview extends BaseChart {
       const isSelected = credit.id === this.selectedCreditId;
       const card = grid.createDiv(`finance-deposit-overview-card is-clickable${isSelected ? ' is-selected' : ''}`);
       card.title = `${credit.name} (${tr.overviewSelectedCredit})`;
+      card.setAttribute('role', 'button');
+      card.setAttribute('tabindex', '0');
+      card.setAttribute('aria-pressed', String(isSelected));
+      this.creditCards.set(credit.id, card);
 
-      card.addEventListener('click', () => {
+      const selectCredit = () => {
+        if (this.selectedCreditId === credit.id) return;
         this.selectedCreditId = credit.id;
-        this.rerender();
+        this.renderSelectedCredit();
+      };
+      card.addEventListener('click', selectCredit);
+      card.addEventListener('keydown', event => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        selectCredit();
       });
 
       const creditColor = creditColorMap.get(credit.id) ?? 'var(--color-orange)';

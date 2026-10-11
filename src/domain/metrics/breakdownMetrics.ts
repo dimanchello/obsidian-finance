@@ -3,7 +3,12 @@
  */
 import type { FinanceRecord, DebtRecord, OverviewGroupBy } from '../../types';
 import { RecordType, DebtDirection, DATE_FORMAT_LENGTH } from '../../constants';
-import { getDebtRepaid, getDebtWithInterest } from '../debtCalculations';
+import {
+  getDebtAmountAsOf,
+  getDebtOriginalAsOf,
+  getDebtRepaidAsOf,
+  getDebtWithInterestAsOf,
+} from '../debtCalculations';
 import { isoWeek } from '../dateMath';
 import { isFutureTransaction } from '../records';
 
@@ -29,7 +34,7 @@ export interface DebtBreakdownItem {
 /**
  * Aggregates debts per person with repayment progress
  */
-export function calcDebtsBreakdown(debts: DebtRecord[]): DebtBreakdownItem[] {
+export function calcDebtsBreakdown(debts: DebtRecord[], now = new Date()): DebtBreakdownItem[] {
   const map = new Map<
     string,
     {
@@ -53,16 +58,17 @@ export function calcDebtsBreakdown(debts: DebtRecord[]): DebtBreakdownItem[] {
       borrowedRepaid: 0,
     };
 
-    const repaid = getDebtRepaid(d);
-    const withInterest = getDebtWithInterest(d);
-    const total = withInterest > 0 ? withInterest : (d.originalAmount || d.amount);
+    const currentAmount = getDebtAmountAsOf(d, now);
+    const repaid = getDebtRepaidAsOf(d, now);
+    const withInterest = getDebtWithInterestAsOf(d, now);
+    const total = withInterest > 0 ? withInterest : (getDebtOriginalAsOf(d, now) || currentAmount);
 
     if (d.direction === DebtDirection.LENT) {
-      cur.lent += d.amount;
+      cur.lent += currentAmount;
       cur.lentTotal += total;
       cur.lentRepaid += repaid;
     } else {
-      cur.borrowed += d.amount;
+      cur.borrowed += currentAmount;
       cur.borrowedTotal += total;
       cur.borrowedRepaid += repaid;
     }

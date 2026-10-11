@@ -1,7 +1,8 @@
 import { CreditPayment, CreditRecord, DepositAccrual, DepositRecord, PERCENT_100 } from '../types';
 import { addMonthsClamped, withDayClamped, daysBetweenStr, parseDateStr, daysInYear } from './dateMath';
-import { round2 } from './money';
+import { round2, sumMoney } from './money';
 import { PaymentStatus, DepositAccrualType } from '../constants';
+import { getDepositInitialAmount } from './depositCalculations';
 
 /** Everything non-deterministic is passed in — that is what makes these functions testable. */
 export interface ScheduleDeps {
@@ -36,15 +37,48 @@ export function buildDepositSchedule(deposit: DepositRecord, deps: ScheduleDeps)
 
   const compounding = deposit.accrualType === DepositAccrualType.CAPITALIZATION;
   const accruals: DepositAccrual[] = [];
-  let principal = deposit.amount;
+  const events = [
+    ...(deposit.topUps ?? []).map(movement => ({
+      date: movement.date,
+      time: movement.time,
+      delta: movement.amount,
+    })),
+    ...(deposit.withdrawals ?? []).map(movement => ({
+      date: movement.date,
+      time: movement.time,
+      delta: -movement.amount,
+    })),
+  ].sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time));
+  let principal = getDepositInitialAmount(deposit);
+  let eventIndex = 0;
   let prevDate = deposit.startDate;
+
+  while (eventIndex < events.length && events[eventIndex]!.date <= deposit.startDate) {
+    principal = round2(Math.max(0, principal + events[eventIndex]!.delta));
+    eventIndex++;
+  }
 
   for (let i = 1; i <= deposit.termMonths; i++) {
     const dueDate = addMonthsClamped(deposit.startDate, i);
+    let periodInterest = 0;
+
+    while (eventIndex < events.length && events[eventIndex]!.date <= dueDate) {
+      const event = events[eventIndex]!;
+      if (event.date >= prevDate) {
+        const days = daysBetweenStr(prevDate, event.date);
+        const year = parseDateStr(event.date)?.year ?? new Date().getFullYear();
+        periodInterest += simpleInterest(principal, deposit.interestRate, days, year);
+        prevDate = event.date;
+      }
+      principal = round2(Math.max(0, principal + event.delta));
+      eventIndex++;
+    }
+
     const days = daysBetweenStr(prevDate, dueDate);
     // Use the year of the period end for leap year determination
     const year = parseDateStr(dueDate)?.year ?? new Date().getFullYear();
-    const interest = round2(simpleInterest(principal, deposit.interestRate, days, year));
+    periodInterest += simpleInterest(principal, deposit.interestRate, days, year);
+    const interest = round2(periodInterest);
     if (compounding) principal = round2(principal + interest);
 
     const isPast = dueDate <= deps.today;
@@ -99,14 +133,44 @@ export function recalcFutureAccruals(deposit: DepositRecord, today: string): Dep
 
   const compounding = deposit.accrualType === DepositAccrualType.CAPITALIZATION;
   const repriced = new Map<string, number>();
-  let principal = deposit.amount;
+  const movementsAfterPaidDate = [
+    ...(deposit.topUps ?? []).filter(movement => movement.date > (lastPaidDate ?? deposit.startDate)).map(movement => movement.amount),
+    ...(deposit.withdrawals ?? []).filter(movement => movement.date > (lastPaidDate ?? deposit.startDate)).map(movement => -movement.amount),
+  ];
+  let principal = round2(Math.max(0, deposit.amount - sumMoney(movementsAfterPaidDate)));
   let prevDate = lastPaidDate ?? deposit.startDate;
 
+  const futureEvents = [
+    ...(deposit.topUps ?? []).map(movement => ({
+      date: movement.date,
+      time: movement.time,
+      delta: movement.amount,
+    })),
+    ...(deposit.withdrawals ?? []).map(movement => ({
+      date: movement.date,
+      time: movement.time,
+      delta: -movement.amount,
+    })),
+  ].filter(event => event.date > prevDate && event.date <= future[future.length - 1]!.dueDate)
+    .sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time));
+  let eventIndex = 0;
+
   for (const accrual of future) {
+    let periodInterest = 0;
+    while (eventIndex < futureEvents.length && futureEvents[eventIndex]!.date <= accrual.dueDate) {
+      const event = futureEvents[eventIndex]!;
+      const days = daysBetweenStr(prevDate, event.date);
+      const year = parseDateStr(event.date)?.year ?? new Date().getFullYear();
+      periodInterest += simpleInterest(principal, deposit.interestRate, days, year);
+      prevDate = event.date;
+      principal = round2(Math.max(0, principal + event.delta));
+      eventIndex++;
+    }
     const days = daysBetweenStr(prevDate, accrual.dueDate);
     // Use the year of the accrual due date for leap year handling
     const year = parseDateStr(accrual.dueDate)?.year ?? new Date().getFullYear();
-    const interest = round2(simpleInterest(principal, deposit.interestRate, days, year));
+    periodInterest += simpleInterest(principal, deposit.interestRate, days, year);
+    const interest = round2(periodInterest);
     if (compounding) principal = round2(principal + interest);
     repriced.set(accrual.id, interest);
     prevDate = accrual.dueDate;

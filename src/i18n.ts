@@ -110,6 +110,11 @@ export interface Translations {
   specifyPerson: string;
   borrowAmountLabel: string;
   repayAmountLabel: string;
+  repaymentInterestLabel: string;
+  repaymentInterestDesc: string;
+  interestExceedsRepayment: string;
+  debtInterestCategory: string;
+  debtInterestNote: string;
   debtNotePlaceholder: string;
   fieldDescSum: string;
   fieldDescRate: string;
@@ -372,12 +377,8 @@ export interface Translations {
   debtRepayNote: string;
   debtBorrowMoreNote: string;
   planned: string;
-  recalculate: string;
   giveMore: string;
   debtGiveMoreNote: string;
-  recalculateConfirmCredit: string;
-  recalculateConfirmDeposit: string;
-  recalculatedNotice: string;
   remainingCreditLabel: string;
   monthlyPaymentLabel: string;
   remainingPaymentsLabel: string;
@@ -387,6 +388,9 @@ export interface Translations {
   specifyBank: string;
   specifyValidDate: string;
   creditTypeLabel: string;
+  dayCountConventionLabel: string;
+  dayCountActual: string;
+  dayCountFixed: string;
   topUpAmountLabel: string;
   exceedsBalance: string;
   confirmDeleteDebt: string;
@@ -616,10 +620,12 @@ export interface Translations {
   overviewDepositPending: string;
   overviewDepositTerm: string;
   overviewDepositRemainingDays: string;
+  perMonth: string;
   overviewDepositNextPayout: string;
   overviewDepositTotalReturn: string;
   overviewDepositCapitalization: string;
   overviewDepositToAccount: string;
+  overviewDepositMonthlyInterest: string;
   overviewDepositCumulativeProfit: string;
   overviewDepositBodyAmount: string;
   overviewDepositTotalProfit: string;
@@ -994,12 +1000,8 @@ const ru: Translations = {
   debtRepayNote: 'Возврат долга',
   debtBorrowMoreNote: 'Дополнительно взято',
   planned: 'Запланировано',
-  recalculate: 'Пересчитать',
   giveMore: '➕ Дать ещё',
   debtGiveMoreNote: 'Дополнительно дано',
-  recalculateConfirmCredit: 'Вы уверены, что хотите пересчитать график платежей по кредиту «{name}»? Все текущие платежи будут удалены и созданы заново в соответствии с календарем.',
-  recalculateConfirmDeposit: 'Вы уверены, что хотите пересчитать начисления по вкладу «{name}»? Все начисления процентов будут удалены и созданы заново в соответствии с календарем.',
-  recalculatedNotice: 'Перерасчет успешно выполнен',
   remainingCreditLabel: 'Остаток кредита',
   monthlyPaymentLabel: 'Ежемесячный платёж',
   remainingPaymentsLabel: 'Осталось платежей',
@@ -1009,6 +1011,9 @@ const ru: Translations = {
   specifyBank: '⚠️ Укажите банк',
   specifyValidDate: '⚠️ Укажите корректную дату начала',
   creditTypeLabel: 'Тип кредита',
+  dayCountConventionLabel: 'Расчёт процентов',
+  dayCountActual: 'По календарным дням (банк / ACT/365)',
+  dayCountFixed: 'Усреднённый (1/12 года)',
   topUpAmountLabel: 'Сумма пополнения',
   exceedsBalance: '⚠️ Сумма превышает доступный остаток ({max} {currency})',
   confirmDeleteDebt: 'Удалить долг?',
@@ -1063,6 +1068,11 @@ const ru: Translations = {
   specifyPerson: '⚠️ Укажите кому',
   borrowAmountLabel: 'Сумма (увеличить долг) *',
   repayAmountLabel: 'Сумма (погашение) *',
+  repaymentInterestLabel: 'Проценты в этой сумме',
+  repaymentInterestDesc: 'Укажите, какая часть платежа — проценты. Остаток считается возвратом тела долга.',
+  interestExceedsRepayment: 'Сумма процентов не может быть больше суммы погашения',
+  debtInterestCategory: 'Проценты по долгу',
+  debtInterestNote: 'Проценты по долгу',
   debtNotePlaceholder: 'Необязательно — любой комментарий…',
   fieldDescSum: 'Основная сумма вклада. При капитализации будет расти за счёт процентов.',
   fieldDescRate: 'Годовая процентная ставка. Для ежемесячного расчёта делится на 12.',
@@ -1278,10 +1288,12 @@ const ru: Translations = {
   overviewDepositPending: 'Ожидается',
   overviewDepositTerm: 'Срок',
   overviewDepositRemainingDays: 'Осталось',
+  perMonth: 'в месяц',
   overviewDepositNextPayout: 'След. выплата',
   overviewDepositTotalReturn: 'К возврату',
   overviewDepositCapitalization: 'Капитализация',
   overviewDepositToAccount: 'На счёт',
+  overviewDepositMonthlyInterest: 'Проценты за месяц',
   overviewDepositCumulativeProfit: 'Накопленный доход',
   overviewDepositBodyAmount: 'Тело вклада',
   overviewDepositTotalProfit: 'Доход за весь срок',
@@ -1656,12 +1668,8 @@ const en: Translations = {
   debtRepayNote: 'Debt repayment',
   debtBorrowMoreNote: 'Additional borrowing',
   planned: 'Planned',
-  recalculate: 'Recalculate',
   giveMore: '➕ Lend more',
   debtGiveMoreNote: 'Additional lending',
-  recalculateConfirmCredit: 'Are you sure you want to recalculate the payment schedule for credit "{name}"? All existing payments will be deleted and recreated according to the calendar.',
-  recalculateConfirmDeposit: 'Are you sure you want to recalculate accruals for deposit "{name}"? All existing accruals will be deleted and recreated according to the calendar.',
-  recalculatedNotice: 'Recalculated successfully',
   remainingCreditLabel: 'Remaining credit',
   monthlyPaymentLabel: 'Monthly payment',
   remainingPaymentsLabel: 'Remaining payments',
@@ -1671,6 +1679,9 @@ const en: Translations = {
   specifyBank: '⚠️ Specify a bank',
   specifyValidDate: '⚠️ Specify a valid start date',
   creditTypeLabel: 'Credit type',
+  dayCountConventionLabel: 'Interest calculation',
+  dayCountActual: 'Actual calendar days (bank / ACT/365)',
+  dayCountFixed: 'Simplified (1/12 year)',
   topUpAmountLabel: 'Top-up amount',
   exceedsBalance: '⚠️ Amount exceeds available balance ({max} {currency})',
   confirmDeleteDebt: 'Delete debt?',
@@ -1725,6 +1736,11 @@ const en: Translations = {
   specifyPerson: '⚠️ Specify a person',
   borrowAmountLabel: 'Amount (increase debt) *',
   repayAmountLabel: 'Amount (repayment) *',
+  repaymentInterestLabel: 'Interest included in this payment',
+  repaymentInterestDesc: 'Enter the interest portion of the payment. The remainder is treated as returned principal.',
+  interestExceedsRepayment: 'Interest cannot exceed the repayment amount',
+  debtInterestCategory: 'Debt interest',
+  debtInterestNote: 'Debt interest',
   debtNotePlaceholder: 'Optional — any comment…',
   fieldDescSum: 'Principal deposit amount. With capitalization, it grows due to interest.',
   fieldDescRate: 'Annual interest rate. Divided by 12 for monthly calculation.',
@@ -1940,10 +1956,12 @@ const en: Translations = {
   overviewDepositPending: 'Expected',
   overviewDepositTerm: 'Term',
   overviewDepositRemainingDays: 'Remaining',
+  perMonth: 'per month',
   overviewDepositNextPayout: 'Next payout',
   overviewDepositTotalReturn: 'Total return',
   overviewDepositCapitalization: 'Capitalization',
   overviewDepositToAccount: 'To account',
+  overviewDepositMonthlyInterest: 'Monthly interest',
   overviewDepositCumulativeProfit: 'Cumulative profit',
   overviewDepositBodyAmount: 'Principal',
   overviewDepositTotalProfit: 'Profit over full term',

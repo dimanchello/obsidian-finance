@@ -61,7 +61,7 @@ Use `Insert account template` command from the command palette.
 ### Tab Navigation
 Each account has tabs, switched via the `•••` menu:
 
-- **Overview** — financial dashboard, interactive KPI cards (assets, liabilities, credit burden, upcoming payments), compact charts & schedules
+- **Overview** — financial dashboard, interactive KPI cards, and selectable deposit/credit charts with color-coded payment schedules
 - **Records** — income and expenses
 - **Debts** — debt tracking
 - **Credits** — loans with payment schedules
@@ -102,6 +102,7 @@ Each account has tabs, switched via the `•••` menu:
 
 ### Analytics
 - Statistics: income, expenses, balance (including debts)
+- Credit burden compares monthly loan payments with non-internal income records over the last three months.
 - Charts by category and month
 
 <img src="assets/screenshots/analytic_charts_en.png" width="600" alt="Analytics bar chart">
@@ -136,6 +137,7 @@ Each account has tabs, switched via the `•••` menu:
 - Payment tracking: borrow → repay
 - Auto-calculated balance accounting for all additional disbursements
 - Interest rate and due date
+- Repayments can split principal from interest; principal is internal and interest is counted in income/expense statistics
 - Inner tabs **All / Open / Closed** — open debts (both directions) are shown by default, repaid ones live in «Closed»
 - Filters by direction, person, dates
 - Movement history for each debt

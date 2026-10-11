@@ -312,18 +312,12 @@ export class OverviewTab {
     );
 
     const assetsCard = this.createKPICard(cardsWrap, this.tr.overviewAssets, this.fmt(assets), 'income', '📈');
-    assetsCard.addClass(CSS_CLASS.IS_CLICKABLE);
-    assetsCard.setAttribute('role', 'button');
-    assetsCard.title = `${this.tr.overviewAssets} (${this.tr.overviewViewDetails})`;
-    assetsCard.addEventListener('click', () => {
+    this.makeKpiCardInteractive(assetsCard, this.tr.overviewAssets, () => {
       new OverviewAssetsModal(this.ctx.app, this.ctx, data.deposits, data.exchanges, data.debts).open();
     });
 
     const liabilitiesCard = this.createKPICard(cardsWrap, this.tr.overviewLiabilities, this.fmt(liabilities), 'expense', '📉');
-    liabilitiesCard.addClass(CSS_CLASS.IS_CLICKABLE);
-    liabilitiesCard.setAttribute('role', 'button');
-    liabilitiesCard.title = `${this.tr.overviewLiabilities} (${this.tr.overviewViewDetails})`;
-    liabilitiesCard.addEventListener('click', () => {
+    this.makeKpiCardInteractive(liabilitiesCard, this.tr.overviewLiabilities, () => {
       new OverviewLiabilitiesModal(this.ctx.app, this.ctx, data.credits, data.debts).open();
     });
 
@@ -338,10 +332,7 @@ export class OverviewTab {
         : 'income';
 
     const burdenCard = this.createKPICard(cardsWrap, this.tr.overviewCreditBurden, burdenValue, burdenMod, '⚖️');
-    burdenCard.addClass(CSS_CLASS.IS_CLICKABLE);
-    burdenCard.setAttribute('role', 'button');
-    burdenCard.title = `${this.tr.overviewCreditBurden} (${this.tr.overviewViewDetails})`;
-    burdenCard.addEventListener('click', () => {
+    this.makeKpiCardInteractive(burdenCard, this.tr.overviewCreditBurden, () => {
       new OverviewBurdenModal(this.ctx.app, this.ctx, data.credits, data.records, today).open();
     });
 
@@ -352,11 +343,21 @@ export class OverviewTab {
       upcoming > 0 ? 'expense' : 'neutral',
       '📅'
     );
-    upcomingCard.addClass(CSS_CLASS.IS_CLICKABLE);
-    upcomingCard.setAttribute('role', 'button');
-    upcomingCard.title = `${this.tr.overviewUpcomingPayments} (${this.tr.overviewViewDetails})`;
-    upcomingCard.addEventListener('click', () => {
+    this.makeKpiCardInteractive(upcomingCard, this.tr.overviewUpcomingPayments, () => {
       new OverviewUpcomingPaymentsModal(this.ctx.app, this.ctx, data.credits, data.debts, today).open();
+    });
+  }
+
+  private makeKpiCardInteractive(card: HTMLElement, label: string, onActivate: () => void): void {
+    card.addClass(CSS_CLASS.IS_CLICKABLE);
+    card.setAttribute('role', 'button');
+    card.setAttribute('tabindex', '0');
+    card.title = `${label} (${this.tr.overviewViewDetails})`;
+    card.addEventListener('click', onActivate);
+    card.addEventListener('keydown', (event: KeyboardEvent) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault();
+      onActivate();
     });
   }
 

@@ -127,6 +127,53 @@ describe('AccountCommands', () => {
       expect(linkedRecords[0].linkedMovementId).toBe('mov-1');
     });
 
+    it('addDebtMovement separates internal principal from external interest', async () => {
+      const debt: DebtRecord = {
+        id: 'debt-interest',
+        person: 'Jane Smith',
+        amount: 110,
+        originalAmount: 100,
+        interestRate: 10,
+        direction: DebtDirection.LENT,
+        date: '2026-01-01',
+        time: '',
+        dueDate: '',
+        createdAt: Date.now(),
+        note: '',
+        movements: [],
+      };
+      await storage.addDebt(accountId, debt);
+
+      const movement: DebtMovement = {
+        id: 'mov-interest',
+        type: DebtMovementType.REPAY,
+        amount: 110,
+        interestAmount: 10,
+        date: '2026-02-01',
+        time: '14:00',
+        createdAt: Date.now(),
+        note: '',
+      };
+
+      await commands.addDebtMovement(
+        debt.id,
+        movement,
+        'Debt',
+        'Repayment from Jane',
+        'Debt interest',
+        'Interest'
+      );
+
+      const records = findLinkedRecords((await storage.load(accountId)).records, debt.id);
+      expect(records).toHaveLength(2);
+      expect(records.find(record => record.isInternal)?.amount).toBe(100);
+      expect(records.find(record => !record.isInternal)).toMatchObject({
+        type: RecordType.INCOME,
+        amount: 10,
+        category: 'Interest',
+      });
+    });
+
     it('deleteDebt удаляет долг и все связанные записи', async () => {
       const debt: DebtRecord = {
         id: 'debt-1',
@@ -163,6 +210,60 @@ describe('AccountCommands', () => {
       const data = await storage.load(accountId);
       expect(data.debts.length).toBe(0);
       expect(data.records.length).toBe(0);
+    });
+
+    it('updateDebt синхронизирует сумму начального движения и зеркальную запись', async () => {
+      const initialMov: DebtMovement = {
+        id: 'mov-1',
+        type: DebtMovementType.BORROW,
+        amount: 1000,
+        date: '2026-01-01',
+        time: '10:00',
+        createdAt: 1000,
+        note: 'Дано в долг',
+      };
+      const debt: DebtRecord = {
+        id: 'debt-1',
+        person: 'Alice',
+        amount: 1000,
+        originalAmount: 1000,
+        interestRate: 0,
+        direction: DebtDirection.LENT,
+        date: '2026-01-01',
+        time: '10:00',
+        dueDate: '',
+        createdAt: 1000,
+        note: '',
+        movements: [initialMov],
+      };
+
+      await commands.addDebt(debt, initialMov, 'Debts', {
+        lentNote: 'Дано в долг',
+        borrowedNote: 'Взято в долг',
+      });
+
+      const originalRecord = (await storage.load(accountId)).records[0]!;
+      await storage.updateRecord(accountId, { ...originalRecord, category: 'Custom Category' });
+
+      const updatedDebt: DebtRecord = {
+        ...debt,
+        person: 'Alice Updated',
+        originalAmount: 1500,
+        amount: 1500,
+        movements: [{ ...initialMov, amount: 1500 }],
+      };
+
+      await commands.updateDebt(updatedDebt, {
+        lentNote: 'Дано в долг',
+        borrowedNote: 'Взято в долг',
+      });
+
+      const data = await storage.load(accountId);
+      expect(data.debts[0]!.person).toBe('Alice Updated');
+      expect(data.debts[0]!.movements[0]!.amount).toBe(1500);
+      expect(data.records[0]!.amount).toBe(1500);
+      expect(data.records[0]!.payer).toBe('Alice Updated');
+      expect(data.records[0]!.category).toBe('Custom Category');
     });
   });
 
@@ -819,7 +920,7 @@ describe('AccountCommands', () => {
       expect(payments.length).toBe(2);
       expect(payments.map(r => r.date).sort()).toEqual(['2026-02-01', '2026-03-01']);
       expect(payments[0].note).toBe('Платёж по кредиту "Car Loan"');
-      expect(payments[0].isInternal).toBe(true);
+      expect(payments[0].isInternal).toBe(false);
 
       const receipt = linked.find(r => r.type === RecordType.INCOME);
       expect(receipt?.note).toBe('Получен кредит "Car Loan"');
@@ -903,7 +1004,7 @@ describe('AccountCommands', () => {
       expect(down?.note).toBe('Первоначальный взнос: Car Loan');
 
       // Платёж 2026-02-01 пропущен: на эту дату есть ручная запись
-      const autoPayments = linked.filter(r => r.isInternal === true && r.type === RecordType.EXPENSE && r.id !== 'rec-down');
+      const autoPayments = linked.filter(r => r.type === RecordType.EXPENSE && r.id !== 'rec-down' && r.id !== 'rec-manual');
       expect(autoPayments.length).toBe(0);
 
       // Запись получения кредита пересоздана
@@ -970,7 +1071,7 @@ describe('AccountCommands', () => {
       const data = await storage.load(accountId);
       const payments = findLinkedRecords(data.records, 'credit-auto').filter(r => r.type === RecordType.EXPENSE);
       expect(payments.map(r => r.date)).toEqual(['2026-02-01', '2026-03-01']);
-      expect(payments.every(r => r.isInternal === true)).toBe(true);
+      expect(payments.every(r => r.isInternal === false)).toBe(true);
     });
 
     it('updateCredit сохраняет id и заметку первоначального взноса при записи платежа', async () => {
@@ -1003,6 +1104,50 @@ describe('AccountCommands', () => {
       expect(downs[0].amount).toBe(20_000);
       expect(downs[0].note).toBe('Первоначальный взнос: Car Loan');
       expect(data.credits.find(c => c.id === 'credit-dp-keep')?.downPaymentRecordId).toBe('rec-dp-keep');
+    });
+
+    it('updateCredit не дублирует первоначальный взнос при повторных вызовах (isInternal: false)', async () => {
+      const credit = makeCredit({
+        id: 'credit-dp-repeat',
+        downPayment: 50_000,
+        downPaymentValue: 50_000,
+        downPaymentType: DownPaymentType.AMOUNT,
+        downPaymentDate: '2026-01-01',
+        downPaymentRecordId: 'rec-dp-repeat',
+      });
+      await storage.addCredit(accountId, credit);
+      await storage.addRecord(accountId, {
+        id: 'rec-dp-repeat',
+        createdAt: 1,
+        date: '2026-01-01',
+        time: '',
+        type: RecordType.EXPENSE,
+        amount: 50_000,
+        category: 'Credit',
+        linkedId: 'credit-dp-repeat',
+        tag: '',
+        payer: '',
+        note: 'Первоначальный взнос: Car Loan',
+        attachmentPath: '',
+        isInternal: false,
+      });
+
+      const notes = {
+        receiptNote: 'Получен кредит "{name}"',
+        paymentNote: 'Платёж по кредиту "{name}"',
+        downPaymentNote: 'Первоначальный взнос: ',
+      };
+
+      // Call updateCredit multiple times
+      await commands.updateCredit(credit, 'Credit', notes);
+      await commands.updateCredit(credit, 'Credit', notes);
+      await commands.updateCredit(credit, 'Credit', notes);
+
+      const data = await storage.load(accountId);
+      const downs = data.records.filter(r => r.id === 'rec-dp-repeat');
+      expect(downs.length).toBe(1);
+      expect(downs[0].amount).toBe(50_000);
+      expect(downs[0].isInternal).toBe(false);
     });
   });
 

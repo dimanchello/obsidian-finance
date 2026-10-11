@@ -1,8 +1,8 @@
 import { CreditPayment, CreditRecord, ACCRUAL_STEP_MONTHLY, PERCENT_100 } from '../types';
 import { round2 } from './money';
-import { addMonthsClamped, withDayClamped, safeEndDate } from './dateMath';
+import { addMonthsClamped, withDayClamped, safeEndDate, daysBetweenStr, daysInYear, parseDateStr } from './dateMath';
 import { getTodayStr, normalizeDateStr } from '../utils';
-import { PaymentStatus, CreditStatus, CreditType } from '../constants';
+import { PaymentStatus, CreditStatus, CreditType, DayCountConvention } from '../constants';
 import type { Translations } from '../i18n';
 
 /**
@@ -21,14 +21,59 @@ export function calculateAnnuityPayment(principal: number, annualRate: number, t
   return round2(payment);
 }
 
+export interface PaymentPeriod {
+  fromDate: string;
+  toDate: string;
+}
+
+/**
+ * Calculates interest for a date range using actual calendar days (ACT/365 / ACT/366).
+ * According to Russian banking standard (Bank of Russia Regulation 39-P / 579-P),
+ * leap year days are divided by 366 and non-leap days by 365.
+ */
+export function calculatePeriodInterest(
+  principal: number,
+  annualRate: number,
+  fromDate: string,
+  toDate: string,
+): number {
+  if (principal <= 0 || annualRate <= 0 || fromDate >= toDate) return 0;
+  const from = parseDateStr(fromDate);
+  const to = parseDateStr(toDate);
+  if (!from || !to) return 0;
+
+  let totalInterest = 0;
+  let curYear = from.year;
+
+  while (curYear <= to.year) {
+    const startStr = curYear === from.year ? fromDate : `${String(curYear).padStart(4, '0')}-01-01`;
+    const endStr = curYear === to.year ? toDate : `${String(curYear).padStart(4, '0')}-12-31`;
+
+    let days = daysBetweenStr(startStr, endStr);
+    if (curYear < to.year) {
+      days += 1;
+    }
+
+    if (days > 0) {
+      const diy = daysInYear(curYear);
+      totalInterest += principal * (annualRate / PERCENT_100) * (days / diy);
+    }
+    curYear++;
+  }
+
+  return round2(totalInterest);
+}
+
 /**
  * Calculates single payment breakdown into principal repayment and bank interest.
+ * Supports both traditional monthly division (1/12) and actual calendar days (ACT/365).
  */
 export function calculatePaymentBreakdown(
   principalRemaining: number,
   paymentAmount: number,
   annualRate: number,
   isLastPayment = false,
+  period?: PaymentPeriod,
 ): { principalPart: number; interestPart: number; remainingDebt: number } {
   if (principalRemaining <= 0) {
     return { principalPart: 0, interestPart: 0, remainingDebt: 0 };
@@ -40,8 +85,13 @@ export function calculatePaymentBreakdown(
     return { principalPart: round2(principalPart), interestPart: 0, remainingDebt };
   }
 
-  const monthlyRate = annualRate / PERCENT_100 / ACCRUAL_STEP_MONTHLY;
-  const interestPart = round2(principalRemaining * monthlyRate);
+  let interestPart: number;
+  if (period && period.fromDate < period.toDate) {
+    interestPart = calculatePeriodInterest(principalRemaining, annualRate, period.fromDate, period.toDate);
+  } else {
+    const monthlyRate = annualRate / PERCENT_100 / ACCRUAL_STEP_MONTHLY;
+    interestPart = round2(principalRemaining * monthlyRate);
+  }
 
   if (isLastPayment || paymentAmount >= round2(principalRemaining + interestPart)) {
     const principalPart = principalRemaining;
@@ -69,6 +119,7 @@ export interface GenerateScheduleParams {
   startDate: string;
   paymentDay?: number | undefined;
   existingPayments?: CreditPayment[] | undefined;
+  dayCountConvention?: DayCountConvention | undefined;
 }
 
 /**
@@ -86,6 +137,7 @@ export function generateAnnuitySchedule(params: GenerateScheduleParams): {
     startDate,
     paymentDay,
     existingPayments = [],
+    dayCountConvention,
   } = params;
 
   if (termMonths <= 0 || originalAmount <= 0) {
@@ -98,6 +150,7 @@ export function generateAnnuitySchedule(params: GenerateScheduleParams): {
   let runningPrincipal = originalAmount;
   let lastPaidRemainingDebt = originalAmount;
   let hasAnyPaid = false;
+  let prevDate = normStartDate;
 
   for (let i = 1; i <= termMonths; i++) {
     const baseDate = addMonthsClamped(normStartDate, i);
@@ -111,7 +164,27 @@ export function generateAnnuitySchedule(params: GenerateScheduleParams): {
     const amount = existing?.amount ?? monthlyPayment;
     const isLast = i === termMonths || runningPrincipal <= 0;
 
-    const breakdown = calculatePaymentBreakdown(runningPrincipal, amount, interestRate, isLast);
+    // Preserve historical paid payment's breakdown if already recorded
+    if (existing?.status === PaymentStatus.PAID && existing.remainingDebt !== undefined) {
+      payments.push({
+        ...existing,
+        amount,
+        dueDate: existing.dueDate || dueDate,
+        status: PaymentStatus.PAID,
+        paidDate: existing.paidDate ?? (isPaid ? dueDate : undefined),
+      });
+      runningPrincipal = existing.remainingDebt;
+      lastPaidRemainingDebt = existing.remainingDebt;
+      hasAnyPaid = true;
+      prevDate = existing.paidDate ?? existing.dueDate ?? dueDate;
+      continue;
+    }
+
+    const period: PaymentPeriod | undefined = dayCountConvention === DayCountConvention.ACTUAL
+      ? { fromDate: prevDate, toDate: dueDate }
+      : undefined;
+
+    const breakdown = calculatePaymentBreakdown(runningPrincipal, amount, interestRate, isLast, period);
 
     const payment: CreditPayment = {
       id: existing?.id ?? crypto.randomUUID(),
@@ -127,6 +200,7 @@ export function generateAnnuitySchedule(params: GenerateScheduleParams): {
 
     payments.push(payment);
     runningPrincipal = breakdown.remainingDebt;
+    prevDate = dueDate;
 
     if (isPaid) {
       lastPaidRemainingDebt = breakdown.remainingDebt;
@@ -211,7 +285,7 @@ export interface CreditScheduleChartItem {
   interestPart: number;
   total: number;
   remainingDebt: number;
-  status: string;
+  status: PaymentStatus;
 }
 
 /**
@@ -220,6 +294,7 @@ export interface CreditScheduleChartItem {
  */
 export function buildCreditScheduleChartData(credit: CreditRecord): CreditScheduleChartItem[] {
   let runningPrincipal = credit.originalAmount;
+  let prevDate = credit.startDate;
   return credit.payments.map((p, i) => {
     let principalPart = p.principalPart;
     let interestPart = p.interestPart;
@@ -227,12 +302,16 @@ export function buildCreditScheduleChartData(credit: CreditRecord): CreditSchedu
 
     if (principalPart === undefined || interestPart === undefined || remainingDebt === undefined) {
       const isLast = i === credit.payments.length - 1;
-      const breakdown = calculatePaymentBreakdown(runningPrincipal, p.amount, credit.interestRate, isLast);
+      const period: PaymentPeriod | undefined = credit.dayCountConvention === DayCountConvention.ACTUAL
+        ? { fromDate: prevDate, toDate: p.dueDate }
+        : undefined;
+      const breakdown = calculatePaymentBreakdown(runningPrincipal, p.amount, credit.interestRate, isLast, period);
       principalPart = breakdown.principalPart;
       interestPart = breakdown.interestPart;
       remainingDebt = breakdown.remainingDebt;
     }
     runningPrincipal = remainingDebt;
+    prevDate = p.dueDate;
 
     return {
       id: p.id,
@@ -247,3 +326,15 @@ export function buildCreditScheduleChartData(credit: CreditRecord): CreditSchedu
   });
 }
 
+/**
+ * Returns the date of the last paid payment, or credit.startDate if none.
+ */
+export function getLastPaidPaymentDate(credit: CreditRecord): string {
+  for (let i = credit.payments.length - 1; i >= 0; i--) {
+    const p = credit.payments[i];
+    if (p?.status === PaymentStatus.PAID) {
+      return p.paidDate ?? p.dueDate;
+    }
+  }
+  return credit.startDate;
+}

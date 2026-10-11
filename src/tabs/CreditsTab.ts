@@ -16,12 +16,14 @@ import {
   calculateRemainingPrincipal,
   calculateCreditEndDate,
   getCreditTypeLabel,
+  getLastPaidPaymentDate,
+  type PaymentPeriod,
 } from '../domain/creditCalculations';
 import { DataTable, FilterControl } from '../ui/DataTable';
 import { CreditsAnalyticsView } from '../CreditsAnalyticsView';
 import { renderMobileCard, renderSummaryCard, renderProgressBar, renderPaginatedSchedule, renderPagination, dateRangeControls, compareValues } from '../ui/tabHelpers';
 import { AccountCommands, type CreditNoteTranslations } from '../domain/AccountCommands';
-import { CSS_CLASS,  CreditStatus, CreditType, EntityListTab, PaymentStatus  } from '../constants';
+import { CSS_CLASS, CreditStatus, CreditType, EntityListTab, PaymentStatus, DayCountConvention } from '../constants';
 import { isCreditOpen, matchesListTab } from '../domain/entityLifecycle';
 import { matchesAnyField, matchesStringFilter, matchesDateRange } from '../domain/filterUtils';
 import { createExpandableTableStateAdapter, createAnalyticsToggleButton, renderListSubTabs } from './tabUtils';
@@ -402,7 +404,22 @@ export class CreditsTab {
       title: `💰 ${this.tr.paymentLabel} — ${credit.name}`,
       credit,
       onSave: async payment => {
-        const breakdown = calculatePaymentBreakdown(credit.currentAmount, payment.amount, credit.interestRate);
+        let period: PaymentPeriod | undefined;
+        const convention = credit.dayCountConvention ?? DayCountConvention.ACTUAL;
+        if (convention === DayCountConvention.ACTUAL) {
+          const fromDate = getLastPaidPaymentDate(credit);
+          const toDate = payment.dueDate;
+          if (fromDate < toDate) {
+            period = { fromDate, toDate };
+          }
+        }
+        const breakdown = calculatePaymentBreakdown(
+          credit.currentAmount,
+          payment.amount,
+          credit.interestRate,
+          false,
+          period
+        );
         payment.principalPart = breakdown.principalPart;
         payment.interestPart = breakdown.interestPart;
         payment.remainingDebt = breakdown.remainingDebt;

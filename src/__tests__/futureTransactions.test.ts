@@ -1,10 +1,37 @@
 import { describe, it, expect } from 'vitest';
 import { isFutureTransaction } from '../domain/records';
-import { calcNetBalance, calcAssets, calcCreditBurden } from '../domain/metrics/balanceMetrics';
+import {
+  calcNetBalance, calcAssets, calcLiabilities, calcCreditBurden, calcUpcomingPayments,
+} from '../domain/metrics/balanceMetrics';
 import { calcGroupBreakdown } from '../domain/metrics/breakdownMetrics';
+import { calcCreditBurdenOverTime } from '../domain/metrics/trendMetrics';
 import { getCurrencyBalance, getCurrencyBalances } from '../domain/currencyBalance';
-import { FinanceRecord, CurrencyExchange } from '../types';
-import { RecordType, CurrencyOperationType } from '../constants';
+import { getDepositCurrentAmount } from '../domain/depositCalculations';
+import { getDebtRemaining } from '../domain/debtCalculations';
+import { calcDebtsBreakdown } from '../domain/metrics/breakdownMetrics';
+import type { CreditRecord, DebtRecord, DepositRecord, FinanceRecord, CurrencyExchange } from '../types';
+import {
+  RecordType, CurrencyOperationType, CreditType, CreditStatus, EarlyRepaymentOption,
+  DebtDirection, DebtMovementType, DepositType, DepositStatus, DepositAccrualType,
+} from '../constants';
+
+const burdenCredit: CreditRecord = {
+  id: 'credit-burden',
+  name: 'Credit',
+  type: CreditType.CONSUMER,
+  bankName: '',
+  originalAmount: 1200,
+  currentAmount: 1200,
+  interestRate: 0,
+  monthlyPayment: 100,
+  termMonths: 12,
+  startDate: '2026-01-01',
+  createdAt: 0,
+  note: '',
+  status: CreditStatus.ACTIVE,
+  earlyRepaymentOption: EarlyRepaymentOption.TERM,
+  payments: [],
+};
 
 describe('isFutureTransaction', () => {
   const referenceNow = new Date('2026-06-15T12:00:00');
@@ -35,6 +62,8 @@ describe('isFutureTransaction', () => {
 });
 
 describe('Metrics future transactions exclusion', () => {
+  const referenceNow = new Date('2026-06-15T12:00:00');
+
   const baseRecord: FinanceRecord = {
     id: 'r1',
     createdAt: 1000,
@@ -112,9 +141,26 @@ describe('Metrics future transactions exclusion', () => {
     expect(assets).toBe(7500);
   });
 
-  it('calcCreditBurden ignores future records', () => {
-    const burden = calcCreditBurden([], [baseRecord, futureRecord], '2020-03-01');
-    expect(burden).toBe(0);
+  it('calcCreditBurden ignores future income dated inside the selected period', () => {
+    const currentIncome = { ...baseRecord, date: '2026-06-10', amount: 1000 };
+    const plannedIncome = { ...futureRecord, date: '2026-06-20', amount: 5000 };
+    const burden = calcCreditBurden([burdenCredit], [currentIncome, plannedIncome], '2026-06-30', referenceNow);
+    expect(burden).toBeCloseTo(30);
+  });
+
+  it('credit burden chart ignores future income inside the displayed month', () => {
+    const currentIncome = { ...baseRecord, date: '2026-06-10', amount: 1000 };
+    const plannedIncome = { ...futureRecord, date: '2026-06-20', amount: 5000 };
+    const [month] = calcCreditBurdenOverTime(
+      [burdenCredit],
+      [currentIncome, plannedIncome],
+      '2026-06-01',
+      '2026-06-30',
+      '2026-06-30',
+      1,
+      referenceNow,
+    );
+    expect(month?.burdenPercent).toBe(10);
   });
 
   it('calcGroupBreakdown ignores future records', () => {
@@ -166,5 +212,59 @@ describe('Currency balances future exchanges exclusion', () => {
     expect(metrics!.balance).toBe(100);
     expect(metrics!.totalBought).toBe(100);
     expect(metrics!.averageBuyRate).toBe(75);
+  });
+});
+
+describe('Future deposit and debt movements exclusion', () => {
+  const referenceNow = new Date('2026-06-15T12:00:00');
+
+  it('does not include future deposit top-ups and withdrawals in current assets', () => {
+    const deposit: DepositRecord = {
+      id: 'dep-future',
+      name: 'Savings',
+      type: DepositType.TERM,
+      bankName: '',
+      amount: 55000,
+      interestRate: 0,
+      startDate: '2026-01-01',
+      termMonths: 12,
+      accrualType: DepositAccrualType.TO_ACCOUNT,
+      createdAt: 0,
+      note: '',
+      status: DepositStatus.ACTIVE,
+      accruals: [],
+      topUps: [{ id: 'top-up-future', amount: 10000, date: '2026-06-16', time: '', createdAt: 1, note: '' }],
+      withdrawals: [{ id: 'withdrawal-future', amount: 5000, date: '2026-06-17', time: '', createdAt: 2, note: '' }],
+    };
+
+    expect(getDepositCurrentAmount(deposit, referenceNow)).toBe(50000);
+    expect(calcAssets([deposit], [], [], referenceNow)).toBe(50000);
+  });
+
+  it('excludes future debt borrowings and repayments from assets, liabilities, and upcoming debt totals', () => {
+    const debt: DebtRecord = {
+      id: 'debt-future',
+      person: 'Alex',
+      amount: 1100,
+      originalAmount: 1000,
+      interestRate: 0,
+      direction: DebtDirection.BORROWED,
+      date: '2026-01-01',
+      time: '',
+      dueDate: '2026-06-20',
+      createdAt: 0,
+      note: '',
+      movements: [
+        { id: 'movement-past', type: DebtMovementType.BORROW, amount: 1000, date: '2026-01-01', time: '', createdAt: 0, note: '' },
+        { id: 'movement-future-borrow', type: DebtMovementType.BORROW, amount: 200, date: '2026-06-16', time: '', createdAt: 1, note: '' },
+        { id: 'movement-future-repay', type: DebtMovementType.REPAY, amount: 100, date: '2026-06-17', time: '', createdAt: 2, note: '' },
+      ],
+    };
+
+    expect(calcAssets([], [], [{ ...debt, direction: DebtDirection.LENT }], referenceNow)).toBe(1000);
+    expect(calcLiabilities([], [debt], referenceNow)).toBe(1000);
+    expect(calcUpcomingPayments([], [debt], '2026-06-15', referenceNow)).toBe(1000);
+    expect(getDebtRemaining(debt, referenceNow)).toBe(1000);
+    expect(calcDebtsBreakdown([debt], referenceNow)[0]?.borrowed).toBe(1000);
   });
 });

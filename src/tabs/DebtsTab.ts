@@ -12,7 +12,13 @@ import { ConfirmModal } from '../ConfirmModal';
 import { sumMoney } from '../domain/money';
 import { DataTable, FilterControl } from '../ui/DataTable';
 import { renderMobileCard, renderSummaryCard, compareValues, dateRangeControls } from '../ui/tabHelpers';
-import { getDebtOriginal, getDebtWithInterest, getDebtRemaining, isDebtPaidOff } from '../domain/debtCalculations';
+import {
+  getDebtOriginalAsOf,
+  getDebtWithInterestAsOf,
+  getDebtRemaining,
+  getDebtAmountAsOf,
+  isDebtPaidOff,
+} from '../domain/debtCalculations';
 import { AccountCommands } from '../domain/AccountCommands';
 import { CSS_CLASS, DebtDirection, DebtMovementType, EntityListTab } from '../constants';
 import { isDebtOpen, matchesListTab } from '../domain/entityLifecycle';
@@ -50,11 +56,11 @@ export class DebtsTab {
         {
           key: 'original', label: this.tr.sum,
           cell: d => {
-            const original = getDebtOriginal(d);
+            const original = getDebtOriginalAsOf(d);
             const hasInterest = d.interestRate > 0;
             return {
               text: hasInterest
-                ? `${this.ctx.fmt(original)} → ${this.ctx.fmt(getDebtWithInterest(d))} (${d.interestRate}%)`
+                ? `${this.ctx.fmt(original)} → ${this.ctx.fmt(getDebtWithInterestAsOf(d))} (${d.interestRate}%)`
                 : this.ctx.fmt(original),
               cls: 'finance-amount-cell',
             };
@@ -280,7 +286,10 @@ export class DebtsTab {
       }
       mr.createEl('td', { text: typeLabel, cls: CSS_CLASS.FINANCE_TD });
       mr.createEl('td', {
-        text: (m.type === DebtMovementType.BORROW ? '−' : '+') + this.ctx.fmt(m.amount),
+        text: (m.type === DebtMovementType.BORROW ? '−' : '+') + this.ctx.fmt(m.amount) +
+          (m.interestAmount && m.interestAmount > 0
+            ? ` · ${this.tr.debtInterestCategory}: ${this.ctx.fmt(m.interestAmount)}`
+            : ''),
         cls: `finance-td finance-td-mov-${m.type}`,
       });
       mr.createEl('td', { text: fmtDate(m.date, m.time), cls: CSS_CLASS.FINANCE_TD });
@@ -303,8 +312,8 @@ export class DebtsTab {
     block.addClass(debt.direction === DebtDirection.LENT ? 'finance-row-income' : 'finance-row-expense');
     
     const remaining = getDebtRemaining(debt);
-    const original = getDebtOriginal(debt);
-    const withInterest = getDebtWithInterest(debt);
+    const original = getDebtOriginalAsOf(debt);
+    const withInterest = getDebtWithInterestAsOf(debt);
     const hasInterest = debt.interestRate > 0;
 
     const details = [];
@@ -371,7 +380,6 @@ export class DebtsTab {
       onSave: async updated => {
         await this.commands.updateDebt(
           updated,
-          this.tr.debtDefaultCat,
           { lentNote: this.tr.debtLentNote, borrowedNote: this.tr.debtBorrowedNote }
         );
         await this.reload(this.tr.debtUpdated);
@@ -384,13 +392,16 @@ export class DebtsTab {
       title: `${this.tr.repaymentAct} — ${debt.person}`,
       type: DebtMovementType.REPAY,
       remainingAmount: getDebtRemaining(debt),
+      allowInterestAmount: true,
       currency: this.ctx.currency,
       onSave: async mov => {
         await this.commands.addDebtMovement(
           debt.id,
           mov,
           this.tr.debtDefaultCat,
-          `${this.tr.debtRepayNote}: ${debt.person}`
+          `${this.tr.debtRepayNote}: ${debt.person}`,
+          this.tr.debtInterestNote,
+          this.tr.debtInterestCategory
         );
         await this.reload(this.tr.repaymentRecorded);
       },
@@ -420,9 +431,18 @@ export class DebtsTab {
       title: `${this.tr.editMovement} — ${debt.person}`,
       type: mov.type,
       movement: mov,
+      allowInterestAmount: mov.type === DebtMovementType.REPAY,
       currency: this.ctx.currency,
       onSave: async updated => {
-        await this.commands.updateDebtMovement(debt.id, mov, updated);
+        await this.commands.updateDebtMovement(
+          debt.id,
+          mov,
+          updated,
+          mov.type === DebtMovementType.REPAY ? `${this.tr.debtRepayNote}: ${debt.person}` : undefined,
+          this.tr.debtDefaultCat,
+          this.tr.debtInterestNote,
+          this.tr.debtInterestCategory
+        );
         await this.reload(this.tr.debtUpdated);
       },
     }).open();
@@ -437,7 +457,7 @@ export class DebtsTab {
   }
 
   private confirmDeleteDebt(debt: DebtRecord): void {
-    const label = `${debt.person} · ${this.ctx.fmt(debt.amount)} · ${fmtDate(debt.date, debt.time)}`;
+    const label = `${debt.person} · ${this.ctx.fmt(getDebtAmountAsOf(debt))} · ${fmtDate(debt.date, debt.time)}`;
     new ConfirmModal(this.ctx.app, `${this.tr.confirmDeleteDebt}\n${label}`, async () => {
       await this.commands.deleteDebt(debt.id);
       await this.reload(this.tr.debtDeleted);

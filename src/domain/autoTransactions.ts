@@ -4,6 +4,7 @@ import {
 import { buildCreditSchedule, buildDepositSchedule, type ScheduleDeps } from './schedule';
 import { round2 } from './money';
 import { parseDateStr, withDayClamped } from './dateMath';
+import { getDepositInitialAmount } from './depositCalculations';
 import {
   PaymentStatus, RecordType, DepositStatus, DepositAccrualType, CreditStatus,
 } from '../constants';
@@ -40,6 +41,7 @@ interface MirrorSpec {
   payer: string;
   note: string;
   linkedId: string;
+  isInternal: boolean;
 }
 
 /**
@@ -77,6 +79,7 @@ class RecordMirror {
       note: spec.note,
       attachmentPath: '',
       linkedId: spec.linkedId,
+      isInternal: spec.isInternal,
     });
     this.changed = true;
   }
@@ -114,11 +117,12 @@ function processDeposit(
     mirror.ensure({
       date: deposit.startDate,
       type: RecordType.EXPENSE,
-      amount: deposit.amount,
+      amount: getDepositInitialAmount(deposit),
       category: deps.labels.depositOpeningCat,
       payer: deposit.bankName,
       note: `${deps.labels.depositOpenNote} "${deposit.name}"`,
       linkedId: deposit.id,
+      isInternal: true,
     }, deps);
 
     if (deposit.accrualType === DepositAccrualType.CAPITALIZATION) {
@@ -148,6 +152,7 @@ function processDeposit(
         payer: deposit.bankName,
         note: `${deps.labels.depositInterestNote} "${deposit.name}"`,
         linkedId: deposit.id,
+        isInternal: false,
       }, deps);
     }
   }
@@ -167,6 +172,7 @@ function processDeposit(
       payer: deposit.bankName,
       note: `${deps.labels.depositRefundNote} "${deposit.name}"`,
       linkedId: deposit.id,
+      isInternal: true,
     }, deps);
   }
 
@@ -225,6 +231,7 @@ function processCredit(
       payer: credit.bankName,
       note: `${deps.labels.creditPaymentNote} "${credit.name}"`,
       linkedId: credit.id,
+      isInternal: false,
     }, deps);
   }
 

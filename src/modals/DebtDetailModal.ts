@@ -4,8 +4,8 @@ import { ViewContext } from '../context';
 import { DebtRecord, DebtMovement } from '../types';
 import { DebtDirection, DebtMovementType, CSS_CLASS } from '../constants';
 import {
-  getDebtOriginal,
-  getDebtWithInterest,
+  getDebtOriginalAsOf,
+  getDebtWithInterestAsOf,
   getDebtRemaining,
   isDebtPaidOff,
 } from '../domain/debtCalculations';
@@ -55,8 +55,8 @@ export class DebtDetailModal extends FinanceBaseModal {
 
     const isLent = this.debt.direction === DebtDirection.LENT;
     const remaining = getDebtRemaining(this.debt);
-    const original = getDebtOriginal(this.debt);
-    const withInterest = getDebtWithInterest(this.debt);
+    const original = getDebtOriginalAsOf(this.debt);
+    const withInterest = getDebtWithInterestAsOf(this.debt);
     const hasInterest = this.debt.interestRate > 0;
     const isPaid = isDebtPaidOff(this.debt);
 
@@ -121,7 +121,10 @@ export class DebtDetailModal extends FinanceBaseModal {
       }
       mr.createEl('td', { text: typeLabel, cls: CSS_CLASS.FINANCE_TD });
       mr.createEl('td', {
-        text: (m.type === DebtMovementType.BORROW ? '−' : '+') + this.ctx.fmt(m.amount),
+        text: (m.type === DebtMovementType.BORROW ? '−' : '+') + this.ctx.fmt(m.amount) +
+          (m.interestAmount && m.interestAmount > 0
+            ? ` · ${this.tr.debtInterestCategory}: ${this.ctx.fmt(m.interestAmount)}`
+            : ''),
         cls: `finance-td finance-td-mov-${m.type}`,
       });
       mr.createEl('td', { text: fmtDate(m.date, m.time), cls: CSS_CLASS.FINANCE_TD });
@@ -178,13 +181,16 @@ export class DebtDetailModal extends FinanceBaseModal {
       title: `${this.tr.repaymentAct} — ${this.debt.person}`,
       type: DebtMovementType.REPAY,
       remainingAmount: getDebtRemaining(this.debt),
+      allowInterestAmount: true,
       currency: this.ctx.currency,
       onSave: async mov => {
         await this.commands.addDebtMovement(
           this.debt.id,
           mov,
           this.tr.debtDefaultCat,
-          `${this.tr.debtRepayNote}: ${this.debt.person}`
+          `${this.tr.debtRepayNote}: ${this.debt.person}`,
+          this.tr.debtInterestNote,
+          this.tr.debtInterestCategory
         );
         await this.reload();
       },

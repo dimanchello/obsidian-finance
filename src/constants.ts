@@ -65,6 +65,13 @@ export const DownPaymentType = {
 } as const;
 export type DownPaymentType = ValueOf<typeof DownPaymentType>;
 
+/** Method of interest calculation: actual calendar days (ACT/365 bank standard) vs fixed 1/12. */
+export const DayCountConvention = {
+  ACTUAL: 'actual',
+  FIXED_30: 'fixed_30',
+} as const;
+export type DayCountConvention = ValueOf<typeof DayCountConvention>;
+
 // ── Deposits ──────────────────────────────────────────────────────────────
 
 export const DepositType = {

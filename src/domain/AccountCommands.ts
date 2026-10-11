@@ -11,16 +11,14 @@ import type {
 import {
   unlinkRecords,
   createDebtMovementRecord,
+  createDebtMovementRecords,
   createCreditReceiptRecord,
   createCreditPaymentRecord,
   createCreditDownPaymentRecord,
   createDepositRefundRecord,
   findLinkedRecord,
 } from './linkedRecords';
-import { RecordType, DebtDirection, DebtMovementType, CreditType, CreditStatus, PaymentStatus, DepositStatus, DepositAccrualType } from '../constants';
-import { generateAnnuitySchedule } from './creditCalculations';
-import { applyAutoTransactions, type AutoTxDeps } from './autoTransactions';
-import { sumMoney, round2 } from './money';
+import { RecordType, DebtDirection, DebtMovementType, CreditType, PaymentStatus, DepositStatus } from '../constants';
 
 /**
  * AccountCommands provides transactional operations for account entities.
@@ -82,7 +80,9 @@ export class AccountCommands {
     debtId: string,
     movement: DebtMovement,
     category: string,
-    note: string
+    note: string,
+    interestNote = note,
+    interestCategory = category
   ): Promise<void> {
     const data = await this.storage.load(this.accountId);
     const debt = data.debts.find(d => d.id === debtId);
@@ -94,8 +94,18 @@ export class AccountCommands {
       ? (debt.direction === DebtDirection.LENT ? RecordType.EXPENSE : RecordType.INCOME)
       : (debt.direction === DebtDirection.LENT ? RecordType.INCOME : RecordType.EXPENSE);
 
-    const record = createDebtMovementRecord(debt, movement, recordType, note, category);
-    await this.storage.addRecord(this.accountId, record);
+    const records = createDebtMovementRecords(
+      debt,
+      movement,
+      recordType,
+      note,
+      category,
+      `${note} — ${interestNote}`,
+      interestCategory
+    );
+    for (const record of records) {
+      await this.storage.addRecord(this.accountId, record);
+    }
   }
 
   /**
@@ -104,24 +114,79 @@ export class AccountCommands {
   async updateDebtMovement(
     debtId: string,
     oldMovement: DebtMovement,
-    updatedMovement: DebtMovement
+    updatedMovement: DebtMovement,
+    note?: string,
+    category?: string,
+    interestNote?: string,
+    interestCategory?: string
   ): Promise<void> {
     await this.storage.updateDebtMovement(this.accountId, debtId, updatedMovement);
 
     const data = await this.storage.load(this.accountId);
-    const linkedRec = findLinkedRecord(
-      data.records,
-      debtId,
-      oldMovement.date,
-      oldMovement.amount,
-      oldMovement.id
+    const linkedRecords = data.records.filter(record =>
+      record.linkedId === debtId && record.linkedMovementId === oldMovement.id
+    );
+    if (linkedRecords.length === 0) {
+      const legacyRecord = findLinkedRecord(data.records, debtId, oldMovement.date, oldMovement.amount);
+      if (legacyRecord) linkedRecords.push(legacyRecord);
+    }
+    const debt = data.debts.find(record => record.id === debtId);
+    const primary = linkedRecords.find(record => record.isInternal) ?? linkedRecords[0];
+    if (!debt) return;
+
+    const recordType = updatedMovement.type === DebtMovementType.BORROW
+      ? (debt.direction === DebtDirection.LENT ? RecordType.EXPENSE : RecordType.INCOME)
+      : (debt.direction === DebtDirection.LENT ? RecordType.INCOME : RecordType.EXPENSE);
+    const interestRecord = linkedRecords.find(record => !record.isInternal);
+    const recordNote = primary?.isInternal
+      ? (note ?? primary.note)
+      : (note ?? primary?.note ?? interestRecord?.note ?? '');
+    const recordCategory = primary?.isInternal
+      ? primary.category
+      : (category ?? primary?.category ?? interestRecord?.category ?? '');
+    const replacements = createDebtMovementRecords(
+      debt,
+      updatedMovement,
+      recordType,
+      recordNote,
+      recordCategory,
+      `${recordNote} — ${interestNote ?? interestRecord?.note ?? recordNote}`,
+      interestCategory ?? interestRecord?.category ?? recordCategory
     );
 
-    if (linkedRec) {
-      linkedRec.date = updatedMovement.date;
-      linkedRec.amount = updatedMovement.amount;
-      linkedRec.time = updatedMovement.time || '';
-      await this.storage.updateRecord(this.accountId, linkedRec);
+    const remainingRecords = [...linkedRecords];
+    const remainingReplacements = [...replacements];
+    for (const existing of linkedRecords) {
+      const replacementIndex = remainingReplacements.findIndex(record =>
+        Boolean(record.isInternal) === Boolean(existing.isInternal)
+      );
+      if (replacementIndex === -1) continue;
+      const [replacement] = remainingReplacements.splice(replacementIndex, 1);
+      if (!replacement) continue;
+      const existingIndex = remainingRecords.findIndex(record => record.id === existing.id);
+      if (existingIndex !== -1) remainingRecords.splice(existingIndex, 1);
+      await this.storage.updateRecord(this.accountId, {
+        ...replacement,
+        id: existing.id,
+        createdAt: existing.createdAt,
+      });
+    }
+
+    while (remainingRecords.length > 0 && remainingReplacements.length > 0) {
+      const existing = remainingRecords.shift();
+      const replacement = remainingReplacements.shift();
+      if (!existing || !replacement) continue;
+      await this.storage.updateRecord(this.accountId, {
+        ...replacement,
+        id: existing.id,
+        createdAt: existing.createdAt,
+      });
+    }
+    for (const record of remainingRecords) {
+      await this.storage.deleteRecord(this.accountId, record.id);
+    }
+    for (const record of remainingReplacements) {
+      await this.storage.addRecord(this.accountId, record);
     }
   }
 
@@ -137,17 +202,18 @@ export class AccountCommands {
     await this.storage.deleteDebtMovement(this.accountId, debtId, movementId);
 
     const data = await this.storage.load(this.accountId);
-    const linkedRec = findLinkedRecord(
-      data.records,
-      debtId,
-      movementDate,
-      movementAmount,
-      movementId
+    const linkedRecords = data.records.filter(record =>
+      record.linkedId === debtId && record.linkedMovementId === movementId
     );
-
-    if (linkedRec) {
-      await this.storage.deleteRecord(this.accountId, linkedRec.id);
+    if (linkedRecords.length > 0) {
+      for (const record of linkedRecords) {
+        await this.storage.deleteRecord(this.accountId, record.id);
+      }
+      return;
     }
+
+    const legacyRecord = findLinkedRecord(data.records, debtId, movementDate, movementAmount);
+    if (legacyRecord) await this.storage.deleteRecord(this.accountId, legacyRecord.id);
   }
 
   /**
@@ -169,7 +235,6 @@ export class AccountCommands {
    */
   async updateDebt(
     updatedDebt: DebtRecord,
-    category: string,
     translations: { lentNote: string; borrowedNote: string }
   ): Promise<void> {
     await this.storage.updateDebt(this.accountId, updatedDebt);
@@ -196,7 +261,6 @@ export class AccountCommands {
       linkedRec.type = recordType;
       linkedRec.payer = updatedDebt.person;
       linkedRec.note = note;
-      linkedRec.category = category;
       await this.storage.updateRecord(this.accountId, linkedRec);
     }
   }
@@ -236,7 +300,7 @@ export class AccountCommands {
           payment.amount,
           translations.paymentNote.replace('{name}', credit.name),
           category,
-          true
+          false
         ));
       }
     }
@@ -283,6 +347,10 @@ export class AccountCommands {
     category: string,
     translations: CreditNoteTranslations
   ): Promise<void> {
+    const dataBefore = await this.storage.load(this.accountId);
+    const existing = dataBefore.credits.find(c => c.id === updated.id);
+    const prevDownPaymentId = existing?.downPaymentRecordId;
+
     // Built first: it may mint `updated.downPaymentRecordId` or clear a stale one.
     const downPaymentRec = this.buildDownPaymentRecord(updated, category, translations.downPaymentNote);
 
@@ -290,13 +358,19 @@ export class AccountCommands {
 
     const data = await this.storage.load(this.accountId);
 
-    // Удаляем все автогенерированные записи (isInternal === true или undefined).
+    const downPaymentIds = new Set<string>();
+    if (prevDownPaymentId) downPaymentIds.add(prevDownPaymentId);
+    if (updated.downPaymentRecordId) downPaymentIds.add(updated.downPaymentRecordId);
+    if (downPaymentRec) downPaymentIds.add(downPaymentRec.id);
+
+    // Удаляем все автогенерированные записи (isInternal !== false) и старые записи первоначального взноса.
     // Сохраняем записи с isInternal === false (вручную добавленные); запись
     // первоначального взноса пересоздаётся ниже с тем же id.
-    const updatedRecords = data.records.filter(r =>
-      r.linkedId !== updated.id ||
-      r.isInternal === false
-    );
+    const updatedRecords = data.records.filter(r => {
+      if (downPaymentIds.has(r.id)) return false;
+      if (r.linkedId !== updated.id) return true;
+      return r.isInternal === false;
+    });
 
     if (downPaymentRec) updatedRecords.push(downPaymentRec);
 
@@ -312,7 +386,7 @@ export class AccountCommands {
     // Payment records — skip dates where manual records exist
     const manualExpenseDates = new Set(
       updatedRecords
-        .filter(r => r.linkedId === updated.id && r.isInternal === false && r.type === RecordType.EXPENSE)
+        .filter(r => r.linkedId === updated.id && r.isInternal === false && r.type === RecordType.EXPENSE && !downPaymentIds.has(r.id))
         .map(r => r.date)
     );
 
@@ -326,7 +400,7 @@ export class AccountCommands {
         payment.amount,
         translations.paymentNote.replace('{name}', updated.name),
         category,
-        true
+        false
       ));
     }
 
@@ -345,44 +419,6 @@ export class AccountCommands {
    */
   async deleteCredits(creditIds: string[]): Promise<void> {
     await this.storage.deleteCreditsWithLinkedRecords(this.accountId, creditIds);
-  }
-
-  /**
-   * Recalculates credit payment schedule from scratch according to calendar dates,
-   * marks past payments as paid, and rebuilds mirrored records in records.json.
-   */
-  async recalculateCredit(
-    creditId: string,
-    category: string,
-    translations: CreditNoteTranslations
-  ): Promise<void> {
-    const data = await this.storage.load(this.accountId);
-    const credit = data.credits.find(c => c.id === creditId);
-    if (!credit) return;
-
-    // Remove all existing linked records for this credit before rebuilding
-    const remainingRecords = data.records.filter(r => r.linkedId !== credit.id);
-    await this.storage.saveAllRecords(this.accountId, remainingRecords);
-
-    const schedule = generateAnnuitySchedule({
-      originalAmount: credit.originalAmount,
-      interestRate: credit.interestRate,
-      termMonths: credit.termMonths,
-      monthlyPayment: credit.monthlyPayment,
-      startDate: credit.startDate,
-      paymentDay: credit.paymentDay,
-      existingPayments: [], // Generate completely fresh schedule
-    });
-
-    const isAllPaid = schedule.payments.length > 0 && schedule.payments.every(p => p.status === PaymentStatus.PAID);
-    const updatedCredit: CreditRecord = {
-      ...credit,
-      payments: schedule.payments,
-      currentAmount: schedule.currentAmount,
-      status: (schedule.currentAmount <= 0 || isAllPaid) ? CreditStatus.PAID : CreditStatus.ACTIVE,
-    };
-
-    await this.updateCredit(updatedCredit, category, translations);
   }
 
   // ── Deposit Commands ──────────────────────────────────────────────────────
@@ -467,7 +503,7 @@ export class AccountCommands {
   ): Promise<void> {
     await this.storage.addDepositTopUp(this.accountId, depositId, topUp);
 
-    // Top-up is an expense
+    // A top-up transfers principal into the deposit; it is not a spending expense.
     await this.storage.addRecord(this.accountId, {
       id: crypto.randomUUID(),
       createdAt: Date.now(),
@@ -480,7 +516,9 @@ export class AccountCommands {
       payer: '',
       note,
       attachmentPath: '',
+      isInternal: true,
       linkedId: depositId,
+      linkedMovementId: topUp.id,
     });
   }
 
@@ -500,8 +538,9 @@ export class AccountCommands {
       data.records,
       depositId,
       topUpDate,
-      topUpAmount
-    );
+      topUpAmount,
+      topUpId
+    ) ?? findLinkedRecord(data.records, depositId, topUpDate, topUpAmount);
 
     if (linkedRec?.type === RecordType.EXPENSE) {
       await this.storage.deleteRecord(this.accountId, linkedRec.id);
@@ -519,7 +558,7 @@ export class AccountCommands {
   ): Promise<void> {
     await this.storage.addDepositWithdrawal(this.accountId, depositId, withdrawal);
 
-    // Withdrawal is an income
+    // A withdrawal returns deposit principal; it is not earned income.
     await this.storage.addRecord(this.accountId, {
       id: crypto.randomUUID(),
       createdAt: Date.now(),
@@ -532,7 +571,9 @@ export class AccountCommands {
       payer: '',
       note,
       attachmentPath: '',
+      isInternal: true,
       linkedId: depositId,
+      linkedMovementId: withdrawal.id,
     });
   }
 
@@ -548,60 +589,14 @@ export class AccountCommands {
     await this.storage.deleteDepositWithdrawal(this.accountId, depositId, withdrawalId);
 
     const data = await this.storage.load(this.accountId);
-    const linkedRec = findLinkedRecord(data.records, depositId, withdrawalDate, withdrawalAmount);
+    const linkedRec = findLinkedRecord(data.records, depositId, withdrawalDate, withdrawalAmount, withdrawalId)
+      ?? findLinkedRecord(data.records, depositId, withdrawalDate, withdrawalAmount);
 
     if (linkedRec?.type === RecordType.INCOME) {
       await this.storage.deleteRecord(this.accountId, linkedRec.id);
     }
   }
 
-  /**
-   * Recalculates deposit accruals from scratch according to calendar dates,
-   * advances past accruals, compounds/refunds, and rebuilds mirrored records.
-   */
-  async recalculateDeposit(
-    depositId: string,
-    deps: AutoTxDeps
-  ): Promise<void> {
-    const data = await this.storage.load(this.accountId);
-    const deposit = data.deposits.find(d => d.id === depositId);
-    if (!deposit) return;
-
-    // Detect starting deposit body
-    const openingRec = data.records.find(
-      r => r.linkedId === deposit.id && r.category === deps.labels.depositOpeningCat
-    );
-    const startingAmount = openingRec ? openingRec.amount : (
-      deposit.accrualType === DepositAccrualType.CAPITALIZATION
-        ? round2(deposit.amount - sumMoney(deposit.accruals.filter(a => a.status === PaymentStatus.PAID).map(a => a.amount)))
-        : deposit.amount
-    );
-
-    // Remove all mirrored records for this deposit
-    const remainingRecords = data.records.filter(r => r.linkedId !== deposit.id);
-
-    // Reset deposit
-    const freshDeposit: DepositRecord = {
-      ...deposit,
-      amount: Math.max(0, startingAmount),
-      accruals: [],
-      status: DepositStatus.ACTIVE,
-    };
-
-    const updatedDeposits = data.deposits.map(d => d.id === depositId ? freshDeposit : d);
-
-    // Apply auto-transactions on fresh deposit
-    const result = applyAutoTransactions(
-      { ...data, records: remainingRecords, deposits: updatedDeposits },
-      deps
-    );
-
-    await this.storage.saveAllRecords(this.accountId, result.records);
-    await this.storage.saveAllDeposits(this.accountId, result.deposits);
-    if (result.changed.credits) {
-      await this.storage.saveAllCredits(this.accountId, result.credits);
-    }
-  }
 
   // ── Currency Exchange Commands ────────────────────────────────────────────
 

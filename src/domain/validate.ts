@@ -8,7 +8,7 @@ import { normalizeDateStr, normalizeTimeStr } from '../utils';
 import {
   RecordType, DebtDirection, DebtMovementType, CreditType, CreditStatus,
   DepositType, DepositStatus, DepositAccrualType, PaymentStatus, CurrencyOperationType,
-  EarlyRepaymentOption, DownPaymentType,
+  EarlyRepaymentOption, DownPaymentType, DayCountConvention,
 } from '../constants';
 
 /**
@@ -69,6 +69,7 @@ const ACCRUAL_TYPES = Object.values(DepositAccrualType);
 const SCHEDULE_STATUSES = Object.values(PaymentStatus);
 const CURRENCY_OPERATION_TYPES = Object.values(CurrencyOperationType);
 const DOWN_PAYMENT_TYPES = Object.values(DownPaymentType);
+const DAY_COUNT_CONVENTIONS = Object.values(DayCountConvention);
 
 export function parseRecord(o: Record<string, unknown>): FinanceRecord | null {
   const id = str(o.id);
@@ -87,6 +88,7 @@ export function parseRecord(o: Record<string, unknown>): FinanceRecord | null {
     attachmentPath: str(o.attachmentPath),
     isInternal: bool(o.isInternal),
     linkedId: str(o.linkedId),
+    ...(typeof o.linkedMovementId === 'string' ? { linkedMovementId: o.linkedMovementId } : {}),
     ...(typeof o.exchangeRate === 'number' ? { exchangeRate: o.exchangeRate } : {}),
   };
 }
@@ -98,6 +100,7 @@ function parseMovement(o: Record<string, unknown>): DebtMovement | null {
     id,
     type: oneOf(o.type, MOVEMENT_TYPES, DebtMovementType.BORROW),
     amount: num(o.amount),
+    ...(typeof o.interestAmount === 'number' ? { interestAmount: num(o.interestAmount) } : {}),
     date: normalizeDateStr(str(o.date)),
     time: normalizeTimeStr(str(o.time)),
     createdAt: num(o.createdAt),
@@ -170,6 +173,9 @@ export function parseCredit(o: Record<string, unknown>): CreditRecord | null {
     ...(typeof o.paymentDay === 'number' ? { paymentDay: num(o.paymentDay) } : {}),
     ...(typeof o.isEscrow === 'boolean' ? { isEscrow: bool(o.isEscrow) } : {}),
     ...(typeof o.attachmentPath === 'string' ? { attachmentPath: str(o.attachmentPath) } : {}),
+    ...(typeof o.dayCountConvention === 'string'
+      ? { dayCountConvention: oneOf(o.dayCountConvention, DAY_COUNT_CONVENTIONS, DayCountConvention.ACTUAL) }
+      : {}),
   };
 }
 

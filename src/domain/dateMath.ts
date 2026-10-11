@@ -1,3 +1,5 @@
+import { DAYS_IN_YEAR, DAYS_IN_LEAP_YEAR } from '../types';
+
 const DATE_STR_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
 
 export const MONTHS_IN_YEAR = 12;
@@ -115,7 +117,7 @@ export function isoWeekRange(year: number, week: number): { from: string; to: st
  * Used for precise interest calculations that need actual/365 or actual/366 day count convention.
  */
 export function daysInYear(year: number): number {
-  return isLeapYear(year) ? 366 : 365;
+  return isLeapYear(year) ? DAYS_IN_LEAP_YEAR : DAYS_IN_YEAR;
 }
 
 /**

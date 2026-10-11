@@ -2,13 +2,15 @@ import { App, Notice } from 'obsidian';
 import { FinanceBaseModal } from '../ui/FinanceBaseModal';
 import { ViewContext } from '../context';
 import { CreditRecord, CREDIT_PAYMENT_PAGE_SIZE } from '../types';
-import { CreditStatus, PaymentStatus, CSS_CLASS } from '../constants';
+import { CreditStatus, PaymentStatus, CSS_CLASS, DayCountConvention } from '../constants';
 import {
   calculateRemainingPrincipal,
   calculateTotalInterestPaid,
   calculateCreditEndDate,
   getCreditTypeLabel,
   calculatePaymentBreakdown,
+  getLastPaidPaymentDate,
+  type PaymentPeriod,
 } from '../domain/creditCalculations';
 import { fmtDate } from '../utils';
 import { renderProgressBar, renderPaginatedSchedule, renderPagination } from '../ui/tabHelpers';
@@ -180,7 +182,22 @@ export class CreditDetailModal extends FinanceBaseModal {
       title: `💰 ${this.tr.paymentLabel} — ${this.credit.name}`,
       credit: this.credit,
       onSave: async payment => {
-        const breakdown = calculatePaymentBreakdown(this.credit.currentAmount, payment.amount, this.credit.interestRate);
+        let period: PaymentPeriod | undefined;
+        const convention = this.credit.dayCountConvention ?? DayCountConvention.ACTUAL;
+        if (convention === DayCountConvention.ACTUAL) {
+          const fromDate = getLastPaidPaymentDate(this.credit);
+          const toDate = payment.dueDate;
+          if (fromDate < toDate) {
+            period = { fromDate, toDate };
+          }
+        }
+        const breakdown = calculatePaymentBreakdown(
+          this.credit.currentAmount,
+          payment.amount,
+          this.credit.interestRate,
+          false,
+          period
+        );
         payment.principalPart = breakdown.principalPart;
         payment.interestPart = breakdown.interestPart;
         payment.remainingDebt = breakdown.remainingDebt;

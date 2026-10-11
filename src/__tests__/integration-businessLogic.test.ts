@@ -115,7 +115,7 @@ describe('Business Logic Integration', () => {
       await commands.updateCredit(credit, 'loan_payment', TR);
 
       const data = await storage.load(accountId);
-      const linked = data.records.filter(r => r.linkedId === 'cr-1' && r.type === RecordType.EXPENSE && r.isInternal);
+      const linked = data.records.filter(r => r.linkedId === 'cr-1' && r.type === RecordType.EXPENSE && !r.isInternal);
       expect(linked).toHaveLength(1);
       expect(linked[0]!.date).toBe('2026-02-01');
       expect(linked[0]!.amount).toBe(10_000);
@@ -352,14 +352,14 @@ describe('Business Logic Integration', () => {
       expect(/^[a-f0-9]{12}$/.test(id)).toBe(true);
     });
 
-    it('createCreditPaymentRecord создаёт internal expense', () => {
+    it('createCreditPaymentRecord создаёт external expense', () => {
       const credit = mkCredit({ id: 'cr-1', bankName: 'Банк' });
       const rec = createCreditPaymentRecord(credit, '2026-02-01', 10_000, 'Платёж', 'loan_payment');
 
       expect(rec.type).toBe(RecordType.EXPENSE);
       expect(rec.amount).toBe(10_000);
       expect(rec.linkedId).toBe('cr-1');
-      expect(rec.isInternal).toBe(true);
+      expect(rec.isInternal).toBe(false);
       expect(rec.payer).toBe('Банк');
     });
 

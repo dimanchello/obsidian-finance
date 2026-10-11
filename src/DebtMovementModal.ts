@@ -12,6 +12,7 @@ export interface DebtMovementOptions {
   type:            DebtMovementType;
   movement?:       DebtMovement;
   remainingAmount?: number;
+  allowInterestAmount?: boolean;
   currency?:       string;
   onSave:          (m: DebtMovement) => void | Promise<void>;
 }
@@ -19,6 +20,7 @@ export interface DebtMovementOptions {
 export class DebtMovementModal extends EntityModal<DebtMovement> {
   private o: DebtMovementOptions;
   private amountInput!: HTMLInputElement;
+  private interestAmountInput: HTMLInputElement | undefined;
 
   constructor(app: App, opts: DebtMovementOptions) {
     super(app, {
@@ -57,6 +59,22 @@ export class DebtMovementModal extends EntityModal<DebtMovement> {
     });
     this.amountInput = amountHandle.input;
 
+    if (this.o.type === DebtMovementType.REPAY && this.o.allowInterestAmount) {
+      const interestGroup = form.createDiv('finance-field-group');
+      interestGroup.createEl('label', {
+        text: this.tr.repaymentInterestLabel,
+        cls: CSS_CLASS.FINANCE_FIELD_LABEL,
+      });
+      this.interestAmountInput = createAmountInput(interestGroup, {
+        value: this.entity.interestAmount,
+        onChange: value => { this.entity.interestAmount = value; },
+      }).input;
+      interestGroup.createEl('p', {
+        text: this.tr.repaymentInterestDesc,
+        cls: 'finance-field-hint',
+      });
+    }
+
     // ── Full repayment link (only for repay type) ────────────────────────
     const remaining = this.o.remainingAmount;
     if (this.o.type === DebtMovementType.REPAY && remaining !== undefined && remaining > 0) {
@@ -88,11 +106,20 @@ export class DebtMovementModal extends EntityModal<DebtMovement> {
   protected validate(): string | null {
     const result = validatePositiveAmount(this.amountInput.value, this.tr.invalidAmount);
     if ('error' in result) return result.error;
+    if (this.interestAmountInput && parseAmount(this.interestAmountInput.value) > parseAmount(this.amountInput.value)) {
+      return this.tr.interestExceedsRepayment;
+    }
     return null;
   }
 
   protected collectData(): DebtMovement {
-    return { ...this.entity, amount: parseAmount(this.amountInput.value) };
+    return {
+      ...this.entity,
+      amount: parseAmount(this.amountInput.value),
+      ...(this.interestAmountInput
+        ? { interestAmount: parseAmount(this.interestAmountInput.value) }
+        : {}),
+    };
   }
 
   protected override onFormReady(): void { this.amountInput.focus(); }
