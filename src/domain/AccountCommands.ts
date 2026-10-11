@@ -18,11 +18,7 @@ import {
   createDepositRefundRecord,
   findLinkedRecord,
 } from './linkedRecords';
-import { RecordType, DebtDirection, DebtMovementType, CreditType, CreditStatus, PaymentStatus, DepositStatus, DayCountConvention } from '../constants';
-import { generateAnnuitySchedule } from './creditCalculations';
-import { applyAutoTransactions, type AutoTxDeps } from './autoTransactions';
-import { sumMoney, round2 } from './money';
-import { getDepositInitialAmount } from './depositCalculations';
+import { RecordType, DebtDirection, DebtMovementType, CreditType, PaymentStatus, DepositStatus } from '../constants';
 
 /**
  * AccountCommands provides transactional operations for account entities.
@@ -304,7 +300,7 @@ export class AccountCommands {
           payment.amount,
           translations.paymentNote.replace('{name}', credit.name),
           category,
-          true
+          false
         ));
       }
     }
@@ -351,6 +347,10 @@ export class AccountCommands {
     category: string,
     translations: CreditNoteTranslations
   ): Promise<void> {
+    const dataBefore = await this.storage.load(this.accountId);
+    const existing = dataBefore.credits.find(c => c.id === updated.id);
+    const prevDownPaymentId = existing?.downPaymentRecordId;
+
     // Built first: it may mint `updated.downPaymentRecordId` or clear a stale one.
     const downPaymentRec = this.buildDownPaymentRecord(updated, category, translations.downPaymentNote);
 
@@ -358,13 +358,19 @@ export class AccountCommands {
 
     const data = await this.storage.load(this.accountId);
 
-    // Удаляем все автогенерированные записи (isInternal === true или undefined).
+    const downPaymentIds = new Set<string>();
+    if (prevDownPaymentId) downPaymentIds.add(prevDownPaymentId);
+    if (updated.downPaymentRecordId) downPaymentIds.add(updated.downPaymentRecordId);
+    if (downPaymentRec) downPaymentIds.add(downPaymentRec.id);
+
+    // Удаляем все автогенерированные записи (isInternal !== false) и старые записи первоначального взноса.
     // Сохраняем записи с isInternal === false (вручную добавленные); запись
     // первоначального взноса пересоздаётся ниже с тем же id.
-    const updatedRecords = data.records.filter(r =>
-      r.linkedId !== updated.id ||
-      r.isInternal === false
-    );
+    const updatedRecords = data.records.filter(r => {
+      if (downPaymentIds.has(r.id)) return false;
+      if (r.linkedId !== updated.id) return true;
+      return r.isInternal === false;
+    });
 
     if (downPaymentRec) updatedRecords.push(downPaymentRec);
 
@@ -380,7 +386,7 @@ export class AccountCommands {
     // Payment records — skip dates where manual records exist
     const manualExpenseDates = new Set(
       updatedRecords
-        .filter(r => r.linkedId === updated.id && r.isInternal === false && r.type === RecordType.EXPENSE)
+        .filter(r => r.linkedId === updated.id && r.isInternal === false && r.type === RecordType.EXPENSE && !downPaymentIds.has(r.id))
         .map(r => r.date)
     );
 
@@ -394,7 +400,7 @@ export class AccountCommands {
         payment.amount,
         translations.paymentNote.replace('{name}', updated.name),
         category,
-        true
+        false
       ));
     }
 
@@ -413,48 +419,6 @@ export class AccountCommands {
    */
   async deleteCredits(creditIds: string[]): Promise<void> {
     await this.storage.deleteCreditsWithLinkedRecords(this.accountId, creditIds);
-  }
-
-  /**
-   * Recalculates credit payment schedule from scratch according to calendar dates,
-   * marks past payments as paid, and rebuilds mirrored records in records.json.
-   */
-  async recalculateCredit(
-    creditId: string,
-    category: string,
-    translations: CreditNoteTranslations
-  ): Promise<void> {
-    const data = await this.storage.load(this.accountId);
-    const credit = data.credits.find(c => c.id === creditId);
-    if (!credit) return;
-
-    // Keep user-created linked records; updateCredit replaces generated mirrors itself.
-    const remainingRecords = data.records.filter(
-      r => r.linkedId !== credit.id || r.isInternal === false
-    );
-    await this.storage.saveAllRecords(this.accountId, remainingRecords);
-
-    const schedule = generateAnnuitySchedule({
-      originalAmount: credit.originalAmount,
-      interestRate: credit.interestRate,
-      termMonths: credit.termMonths,
-      monthlyPayment: credit.monthlyPayment,
-      startDate: credit.startDate,
-      paymentDay: credit.paymentDay,
-      existingPayments: [], // Generate completely fresh schedule
-      dayCountConvention: credit.dayCountConvention ?? DayCountConvention.ACTUAL,
-    });
-
-    const isAllPaid = schedule.payments.length > 0 && schedule.payments.every(p => p.status === PaymentStatus.PAID);
-    const updatedCredit: CreditRecord = {
-      ...credit,
-      dayCountConvention: credit.dayCountConvention ?? DayCountConvention.ACTUAL,
-      payments: schedule.payments,
-      currentAmount: schedule.currentAmount,
-      status: (schedule.currentAmount <= 0 || isAllPaid) ? CreditStatus.PAID : CreditStatus.ACTIVE,
-    };
-
-    await this.updateCredit(updatedCredit, category, translations);
   }
 
   // ── Deposit Commands ──────────────────────────────────────────────────────
@@ -633,69 +597,6 @@ export class AccountCommands {
     }
   }
 
-  /**
-   * Recalculates deposit accruals from scratch according to calendar dates,
-   * advances past accruals, compounds/refunds, and rebuilds mirrored records.
-   */
-  async recalculateDeposit(
-    depositId: string,
-    deps: AutoTxDeps
-  ): Promise<void> {
-    const data = await this.storage.load(this.accountId);
-    const deposit = data.deposits.find(d => d.id === depositId);
-    if (deposit?.status !== DepositStatus.ACTIVE) return;
-
-    // Detect starting deposit body
-    const openingRec = data.records.find(
-      r => r.linkedId === deposit.id && r.category === deps.labels.depositOpeningCat
-    );
-    const startingAmount = openingRec?.amount ?? getDepositInitialAmount(deposit);
-
-    const movementIds = new Set([
-      ...(deposit.topUps ?? []).map(topUp => topUp.id),
-      ...(deposit.withdrawals ?? []).map(withdrawal => withdrawal.id),
-    ]);
-    const movementKeys = new Set([
-      ...(deposit.topUps ?? []).map(topUp => `${topUp.date}|${RecordType.EXPENSE}|${topUp.amount}`),
-      ...(deposit.withdrawals ?? []).map(withdrawal => `${withdrawal.date}|${RecordType.INCOME}|${withdrawal.amount}`),
-    ]);
-    const generatedCategories = new Set([
-      deps.labels.depositOpeningCat,
-      deps.labels.depositInterestCat,
-      deps.labels.depositRefundCat,
-    ]);
-    const remainingRecords = data.records.filter(record => {
-      if (record.linkedId !== deposit.id) return true;
-      const hasMovementId = record.linkedMovementId !== undefined && movementIds.has(record.linkedMovementId);
-      const legacyMovementKey = `${record.date}|${record.type}|${record.amount}`;
-      const isLegacyMovement = record.linkedMovementId === undefined && movementKeys.has(legacyMovementKey);
-      return hasMovementId || isLegacyMovement || !generatedCategories.has(record.category);
-    });
-
-    const movementDelta = sumMoney((deposit.topUps ?? []).map(topUp => topUp.amount))
-      - sumMoney((deposit.withdrawals ?? []).map(withdrawal => withdrawal.amount));
-
-    // Reset deposit
-    const freshDeposit: DepositRecord = {
-      ...deposit,
-      amount: round2(Math.max(0, startingAmount + movementDelta)),
-      accruals: [],
-    };
-
-    const updatedDeposits = data.deposits.map(d => d.id === depositId ? freshDeposit : d);
-
-    // Apply auto-transactions on fresh deposit
-    const result = applyAutoTransactions(
-      { ...data, records: remainingRecords, deposits: updatedDeposits },
-      deps
-    );
-
-    await this.storage.saveAllRecords(this.accountId, result.records);
-    await this.storage.saveAllDeposits(this.accountId, result.deposits);
-    if (result.changed.credits) {
-      await this.storage.saveAllCredits(this.accountId, result.credits);
-    }
-  }
 
   // ── Currency Exchange Commands ────────────────────────────────────────────
 

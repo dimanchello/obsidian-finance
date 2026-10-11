@@ -20,6 +20,7 @@ export class DataTable<T> {
   private selectedIds = new Set<string>();
   private expandedId: string | null = null;
   private filterPanel: FilterPanel;
+  private contentHost: HTMLElement | null = null;
 
   constructor(spec: TableSpec<T>) {
     this.spec = spec;
@@ -29,15 +30,23 @@ export class DataTable<T> {
       spec.filterControls,
       spec.sortFields,
       spec.state,
-      () => {
+      (fullRerender = false) => {
         spec.onFilterChange();
-        spec.rerender();
+        if (fullRerender) {
+          spec.rerender();
+        } else {
+          this.updateContentOnly();
+        }
       }
     );
   }
 
   private get ctx(): ViewContext { return this.spec.ctx; }
   private get tr() { return this.ctx.tr; }
+
+  destroy(): void {
+    this.filterPanel.destroy();
+  }
 
   render(host: HTMLElement): void {
     this.spec.renderStats(host);
@@ -50,6 +59,20 @@ export class DataTable<T> {
     filtersEl.toggleClass('is-hidden', !this.filtersOpen);
     if (this.filtersOpen) this.filterPanel.render(filtersEl);
 
+    this.contentHost = host.createDiv('finance-table-content');
+    this.renderContent(this.contentHost);
+  }
+
+  private updateContentOnly(): void {
+    if (this.contentHost?.isConnected) {
+      this.contentHost.empty();
+      this.renderContent(this.contentHost);
+    } else {
+      this.spec.rerender();
+    }
+  }
+
+  private renderContent(host: HTMLElement): void {
     if (!this.spec.hasAnyItems()) {
       const { emptyState } = this.spec;
       this.renderEmpty(host, typeof emptyState === 'function' ? emptyState() : emptyState);
@@ -91,17 +114,6 @@ export class DataTable<T> {
     }
 
     if (totalPages > 1) this.renderPaginationEl(paginationEl, totalPages, page);
-
-    // Restore focus to search input after re-render
-    const lastFocusedSearch = this.filterPanel.getLastFocusedSearch();
-    if (lastFocusedSearch) {
-      const activeEl = document.activeElement;
-      if (!activeEl?.matches('input')) {
-        lastFocusedSearch.focus();
-        const len = lastFocusedSearch.value.length;
-        lastFocusedSearch.setSelectionRange(len, len);
-      }
-    }
   }
 
   private renderEmpty(host: HTMLElement, spec: EmptyStateSpec): void {
@@ -208,14 +220,14 @@ export class DataTable<T> {
   private toggleSelected(id: string): void {
     if (this.selectedIds.has(id)) this.selectedIds.delete(id);
     else this.selectedIds.add(id);
-    this.spec.rerender();
+    this.updateContentOnly();
   }
 
   private toggleExpanded(id: string): void {
     this.expandedId = this.expandedId === id ? null : id;
     this.spec.state.setExpandedId?.(this.expandedId);
     if (this.spec.state.setExpandedId) this.ctx.saveState();
-    this.spec.rerender();
+    this.updateContentOnly();
   }
 
   private renderTable(container: HTMLElement, pageItems: T[]): void {
@@ -226,7 +238,7 @@ export class DataTable<T> {
       this.expandedId,
       (id) => this.toggleSelected(id),
       (id) => this.toggleExpanded(id),
-      () => this.spec.rerender()
+      () => this.updateContentOnly()
     );
     renderer.render(container, pageItems);
   }
@@ -251,7 +263,7 @@ export class DataTable<T> {
       isMobile: this.ctx.isMobile,
       onPageChange: page => {
         this.spec.state.setPage(page);
-        this.spec.rerender();
+        this.updateContentOnly();
       },
     });
   }

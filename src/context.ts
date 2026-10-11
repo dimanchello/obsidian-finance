@@ -88,18 +88,16 @@ export class ViewContext {
     const recs = this._data.records;
 
     // Single-pass accumulation (4× faster than multiple filter+reduce)
-    let inc = 0, exp = 0, totalInc = 0, totalExp = 0;
+    let inc = 0, exp = 0;
     for (const r of recs) {
       if (isFutureTransaction(r)) continue;
       if (r.type === RecordType.INCOME) {
-        totalInc += r.amount;
         if (!r.isInternal) inc += r.amount;
       } else if (r.type === RecordType.EXPENSE) {
-        totalExp += r.amount;
         if (!r.isInternal) exp += r.amount;
       }
     }
-    const bal = totalInc - totalExp;
+    const bal = inc - exp;
 
     const el = container.createDiv('finance-stats-container');
     const items: StatCardItem[] = [

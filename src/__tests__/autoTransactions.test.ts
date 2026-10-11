@@ -146,7 +146,7 @@ describe('applyAutoTransactions — дедупликация', () => {
     expect(res.records.filter(r => r.type === RecordType.EXPENSE)).toHaveLength(1);
   });
 
-  it('помечает автоматически созданный платёж по кредиту внутренним', () => {
+  it('помечает автоматически созданный платёж по кредиту внешним расходом', () => {
     const data = mkData({
       credits: [mkCredit({ payments: [
         { id: 'p1', amount: 9_000, dueDate: '2026-02-15', status: PaymentStatus.PAID, paidDate: '2026-02-15' },
@@ -156,7 +156,7 @@ describe('applyAutoTransactions — дедупликация', () => {
     const res = applyAutoTransactions(data, mkDeps('2026-02-20'));
     const payment = res.records.find(r => r.category === LABELS.creditDefaultCat);
 
-    expect(payment?.isInternal).toBe(true);
+    expect(payment?.isInternal).toBe(false);
   });
 
   it('не считает дублем запись без linkedId', () => {

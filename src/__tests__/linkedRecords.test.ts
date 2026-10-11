@@ -712,7 +712,7 @@ describe('linkedRecords', () => {
       expect(record.linkedId).toBe('credit-1');
       expect(record.type).toBe(RecordType.EXPENSE);
       expect(record.amount).toBe(20000);
-      expect(record.isInternal).toBe(true);
+      expect(record.isInternal).toBe(false);
     });
 
     it('creates deposit refund record', () => {

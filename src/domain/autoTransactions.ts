@@ -231,7 +231,7 @@ function processCredit(
       payer: credit.bankName,
       note: `${deps.labels.creditPaymentNote} "${credit.name}"`,
       linkedId: credit.id,
-      isInternal: true,
+      isInternal: false,
     }, deps);
   }
 

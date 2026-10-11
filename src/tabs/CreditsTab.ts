@@ -69,7 +69,6 @@ export class CreditsTab {
           { icon: '💰', title: this.tr.addMovement, onClick: () => this.openAddCreditPaymentModal(c) },
           { icon: '⚡', title: this.tr.earlyRepayment, onClick: () => this.openEarlyRepaymentModal(c) },
         ] : []),
-        { icon: '🔄', title: this.tr.recalculate, onClick: () => this.confirmRecalculateCredit(c) },
         { icon: '✏️', title: this.tr.edit, onClick: () => this.openEditCreditModal(c) },
         { icon: '🗑️', title: this.tr.delete, onClick: () => this.confirmDeleteCredit(c), cls: CSS_CLASS.FINANCE_DELETE_BTN },
       ],
@@ -354,20 +353,6 @@ export class CreditsTab {
       paymentNote: this.tr.creditPaymentNote,
       downPaymentNote: this.tr.downPaymentNotePrefix,
     };
-  }
-
-  private confirmRecalculateCredit(credit: CreditRecord): void {
-    const displayName = credit.name?.trim() || credit.bankName?.trim() || this.typeLabel(credit);
-    new ConfirmModal(
-      this.ctx.app,
-      this.tr.recalculateConfirmCredit.replace(/\{name\}/g, displayName),
-      async () => {
-        await this.commands.recalculateCredit(credit.id, this.tr.creditDefaultCat, this.creditNotes());
-        await this.reload(this.tr.recalculatedNotice);
-      },
-      this.tr.recalculate,
-      false
-    ).open();
   }
 
   private openNewCreditModal(): void {

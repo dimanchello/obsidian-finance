@@ -377,12 +377,8 @@ export interface Translations {
   debtRepayNote: string;
   debtBorrowMoreNote: string;
   planned: string;
-  recalculate: string;
   giveMore: string;
   debtGiveMoreNote: string;
-  recalculateConfirmCredit: string;
-  recalculateConfirmDeposit: string;
-  recalculatedNotice: string;
   remainingCreditLabel: string;
   monthlyPaymentLabel: string;
   remainingPaymentsLabel: string;
@@ -1004,12 +1000,8 @@ const ru: Translations = {
   debtRepayNote: 'Возврат долга',
   debtBorrowMoreNote: 'Дополнительно взято',
   planned: 'Запланировано',
-  recalculate: 'Пересчитать',
   giveMore: '➕ Дать ещё',
   debtGiveMoreNote: 'Дополнительно дано',
-  recalculateConfirmCredit: 'Вы уверены, что хотите пересчитать график платежей по кредиту «{name}»? Все текущие платежи будут удалены и созданы заново в соответствии с календарем.',
-  recalculateConfirmDeposit: 'Вы уверены, что хотите пересчитать начисления по вкладу «{name}»? Все начисления процентов будут удалены и созданы заново в соответствии с календарем.',
-  recalculatedNotice: 'Перерасчет успешно выполнен',
   remainingCreditLabel: 'Остаток кредита',
   monthlyPaymentLabel: 'Ежемесячный платёж',
   remainingPaymentsLabel: 'Осталось платежей',
@@ -1676,12 +1668,8 @@ const en: Translations = {
   debtRepayNote: 'Debt repayment',
   debtBorrowMoreNote: 'Additional borrowing',
   planned: 'Planned',
-  recalculate: 'Recalculate',
   giveMore: '➕ Lend more',
   debtGiveMoreNote: 'Additional lending',
-  recalculateConfirmCredit: 'Are you sure you want to recalculate the payment schedule for credit "{name}"? All existing payments will be deleted and recreated according to the calendar.',
-  recalculateConfirmDeposit: 'Are you sure you want to recalculate accruals for deposit "{name}"? All existing accruals will be deleted and recreated according to the calendar.',
-  recalculatedNotice: 'Recalculated successfully',
   remainingCreditLabel: 'Remaining credit',
   monthlyPaymentLabel: 'Monthly payment',
   remainingPaymentsLabel: 'Remaining payments',

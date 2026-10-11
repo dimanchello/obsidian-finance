@@ -285,7 +285,7 @@ export function createCreditPaymentRecord(
   paymentAmount: number,
   note: string,
   category: string,
-  isInternal = true
+  isInternal = false
 ): FinanceRecord {
   return createLinkedRecord({
     entityId: credit.id,
