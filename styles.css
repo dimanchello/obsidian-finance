@@ -571,6 +571,7 @@
 .finance-sum-sep     { color: var(--text-faint); }
 
 /* ── Table ──────────────────────────────────────────────────────────────────── */
+.finance-table-content    { width: 100%; box-sizing: border-box; min-width: 0; }
 .finance-table-wrapper    { width: 100%; box-sizing: border-box; min-width: 0; }
 .finance-table-container  { width: 100%; box-sizing: border-box; min-width: 0; }
 .finance-table-scroll {

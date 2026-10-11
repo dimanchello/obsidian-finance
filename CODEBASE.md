@@ -286,10 +286,10 @@ Debts, credits, deposits do NOT have separate ledgers — they materialize Finan
 - `AccountCommands` class
 - `CreditNoteTranslations` — `receiptNote` / `paymentNote` / `downPaymentNote`, all required
 - `addDebt()`, `updateDebt()`, `addDebtMovement()`, `updateDebtMovement()`, `deleteDebtMovement()`, `deleteDebt()`, `deleteDebts()`
-- `addCredit()`, `updateCredit()`, `recalculateCredit()`, `deleteCredit()`, `deleteCredits()`
+- `addCredit()`, `updateCredit()`, `deleteCredit()`, `deleteCredits()`
 - `buildDownPaymentRecord()` (private) — mints/clears `credit.downPaymentRecordId` and builds the
   down-payment mirror record; called by `addCredit`/`updateCredit` *before* the credit is stored
-- `closeDeposit()`, `deleteDeposit()`, `deleteDeposits()`, `recalculateDeposit()`, `addDepositTopUp()`, `deleteDepositTopUp()`, `addDepositWithdrawal()`, `deleteDepositWithdrawal()`
+- `closeDeposit()`, `deleteDeposit()`, `deleteDeposits()`, `addDepositTopUp()`, `deleteDepositTopUp()`, `addDepositWithdrawal()`, `deleteDepositWithdrawal()`
 - `deleteExchange()`, `deleteExchanges()`
 
 **Note:** `addCredit`/`updateCredit` take a `CreditNoteTranslations` (all three notes
