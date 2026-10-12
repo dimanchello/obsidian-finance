@@ -1,5 +1,5 @@
-import { VaultAdapter } from './VaultAdapter';
-import { AccountFiles, AccountFileKind } from './AccountFiles';
+import type { IStorageBackend } from './interfaces/IStorageBackend';
+import type { AccountFiles, AccountFileKind } from './AccountFiles';
 
 export const FLUSH_DEBOUNCE_MS = 500;
 
@@ -20,10 +20,21 @@ export class FileStore<T> {
     this.onDirty = onDirty;
   }
 
-  async load(vault: VaultAdapter, files: AccountFiles, accountId: string): Promise<T> {
+  async load(backend: IStorageBackend, files: AccountFiles, accountId: string): Promise<T> {
     const cached = this.cache.get(accountId);
     if (cached !== undefined) return cached;
-    const value = this.parse(await vault.readJson(files.file(accountId, this.kind)));
+    const path = files.file(accountId, this.kind);
+    const raw = await backend.read(path);
+    let parsed: unknown = null;
+    if (raw) {
+      try {
+        parsed = JSON.parse(raw);
+      } catch (e) {
+        console.error(`[FT-storage] ${path} parse error:`, e);
+        parsed = null;
+      }
+    }
+    const value = this.parse(parsed);
     this.cache.set(accountId, value);
     return value;
   }
@@ -70,12 +81,12 @@ export class FileStore<T> {
     this.set(accountId, filtered as unknown as T);
   }
 
-  async flush(vault: VaultAdapter, files: AccountFiles): Promise<void> {
+  async flush(backend: IStorageBackend, files: AccountFiles): Promise<void> {
     for (const accountId of this.dirty) {
       const value = this.cache.get(accountId);
       if (value === undefined) continue;
-      await vault.mkdir(files.folder(accountId));
-      await vault.atomicWrite(files.file(accountId, this.kind), JSON.stringify(value));
+      await backend.ensureDir(files.folder(accountId));
+      await backend.write(files.file(accountId, this.kind), JSON.stringify(value));
     }
     this.dirty.clear();
   }
