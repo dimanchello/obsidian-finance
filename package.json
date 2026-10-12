@@ -15,6 +15,7 @@
   "license": "MIT",
   "devDependencies": {
     "@types/node": "^20.0.0",
+    "@types/sql.js": "^1.4.11",
     "@typescript-eslint/eslint-plugin": "^8.59.4",
     "@typescript-eslint/parser": "^8.59.4",
     "@vitest/coverage-v8": "^2.1.9",
@@ -24,5 +25,8 @@
     "tslib": "^2.6.0",
     "typescript": "^5.3.0",
     "vitest": "^2.0.0"
+  },
+  "dependencies": {
+    "sql.js": "^1.10.3"
   }
 }
