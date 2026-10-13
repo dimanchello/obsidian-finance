@@ -13,6 +13,11 @@
 
 type ValueOf<T> = T[keyof T];
 
+// ── Storage ───────────────────────────────────────────────────────────────
+
+/** Current data schema version */
+export const DATA_VERSION = 1;
+
 // ── Records ───────────────────────────────────────────────────────────────
 
 export const RecordType = {

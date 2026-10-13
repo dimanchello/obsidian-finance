@@ -37,10 +37,13 @@ import { RecordType, DebtDirection, DebtMovementType, CreditType, PaymentStatus,
  * Notes for the records `addCredit`/`updateCredit` materialize.
  *
  * All three are required: `updateCredit` rebuilds every auto-generated record from
- * scratch, so a caller that omits `downPaymentNote` would silently relabel the
- * down-payment record. See {@link AccountCommands.buildDownPaymentRecord}.
+ * scratch, so if the user changed the note/category on a paid payment, we need to
+ * preserve that. The three strings should contain placeholders like %bank% and %amount%.
  */
 export interface CreditNoteTranslations {
+  creditDefaultCat: string;
+  creditPaymentNote: string;
+  creditRefundNote: string;
   receiptNote: string;
   paymentNote: string;
   downPaymentNote: string;
@@ -621,5 +624,151 @@ export class AccountCommands {
     const idSet = new Set(exchangeIds);
     const filtered = data.records.filter(r => !r.linkedId || !idSet.has(r.linkedId));
     await this.storage.saveAllRecords(this.accountId, filtered);
+  }
+
+  // ── Recalculation Commands ─────────────────────────────────────────────────
+
+  /**
+   * Recalculates credit payment schedule by rebuilding all future payments.
+   * Keeps paid payments unchanged, recreates pending ones.
+   */
+  async recalculateCredit(
+    creditId: string,
+    category: string,
+    notes: CreditNoteTranslations
+  ): Promise<void> {
+    const data = await this.storage.load(this.accountId);
+    const credit = data.credits.find(c => c.id === creditId);
+    if (!credit) return;
+
+    // Import dependencies
+    const { buildCreditSchedule } = await import('./schedule');
+    const { getTodayStr } = await import('../utils');
+    const { nanoid } = await import('nanoid');
+
+    // Rebuild schedule
+    const newPayments = buildCreditSchedule(credit, {
+      today: getTodayStr(),
+      newId: () => nanoid()
+    });
+
+    // Keep paid payments, replace pending ones
+    const paidPayments = credit.payments.filter(p => p.status === PaymentStatus.PAID);
+    const mergedPayments = [
+      ...paidPayments,
+      ...newPayments.filter(np =>
+        !paidPayments.some(pp => pp.dueDate === np.dueDate)
+      ),
+    ];
+
+    // Update credit
+    const updatedCredit: CreditRecord = {
+      ...credit,
+      payments: mergedPayments,
+    };
+
+    await this.updateCredit(updatedCredit, category, notes);
+  }
+
+  /**
+   * Recalculates deposit accrual schedule by rebuilding all future accruals.
+   * Keeps paid accruals unchanged, recreates pending ones.
+   */
+  async recalculateDeposit(
+    depositId: string,
+    deps: { today: string; labels: {
+      depositInterestCat: string;
+      depositInterestNote: string;
+      depositRefundCat: string;
+      depositRefundNote: string;
+      depositOpeningCat: string;
+      depositOpenNote: string;
+    }}
+  ): Promise<void> {
+    const data = await this.storage.load(this.accountId);
+    const deposit = data.deposits.find(d => d.id === depositId);
+    if (!deposit) return;
+
+    // Import dependencies
+    const { buildDepositSchedule } = await import('./schedule');
+    const { nanoid } = await import('nanoid');
+
+    // Rebuild schedule
+    const newAccruals = buildDepositSchedule(deposit, {
+      today: deps.today,
+      newId: () => nanoid()
+    });
+
+    // Keep paid accruals, replace pending ones
+    const paidAccruals = deposit.accruals.filter(a => a.status === PaymentStatus.PAID);
+    const mergedAccruals = [
+      ...paidAccruals,
+      ...newAccruals.filter(na =>
+        !paidAccruals.some(pa => pa.dueDate === na.dueDate)
+      ),
+    ];
+
+    // Update deposit
+    const updatedDeposit: DepositRecord = {
+      ...deposit,
+      accruals: mergedAccruals,
+    };
+
+    await this.storage.updateDeposit(this.accountId, updatedDeposit);
+
+    // Rebuild linked records: delete all, then recreate
+    const filtered = data.records.filter(r => r.linkedId !== depositId);
+
+    // Import dependencies
+    const { applyAutoTransactions } = await import('./autoTransactions');
+    const { getDepositInitialAmount } = await import('./depositCalculations');
+    const { RecordType } = await import('../constants');
+
+    // Manually create opening record (applyAutoTransactions only creates it if accruals is empty)
+    const openingRecord: FinanceRecord = {
+      id: nanoid(),
+      createdAt: Date.now(),
+      date: deposit.startDate,
+      time: new Date().toTimeString().slice(0, 5),
+      type: RecordType.EXPENSE,
+      amount: getDepositInitialAmount(deposit),
+      category: deps.labels.depositOpeningCat,
+      tag: '',
+      payer: deposit.bankName,
+      note: `${deps.labels.depositOpenNote} "${deposit.name}"`,
+      attachmentPath: '',
+      linkedId: deposit.id,
+      isInternal: true,
+    };
+
+    // Combine with existing non-linked records
+    const recordsWithOpening = [...filtered, openingRecord];
+    await this.storage.saveAllRecords(this.accountId, recordsWithOpening);
+
+    // Trigger auto-transactions to create accrual income records
+    const newData = await this.storage.load(this.accountId);
+    const result = applyAutoTransactions(newData, {
+      now: Date.now(),
+      nowTime: new Date().toTimeString().slice(0, 5),
+      today: deps.today,
+      newId: () => nanoid(),
+      labels: {
+        depositInterestCat: deps.labels.depositInterestCat,
+        depositInterestNote: deps.labels.depositInterestNote,
+        depositRefundCat: deps.labels.depositRefundCat,
+        depositRefundNote: deps.labels.depositRefundNote,
+        depositOpeningCat: deps.labels.depositOpeningCat,
+        depositOpenNote: deps.labels.depositOpenNote,
+        creditDefaultCat: '',
+        creditPaymentNote: '',
+      },
+    });
+
+    if (result.changed.records) {
+      await this.storage.saveAllRecords(this.accountId, result.records);
+    }
+    if (result.changed.deposits) {
+      await this.storage.saveAllDeposits(this.accountId, result.deposits);
+    }
   }
 }

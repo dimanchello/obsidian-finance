@@ -289,7 +289,7 @@ describe('AccountCommands', () => {
       };
 
       await commands.addCredit(credit, 'Credit', {
-        receiptNote: 'Credit receipt: "{name}"',
+        creditDefaultCat: "", creditPaymentNote: "", creditRefundNote: "", receiptNote: 'Credit receipt: "{name}"',
         paymentNote: 'Payment: "{name}"',
         downPaymentNote: 'Down payment: ',
       });
@@ -323,7 +323,7 @@ describe('AccountCommands', () => {
       };
 
       await commands.addCredit(credit, 'Credit', {
-        receiptNote: 'Credit receipt: "{name}"',
+        creditDefaultCat: "", creditPaymentNote: "", creditRefundNote: "", receiptNote: 'Credit receipt: "{name}"',
         paymentNote: 'Payment: "{name}"',
         downPaymentNote: 'Down payment: ',
       });
@@ -591,7 +591,7 @@ describe('AccountCommands', () => {
       await commands.updateCredit(
         { ...credit, name: 'Renamed Loan', interestRate: 12, note: 'Updated note' },
         'Credit',
-        { receiptNote: 'Receipt for {name}', paymentNote: 'Payment for {name}', downPaymentNote: 'Down payment: ' }
+        { creditDefaultCat: "", creditPaymentNote: "", creditRefundNote: "", receiptNote: 'Receipt for {name}', paymentNote: 'Payment for {name}', downPaymentNote: 'Down payment: ' }
       );
 
       const data = await storage.load(accountId);
@@ -906,7 +906,7 @@ describe('AccountCommands', () => {
       });
 
       await commands.addCredit(credit, 'Credit', {
-        receiptNote: 'Получен кредит "{name}"',
+        creditDefaultCat: "", creditPaymentNote: "", creditRefundNote: "", receiptNote: 'Получен кредит "{name}"',
         paymentNote: 'Платёж по кредиту "{name}"',
         downPaymentNote: 'Первоначальный взнос: ',
       });
@@ -936,7 +936,7 @@ describe('AccountCommands', () => {
       });
 
       await commands.addCredit(credit, 'Credit', {
-        receiptNote: 'Получен кредит "{name}"',
+        creditDefaultCat: "", creditPaymentNote: "", creditRefundNote: "", receiptNote: 'Получен кредит "{name}"',
         paymentNote: 'Платёж по кредиту "{name}"',
         downPaymentNote: 'Первоначальный взнос: ',
       });
@@ -984,7 +984,7 @@ describe('AccountCommands', () => {
       });
 
       await commands.updateCredit(credit, 'Credit', {
-        receiptNote: 'Получен кредит "{name}"',
+        creditDefaultCat: "", creditPaymentNote: "", creditRefundNote: "", receiptNote: 'Получен кредит "{name}"',
         paymentNote: 'Платёж по кредиту "{name}"',
         downPaymentNote: 'Первоначальный взнос: ',
       });
@@ -1027,7 +1027,7 @@ describe('AccountCommands', () => {
       });
 
       await commands.updateCredit(credit, 'Credit', {
-        receiptNote: 'Получен кредит "{name}"',
+        creditDefaultCat: "", creditPaymentNote: "", creditRefundNote: "", receiptNote: 'Получен кредит "{name}"',
         paymentNote: 'Платёж по кредиту "{name}"',
         downPaymentNote: 'Первоначальный взнос: ',
       });
@@ -1042,7 +1042,7 @@ describe('AccountCommands', () => {
       await storage.addCredit(accountId, credit);
 
       await commands.updateCredit(credit, 'Credit', {
-        receiptNote: 'Получен кредит "{name}"',
+        creditDefaultCat: "", creditPaymentNote: "", creditRefundNote: "", receiptNote: 'Получен кредит "{name}"',
         paymentNote: 'Платёж по кредиту "{name}"',
         downPaymentNote: 'Первоначальный взнос: ',
       });
@@ -1063,7 +1063,7 @@ describe('AccountCommands', () => {
       await storage.addCredit(accountId, credit);
 
       await commands.updateCredit(credit, 'Credit', {
-        receiptNote: 'Получен кредит "{name}"',
+        creditDefaultCat: "", creditPaymentNote: "", creditRefundNote: "", receiptNote: 'Получен кредит "{name}"',
         paymentNote: 'Платёж по кредиту "{name}"',
         downPaymentNote: 'Первоначальный взнос: ',
       });
@@ -1093,7 +1093,7 @@ describe('AccountCommands', () => {
       // Путь «записать платёж» / «досрочное погашение»: заметка взноса обязательна,
       // иначе запись пересоздалась бы с пустым префиксом.
       await commands.updateCredit(credit, 'Credit', {
-        receiptNote: 'Получен кредит "{name}"',
+        creditDefaultCat: "", creditPaymentNote: "", creditRefundNote: "", receiptNote: 'Получен кредит "{name}"',
         paymentNote: 'Платёж по кредиту "{name}"',
         downPaymentNote: 'Первоначальный взнос: ',
       });
@@ -1133,7 +1133,7 @@ describe('AccountCommands', () => {
       });
 
       const notes = {
-        receiptNote: 'Получен кредит "{name}"',
+        creditDefaultCat: "", creditPaymentNote: "", creditRefundNote: "", receiptNote: 'Получен кредит "{name}"',
         paymentNote: 'Платёж по кредиту "{name}"',
         downPaymentNote: 'Первоначальный взнос: ',
       };

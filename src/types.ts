@@ -409,20 +409,20 @@ export interface CreditRecord {
   monthlyPayment: number;
   termMonths: number;
   startDate: string;
-  paymentDay?: number;
+  paymentDay?: number | undefined;
   createdAt: number;
   note: string;
   status: CreditStatus;
   earlyRepaymentOption: EarlyRepaymentOption | null;
   payments: CreditPayment[];
-  purchasePrice?: number;
-  downPayment?: number;
-  downPaymentType?: DownPaymentType;
-  downPaymentValue?: number;
-  downPaymentDate?: string;
+  purchasePrice?: number | undefined;
+  downPayment?: number | undefined;
+  downPaymentType?: DownPaymentType | undefined;
+  downPaymentValue?: number | undefined;
+  downPaymentDate?: string | undefined;
   downPaymentRecordId?: string | undefined;
   isEscrow?: boolean; // funds go to developer via escrow account, not added to balance
-  attachmentPath?: string;
+  attachmentPath?: string | undefined;
   dayCountConvention?: DayCountConvention | undefined;
 }
 
@@ -487,10 +487,10 @@ export interface CurrencyExchange {
   targetAmount: number;
   exchangeRate: number;
   provider: string;
-  category?: string;
-  fee?: number;
+  category?: string | undefined;
+  fee?: number | undefined;
   note: string;
-  attachmentPath?: string;
+  attachmentPath?: string | undefined;
 }
 
 export interface CurrencyFilterState {

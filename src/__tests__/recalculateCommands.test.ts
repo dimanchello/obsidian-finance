@@ -106,7 +106,7 @@ describe('Recalculate Commands in AccountCommands', () => {
         movements: [{ ...initialMov, amount: 1500 }],
       };
 
-      await commands.updateDebt(updatedDebt, 'Debts', {
+      await commands.updateDebt(updatedDebt, {
         lentNote: 'Дано в долг',
         borrowedNote: 'Взято в долг',
       });
@@ -143,7 +143,7 @@ describe('Recalculate Commands in AccountCommands', () => {
       await storage.addCredit(accountId, credit);
 
       await commands.recalculateCredit('credit-1', 'Credit', {
-        receiptNote: 'Получен кредит {name}',
+        creditDefaultCat: "", creditPaymentNote: "", creditRefundNote: "", receiptNote: 'Получен кредит {name}',
         paymentNote: 'Платеж по кредиту {name}',
         downPaymentNote: 'Первоначальный взнос ',
       });

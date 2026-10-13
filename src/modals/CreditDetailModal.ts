@@ -171,6 +171,9 @@ export class CreditDetailModal extends FinanceBaseModal {
 
   private creditNotes(): CreditNoteTranslations {
     return {
+      creditDefaultCat: this.tr.creditDefaultCat,
+      creditPaymentNote: this.tr.creditPaymentNote,
+      creditRefundNote: this.tr.creditRefundNote,
       receiptNote: this.tr.creditReceiptNote,
       paymentNote: this.tr.creditPaymentNote,
       downPaymentNote: this.tr.downPaymentNotePrefix,

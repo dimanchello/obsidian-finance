@@ -18,9 +18,7 @@ import { parseCredits, parseDebts, parseDeposits, parseRecords, parseStringList,
 import { getTodayStr } from '../../utils';
 import { recalcFutureAccruals } from '../../domain/schedule';
 import { round2, sumMoney } from '../../domain/money';
-import { DebtMovementType } from '../../constants';
-
-export const DATA_VERSION = 1;
+import { DebtMovementType, DATA_VERSION } from '../../constants';
 
 export interface AccountMetaFile {
   version: number;

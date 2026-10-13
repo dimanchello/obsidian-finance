@@ -350,6 +350,9 @@ export class CreditsTab {
   /** Notes for the records `addCredit`/`updateCredit` materialize — all call sites share them. */
   private creditNotes(): CreditNoteTranslations {
     return {
+      creditDefaultCat: this.tr.creditDefaultCat,
+      creditPaymentNote: this.tr.creditPaymentNote,
+      creditRefundNote: this.tr.creditRefundNote,
       receiptNote: this.tr.creditReceiptNote,
       paymentNote: this.tr.creditPaymentNote,
       downPaymentNote: this.tr.downPaymentNotePrefix,

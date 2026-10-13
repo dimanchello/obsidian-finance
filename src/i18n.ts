@@ -360,6 +360,11 @@ export interface Translations {
   creditPaymentCat: string;
   creditReceiptNote: string;
   creditPaymentNote: string;
+  creditRefundNote: string;
+  recalculate: string;
+  recalculateConfirmCredit: string;
+  recalculateConfirmDeposit: string;
+  recalculatedNotice: string;
   depositDefaultCat: string;
   depositInterestCat: string;
   depositRefundCat: string;
@@ -983,6 +988,11 @@ const ru: Translations = {
   creditPaymentCat: 'Платёж по кредиту',
   creditReceiptNote: 'Получение кредита',
   creditPaymentNote: 'Платёж по кредиту',
+  creditRefundNote: 'Возврат кредита',
+  recalculate: 'Пересчитать',
+  recalculateConfirmCredit: 'Пересчитать график платежей для кредита "{name}"? Это пересоздаст все будущие платежи.',
+  recalculateConfirmDeposit: 'Пересчитать график начислений для вклада "{name}"? Это пересоздаст все будущие начисления.',
+  recalculatedNotice: 'График платежей пересчитан',
   depositDefaultCat: 'Вклад',
   depositInterestCat: 'Проценты по вкладу',
   depositRefundCat: 'Возврат вклада',
@@ -1651,6 +1661,11 @@ const en: Translations = {
   creditPaymentCat: 'Credit payment',
   creditReceiptNote: 'Credit receipt',
   creditPaymentNote: 'Credit payment',
+  creditRefundNote: 'Credit refund',
+  recalculate: 'Recalculate',
+  recalculateConfirmCredit: 'Recalculate payment schedule for credit "{name}"? This will recreate all future payments.',
+  recalculateConfirmDeposit: 'Recalculate accrual schedule for deposit "{name}"? This will recreate all future accruals.',
+  recalculatedNotice: 'Payment schedule recalculated',
   depositDefaultCat: 'Deposit',
   depositInterestCat: 'Deposit interest',
   depositRefundCat: 'Deposit refund',
