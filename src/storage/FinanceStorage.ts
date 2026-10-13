@@ -25,7 +25,7 @@ export class FinanceStorage {
 
   constructor(app: App, pluginId: string, defaultCurrency = '₽') {
     // Currently only JSON backend (SQLite will be added in Stage 5)
-    const backend = new JsonStorageBackend(app);
+    const backend = new JsonStorageBackend(pluginId, app);
     const files = new AccountFiles(pluginId);
     this.repository = new JsonAccountRepository(backend, files, defaultCurrency);
   }

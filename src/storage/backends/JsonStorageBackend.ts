@@ -1,15 +1,17 @@
-import { App, normalizePath } from 'obsidian';
+import { App } from 'obsidian';
 import type { IStorageBackend } from '../interfaces/IStorageBackend';
 import { StorageBackendType } from '../../types';
 
 /**
- * JSON file-based storage backend using Obsidian vault API.
- * Implements IStorageBackend for compatibility with the repository pattern.
+ * JSON file storage backend using Obsidian's VaultAdapter.
+ * Each entity is stored as a separate JSON file in the plugin folder.
  */
 export class JsonStorageBackend implements IStorageBackend {
   private app: App;
+  private basePath: string;
 
-  constructor(app: App) {
+  constructor(pluginId: string, app: App) {
+    this.basePath = `.obsidian/plugins/${pluginId}/data`;
     this.app = app;
   }
 
@@ -18,67 +20,69 @@ export class JsonStorageBackend implements IStorageBackend {
   }
 
   async initialize(): Promise<void> {
-    // No-op for JSON (vault already initialized)
+    // Ensure base directory exists
+    await this.ensureDir(this.basePath);
   }
 
   async close(): Promise<void> {
-    // No-op for JSON
+    // No-op for JSON backend (files are written immediately)
   }
 
   async exists(path: string): Promise<boolean> {
-    return this.app.vault.adapter.exists(path);
+    return await this.app.vault.adapter.exists(this.resolvePath(path));
   }
 
   async read(path: string): Promise<string | null> {
-    if (!(await this.exists(path))) return null;
-    try {
-      return await this.app.vault.adapter.read(path);
-    } catch (e) {
-      console.error(`[JsonBackend] Read error: ${path}`, e);
+    const fullPath = this.resolvePath(path);
+    if (!(await this.app.vault.adapter.exists(fullPath))) {
       return null;
     }
+    return await this.app.vault.adapter.read(fullPath);
   }
 
   async write(path: string, content: string): Promise<void> {
-    await this.atomicWrite(path, content);
+    const fullPath = this.resolvePath(path);
+    const dir = fullPath.substring(0, fullPath.lastIndexOf('/'));
+    await this.ensureDir(dir);
+    await this.app.vault.adapter.write(fullPath, content);
   }
 
   async delete(path: string): Promise<void> {
-    if (await this.exists(path)) {
-      await this.app.vault.adapter.remove(path);
+    const fullPath = this.resolvePath(path);
+    if (await this.app.vault.adapter.exists(fullPath)) {
+      await this.app.vault.adapter.remove(fullPath);
     }
   }
 
   async ensureDir(path: string): Promise<void> {
-    if (!(await this.exists(path))) {
-      await this.app.vault.adapter.mkdir(path);
+    const fullPath = this.resolvePath(path);
+    if (!(await this.app.vault.adapter.exists(fullPath))) {
+      await this.app.vault.adapter.mkdir(fullPath);
     }
   }
 
   async removeDir(path: string): Promise<void> {
-    if (await this.exists(path)) {
-      await this.app.vault.adapter.rmdir(path, true);
+    const fullPath = this.resolvePath(path);
+    if (await this.app.vault.adapter.exists(fullPath)) {
+      await this.app.vault.adapter.rmdir(fullPath, true);
     }
   }
 
   async listDirs(path: string): Promise<string[]> {
-    if (!(await this.exists(path))) return [];
-    return (await this.app.vault.adapter.list(path)).folders;
+    const fullPath = this.resolvePath(path);
+    if (!(await this.app.vault.adapter.exists(fullPath))) {
+      return [];
+    }
+    const entries = await this.app.vault.adapter.list(fullPath);
+    return entries.folders.map(f => f.replace(fullPath + '/', ''));
   }
 
-  // ── Internal ────────────────────────────────────────────────────────────
-
-  /**
-   * Write via a temp file + rename so an interrupted write cannot leave a truncated
-   * JSON behind — there are no backups and no migrations left to repair one.
-   */
-  private async atomicWrite(path: string, content: string): Promise<void> {
-    const a = this.app.vault.adapter;
-    const tmp = normalizePath(`${path}.tmp`);
-    await a.write(tmp, content);
-    try {
-      await a.remove(path);
-    } catch { /* first write: nothing to remove */ }
-    await a.rename(tmp, path);
+  private resolvePath(path: string): string {
+    // If path is already absolute (starts with base), return as-is
+    if (path.startsWith(this.basePath)) {
+      return path;
+    }
+    // Otherwise, prepend base path
+    return path.startsWith('/') ? `${this.basePath}${path}` : `${this.basePath}/${path}`;
   }
 }
