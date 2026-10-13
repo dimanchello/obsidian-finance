@@ -1,10 +1,9 @@
 import { SQL_TABLE, SQL_COLUMN } from '../../../constants';
-import { SQLITE_SCHEMA_VERSION } from '../../../types';
 
-/**
- * SQLite database schema DDL.
- * Single source of truth for all table and column definitions.
- */
+/** SQLite schema version */
+export const SQLITE_SCHEMA_VERSION = 1;
+
+/** SQLite schema — single source of truth */
 export const SQLITE_SCHEMA_DDL = `
 -- Version marker
 PRAGMA user_version = ${SQLITE_SCHEMA_VERSION};
@@ -234,4 +233,3 @@ CREATE TABLE ${SQL_TABLE.VIEW_STATES} (
   FOREIGN KEY (${SQL_COLUMN.ACCOUNT_ID}) REFERENCES ${SQL_TABLE.ACCOUNTS}(${SQL_COLUMN.ID}) ON DELETE CASCADE
 );
 `;
-

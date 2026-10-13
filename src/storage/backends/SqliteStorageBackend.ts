@@ -1,12 +1,12 @@
 import initSqlJs, { Database } from 'sql.js';
-import type { App } from 'obsidian';
+import { App } from 'obsidian';
 import type { IStorageBackend } from '../interfaces/IStorageBackend';
 import { StorageBackendType, SQLITE_DB_FILENAME } from '../../types';
 import { SQLITE_SCHEMA_DDL } from './sqlite/schema';
 
 /**
  * SQLite storage backend using sql.js (WebAssembly).
- * Provides a single-file database alternative to JSON files.
+ * Database is stored as a binary file in the plugin folder.
  */
 export class SqliteStorageBackend implements IStorageBackend {
   private db: Database | null = null;
@@ -24,7 +24,7 @@ export class SqliteStorageBackend implements IStorageBackend {
 
   async initialize(): Promise<void> {
     const SQL = await initSqlJs({
-      locateFile: file => `https://sql.js.org/dist/${file}`
+      locateFile: file => `https://sql.js.org/dist/${file}`,
     });
 
     const exists = await this.app.vault.adapter.exists(this.dbPath);
@@ -98,8 +98,11 @@ export class SqliteStorageBackend implements IStorageBackend {
     if (!(await this.app.vault.adapter.exists(dir))) {
       await this.app.vault.adapter.mkdir(dir);
     }
-    // Cast to ArrayBuffer for writeBinary (data.buffer is Uint8Array.buffer which is ArrayBufferLike)
-    await this.app.vault.adapter.writeBinary(this.dbPath, data.buffer as ArrayBuffer);
+    // Convert Uint8Array to ArrayBuffer (handle both ArrayBuffer and SharedArrayBuffer)
+    const buffer = data.buffer instanceof ArrayBuffer
+      ? data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength)
+      : new Uint8Array(data).buffer;
+    await this.app.vault.adapter.writeBinary(this.dbPath, buffer);
   }
 
   /** Manual flush (called by repository) */

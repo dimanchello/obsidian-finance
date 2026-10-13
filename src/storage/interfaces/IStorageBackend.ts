@@ -1,4 +1,4 @@
-import type { StorageBackendType } from '../../types';
+import { StorageBackendType } from '../../types';
 
 /**
  * Low-level storage operations.
