@@ -1,9 +1,16 @@
 import { DebtRecord } from '../types';
 import { round2, sumMoney } from './money';
-import { DebtMovementType } from '../constants';
+import { DebtDirection, DebtMovementType } from '../constants';
 import { isFutureTransaction } from './records';
 
 const PERCENT_100 = 100;
+
+export interface DebtsSummary {
+  lentRemaining: number;
+  lentCount: number;
+  borrowedRemaining: number;
+  borrowedCount: number;
+}
 
 export function getDebtRepaid(debt: DebtRecord): number {
   return sumMoney(debt.movements.filter(m => m.type === DebtMovementType.REPAY).map(m => m.amount));
@@ -55,3 +62,16 @@ export function getDebtRemaining(debt: DebtRecord, now = new Date()): number {
 export function isDebtPaidOff(debt: DebtRecord, now = new Date()): boolean {
   return getDebtRemaining(debt, now) <= 0;
 }
+
+export function calculateDebtsSummary(debts: DebtRecord[], now = new Date()): DebtsSummary {
+  const openLent = debts.filter(d => d.direction === DebtDirection.LENT && !isDebtPaidOff(d, now));
+  const openBorrowed = debts.filter(d => d.direction === DebtDirection.BORROWED && !isDebtPaidOff(d, now));
+
+  return {
+    lentRemaining: sumMoney(openLent.map(d => getDebtRemaining(d, now))),
+    lentCount: openLent.length,
+    borrowedRemaining: sumMoney(openBorrowed.map(d => getDebtRemaining(d, now))),
+    borrowedCount: openBorrowed.length,
+  };
+}
+

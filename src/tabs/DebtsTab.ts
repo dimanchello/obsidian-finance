@@ -9,7 +9,6 @@ import {
 import { DebtModal } from '../DebtModal';
 import { DebtMovementModal } from '../DebtMovementModal';
 import { ConfirmModal } from '../ConfirmModal';
-import { sumMoney } from '../domain/money';
 import { DataTable, FilterControl } from '../ui/DataTable';
 import { renderMobileCard, renderSummaryCard, compareValues, dateRangeControls } from '../ui/tabHelpers';
 import {
@@ -18,6 +17,7 @@ import {
   getDebtRemaining,
   getDebtAmountAsOf,
   isDebtPaidOff,
+  calculateDebtsSummary,
 } from '../domain/debtCalculations';
 import { AccountCommands } from '../domain/AccountCommands';
 import { CSS_CLASS, DebtDirection, DebtMovementType, EntityListTab } from '../constants';
@@ -175,24 +175,21 @@ export class DebtsTab {
     const allDebts = this.ctx.data?.debts ?? [];
     const summary = host.createDiv('finance-stats-container finance-stats-two-cols');
 
-    const lentDebts = allDebts.filter(d => d.direction === DebtDirection.LENT);
-    const borrowedDebts = allDebts.filter(d => d.direction !== DebtDirection.LENT);
-    const remainingOf = (debts: DebtRecord[]) =>
-      sumMoney(debts.map(d => getDebtRemaining(d)));
+    const { lentRemaining, lentCount, borrowedRemaining, borrowedCount } = calculateDebtsSummary(allDebts);
 
     const countSub = (count: number) => `${count} ${count === 1 ? this.tr.debtCount_one : count < PLURAL_THRESHOLD ? this.tr.debtCount_few : this.tr.debtCount_many}`;
 
     renderSummaryCard(summary, {
       icon: '💸', title: this.tr.lent,
-      main: remainingOf(lentDebts) > 0 ? this.ctx.fmt(remainingOf(lentDebts)) : '—',
-      sub: countSub(lentDebts.length),
+      main: lentRemaining > 0 ? this.ctx.fmt(lentRemaining) : '—',
+      sub: countSub(lentCount),
       mod: 'finance-stat-lent-summary'
     });
 
     renderSummaryCard(summary, {
       icon: '💳', title: this.tr.borrowed,
-      main: remainingOf(borrowedDebts) > 0 ? this.ctx.fmt(remainingOf(borrowedDebts)) : '—',
-      sub: countSub(borrowedDebts.length),
+      main: borrowedRemaining > 0 ? this.ctx.fmt(borrowedRemaining) : '—',
+      sub: countSub(borrowedCount),
       mod: 'finance-stat-borrowed-summary'
     });
   }

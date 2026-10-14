@@ -40,7 +40,7 @@ Obsidian плагин для личного финансового учёта. �
 - `autoTransactions.ts` — advances schedules to today, materializes deposit/credit records
 - `linkedRecords.ts` — creates/unlinks mirrored FinanceRecords for debts/credits/deposits
 - `schedule.ts` — builds credit payment and deposit accrual schedules
-- `creditCalculations.ts`, `debtCalculations.ts`, `depositCalculations.ts` — interest/annuity/deposit math. `creditCalculations.ts` supports actual calendar day count convention (ACT/365 / ACT/366, `DayCountConvention`) and `calculatePeriodInterest`.
+- `creditCalculations.ts`, `debtCalculations.ts`, `depositCalculations.ts` — interest/annuity/deposit math. `creditCalculations.ts` supports actual calendar day count convention (ACT/365 / ACT/366, `DayCountConvention`) and `calculatePeriodInterest`. `debtCalculations.ts` exports `calculateDebtsSummary` for open debt aggregates.
 - `overviewMetrics.ts` — dashboard calculations (savings rate, debt burden, trends).
   Trend span is a month count; `ALL_TIME_MONTHS` (0) is a sentinel meaning "span the data",
   clamped to `OVERVIEW_MAX_TREND_MONTHS`. `calcActiveDepositsProgress` returns
