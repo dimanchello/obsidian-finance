@@ -15,6 +15,7 @@ import {
   getDepositAccrued,
   getDepositProfit,
   getDepositTypeLabel,
+  getDepositCurrentAmount,
 } from '../domain/depositCalculations';
 import { sumMoney } from '../domain/money';
 import { DataTable, FilterControl } from '../ui/DataTable';
@@ -50,7 +51,7 @@ export class DepositsTab {
         { key: 'name', label: this.tr.name, cell: d => ({ text: d.name || '—' }) },
         { key: 'bank', label: this.tr.bankName, cell: d => ({ text: d.bankName || '—' }) },
         { key: 'type', label: this.tr.type, cell: d => ({ text: this.typeLabel(d) }) },
-        { key: 'amount', label: this.tr.sum, cell: d => ({ text: this.ctx.fmt(d.amount), cls: 'finance-amount-cell' }) },
+        { key: 'amount', label: this.tr.sum, cell: d => ({ text: this.ctx.fmt(getDepositCurrentAmount(d)), cls: 'finance-amount-cell' }) },
         {
           key: 'profit', label: this.tr.profitLabel,
           cell: d => {
@@ -218,7 +219,7 @@ export class DepositsTab {
 
     renderSummaryCard(summary, {
       icon: '💰', title: this.tr.activeCards,
-      main: sumMoney(activeDeposits.map(d => d.amount)) > 0 ? this.ctx.fmt(sumMoney(activeDeposits.map(d => d.amount))) : '—',
+      main: sumMoney(activeDeposits.map(d => getDepositCurrentAmount(d))) > 0 ? this.ctx.fmt(sumMoney(activeDeposits.map(d => getDepositCurrentAmount(d)))) : '—',
       sub: countSub(activeDeposits.length, sumMoney(activeDeposits.map(d => this.getDepositProfit(d)))),
       mod: 'finance-stat-deposit-active'
     });
@@ -282,7 +283,7 @@ export class DepositsTab {
 
     result.sort((a, b) => {
       let av: string | number, bv: string | number;
-      if (s.field === 'amount') { av = a.amount; bv = b.amount; }
+      if (s.field === 'amount') { av = getDepositCurrentAmount(a); bv = getDepositCurrentAmount(b); }
       else if (s.field === 'bankName') { av = a.bankName; bv = b.bankName; }
       else { av = a.startDate; bv = b.startDate; }
       return compareValues(av, bv, s.dir);
@@ -307,7 +308,7 @@ export class DepositsTab {
     }
 
     renderMobileCard(block, {
-      amountText: '+' + this.ctx.fmt(deposit.amount),
+      amountText: '+' + this.ctx.fmt(getDepositCurrentAmount(deposit)),
       amountCls: 'finance-amount-income',
       subtitle: `${deposit.bankName} · ${this.typeLabel(deposit)}`,
       details,

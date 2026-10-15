@@ -29,6 +29,12 @@ import { DebtsBreakdownChart } from '../ui/charts/DebtsBreakdownChart';
 import { DepositsOverview } from '../ui/charts/DepositsOverview';
 import { CreditsOverview } from '../ui/charts/CreditsOverview';
 import { renderStatCard } from '../ui/statCards';
+import {
+  OverviewAssetsModal,
+  OverviewLiabilitiesModal,
+  OverviewBurdenModal,
+  OverviewUpcomingPaymentsModal,
+} from '../modals/OverviewMetricModals';
 
 export class OverviewTab {
   private el: HTMLElement;
@@ -304,8 +310,16 @@ export class OverviewTab {
       netBalance >= 0 ? 'income' : 'expense',
       '💰'
     );
-    this.createKPICard(cardsWrap, this.tr.overviewAssets, this.fmt(assets), 'income', '📈');
-    this.createKPICard(cardsWrap, this.tr.overviewLiabilities, this.fmt(liabilities), 'expense', '📉');
+
+    const assetsCard = this.createKPICard(cardsWrap, this.tr.overviewAssets, this.fmt(assets), 'income', '📈');
+    this.makeKpiCardInteractive(assetsCard, this.tr.overviewAssets, () => {
+      new OverviewAssetsModal(this.ctx.app, this.ctx, data.deposits, data.exchanges, data.debts).open();
+    });
+
+    const liabilitiesCard = this.createKPICard(cardsWrap, this.tr.overviewLiabilities, this.fmt(liabilities), 'expense', '📉');
+    this.makeKpiCardInteractive(liabilitiesCard, this.tr.overviewLiabilities, () => {
+      new OverviewLiabilitiesModal(this.ctx.app, this.ctx, data.credits, data.debts).open();
+    });
 
     const burdenValue = burden !== null ? `${Math.round(burden)}%` : this.tr.noData;
     const burdenMod =
@@ -317,14 +331,34 @@ export class OverviewTab {
         ? 'warning'
         : 'income';
 
-    this.createKPICard(cardsWrap, this.tr.overviewCreditBurden, burdenValue, burdenMod, '⚖️');
-    this.createKPICard(
+    const burdenCard = this.createKPICard(cardsWrap, this.tr.overviewCreditBurden, burdenValue, burdenMod, '⚖️');
+    this.makeKpiCardInteractive(burdenCard, this.tr.overviewCreditBurden, () => {
+      new OverviewBurdenModal(this.ctx.app, this.ctx, data.credits, data.records, today).open();
+    });
+
+    const upcomingCard = this.createKPICard(
       cardsWrap,
       this.tr.overviewUpcomingPayments,
       this.fmt(upcoming),
       upcoming > 0 ? 'expense' : 'neutral',
       '📅'
     );
+    this.makeKpiCardInteractive(upcomingCard, this.tr.overviewUpcomingPayments, () => {
+      new OverviewUpcomingPaymentsModal(this.ctx.app, this.ctx, data.credits, data.debts, today).open();
+    });
+  }
+
+  private makeKpiCardInteractive(card: HTMLElement, label: string, onActivate: () => void): void {
+    card.addClass(CSS_CLASS.IS_CLICKABLE);
+    card.setAttribute('role', 'button');
+    card.setAttribute('tabindex', '0');
+    card.title = `${label} (${this.tr.overviewViewDetails})`;
+    card.addEventListener('click', onActivate);
+    card.addEventListener('keydown', (event: KeyboardEvent) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault();
+      onActivate();
+    });
   }
 
 

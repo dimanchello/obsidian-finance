@@ -53,6 +53,11 @@ describe('parseRecords', () => {
     expect(parseRecords([{ ...valid, exchangeRate: 95.5 }])[0].exchangeRate).toBe(95.5);
     expect(parseRecords([{ ...valid, exchangeRate: 'нет' }])[0].exchangeRate).toBeUndefined();
   });
+
+  it('сохраняет id движения связанной записи', () => {
+    const [record] = parseRecords([{ ...valid, linkedId: 'debt-1', linkedMovementId: 'movement-1' }]);
+    expect(record.linkedMovementId).toBe('movement-1');
+  });
 });
 
 describe('parseDebts', () => {
@@ -66,6 +71,14 @@ describe('parseDebts', () => {
     const [d] = parseDebts([valid]);
     expect(d.person).toBe('Иван');
     expect(d.movements).toHaveLength(1);
+  });
+
+  it('сохраняет сумму процентов в движении погашения', () => {
+    const [d] = parseDebts([{
+      ...valid,
+      movements: [{ ...valid.movements[0], interestAmount: 125 }],
+    }]);
+    expect(d.movements[0].interestAmount).toBe(125);
   });
 
   it('отсутствующие движения дают пустой список', () => {

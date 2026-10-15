@@ -16,6 +16,7 @@ import { renderSummaryCard } from '../ui/statCards';
 import { renderCompactTransactionCard } from '../ui/tabHelpers';
 import { matchesAnyField, matchesStringFilter, matchesDateRange } from '../domain/filterUtils';
 import { createTableStateAdapter } from './tabUtils';
+import { isFutureTransaction } from '../domain/records';
 
 export class CurrencyTab {
   private ctx: ViewContext;
@@ -38,7 +39,17 @@ export class CurrencyTab {
       itemId: e => e.id,
       hasAnyItems: () => (this.ctx.data?.exchanges.length ?? 0) > 0,
       columns: [
-        { key: 'date', label: this.tr.date, cell: e => ({ text: fmtDate(e.date, e.time) }) },
+        {
+          key: 'date', label: this.tr.date,
+          cell: e => {
+            const isFuture = isFutureTransaction(e);
+            const dateText = fmtDate(e.date, e.time);
+            return {
+              text: isFuture ? `⏳ ${dateText}` : dateText,
+              cls: isFuture ? 'finance-td-date finance-td-future' : 'finance-td-date',
+            };
+          },
+        },
         { key: 'type', label: this.tr.type, cell: e => ({ text: this.typeLabel(e.type), cls: this.typeCls(e.type) }) },
         { key: 'currency', label: this.tr.currency, cell: e => ({ text: e.targetCurrency }) },
         { key: 'amount', label: `${this.tr.sum} (${this.ctx.data?.currency ?? ''})`, cell: e => ({ text: e.type === CurrencyOperationType.ADD ? '—' : this.ctx.fmt(e.amountInAccountCurrency), cls: 'finance-amount-cell' }) },
@@ -51,7 +62,11 @@ export class CurrencyTab {
         { key: 'provider', label: this.tr.provider, cell: e => ({ text: e.provider ?? '—' }) },
         { key: 'category', label: this.tr.category, cell: e => ({ text: e.category ?? '—' }) },
       ],
-      rowCls: e => [(e.type === CurrencyOperationType.BUY || e.type === CurrencyOperationType.ADD) ? 'finance-row-income' : 'finance-row-expense'],
+      rowCls: e => {
+        const cls = [(e.type === CurrencyOperationType.BUY || e.type === CurrencyOperationType.ADD) ? 'finance-row-income' : 'finance-row-expense'];
+        if (isFutureTransaction(e)) cls.push(CSS_CLASS.FINANCE_TR_FUTURE);
+        return cls;
+      },
       rowActions: e => [
         { icon: '✏️', title: this.tr.edit, onClick: () => this.openModal(e.type, e) },
         { icon: '🗑️', title: this.tr.delete, onClick: () => this.confirmDeleteExchange(e), cls: CSS_CLASS.FINANCE_DELETE_BTN },
@@ -127,15 +142,16 @@ export class CurrencyTab {
       },
       infoBarSums: (host, filtered) => {
         const selCur = this.ctx.state.currencyFilter?.targetCurrency;
-        const fiAcc = filtered.filter(r => r.type === CurrencyOperationType.BUY || r.type === CurrencyOperationType.ADD).reduce((s, r) => s + r.amountInAccountCurrency, 0);
-        const feAcc = filtered.filter(r => r.type === CurrencyOperationType.SELL || r.type === CurrencyOperationType.SPEND).reduce((s, r) => s + r.amountInAccountCurrency, 0);
+        const currentFiltered = filtered.filter(r => !isFutureTransaction(r));
+        const fiAcc = currentFiltered.filter(r => r.type === CurrencyOperationType.BUY || r.type === CurrencyOperationType.ADD).reduce((s, r) => s + r.amountInAccountCurrency, 0);
+        const feAcc = currentFiltered.filter(r => r.type === CurrencyOperationType.SELL || r.type === CurrencyOperationType.SPEND).reduce((s, r) => s + r.amountInAccountCurrency, 0);
         
         let fiText = `↑\u00A0${this.ctx.fmt(fiAcc)}`;
         let feText = `↓\u00A0${this.ctx.fmt(feAcc)}`;
         
         if (selCur) {
-          const fiCur = filtered.filter(r => r.type === CurrencyOperationType.BUY || r.type === CurrencyOperationType.ADD).reduce((s, r) => s + r.targetAmount, 0);
-          const feCur = filtered.filter(r => r.type === CurrencyOperationType.SELL || r.type === CurrencyOperationType.SPEND).reduce((s, r) => s + r.targetAmount, 0);
+          const fiCur = currentFiltered.filter(r => r.type === CurrencyOperationType.BUY || r.type === CurrencyOperationType.ADD).reduce((s, r) => s + r.targetAmount, 0);
+          const feCur = currentFiltered.filter(r => r.type === CurrencyOperationType.SELL || r.type === CurrencyOperationType.SPEND).reduce((s, r) => s + r.targetAmount, 0);
           fiText = `↑\u00A0${fmt(fiCur, selCur)} (${this.ctx.fmt(fiAcc)})`;
           feText = `↓\u00A0${fmt(feCur, selCur)} (${this.ctx.fmt(feAcc)})`;
         }
@@ -318,6 +334,10 @@ export class CurrencyTab {
   }
 
   private renderCard(block: HTMLElement, e: CurrencyExchange): void {
+    const isFuture = isFutureTransaction(e);
+    if (isFuture) {
+      block.addClass(CSS_CLASS.FINANCE_TR_FUTURE);
+    }
     const isIncome = e.type === CurrencyOperationType.BUY || e.type === CurrencyOperationType.ADD;
     const indicator = isIncome ? '+' : '—';
     const indicatorCls = isIncome ? 'finance-indicator-income' : 'finance-indicator-expense';
@@ -341,7 +361,7 @@ export class CurrencyTab {
       subtitle,
       amountText,
       amountCls,
-      dateText: fmtDate(e.date, e.time),
+      dateText: isFuture ? `⏳ ${fmtDate(e.date, e.time)}` : fmtDate(e.date, e.time),
       deleteTitle: this.tr.delete,
       onDelete: () => this.confirmDeleteExchange(e),
     });

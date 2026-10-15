@@ -17,6 +17,7 @@ import {
   OVERVIEW_POINT_RADIUS_HOVER,
 } from '../../types';
 import { BaseChart } from './BaseChart';
+import { getTodayStr } from '../../utils';
 
 /**
  * MoneyFlowChart: визуализация доходов, расходов и чистого баланса по месяцам.
@@ -72,6 +73,7 @@ export class MoneyFlowChart extends BaseChart {
     this.renderNetPoints(svg_el, netPoints);
 
     scrollWrap.appendChild(svg_el);
+    this.scrollToCurrentOrEnd(scrollWrap, containerWidth, groups.map(g => g.label), getTodayStr());
   }
 
   private renderBars(

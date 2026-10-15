@@ -13,7 +13,7 @@ import { createAmountInput, type AmountInputHandle } from './ui/AmountInput';
 import { buildAttachmentField } from './ui/attachmentField';
 import { EntityModal } from './ui/EntityModal';
 import { buildDateField, buildNoteField, buildComboboxField } from './ui/formHelpers';
-import { CreditStatus, CSS_CLASS } from './constants';
+import { CreditStatus, CSS_CLASS, DayCountConvention } from './constants';
 import { validatePositiveAmount, validateRequiredString, validatePositiveNumber } from './domain/validators';
 
 export interface CreditModalOptions {
@@ -51,6 +51,7 @@ export class CreditModal extends EntityModal<CreditRecord> {
               dueDate: normalizeDateStr(p.dueDate),
               paidDate: p.paidDate ? normalizeDateStr(p.paidDate) : undefined,
             })),
+            dayCountConvention: opts.credit.dayCountConvention,
           }
         : {
             id: crypto.randomUUID(),
@@ -74,6 +75,7 @@ export class CreditModal extends EntityModal<CreditRecord> {
             downPaymentValue: 0,
             downPaymentDate: '',
             isEscrow: false,
+            dayCountConvention: DayCountConvention.ACTUAL,
           },
       isEdit: !!opts.credit,
       onSave: opts.onSave,
@@ -389,11 +391,14 @@ export class CreditModal extends EntityModal<CreditRecord> {
   }
 
   protected collectData(): CreditRecord {
+    const initial = this.o.credit;
+    const hadConvention = initial?.dayCountConvention !== undefined;
     const credit: CreditRecord = {
       ...this.entity,
       purchasePrice: parseAmount(this.amountInput.value),
       bankName: this.entity.bankName.trim(),
       name: this.entity.name.trim() || this.tr.creditDefaultCat,
+      dayCountConvention: initial?.dayCountConvention ?? DayCountConvention.ACTUAL,
     };
 
     // No down payment: zero out the value but keep a date the user deliberately entered.
@@ -402,20 +407,31 @@ export class CreditModal extends EntityModal<CreditRecord> {
       credit.downPaymentValue = 0;
     }
 
-    if (credit.termMonths > 0 && credit.monthlyPayment > 0) {
-      const schedule = generateAnnuitySchedule({
-        originalAmount: credit.originalAmount,
-        interestRate: credit.interestRate,
-        termMonths: credit.termMonths,
-        monthlyPayment: credit.monthlyPayment,
-        startDate: credit.startDate,
-        paymentDay: credit.paymentDay,
-        existingPayments: credit.payments,
-      });
-      credit.payments = schedule.payments;
-      credit.currentAmount = schedule.currentAmount;
-    } else {
-      credit.currentAmount = credit.originalAmount;
+    const financialParamsChanged =
+      initial?.originalAmount !== credit.originalAmount ||
+      initial?.interestRate !== credit.interestRate ||
+      initial?.termMonths !== credit.termMonths ||
+      initial?.monthlyPayment !== credit.monthlyPayment ||
+      initial?.startDate !== credit.startDate ||
+      initial?.paymentDay !== credit.paymentDay;
+
+    if (!hadConvention || financialParamsChanged) {
+      if (credit.termMonths > 0 && credit.monthlyPayment > 0) {
+        const schedule = generateAnnuitySchedule({
+          originalAmount: credit.originalAmount,
+          interestRate: credit.interestRate,
+          termMonths: credit.termMonths,
+          monthlyPayment: credit.monthlyPayment,
+          startDate: credit.startDate,
+          paymentDay: credit.paymentDay,
+          existingPayments: credit.payments,
+          dayCountConvention: credit.dayCountConvention,
+        });
+        credit.payments = schedule.payments;
+        credit.currentAmount = schedule.currentAmount;
+      } else {
+        credit.currentAmount = credit.originalAmount;
+      }
     }
 
     return credit;

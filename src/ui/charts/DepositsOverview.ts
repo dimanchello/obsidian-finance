@@ -1,15 +1,55 @@
-import { DepositRecord, OVERVIEW_TREND_MONTHS, OVERVIEW_CHART_PAD_LEFT, OVERVIEW_CHART_PAD_TOP, OVERVIEW_LABEL_OFFSET_Y, OVERVIEW_MAX_BAR_W, OVERVIEW_BAR_SPACING_PAD, OVERVIEW_BAR_RADIUS, OVERVIEW_LINE_STROKE_W, OVERVIEW_POINT_RADIUS, OVERVIEW_POINT_RADIUS_HOVER, CHART_PALETTE, AccountMode, PERCENT_100 } from '../../types';
-import { CSS_CLASS } from '../../constants';
-import { fmtShort, svg } from '../chartHelpers';
-import { calcDepositInterestOverTime, calcActiveDepositsProgress, DepositInterestMonth, ActiveDepositProgress } from '../../domain/metrics';
-import { fmtDate } from '../../utils';
-import { DepositAccrualType, PaymentStatus } from '../../constants';
+import {
+  DepositRecord,
+  OVERVIEW_TREND_MONTHS,
+  OVERVIEW_CHART_PAD_LEFT,
+  OVERVIEW_CHART_PAD_TOP,
+  OVERVIEW_LABEL_OFFSET_Y,
+  OVERVIEW_DEPOSIT_BAR_GAP,
+  OVERVIEW_DEPOSIT_BAR_MAX_W,
+  OVERVIEW_DEPOSIT_BODY_MIN_HEIGHT_PCT,
+  OVERVIEW_DEPOSIT_INTEREST_MIN_HEIGHT,
+  OVERVIEW_DEPOSIT_INTEREST_TARGET_WIDTH,
+  OVERVIEW_COMPACT_BAR_MIN_W,
+  OVERVIEW_BAR_RADIUS,
+  CHART_PALETTE,
+  AccountMode,
+  PERCENT_100,
+} from '../../types';
+import { CSS_CLASS, DepositAccrualType, PaymentStatus, DepositStatus } from '../../constants';
+import { svg } from '../chartHelpers';
+import {
+  calcDepositInterestOverTime,
+  calcActiveDepositsProgress,
+  DepositInterestMonth,
+  ActiveDepositProgress,
+} from '../../domain/metrics';
+import { fmtDate, getTodayStr } from '../../utils';
+import {
+  getDepositInitialAmount,
+  getDepositCurrentAmount,
+  getDepositAccrued,
+  getDepositProfit,
+  getDepositTypeLabel,
+  getDepositProjectedBalanceBeforeDate,
+} from '../../domain/depositCalculations';
+import { sumMoney } from '../../domain/money';
 import { DepositDetailModal } from '../../modals/DepositDetailModal';
 import { formatChartAmount } from '../../domain/formattingHelpers';
 import { BaseChart } from './BaseChart';
 import { isDepositOpen, listTabFor } from '../../domain/entityLifecycle';
 
 export class DepositsOverview extends BaseChart {
+  private selectedDepositId: string | null = null;
+  private containerEl: HTMLElement | null = null;
+  private selectedChartHostEl: HTMLElement | null = null;
+  private selectedDetailHostEl: HTMLElement | null = null;
+  private depositCards = new Map<string, HTMLElement>();
+
+  private lastDeposits: DepositRecord[] = [];
+  private lastToday = '';
+  private lastOnNavigate: ((mode: AccountMode) => void) | undefined = undefined;
+  private lastTrendMonths = OVERVIEW_TREND_MONTHS;
+  private lastOnUpdate: (() => void) | undefined = undefined;
 
   destroy(): void {
     this.tooltip.destroy();
@@ -18,19 +58,41 @@ export class DepositsOverview extends BaseChart {
   render(
     parent: HTMLElement,
     deposits: DepositRecord[],
-    today: string,
+    today: string = getTodayStr(),
     onNavigate?: (mode: AccountMode) => void,
     trendMonths: number = OVERVIEW_TREND_MONTHS,
     onUpdate?: () => void
   ): void {
-    const { tr, state } = this.ctx;
-    const chartWrap = parent.createDiv('finance-chart-wrap finance-chart-wrap-full');
-    chartWrap.createEl('h3', { text: tr.overviewDepositsSummary, cls: CSS_CLASS.FINANCE_CHART_TITLE });
+    this.lastDeposits = deposits;
+    this.lastToday = today;
+    this.lastOnNavigate = onNavigate;
+    this.lastTrendMonths = trendMonths;
+    this.lastOnUpdate = onUpdate;
+
+    if (this.containerEl) {
+      this.containerEl.remove();
+      this.containerEl = null;
+    }
+    this.selectedChartHostEl = null;
+    this.selectedDetailHostEl = null;
+    this.depositCards.clear();
 
     if (deposits.length === 0) {
-      this.renderNoData(chartWrap, tr.overviewNoDeposits);
+      // Hide section if no deposits exist
       return;
     }
+
+    const { tr } = this.ctx;
+    this.containerEl = parent.createDiv('finance-chart-wrap finance-chart-wrap-full');
+    this.containerEl.createEl('h3', { text: tr.overviewDepositsSummary, cls: CSS_CLASS.FINANCE_CHART_TITLE });
+
+    const activeDeposits = deposits.filter(d => d.status === DepositStatus.ACTIVE);
+    const availableDeposits = activeDeposits.length > 0 ? activeDeposits : deposits;
+
+    if (!this.selectedDepositId || !deposits.some(d => d.id === this.selectedDepositId)) {
+      this.selectedDepositId = availableDeposits[0]?.id ?? null;
+    }
+    const selectedDeposit = deposits.find(d => d.id === this.selectedDepositId) ?? availableDeposits[0];
 
     const depositColorMap = new Map<string, string>();
     deposits.forEach((d, idx) => {
@@ -38,114 +100,204 @@ export class DepositsOverview extends BaseChart {
       depositColorMap.set(d.id, color);
     });
 
+    if (selectedDeposit) {
+      // 2-column split row: 50% compact chart, 50% schedule table & summary
+      const splitRow = this.containerEl.createDiv('finance-overview-split-row');
+      this.selectedChartHostEl = splitRow.createDiv('finance-overview-split-col finance-overview-chart-col');
+      this.selectedDetailHostEl = splitRow.createDiv('finance-overview-split-col finance-overview-detail-col');
+      this.renderSelectedDeposit();
+    }
+
+    // List of active deposit cards below
+    const activeProgress = calcActiveDepositsProgress(deposits, today);
+    if (activeProgress.length > 0) {
+      const section = this.containerEl.createDiv('finance-deposits-overview-section');
+      this.renderActiveDeposits(section, activeProgress, depositColorMap);
+    }
+  }
+
+  private renderSelectedDeposit(): void {
+    const chartHost = this.selectedChartHostEl;
+    const detailHost = this.selectedDetailHostEl;
+    const deposit = this.lastDeposits.find(item => item.id === this.selectedDepositId);
+    if (!chartHost || !detailHost || !deposit) return;
+
+    chartHost.empty();
+    detailHost.empty();
+    const depositIndex = this.lastDeposits.findIndex(item => item.id === deposit.id);
+    const color = CHART_PALETTE[depositIndex % CHART_PALETTE.length] ?? 'var(--color-green)';
     const interestData = calcDepositInterestOverTime(
-      deposits,
-      state.overviewDateFrom,
-      state.overviewDateTo,
-      today,
-      trendMonths
+      [deposit],
+      this.ctx.state.overviewDateFrom,
+      this.ctx.state.overviewDateTo,
+      this.lastToday,
+      this.lastTrendMonths
     );
 
-    const hasInterestData = interestData.length > 0 && interestData.some(d => d.total > 0);
-
-    if (hasInterestData) {
-      this.renderInterestChart(chartWrap, interestData, depositColorMap, deposits);
-    }
-
-    const activeDeposits = calcActiveDepositsProgress(deposits, today);
-    const section = chartWrap.createDiv('finance-deposits-overview-section');
-
-    if (activeDeposits.length === 0) {
-      this.renderNoData(section, tr.overviewNoActiveDeposits);
-      return;
-    }
-
-    this.renderActiveDeposits(section, activeDeposits, depositColorMap, onNavigate, deposits, onUpdate);
+    this.renderInterestChart(chartHost, interestData, color, deposit, this.lastToday);
+    this.renderDepositDetailPanel(
+      detailHost,
+      deposit,
+      color,
+      this.lastOnNavigate,
+      this.lastOnUpdate
+    );
+    this.depositCards.forEach((card, id) => {
+      const isSelected = id === deposit.id;
+      if (isSelected) card.addClass('is-selected');
+      else card.removeClass('is-selected');
+      card.setAttribute('aria-pressed', String(isSelected));
+    });
   }
 
   private renderInterestChart(
     parent: HTMLElement,
     interestData: DepositInterestMonth[],
-    depositColorMap: Map<string, string>,
-    deposits: DepositRecord[]
+    color: string,
+    deposit: DepositRecord,
+    today: string
   ): void {
     const { tr } = this.ctx;
 
-    const legendItems: { label: string; color?: string; cssClass?: string }[] = deposits.map(d => ({
-      label: d.name || d.bankName || '—',
-      color: depositColorMap.get(d.id) ?? 'var(--color-green)',
-    }));
+    const chartPanel = parent.createDiv('finance-overview-chart-panel');
 
-    legendItems.push({
-      label: tr.overviewDepositCumulativeProfit,
-      cssClass: 'is-cumulative',
+    const legendItems: { label: string; color?: string; cssClass?: string }[] = [
+      {
+        label: tr.overviewDepositBodyAmount,
+        color,
+      },
+      {
+        label: tr.overviewDepositMonthlyInterest,
+        color: 'var(--color-green)',
+      },
+    ];
+
+    this.renderLegend(chartPanel, legendItems);
+
+    if (interestData.length === 0) {
+      this.renderNoData(chartPanel, tr.noChartData);
+      return;
+    }
+
+    const chartPoints = interestData.map(data => {
+      const monthStart = `${data.monthKey}-01`;
+      const topUpsThisMonth = sumMoney((deposit.topUps ?? [])
+        .filter(topUp => topUp.date.slice(0, 7) === data.monthKey)
+        .map(topUp => topUp.amount));
+      const withdrawalsThisMonth = sumMoney((deposit.withdrawals ?? [])
+        .filter(withdrawal => withdrawal.date.slice(0, 7) === data.monthKey)
+        .map(withdrawal => withdrawal.amount));
+      const balanceBeforeInterest = Math.max(
+        0,
+        getDepositProjectedBalanceBeforeDate(deposit, monthStart)
+          + topUpsThisMonth
+          - withdrawalsThisMonth
+      );
+      return { data, balanceBeforeInterest };
     });
 
-    this.renderLegend(parent, legendItems);
+    if (chartPoints.every(point => point.balanceBeforeInterest <= 0 && point.data.total === 0)) {
+      this.renderNoData(chartPanel, tr.noChartData);
+      return;
+    }
 
-    const maxMonthlyValue = Math.max(...interestData.map(d => d.total));
-    const maxCumulativeValue = Math.max(...interestData.map(d => d.cumulativeTotal)) || 1;
-
-    const containerWidth = parent.clientWidth || 400;
+    const containerWidth = parent.clientWidth || 360;
     const dims = this.calculateChartDimensions(containerWidth, interestData.length);
+    const maxBalance = Math.max(
+      1,
+      ...chartPoints.map(point => point.balanceBeforeInterest + point.data.total)
+    );
+    const interestScale = Math.max(0, dims.plotHeight - OVERVIEW_DEPOSIT_INTEREST_MIN_HEIGHT) / maxBalance;
+    const chartPointsWithInterestHeight = chartPoints.map(point => ({
+      ...point,
+      profitHeight: point.data.total > 0
+        ? Math.max(OVERVIEW_DEPOSIT_INTEREST_MIN_HEIGHT, point.data.total * interestScale)
+        : 0,
+    }));
+    const maxProfitHeight = Math.max(...chartPointsWithInterestHeight.map(point => point.profitHeight));
+    const maxPrincipalHeight = Math.max(0, dims.plotHeight - maxProfitHeight);
+    const minPrincipalHeight = maxPrincipalHeight * OVERVIEW_DEPOSIT_BODY_MIN_HEIGHT_PCT / PERCENT_100;
+    const minBalance = Math.min(...chartPoints.map(point => point.balanceBeforeInterest));
+    const maxPrincipalBalance = Math.max(...chartPoints.map(point => point.balanceBeforeInterest));
+    const balanceRange = maxPrincipalBalance - minBalance;
 
     const spacing = dims.plotWidth / interestData.length;
-    const barWidth = Math.min(OVERVIEW_MAX_BAR_W, Math.max(4, spacing - OVERVIEW_BAR_SPACING_PAD));
+    const barWidth = Math.min(
+      OVERVIEW_DEPOSIT_BAR_MAX_W,
+      Math.max(OVERVIEW_COMPACT_BAR_MIN_W, spacing - OVERVIEW_DEPOSIT_BAR_GAP)
+    );
 
-    const scrollWrap = parent.createDiv('finance-overview-chart-scroll');
+    const scrollWrap = chartPanel.createDiv('finance-overview-chart-scroll');
     const svg_el = this.createSvg(dims.chartWidth, dims.chartHeight);
 
     const baselineY = OVERVIEW_CHART_PAD_TOP + dims.plotHeight;
 
-    // Grid lines
-    this.renderYAxisGrid(svg_el, dims.plotWidth, dims.plotHeight, maxMonthlyValue, {
-      formatLabel: (v: number) => fmtShort(v),
-    });
-
-    const cumulativePoints: { x: number; y: number; item: DepositInterestMonth }[] = [];
-
-    interestData.forEach((d: DepositInterestMonth, i: number) => {
+    chartPointsWithInterestHeight.forEach(({ data: d, balanceBeforeInterest, profitHeight }, i) => {
       const x = OVERVIEW_CHART_PAD_LEFT + i * spacing + (spacing - barWidth) / 2;
       const cx = x + barWidth / 2;
+      const balanceProgress = balanceRange > 0
+        ? (balanceBeforeInterest - minBalance) / balanceRange
+        : 0;
+      const principalHeight = minPrincipalHeight
+        + balanceProgress * (maxPrincipalHeight - minPrincipalHeight);
+      const principalY = baselineY - principalHeight;
+      const profitY = principalY - profitHeight;
 
-      let accumulatedHeight = 0;
+      const principalBar = svg('rect', {
+        x,
+        y: principalY,
+        width: Math.max(1, barWidth),
+        height: Math.max(1, principalHeight),
+        fill: color,
+        rx: OVERVIEW_BAR_RADIUS,
+        class: 'finance-chart-bar-hover',
+      });
+      const principalTip = `${d.label}\n${tr.overviewDepositBodyAmount}: ${formatChartAmount(balanceBeforeInterest, this.ctx.currency)}`;
+      principalBar.addEventListener('mouseenter', e => this.tooltip.showTip(e, principalTip));
+      principalBar.addEventListener('mousemove', e => this.tooltip.showTip(e, principalTip));
+      principalBar.addEventListener('mouseleave', () => this.tooltip.hideTip());
+      svg_el.appendChild(principalBar);
 
-      d.segments.forEach(seg => {
-        if (seg.amount <= 0) return;
-        const segHeight = maxMonthlyValue > 0 ? (seg.amount / maxMonthlyValue) * dims.plotHeight : 0;
-        const segY = baselineY - accumulatedHeight - segHeight;
-        const segColor = depositColorMap.get(seg.depositId) ?? 'var(--color-green)';
-        const isPending = seg.status === PaymentStatus.PENDING;
-
-        const rect = svg('rect', {
-          x: x,
-          y: segY,
+      if (d.total > 0) {
+        const profitBar = svg('rect', {
+          x,
+          y: profitY,
           width: Math.max(1, barWidth),
-          height: Math.max(1, segHeight),
-          fill: segColor,
-          opacity: isPending ? 0.55 : 1,
-          stroke: isPending ? segColor : 'none',
-          'stroke-width': isPending ? 1 : 0,
-          'stroke-dasharray': isPending ? '2,2' : '',
+          height: Math.max(1, profitHeight),
+          fill: 'var(--color-green)',
           rx: OVERVIEW_BAR_RADIUS,
+          class: 'finance-deposit-interest-bar',
+        });
+        const profitLines = [
+          d.label,
+          `${tr.overviewDepositMonthlyInterest}: ${formatChartAmount(d.total, this.ctx.currency)}`,
+          `${tr.overviewDepositCumulativeProfit}: ${formatChartAmount(d.cumulativeTotal, this.ctx.currency)}`,
+        ];
+        if (d.paidInterest > 0) {
+          profitLines.push(`${tr.overviewDepositAccrued}: ${formatChartAmount(d.paidInterest, this.ctx.currency)}`);
+        }
+        if (d.pendingInterest > 0) {
+          profitLines.push(`${tr.overviewDepositPending}: ${formatChartAmount(d.pendingInterest, this.ctx.currency)}`);
+        }
+        const profitTip = profitLines.join('\n');
+        svg_el.appendChild(profitBar);
+
+        const interestHitTarget = svg('rect', {
+          x: cx - Math.max(barWidth, OVERVIEW_DEPOSIT_INTEREST_TARGET_WIDTH) / 2,
+          y: profitY,
+          width: Math.max(barWidth, OVERVIEW_DEPOSIT_INTEREST_TARGET_WIDTH),
+          height: profitHeight,
+          fill: 'transparent',
           class: 'finance-chart-bar-hover',
         });
-
-        const statusLabel = isPending ? tr.overviewDepositPending : tr.overviewDepositAccrued;
-        const tipText = `${seg.depositName} (${seg.bankName})\n${statusLabel}: ${formatChartAmount(seg.amount, this.ctx.currency)}\n${d.label}`;
-        rect.addEventListener('mouseenter', e => this.tooltip.showTip(e, tipText));
-        rect.addEventListener('mousemove', e => this.tooltip.showTip(e, tipText));
-        rect.addEventListener('mouseleave', () => this.tooltip.hideTip());
-        svg_el.appendChild(rect);
-
-        accumulatedHeight += segHeight;
-      });
-
-      if (d.cumulativeTotal > 0 && maxCumulativeValue > 0) {
-        const cumY = baselineY - Math.min(dims.plotHeight, (d.cumulativeTotal / maxMonthlyValue) * dims.plotHeight);
-        cumulativePoints.push({ x: cx, y: cumY, item: d });
+        interestHitTarget.addEventListener('mouseenter', e => this.tooltip.showTip(e, profitTip));
+        interestHitTarget.addEventListener('mousemove', e => this.tooltip.showTip(e, profitTip));
+        interestHitTarget.addEventListener('mouseleave', () => this.tooltip.hideTip());
+        interestHitTarget.addEventListener('click', e => this.tooltip.showTip(e, profitTip));
+        svg_el.appendChild(interestHitTarget);
       }
 
+      // X-axis label includes year
       const label = svg('text', {
         x: cx,
         y: baselineY + OVERVIEW_LABEL_OFFSET_Y,
@@ -153,82 +305,152 @@ export class DepositsOverview extends BaseChart {
         fill: 'var(--text-muted)',
         'font-size': '11px',
       });
-      label.textContent = d.label.slice(5);
+      label.textContent = d.label;
       svg_el.appendChild(label);
     });
 
-    // Cumulative line
-    if (cumulativePoints.length > 1) {
-      const pathD = cumulativePoints.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
-      const cumLine = svg('path', {
-        d: pathD,
-        stroke: 'var(--color-green)',
-        'stroke-width': OVERVIEW_LINE_STROKE_W,
-        fill: 'none',
-        'stroke-dasharray': '4,4',
-      });
-      svg_el.appendChild(cumLine);
+    scrollWrap.appendChild(svg_el);
+    this.scrollToCurrentOrEnd(scrollWrap, containerWidth, interestData.map(d => d.label), today);
+  }
+
+  private renderDepositDetailPanel(
+    parent: HTMLElement,
+    deposit: DepositRecord,
+    color: string,
+    onNavigate?: (mode: AccountMode) => void,
+    onUpdate?: () => void
+  ): void {
+    const { tr } = this.ctx;
+    const panel = parent.createDiv('finance-overview-detail-panel');
+
+    // Header
+    const header = panel.createDiv('finance-overview-detail-header');
+    const titleWrap = header.createDiv('finance-overview-detail-title-wrap');
+    const dot = titleWrap.createSpan({ cls: 'finance-deposit-overview-dot' });
+    dot.style.background = color;
+    const title = titleWrap.createDiv('finance-overview-detail-title');
+    title.textContent = `${deposit.name || deposit.bankName || tr.deposits} (${deposit.interestRate}%)`;
+    if (deposit.bankName) {
+      title.title = `${deposit.name} · ${deposit.bankName}`;
     }
 
-    // Cumulative points
-    cumulativePoints.forEach(p => {
-      const point = svg('circle', {
-        cx: p.x,
-        cy: p.y,
-        r: OVERVIEW_POINT_RADIUS,
-        fill: 'var(--color-green)',
-        class: 'finance-chart-point',
-      });
-      const tipText = `${p.item.label}\n${tr.overviewDepositCumulativeProfit}: ${formatChartAmount(p.item.cumulativeTotal, this.ctx.currency)}`;
-      point.addEventListener('mouseenter', e => {
-        point.setAttribute('r', String(OVERVIEW_POINT_RADIUS_HOVER));
-        this.tooltip.showTip(e, tipText);
-      });
-      point.addEventListener('mousemove', e => this.tooltip.showTip(e, tipText));
-      point.addEventListener('mouseleave', () => {
-        point.setAttribute('r', String(OVERVIEW_POINT_RADIUS));
-        this.tooltip.hideTip();
-      });
-      svg_el.appendChild(point);
+    const badges = header.createDiv('finance-deposit-overview-badges');
+    const termBadge = badges.createDiv('finance-deposit-badge remaining');
+    termBadge.textContent = getDepositTypeLabel(deposit.type, tr);
+
+    const typeBadge = badges.createDiv('finance-deposit-badge accrual-type');
+    typeBadge.textContent =
+      deposit.accrualType === DepositAccrualType.CAPITALIZATION
+        ? tr.overviewDepositCapitalization
+        : tr.overviewDepositToAccount;
+
+    const modalBtn = header.createEl('button', {
+      cls: 'finance-action-btn',
+      text: '↗️',
+    });
+    modalBtn.title = tr.overviewViewDetails;
+    modalBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      new DepositDetailModal(this.ctx.app, {
+        ctx: this.ctx,
+        deposit,
+        onNavigateToDeposits: onNavigate ? () => {
+          this.ctx.state.depositListTab = listTabFor(isDepositOpen(deposit));
+          this.ctx.state.depositExpandedId = deposit.id;
+          this.ctx.state.depositPage = 0;
+          this.ctx.saveState();
+          onNavigate(AccountMode.DEPOSITS);
+        } : undefined,
+        onDepositUpdated: () => onUpdate?.(),
+      }).open();
     });
 
-    scrollWrap.appendChild(svg_el);
+    // Stats grid
+    const initialAmount = getDepositInitialAmount(deposit);
+    const currentAmount = getDepositCurrentAmount(deposit);
+    const accrued = getDepositAccrued(deposit);
+    const totalProfit = getDepositProfit(deposit);
+    const pendingProfit = Math.max(0, totalProfit - accrued);
+
+    const statsGrid = panel.createDiv('finance-overview-detail-stats');
+    const addStatPill = (label: string, val: string, modCls = '') => {
+      const pill = statsGrid.createDiv(`finance-overview-detail-stat-pill ${modCls}`);
+      pill.createDiv({ text: label, cls: 'finance-overview-detail-stat-label' });
+      pill.createDiv({ text: val, cls: 'finance-overview-detail-stat-val' });
+    };
+
+    addStatPill(tr.overviewInitialAmount, this.ctx.fmt(initialAmount));
+    addStatPill(tr.overviewCurrentBalance, this.ctx.fmt(currentAmount), 'finance-stat-positive');
+    addStatPill(tr.overviewDepositProfitAccrued, `+${this.ctx.fmt(accrued)}`, 'finance-stat-income');
+    addStatPill(tr.overviewDepositProfitPending, `+${this.ctx.fmt(pendingProfit)}`, 'finance-stat-neutral');
+
+    // Accruals table
+    const tableScroll = panel.createDiv('finance-overview-table-scroll');
+    if (!deposit.accruals || deposit.accruals.length === 0) {
+      tableScroll.createEl('p', { text: tr.noScheduledAccruals, cls: CSS_CLASS.FINANCE_EMPTY_TEXT });
+    } else {
+      const table = tableScroll.createEl('table', { cls: 'finance-table' });
+      const thead = table.createEl('thead');
+      const trHead = thead.createEl('tr');
+      const labels = ['#', tr.date, tr.sum, tr.status];
+      labels.forEach((h, i) =>
+        trHead.createEl('th', { text: h, cls: i === 0 ? 'finance-overview-col-idx' : '' })
+      );
+      const tbody = table.createEl('tbody');
+      deposit.accruals.forEach((a, idx) => {
+        const isPaid = a.status === PaymentStatus.PAID;
+        const row = tbody.createEl('tr', {
+          cls: isPaid ? 'finance-payment-paid' : 'finance-payment-pending',
+        });
+        const createCell = (labelIndex: number, text: string, cls: string) => {
+          const cell = row.createEl('td', { text, cls });
+          cell.setAttribute('data-label', labels[labelIndex]!);
+          return cell;
+        };
+        createCell(0, String(idx + 1), 'finance-td finance-td-muted finance-overview-col-idx');
+        createCell(1, fmtDate(a.dueDate), `${CSS_CLASS.FINANCE_TD} finance-overview-col-date`);
+        createCell(2, `+${this.ctx.fmt(a.amount)}`, 'finance-td finance-amount-cell finance-amount-income');
+        const statusTd = row.createEl('td', { cls: `${CSS_CLASS.FINANCE_TD} finance-overview-col-status` });
+        statusTd.setAttribute('data-label', labels[3]!);
+        statusTd.createSpan({
+          text: isPaid
+            ? deposit.accrualType === DepositAccrualType.CAPITALIZATION
+              ? tr.accrualIncluded
+              : tr.accrualPaidToAccount
+            : tr.pendingStatus,
+          cls: isPaid ? 'finance-badge-paid' : 'finance-badge-pending',
+        });
+      });
+    }
   }
 
   private renderActiveDeposits(
     parent: HTMLElement,
     activeDeposits: ActiveDepositProgress[],
-    depositColorMap: Map<string, string>,
-    onNavigate?: (mode: AccountMode) => void,
-    deposits?: DepositRecord[],
-    onUpdate?: () => void
+    depositColorMap: Map<string, string>
   ): void {
     const { tr } = this.ctx;
     const grid = parent.createDiv('finance-deposits-overview-grid');
 
     activeDeposits.forEach((dep: ActiveDepositProgress) => {
-      const card = grid.createDiv('finance-deposit-overview-card is-clickable');
-      card.title = `${dep.name} (${tr.overviewViewDetails})`;
+      const isSelected = dep.id === this.selectedDepositId;
+      const card = grid.createDiv(`finance-deposit-overview-card is-clickable${isSelected ? ' is-selected' : ''}`);
+      card.title = `${dep.name} (${tr.overviewSelectedDeposit})`;
+      card.setAttribute('role', 'button');
+      card.setAttribute('tabindex', '0');
+      card.setAttribute('aria-pressed', String(isSelected));
+      this.depositCards.set(dep.id, card);
 
-      card.addEventListener('click', () => {
-        this.tooltip.hideTip();
-        const fullDeposit = deposits?.find(d => d.id === dep.id);
-        if (!fullDeposit) return;
-
-        const handleNavigate = () => {
-          this.ctx.state.depositListTab = listTabFor(isDepositOpen(fullDeposit));
-          this.ctx.state.depositExpandedId = dep.id;
-          this.ctx.state.depositPage = 0;
-          this.ctx.saveState();
-          onNavigate?.(AccountMode.DEPOSITS);
-        };
-
-        new DepositDetailModal(this.ctx.app, {
-          ctx: this.ctx,
-          deposit: fullDeposit,
-          onNavigateToDeposits: onNavigate ? handleNavigate : undefined,
-          onDepositUpdated: () => onUpdate?.(),
-        }).open();
+      const selectDeposit = () => {
+        if (this.selectedDepositId === dep.id) return;
+        this.selectedDepositId = dep.id;
+        this.renderSelectedDeposit();
+      };
+      card.addEventListener('click', selectDeposit);
+      card.addEventListener('keydown', event => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        selectDeposit();
       });
 
       const depositColor = depositColorMap.get(dep.id) ?? 'var(--color-green)';

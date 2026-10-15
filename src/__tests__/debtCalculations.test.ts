@@ -6,6 +6,7 @@ import {
   getDebtWithInterest,
   getDebtRemaining,
   isDebtPaidOff,
+  calculateDebtsSummary,
 } from '../domain/debtCalculations';
 import { createLinkedRecord } from '../domain/records';
 
@@ -111,6 +112,94 @@ describe('debtCalculations', () => {
       ],
     });
     expect(isDebtPaidOff(paidDebt)).toBe(true);
+  });
+
+  describe('calculateDebtsSummary', () => {
+    it('returns 0 for both amounts and counts when debt list is empty', () => {
+      const summary = calculateDebtsSummary([]);
+      expect(summary).toEqual({
+        lentRemaining: 0,
+        lentCount: 0,
+        borrowedRemaining: 0,
+        borrowedCount: 0,
+      });
+    });
+
+    it('counts and sums only active/open debts, ignoring paid off debts', () => {
+      const debts: DebtRecord[] = [
+        // Open lent debts
+        createMockDebt({
+          id: 'l1',
+          direction: DebtDirection.LENT,
+          movements: [
+            { id: 'm1', type: DebtMovementType.BORROW, amount: 1000, date: '2026-01-01', time: '', createdAt: 1, note: '' },
+            { id: 'm2', type: DebtMovementType.REPAY, amount: 200, date: '2026-01-02', time: '', createdAt: 2, note: '' },
+          ], // remaining: 800
+        }),
+        createMockDebt({
+          id: 'l2',
+          direction: DebtDirection.LENT,
+          movements: [
+            { id: 'm3', type: DebtMovementType.BORROW, amount: 500, date: '2026-01-01', time: '', createdAt: 3, note: '' },
+          ], // remaining: 500
+        }),
+        // Closed lent debt (paid off)
+        createMockDebt({
+          id: 'l3',
+          direction: DebtDirection.LENT,
+          movements: [
+            { id: 'm4', type: DebtMovementType.BORROW, amount: 300, date: '2026-01-01', time: '', createdAt: 4, note: '' },
+            { id: 'm5', type: DebtMovementType.REPAY, amount: 300, date: '2026-01-02', time: '', createdAt: 5, note: '' },
+          ], // remaining: 0
+        }),
+        // Open borrowed debt
+        createMockDebt({
+          id: 'b1',
+          direction: DebtDirection.BORROWED,
+          movements: [
+            { id: 'm6', type: DebtMovementType.BORROW, amount: 2000, date: '2026-01-01', time: '', createdAt: 6, note: '' },
+            { id: 'm7', type: DebtMovementType.REPAY, amount: 500, date: '2026-01-02', time: '', createdAt: 7, note: '' },
+          ], // remaining: 1500
+        }),
+        // Closed borrowed debt (paid off)
+        createMockDebt({
+          id: 'b2',
+          direction: DebtDirection.BORROWED,
+          movements: [
+            { id: 'm8', type: DebtMovementType.BORROW, amount: 700, date: '2026-01-01', time: '', createdAt: 8, note: '' },
+            { id: 'm9', type: DebtMovementType.REPAY, amount: 700, date: '2026-01-02', time: '', createdAt: 9, note: '' },
+          ], // remaining: 0
+        }),
+      ];
+
+      const summary = calculateDebtsSummary(debts);
+
+      // 2 open lent debts (800 + 500 = 1300), 1 closed ignored
+      expect(summary.lentCount).toBe(2);
+      expect(summary.lentRemaining).toBe(1300);
+
+      // 1 open borrowed debt (1500), 1 closed ignored
+      expect(summary.borrowedCount).toBe(1);
+      expect(summary.borrowedRemaining).toBe(1500);
+    });
+
+    it('handles interest rate when computing remaining amount', () => {
+      const debts: DebtRecord[] = [
+        createMockDebt({
+          id: 'l1',
+          direction: DebtDirection.LENT,
+          interestRate: 20,
+          movements: [
+            { id: 'm1', type: DebtMovementType.BORROW, amount: 1000, date: '2026-01-01', time: '', createdAt: 1, note: '' },
+            { id: 'm2', type: DebtMovementType.REPAY, amount: 200, date: '2026-01-02', time: '', createdAt: 2, note: '' },
+          ], // with interest: 1200 - 200 = 1000
+        }),
+      ];
+
+      const summary = calculateDebtsSummary(debts);
+      expect(summary.lentCount).toBe(1);
+      expect(summary.lentRemaining).toBe(1000);
+    });
   });
 });
 

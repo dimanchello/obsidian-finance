@@ -43,14 +43,32 @@ export class CreditsAnalyticsView extends BaseAnalyticsView {
     this.credits = credits;
   }
 
+  private controlsEl: HTMLElement | null = null;
+  private contentEl: HTMLElement | null = null;
+
   render(): void {
     this.setupContainer();
 
-    this.renderControls();
-    this.renderSummaryCards();
-    this.chartEl = this.el.createDiv('finance-chart-area');
+    this.controlsEl = this.el.createDiv('finance-credits-analytics-controls');
+    this.renderControls(this.controlsEl);
+    this.contentEl = this.el.createDiv('finance-credits-analytics-content');
+    this.renderAnalyticsContent(this.contentEl);
+  }
+
+  private updateContentOnly(): void {
+    if (this.contentEl?.isConnected) {
+      this.contentEl.empty();
+      this.renderAnalyticsContent(this.contentEl);
+    } else {
+      this.render();
+    }
+  }
+
+  private renderAnalyticsContent(container: HTMLElement): void {
+    this.renderSummaryCards(container);
+    this.chartEl = container.createDiv('finance-chart-area');
     this.renderPaymentChart();
-    this.renderProgressList();
+    this.renderProgressList(container);
   }
 
   private creditTypeLabel(type: string): string {
@@ -60,18 +78,18 @@ export class CreditsAnalyticsView extends BaseAnalyticsView {
     return type;
   }
 
-  private renderControls(): void {
-    const row = this.el.createDiv('finance-filters-row finance-analytics-date-row');
+  private renderControls(container: HTMLElement): void {
+    const row = container.createDiv('finance-filters-row finance-analytics-date-row');
 
     renderDateRangeFilter(
-      this.el,
+      container,
       this.ctx,
       {
         from: 'creditAnalyticsDateFrom',
         to: 'creditAnalyticsDateTo',
       },
       this.tr,
-      () => this.render()
+      () => this.updateContentOnly()
     );
 
     const grpG = row.createDiv('finance-filter-group');
@@ -93,7 +111,7 @@ export class CreditsAnalyticsView extends BaseAnalyticsView {
     grpSel.addEventListener('change', () => {
       this.state.creditAnalyticsGroupBy = grpSel.value as CreditAnalyticsGroupBy;
       this.ctx.saveState();
-      this.render();
+      this.updateContentOnly();
     });
   }
 
@@ -107,7 +125,7 @@ export class CreditsAnalyticsView extends BaseAnalyticsView {
     });
   }
 
-  private renderSummaryCards(): void {
+  private renderSummaryCards(container: HTMLElement): void {
     const credits = this.getFilteredCredits();
     const totalBorrowed = credits.reduce((s, c) => s + c.originalAmount, 0);
     const totalRemaining = credits.filter(c => c.status === CreditStatus.ACTIVE).reduce((s, c) => s + calculateRemainingPrincipal(c), 0);
@@ -120,7 +138,7 @@ export class CreditsAnalyticsView extends BaseAnalyticsView {
       { label: this.tr.creditPrincipalPaid, value: this.ctx.fmt(totalPaidPrincipal), mod: CSS_CLASS.INCOME },
       { label: this.tr.creditInterestPaid, value: this.ctx.fmt(totalInterest), mod: 'neutral' },
     ];
-    renderStatCards(this.el, cards, 'finance-credit-analytics-cards');
+    renderStatCards(container, cards, 'finance-credit-analytics-cards');
   }
 
   private buildBarData(): PaymentBarItem[] {
@@ -330,11 +348,11 @@ export class CreditsAnalyticsView extends BaseAnalyticsView {
     wrap.before(header);
   }
 
-  private renderProgressList(): void {
+  private renderProgressList(container: HTMLElement): void {
     const credits = this.getFilteredCredits().filter(c => c.status === CreditStatus.ACTIVE);
     if (!credits.length) return;
 
-    const section = this.el.createDiv('finance-credit-progress-list');
+    const section = container.createDiv('finance-credit-progress-list');
     section.createDiv({ text: this.tr.creditRepaymentProgress, cls: 'finance-analytics-section-title' });
 
     credits.forEach(c => {

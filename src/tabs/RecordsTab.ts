@@ -20,6 +20,7 @@ import { renderStatCard } from '../ui/statCards';
 import { CSS_CLASS,  RecordType  } from '../constants';
 import { matchesAnyField, matchesStringFilter, matchesDateRange } from '../domain/filterUtils';
 import { createTableStateAdapter } from './tabUtils';
+import { isFutureTransaction } from '../domain/records';
 
 type Panel = 'analytics' | 'filters' | 'settings';
 
@@ -45,7 +46,14 @@ export class RecordsTab {
       columns: [
         {
           key: 'date', label: `${this.tr.date} / ${this.tr.time}`,
-          cell: r => ({ text: fmtDate(r.date, r.time), cls: 'finance-td-date' }),
+          cell: r => {
+            const isFuture = isFutureTransaction(r);
+            const dateText = fmtDate(r.date, r.time);
+            return {
+              text: isFuture ? `⏳ ${dateText}` : dateText,
+              cls: isFuture ? 'finance-td-date finance-td-future' : 'finance-td-date',
+            };
+          },
         },
         {
           key: 'type', label: this.tr.type,
@@ -70,6 +78,7 @@ export class RecordsTab {
       rowCls: r => {
         const cls = [r.type === RecordType.INCOME ? 'finance-row-income' : 'finance-row-expense'];
         if (r.isInternal) cls.push('finance-tr-internal');
+        if (isFutureTransaction(r)) cls.push(CSS_CLASS.FINANCE_TR_FUTURE);
         return cls;
       },
       rowActions: r => [
@@ -104,8 +113,8 @@ export class RecordsTab {
       ownToolbar: (toolbar, api) => this.renderToolbar(toolbar, api),
       renderPanels: host => this.renderPanels(host),
       infoBarSums: (host, filtered) => {
-        const fi = filtered.filter(r => r.type === RecordType.INCOME && !r.isInternal).reduce((s, r) => s + r.amount, 0);
-        const fe = filtered.filter(r => r.type === RecordType.EXPENSE && !r.isInternal).reduce((s, r) => s + r.amount, 0);
+        const fi = filtered.filter(r => r.type === RecordType.INCOME && !r.isInternal && !isFutureTransaction(r)).reduce((s, r) => s + r.amount, 0);
+        const fe = filtered.filter(r => r.type === RecordType.EXPENSE && !r.isInternal && !isFutureTransaction(r)).reduce((s, r) => s + r.amount, 0);
         const sums = host.createDiv('finance-table-sums');
         sums.createSpan({ text: `↑\u00a0${this.ctx.fmt(fi)}`, cls: 'finance-sum-income' });
         sums.createSpan({ text: '·', cls: 'finance-sum-sep' });
@@ -200,12 +209,10 @@ export class RecordsTab {
   private renderStats(host: HTMLElement): void {
     if (!this.ctx.data) return;
     const statsEl = host.createDiv('finance-stats-container');
-    const recs = this.ctx.data.records;
+    const recs = this.ctx.data.records.filter(r => !isFutureTransaction(r));
     const inc = recs.filter(r => r.type === RecordType.INCOME && !r.isInternal).reduce((s, r) => s + r.amount, 0);
     const exp = recs.filter(r => r.type === RecordType.EXPENSE && !r.isInternal).reduce((s, r) => s + r.amount, 0);
-    const totalInc = recs.filter(r => r.type === RecordType.INCOME).reduce((s, r) => s + r.amount, 0);
-    const totalExp = recs.filter(r => r.type === RecordType.EXPENSE).reduce((s, r) => s + r.amount, 0);
-    const bal = totalInc - totalExp;
+    const bal = inc - exp;
 
     const cards = [
       { label: this.tr.incomeStat, value: this.ctx.fmt(inc), mod: CSS_CLASS.INCOME, icon: '↑' },
@@ -311,6 +318,8 @@ export class RecordsTab {
   // ── Mobile card ──────────────────────────────────────────────────────────
 
   private renderCard(block: HTMLElement, rec: FinanceRecord): void {
+    const isFuture = isFutureTransaction(rec);
+    if (isFuture) block.addClass(CSS_CLASS.FINANCE_TR_FUTURE);
     const isIncome = rec.type === RecordType.INCOME;
     const indicator = isIncome ? '+' : (rec.isInternal ? '◆' : '—');
     const indicatorCls = isIncome
@@ -336,7 +345,7 @@ export class RecordsTab {
       subtitle,
       amountText,
       amountCls,
-      dateText: fmtDate(rec.date, rec.time),
+      dateText: isFuture ? `⏳ ${fmtDate(rec.date, rec.time)}` : fmtDate(rec.date, rec.time),
       deleteTitle: this.tr.delete,
       onDelete: () => this.confirmDelete(rec),
     });

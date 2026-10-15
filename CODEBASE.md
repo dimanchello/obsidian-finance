@@ -40,7 +40,7 @@ Obsidian плагин для личного финансового учёта. �
 - `autoTransactions.ts` — advances schedules to today, materializes deposit/credit records
 - `linkedRecords.ts` — creates/unlinks mirrored FinanceRecords for debts/credits/deposits
 - `schedule.ts` — builds credit payment and deposit accrual schedules
-- `creditCalculations.ts`, `debtCalculations.ts`, `depositCalculations.ts` — interest/annuity/deposit math
+- `creditCalculations.ts`, `debtCalculations.ts`, `depositCalculations.ts` — interest/annuity/deposit math. `creditCalculations.ts` supports actual calendar day count convention (ACT/365 / ACT/366, `DayCountConvention`) and `calculatePeriodInterest`. `debtCalculations.ts` exports `calculateDebtsSummary` for open debt aggregates.
 - `overviewMetrics.ts` — dashboard calculations (savings rate, debt burden, trends).
   Trend span is a month count; `ALL_TIME_MONTHS` (0) is a sentinel meaning "span the data",
   clamped to `OVERVIEW_MAX_TREND_MONTHS`. `calcActiveDepositsProgress` returns
@@ -92,11 +92,10 @@ Chart components used by `OverviewTab`: `MoneyFlowChart`, `AssetsChart`, `Burden
 `BreakdownChart`, `SavingsRateChart`, `DebtsBreakdownChart`, `DepositsOverview`, `CreditsOverview`.
 The four trend charts (`AssetsChart`, `BurdenChart`, `SavingsRateChart`, `DepositsOverview`)
 take a trailing `trendMonths` argument; `OverviewTab` passes `ALL_TIME_MONTHS` when
-`state.overviewAllTime` is set, otherwise `OVERVIEW_TREND_MONTHS`. Clicking items in
-`BreakdownChart`, `SavingsRateChart`, `DepositsOverview`, `CreditsOverview`, and `DebtsBreakdownChart` opens
-detail modals (`OverviewRecordsModal`, `DepositDetailModal`, `CreditDetailModal`, `DebtDetailModal`) showing
-filtered records, deposit accruals, credit payments or debt movements, with deep-link navigation buttons
-to the corresponding tabs.
+`state.overviewAllTime` is set, otherwise `OVERVIEW_TREND_MONTHS`. Selecting a deposit or credit card updates its chart and schedule panel in place, preserving the card list and current page focus; its `↗️` button opens `DepositDetailModal` or `CreditDetailModal`. Items in
+`BreakdownChart`, `SavingsRateChart`, `BurdenChart`, and `DebtsBreakdownChart` open detail modals (`OverviewRecordsModal`, `OverviewBurdenModal`, `DebtDetailModal`) showing
+filtered records, monthly burden calculation breakdown, or debt movements, with deep-link navigation buttons
+to the corresponding tabs. Top KPI badges in `OverviewTab` open breakdown modals (`OverviewAssetsModal`, `OverviewLiabilitiesModal`, `OverviewBurdenModal`, `OverviewUpcomingPaymentsModal`).
 
 **`src/__tests__/`**
 Vitest tests:
@@ -286,7 +285,7 @@ Debts, credits, deposits do NOT have separate ledgers — they materialize Finan
 **Important symbols:**
 - `AccountCommands` class
 - `CreditNoteTranslations` — `receiptNote` / `paymentNote` / `downPaymentNote`, all required
-- `addDebt()`, `addDebtMovement()`, `updateDebtMovement()`, `deleteDebtMovement()`, `deleteDebt()`, `deleteDebts()`
+- `addDebt()`, `updateDebt()`, `addDebtMovement()`, `updateDebtMovement()`, `deleteDebtMovement()`, `deleteDebt()`, `deleteDebts()`
 - `addCredit()`, `updateCredit()`, `deleteCredit()`, `deleteCredits()`
 - `buildDownPaymentRecord()` (private) — mints/clears `credit.downPaymentRecordId` and builds the
   down-payment mirror record; called by `addCredit`/`updateCredit` *before* the credit is stored
@@ -309,7 +308,7 @@ every call site. `CreditModal` no longer touches records at all.
 
 **Path:** `src/domain/autoTransactions.ts`
 
-**Purpose:** Advances deposit/credit schedules to today, marks due items paid, materializes FinanceRecords with linkedId.
+**Purpose:** Advances deposit/credit schedules to today, marks due items paid, and materializes linked FinanceRecords. Principal transfers and credit payments are marked internal; deposit interest remains income.
 
 **Important symbols:**
 - `applyAutoTransactions(data, deps): AutoTxResult` — pure function, returns new state
@@ -330,8 +329,11 @@ every call site. `CreditModal` no longer touches records at all.
 
 **Purpose:** Creates/finds/unlinks mirrored FinanceRecords for debts/credits/deposits.
 
+Debt principal movements, credit receipts, deposit principal transfers, and credit payments are internal so they do not inflate income/expense statistics. Debt repayments can store an explicit `interestAmount`; that share becomes an external income/expense record. Deposit interest remains a regular income record.
+
 **Important symbols:**
 - `createDebtMovementRecord()`
+- `createDebtMovementRecords()` — splits repayment principal and interest into separate linked records
 - `createCreditReceiptRecord()`, `createCreditPaymentRecord()`
 - `createCreditDownPaymentRecord()` — keeps a caller-supplied id (`credit.downPaymentRecordId`) so
   the record survives schedule regeneration

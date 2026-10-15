@@ -13,6 +13,7 @@ import {
   PaymentStatus,
   CurrencyOperationType,
   AccountMode,
+  DayCountConvention,
   CODE_BLOCK_LANGUAGES,
   type CodeBlockLanguage,
 } from './constants';
@@ -25,6 +26,7 @@ export {
   CreditStatus,
   EarlyRepaymentOption,
   DownPaymentType,
+  DayCountConvention,
   DepositType,
   DepositStatus,
   EntityListTab,
@@ -61,6 +63,7 @@ export interface DebtMovement {
   id:        string;
   type:      DebtMovementType;
   amount:    number;
+  interestAmount?: number; // Portion of a repayment that is interest; the remainder is principal
   date:      string;   // YYYY-MM-DD
   time:      string;   // HH:MM
   createdAt: number;
@@ -308,6 +311,7 @@ export const AUTOFILL_BADGE_MS = 6_000;
 export const SKELETON_CARD_COUNT = 3;
 export const PLURAL_THRESHOLD = 5;
 export const DAYS_IN_YEAR = 365;
+export const DAYS_IN_LEAP_YEAR = 366;
 export const ACCRUAL_STEP_MONTHLY = 12;
 export const ONE_WEEK_MS = 604_800_000;
 export const AUTO_TX_INTERVAL_MS = 3_600_000;
@@ -329,6 +333,11 @@ export const OVERVIEW_CHART_PAD_TOP = 16;
 export const OVERVIEW_CHART_PAD_BOTTOM = 42;
 export const OVERVIEW_LABEL_OFFSET_Y = 18;
 export const OVERVIEW_BAR_GAP = 6;
+export const OVERVIEW_DEPOSIT_BAR_GAP = 2;
+export const OVERVIEW_DEPOSIT_BAR_MAX_W = 40;
+export const OVERVIEW_DEPOSIT_BODY_MIN_HEIGHT_PCT = 65;
+export const OVERVIEW_DEPOSIT_INTEREST_MIN_HEIGHT = 44;
+export const OVERVIEW_DEPOSIT_INTEREST_TARGET_WIDTH = 44;
 export const OVERVIEW_GROUP_GAP = 18;
 export const OVERVIEW_MIN_GROUP_W = 56;
 export const OVERVIEW_MIN_GROUP_W_MOBILE = 44;
@@ -344,6 +353,9 @@ export const OVERVIEW_SAVINGS_BENCHMARK = 20;
 export const OVERVIEW_INPUT_DEBOUNCE_MS = 600;
 export const OVERVIEW_DEPOSIT_CARD_MIN_W = 280;
 export const OVERVIEW_DEPOSIT_TREND_MONTHS = 6;
+export const OVERVIEW_SPLIT_TABLE_MAX_HEIGHT = 260;
+export const OVERVIEW_COMPACT_BAR_MIN_W = 4;
+export const OVERVIEW_COMPACT_BAR_MAX_W = 28;
 export const CURRENCY_ROUNDING_PRECISION = 100;      // 2 decimal places
 export const EXCHANGE_RATE_PRECISION = 10000;        // 4 decimal places
 
@@ -386,6 +398,7 @@ export interface CreditRecord {
   downPaymentRecordId?: string | undefined;
   isEscrow?: boolean; // funds go to developer via escrow account, not added to balance
   attachmentPath?: string;
+  dayCountConvention?: DayCountConvention | undefined;
 }
 
 export type DepositAccrualStatus = PaymentStatus;

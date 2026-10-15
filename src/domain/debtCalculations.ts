@@ -1,8 +1,16 @@
 import { DebtRecord } from '../types';
 import { round2, sumMoney } from './money';
-import { DebtMovementType } from '../constants';
+import { DebtDirection, DebtMovementType } from '../constants';
+import { isFutureTransaction } from './records';
 
 const PERCENT_100 = 100;
+
+export interface DebtsSummary {
+  lentRemaining: number;
+  lentCount: number;
+  borrowedRemaining: number;
+  borrowedCount: number;
+}
 
 export function getDebtRepaid(debt: DebtRecord): number {
   return sumMoney(debt.movements.filter(m => m.type === DebtMovementType.REPAY).map(m => m.amount));
@@ -18,10 +26,52 @@ export function getDebtWithInterest(debt: DebtRecord): number {
   return round2(original + (original * debt.interestRate / PERCENT_100));
 }
 
-export function getDebtRemaining(debt: DebtRecord): number {
-  return Math.max(0, round2(getDebtWithInterest(debt) - getDebtRepaid(debt)));
+export function getDebtOriginalAsOf(debt: DebtRecord, now = new Date()): number {
+  return sumMoney(debt.movements
+    .filter(movement => movement.type === DebtMovementType.BORROW && !isFutureTransaction(movement, now))
+    .map(movement => movement.amount));
 }
 
-export function isDebtPaidOff(debt: DebtRecord): boolean {
-  return getDebtRemaining(debt) <= 0;
+export function getDebtRepaidAsOf(debt: DebtRecord, now = new Date()): number {
+  return sumMoney(debt.movements
+    .filter(movement => movement.type === DebtMovementType.REPAY && !isFutureTransaction(movement, now))
+    .map(movement => movement.amount));
 }
+
+export function getDebtWithInterestAsOf(debt: DebtRecord, now = new Date()): number {
+  const original = getDebtOriginalAsOf(debt, now);
+  if (debt.interestRate <= 0) return original;
+  return round2(original + (original * debt.interestRate / PERCENT_100));
+}
+
+/** Current debt balance with future-dated movements excluded. */
+export function getDebtAmountAsOf(debt: DebtRecord, now = new Date()): number {
+  const futureBorrowed = sumMoney(debt.movements
+    .filter(movement => movement.type === DebtMovementType.BORROW && isFutureTransaction(movement, now))
+    .map(movement => movement.amount));
+  const futureRepaid = sumMoney(debt.movements
+    .filter(movement => movement.type === DebtMovementType.REPAY && isFutureTransaction(movement, now))
+    .map(movement => movement.amount));
+  return Math.max(0, round2(debt.amount - futureBorrowed + futureRepaid));
+}
+
+export function getDebtRemaining(debt: DebtRecord, now = new Date()): number {
+  return Math.max(0, round2(getDebtWithInterestAsOf(debt, now) - getDebtRepaidAsOf(debt, now)));
+}
+
+export function isDebtPaidOff(debt: DebtRecord, now = new Date()): boolean {
+  return getDebtRemaining(debt, now) <= 0;
+}
+
+export function calculateDebtsSummary(debts: DebtRecord[], now = new Date()): DebtsSummary {
+  const openLent = debts.filter(d => d.direction === DebtDirection.LENT && !isDebtPaidOff(d, now));
+  const openBorrowed = debts.filter(d => d.direction === DebtDirection.BORROWED && !isDebtPaidOff(d, now));
+
+  return {
+    lentRemaining: sumMoney(openLent.map(d => getDebtRemaining(d, now))),
+    lentCount: openLent.length,
+    borrowedRemaining: sumMoney(openBorrowed.map(d => getDebtRemaining(d, now))),
+    borrowedCount: openBorrowed.length,
+  };
+}
+

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   addMonthsClamped, toDateStr, toDateTimeLocalStr, parseDateStr,
   daysBetweenStr, daysInMonth, isLeapYear, isoWeek, isoWeekRange,
-  daysInYear, safeEndDate,
+  daysInYear, safeEndDate, addDays,
 } from '../domain/dateMath';
 
 describe('isLeapYear', () => {
@@ -152,6 +152,18 @@ describe('daysBetweenStr', () => {
   it('возвращает 0 на некорректном входе', () => {
     expect(daysBetweenStr('', '2026-01-01')).toBe(0);
     expect(daysBetweenStr('2026-01-01', 'мусор')).toBe(0);
+  });
+});
+
+describe('addDays', () => {
+  it('adds days across month and year boundaries', () => {
+    expect(addDays('2026-01-31', 1)).toBe('2026-02-01');
+    expect(addDays('2026-12-31', 1)).toBe('2027-01-01');
+  });
+
+  it('supports negative offsets and preserves invalid input', () => {
+    expect(addDays('2026-03-01', -1)).toBe('2026-02-28');
+    expect(addDays('invalid', 1)).toBe('invalid');
   });
 });
 

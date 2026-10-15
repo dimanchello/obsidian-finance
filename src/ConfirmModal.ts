@@ -9,6 +9,8 @@ export class ConfirmModal extends FinanceBaseModal {
     app: App,
     private message: string,
     private onConfirm: () => void | Promise<void>,
+    private confirmText?: string,
+    private isDanger = true,
   ) { super(app); this.tr = t(getLocaleFromApp(app)); }
 
   override onOpen(): void {
@@ -19,7 +21,8 @@ export class ConfirmModal extends FinanceBaseModal {
     const btns = contentEl.createDiv('finance-confirm-btns');
     btns.createEl('button', { text: this.tr.cancel, cls: CSS_CLASS.FINANCE_BTN_CANCEL })
         .addEventListener('click', () => this.close());
-    btns.createEl('button', { text: this.tr.deleteConfirm, cls: 'finance-btn-danger' })
+    const confirmBtnCls = this.isDanger ? CSS_CLASS.FINANCE_BTN_DANGER : CSS_CLASS.FINANCE_BTN_PRIMARY;
+    btns.createEl('button', { text: this.confirmText ?? this.tr.deleteConfirm, cls: confirmBtnCls })
         .addEventListener('click', () => { void this.onConfirm(); this.close(); });
   }
 }

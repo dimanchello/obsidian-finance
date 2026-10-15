@@ -4,6 +4,7 @@ import {
   getDepositAccrued,
   getDepositProfit,
   getDepositInitialAmount,
+  getDepositProjectedBalanceBeforeDate,
   getDepositCurrentAmount,
   getDepositTypeLabel,
 } from '../domain/depositCalculations';
@@ -63,6 +64,29 @@ describe('depositCalculations', () => {
     };
     // 116600 - 20000 + 5000 - 1600 = 100000
     expect(getDepositInitialAmount(depWithMovements)).toBe(100000);
+  });
+
+  it('reconstructs a capitalized balance at the start of a chart period', () => {
+    const capitalizedDeposit: DepositRecord = {
+      ...baseDeposit,
+      amount: 116600,
+      topUps: [
+        { id: 'tu-1', amount: 20000, date: '2026-02-15', time: '', createdAt: 1, note: '' },
+      ],
+      withdrawals: [
+        { id: 'wd-1', amount: 5000, date: '2026-03-10', time: '', createdAt: 2, note: '' },
+      ],
+    };
+    expect(getDepositProjectedBalanceBeforeDate(capitalizedDeposit, '2026-03-01')).toBe(120800);
+    expect(getDepositProjectedBalanceBeforeDate(capitalizedDeposit, '2026-04-01')).toBe(116600);
+  });
+
+  it('does not add accrued interest to the projected body when paid to the account', () => {
+    const depToAccount: DepositRecord = {
+      ...baseDeposit,
+      accrualType: DepositAccrualType.TO_ACCOUNT,
+    };
+    expect(getDepositProjectedBalanceBeforeDate(depToAccount, '2026-04-01')).toBe(100000);
   });
 
   it('does not subtract accrued interest from initial amount if paid to account', () => {

@@ -4,13 +4,15 @@ import { FinanceRecord,
   CHART_MIN_GROUP_MOBILE, CHART_MIN_GROUP_DESKTOP,
   CHART_MAX_BAR_W_MOBILE, CHART_MAX_BAR_W_SMALL, CHART_MAX_BAR_W_MED, CHART_MAX_BAR_W_LARGE,
   CHART_BAR_RATIO_MOBILE, CHART_BAR_RATIO_DESKTOP,
-  CHART_MAX_ITEMS, CHART_BAR_GAP, CHART_BAR_RADIUS, CHART_LABEL_ROTATE_THRESHOLD,} from './types';
+  CHART_MAX_ITEMS, CHART_BAR_GAP, CHART_BAR_RADIUS, CHART_LABEL_ROTATE_THRESHOLD,
+  SEARCH_DEBOUNCE_MS,} from './types';
 import { ViewContext } from './context';
 import { isoWeek } from './domain/dateMath';
 import { svg, fmtShort, shortMonth, createChartTooltip } from './ui/chartHelpers';
 import { CSS_CLASS, RecordType, DATE_FORMAT_LENGTH} from './constants';
 import { BaseAnalyticsView } from './ui/BaseAnalyticsView';
 import { fmtPercentage } from './utils';
+import { isFutureTransaction } from './domain/records';
 
 type ChartType = 'bar' | 'pie';
 type GroupBy   = 'category' | 'payer' | 'month' | 'week' | 'year';
@@ -82,7 +84,8 @@ export class AnalyticsView extends BaseAnalyticsView {
     dfG.createEl('label', { text: this.tr.from, cls: CSS_CLASS.FINANCE_FILTER_LABEL });
     const dfI = dfG.createEl('input', { type: 'datetime-local', cls: CSS_CLASS.FINANCE_FILTER_INPUT });
     if (this.dateFrom) dfI.value = `${this.dateFrom}T${this.timeFrom || '00:00'}`;
-    dfI.addEventListener('change', () => {
+    let dfDebounce: number | null = null;
+    const applyDf = () => {
       if (dfI.value) {
         const [d, t] = dfI.value.split('T');
         this.dateFrom = d ?? '';
@@ -92,13 +95,30 @@ export class AnalyticsView extends BaseAnalyticsView {
         this.timeFrom = '00:00';
       }
       this.redrawChart();
+    };
+    const triggerDf = () => {
+      if (dfDebounce !== null) window.clearTimeout(dfDebounce);
+      dfDebounce = window.setTimeout(() => {
+        dfDebounce = null;
+        applyDf();
+      }, SEARCH_DEBOUNCE_MS);
+    };
+    dfI.addEventListener('input', triggerDf);
+    dfI.addEventListener('change', triggerDf);
+    dfI.addEventListener('blur', () => {
+      if (dfDebounce !== null) {
+        window.clearTimeout(dfDebounce);
+        dfDebounce = null;
+        applyDf();
+      }
     });
 
     const dtG = dateRow.createDiv('finance-filter-group');
     dtG.createEl('label', { text: this.tr.to, cls: CSS_CLASS.FINANCE_FILTER_LABEL });
     const dtI = dtG.createEl('input', { type: 'datetime-local', cls: CSS_CLASS.FINANCE_FILTER_INPUT });
     if (this.dateTo) dtI.value = `${this.dateTo}T${this.timeTo || '23:59'}`;
-    dtI.addEventListener('change', () => {
+    let dtDebounce: number | null = null;
+    const applyDt = () => {
       if (dtI.value) {
         const [d, t] = dtI.value.split('T');
         this.dateTo = d ?? '';
@@ -108,6 +128,22 @@ export class AnalyticsView extends BaseAnalyticsView {
         this.timeTo = '00:00';
       }
       this.redrawChart();
+    };
+    const triggerDt = () => {
+      if (dtDebounce !== null) window.clearTimeout(dtDebounce);
+      dtDebounce = window.setTimeout(() => {
+        dtDebounce = null;
+        applyDt();
+      }, SEARCH_DEBOUNCE_MS);
+    };
+    dtI.addEventListener('input', triggerDt);
+    dtI.addEventListener('change', triggerDt);
+    dtI.addEventListener('blur', () => {
+      if (dtDebounce !== null) {
+        window.clearTimeout(dtDebounce);
+        dtDebounce = null;
+        applyDt();
+      }
     });
 
     this.chartEl = this.el.createDiv('finance-chart-area');
@@ -137,7 +173,7 @@ export class AnalyticsView extends BaseAnalyticsView {
     const map = new Map<string, { income: number; expense: number }>();
 
     this.records.forEach(r => {
-      if (r.isInternal) return;
+      if (r.isInternal || isFutureTransaction(r)) return;
 
       // Filter by analytics date range
       if (this.dateFrom && r.date < this.dateFrom) return;

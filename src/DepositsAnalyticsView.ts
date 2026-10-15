@@ -16,24 +16,42 @@ export class DepositsAnalyticsView extends BaseAnalyticsView {
     this.deposits = deposits;
   }
 
+  private controlsEl: HTMLElement | null = null;
+  private contentEl: HTMLElement | null = null;
+
   render(): void {
     this.setupContainer();
 
-    this.renderControls();
-    this.renderSummaryCards();
-    this.renderActiveDepositsList();
+    this.controlsEl = this.el.createDiv('finance-deposits-analytics-controls');
+    this.renderControls(this.controlsEl);
+    this.contentEl = this.el.createDiv('finance-deposits-analytics-content');
+    this.renderAnalyticsContent(this.contentEl);
   }
 
-  private renderControls(): void {
+  private updateContentOnly(): void {
+    if (this.contentEl?.isConnected) {
+      this.contentEl.empty();
+      this.renderAnalyticsContent(this.contentEl);
+    } else {
+      this.render();
+    }
+  }
+
+  private renderAnalyticsContent(container: HTMLElement): void {
+    this.renderSummaryCards(container);
+    this.renderActiveDepositsList(container);
+  }
+
+  private renderControls(container: HTMLElement): void {
     renderDateRangeFilter(
-      this.el,
+      container,
       this.ctx,
       {
         from: 'depositAnalyticsDateFrom',
         to: 'depositAnalyticsDateTo',
       },
       this.tr,
-      () => this.render()
+      () => this.updateContentOnly()
     );
   }
 
@@ -47,7 +65,7 @@ export class DepositsAnalyticsView extends BaseAnalyticsView {
     });
   }
 
-  private renderSummaryCards(): void {
+  private renderSummaryCards(container: HTMLElement): void {
     const deposits = this.getFilteredDeposits();
     const active = deposits.filter(d => d.status === DepositStatus.ACTIVE);
     const totalBalance = active.reduce((s, d) => s + d.amount, 0);
@@ -67,14 +85,14 @@ export class DepositsAnalyticsView extends BaseAnalyticsView {
       { label: this.tr.depositProjectedIncome, value: this.ctx.fmt(projectedIncome), mod: CSS_CLASS.INCOME },
       { label: this.tr.depositAvgRate, value: `${avgRate}%`, mod: 'neutral' },
     ];
-    renderStatCards(this.el, cards, 'finance-credit-analytics-cards');
+    renderStatCards(container, cards, 'finance-credit-analytics-cards');
   }
 
-  private renderActiveDepositsList(): void {
+  private renderActiveDepositsList(container: HTMLElement): void {
     const deposits = this.getFilteredDeposits().filter(d => d.status === DepositStatus.ACTIVE);
     if (!deposits.length) return;
 
-    const section = this.el.createDiv('finance-credit-progress-list');
+    const section = container.createDiv('finance-credit-progress-list');
     section.createDiv({ text: this.tr.depositActiveList, cls: 'finance-analytics-section-title' });
 
     deposits.forEach(d => {

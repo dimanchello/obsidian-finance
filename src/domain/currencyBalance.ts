@@ -1,8 +1,9 @@
 import { CurrencyExchange, CURRENCY_ROUNDING_PRECISION, CurrencyOperationType } from '../types';
+import { isFutureTransaction } from './records';
 
-export function getCurrencyBalance(exchanges: CurrencyExchange[], currency: string): number {
+export function getCurrencyBalance(exchanges: CurrencyExchange[], currency: string, now = new Date()): number {
   const balance = exchanges
-    .filter(e => e.targetCurrency === currency)
+    .filter(e => e.targetCurrency === currency && !isFutureTransaction(e, now))
     .reduce((sum, e) => {
       if (e.type === CurrencyOperationType.BUY || e.type === CurrencyOperationType.ADD) return sum + e.targetAmount;
       if (e.type === CurrencyOperationType.SELL || e.type === CurrencyOperationType.SPEND) return sum - e.targetAmount;
@@ -22,12 +23,13 @@ export interface CurrencyBalanceMetrics {
   valueInAccountCurrency: number;
 }
 
-export function getCurrencyBalances(exchanges: CurrencyExchange[]): Map<string, CurrencyBalanceMetrics> {
-  const currencies = new Set(exchanges.map(e => e.targetCurrency));
+export function getCurrencyBalances(exchanges: CurrencyExchange[], now = new Date()): Map<string, CurrencyBalanceMetrics> {
+  const validExchanges = exchanges.filter(e => !isFutureTransaction(e, now));
+  const currencies = new Set(validExchanges.map(e => e.targetCurrency));
   const result = new Map<string, CurrencyBalanceMetrics>();
   
   for (const currency of currencies) {
-    const ops = exchanges.filter(e => e.targetCurrency === currency);
+    const ops = validExchanges.filter(e => e.targetCurrency === currency);
     const buys = ops.filter(e => e.type === CurrencyOperationType.BUY);
     const adds = ops.filter(e => e.type === CurrencyOperationType.ADD);
     const sells = ops.filter(e => e.type === CurrencyOperationType.SELL);

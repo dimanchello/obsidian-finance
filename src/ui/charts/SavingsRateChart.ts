@@ -150,7 +150,7 @@ export class SavingsRateChart extends BaseChart {
         fill: 'var(--text-muted)',
         'font-size': '11px',
       });
-      label.textContent = d.label.slice(5);
+      label.textContent = d.label;
       colGroup.appendChild(label);
 
       const tipText = `${d.label}\n${tr.overviewSavingsRate}: ${clampedRate.toFixed(1)}%\n${tr.income}: ${formatChartAmount(d.income, this.ctx.currency)}\n${tr.expense}: ${formatChartAmount(d.expense, this.ctx.currency)}\n${tr.balance}: ${d.savings >= 0 ? '+' : ''}${formatChartAmount(d.savings, this.ctx.currency)}`;
@@ -191,5 +191,6 @@ export class SavingsRateChart extends BaseChart {
     });
 
     scrollWrap.appendChild(svg_el);
+    this.scrollToCurrentOrEnd(scrollWrap, containerWidth, savingsData.map(d => d.label), today);
   }
 }
