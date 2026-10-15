@@ -220,6 +220,6 @@ export abstract class BaseChart {
     };
 
     applyScroll();
-    requestAnimationFrame(applyScroll);
+    window.requestAnimationFrame(applyScroll);
   }
 }
