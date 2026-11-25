@@ -1,6 +1,7 @@
 import { FinanceRecord, RecordType, CreditRecord, DebtRecord, DepositRecord, DebtMovement, CurrencyExchange } from '../types';
 import { getTodayTime } from '../utils';
 import { DebtDirection, DebtMovementType } from '../constants';
+import { round2 } from './money';
 
 /**
  * Centralized logic for managing linkedId records.
@@ -189,18 +190,41 @@ export function createDebtMovementRecord(
   note: string,
   category: string
 ): FinanceRecord {
+  const isInterest = movement.type === DebtMovementType.INTEREST;
   return createLinkedRecord({
     entityId: debt.id,
     date: movement.date,
     time: movement.time,
-    type,
+    type: isInterest
+      ? (debt.direction === DebtDirection.LENT ? RecordType.INCOME : RecordType.EXPENSE)
+      : type,
     amount: movement.amount,
     category,
     payer: debt.person,
     note,
-    isInternal: true,
+    isInternal: !isInterest,
     linkedMovementId: movement.id,
   });
+}
+
+/**
+ * Formats the note for the interest portion of a debt repayment without leaving
+ * a dangling separator when the base note is empty.
+ */
+export function buildDebtInterestNote(
+  baseNote: string,
+  fallbackRepayNote: string,
+  interestSuffix: string
+): string {
+  const trimmedBase = baseNote.trim();
+  const trimmedSuffix = interestSuffix.trim();
+  if (!trimmedSuffix) return trimmedBase || fallbackRepayNote;
+  if (trimmedBase) {
+    if (trimmedBase.endsWith(trimmedSuffix)) return trimmedBase;
+    return `${trimmedBase} — ${trimmedSuffix}`;
+  }
+  const trimmedFallback = fallbackRepayNote.trim();
+  return trimmedFallback ? `${trimmedFallback} — ${trimmedSuffix}` : trimmedSuffix;
 }
 
 /**
@@ -217,10 +241,25 @@ export function createDebtMovementRecords(
   interestNote = note,
   interestCategory = category
 ): FinanceRecord[] {
+  if (movement.type === DebtMovementType.INTEREST) {
+    return [createLinkedRecord({
+      entityId: debt.id,
+      date: movement.date,
+      time: movement.time,
+      type: debt.direction === DebtDirection.LENT ? RecordType.INCOME : RecordType.EXPENSE,
+      amount: round2(Math.max(0, movement.amount)),
+      category: interestCategory,
+      payer: debt.person,
+      note: interestNote,
+      isInternal: false,
+      linkedMovementId: movement.id,
+    })];
+  }
+
   const interestAmount = movement.type === DebtMovementType.REPAY
-    ? Math.max(0, Math.min(movement.amount, movement.interestAmount ?? 0))
+    ? round2(Math.max(0, Math.min(movement.amount, movement.interestAmount ?? 0)))
     : 0;
-  const principalAmount = movement.amount - interestAmount;
+  const principalAmount = round2(Math.max(0, movement.amount - interestAmount));
   const records: FinanceRecord[] = [];
 
   if (principalAmount > 0) {

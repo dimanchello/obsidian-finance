@@ -5,7 +5,7 @@ import {
   type CreditRecord, type DepositRecord,
   CreditType, CreditStatus, EarlyRepaymentOption,
   DepositType, DepositStatus, DepositAccrualType,
-  PaymentStatus, RecordType,
+  PaymentStatus, RecordType, DayCountConvention,
 } from '../types';
 import { findLinkedRecords } from '../domain/linkedRecords';
 
@@ -233,6 +233,61 @@ describe('autoTransactions Integration Tests', () => {
       expect(result.changed.credits).toBe(false);
       expect(result.changed.records).toBe(false);
       expect(result.records.length).toBe(recordsAfterFirst);
+    });
+
+    it('обновляет currentAmount в хранилище и поддерживает firstPaymentInterestOnly', async () => {
+      const ORIGINAL_AMOUNT = 500_000;
+      const PAYMENT_DAY = 15;
+      const TERM_MONTHS = 12;
+      const INTEREST_RATE = 12;
+      const MONTHLY_PAYMENT = 45_000;
+      const credit: CreditRecord = {
+        id: 'credit-interest-only',
+        name: 'Ипотека',
+        bankName: 'Тест Банк',
+        originalAmount: ORIGINAL_AMOUNT,
+        currentAmount: ORIGINAL_AMOUNT,
+        type: CreditType.MORTGAGE,
+        interestRate: INTEREST_RATE,
+        monthlyPayment: MONTHLY_PAYMENT,
+        startDate: '2026-01-03',
+        paymentDay: PAYMENT_DAY,
+        termMonths: TERM_MONTHS,
+        status: CreditStatus.ACTIVE,
+        earlyRepaymentOption: null,
+        payments: [],
+        createdAt: Date.now(),
+        note: '',
+        isEscrow: false,
+        dayCountConvention: DayCountConvention.ACTUAL,
+        firstPaymentInterestOnly: true,
+      };
+
+      await storage.addCredit(accountId, credit);
+
+      let data = await storage.load(accountId);
+      let result = applyAutoTransactions(data, mkDeps('2026-01-20'));
+      const firstRunCredit = result.credits[0];
+      expect(firstRunCredit.payments).toHaveLength(TERM_MONTHS + 1);
+      expect(firstRunCredit.payments[0].dueDate).toBe('2026-01-15');
+      expect(firstRunCredit.payments[0].principalPart).toBe(0);
+      expect(firstRunCredit.currentAmount).toBe(ORIGINAL_AMOUNT);
+
+      await storage.updateCredit(accountId, firstRunCredit);
+      await storage.saveAllRecords(accountId, result.records);
+
+      data = await storage.load(accountId);
+      result = applyAutoTransactions(data, mkDeps('2026-02-20'));
+      const secondRunCredit = result.credits[0];
+      expect(secondRunCredit.payments[1].status).toBe(PaymentStatus.PAID);
+      expect(secondRunCredit.currentAmount).toBe(secondRunCredit.payments[1].remainingDebt);
+      expect(secondRunCredit.currentAmount).toBeLessThan(ORIGINAL_AMOUNT);
+
+      await storage.updateCredit(accountId, secondRunCredit);
+      await storage.flush();
+
+      const reloaded = await storage.load(accountId);
+      expect(reloaded.credits[0].currentAmount).toBe(secondRunCredit.currentAmount);
     });
   });
 

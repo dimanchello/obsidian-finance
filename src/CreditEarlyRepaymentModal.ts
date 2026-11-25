@@ -33,9 +33,7 @@ export class CreditEarlyRepaymentModal extends FinanceBaseModal {
     this.credit = { ...opts.credit, payments: [...opts.credit.payments] };
 
     this.pendingPayments = this.credit.payments.filter(p => p.status === PaymentStatus.PENDING);
-    this.actualRemaining = this.credit.currentAmount > 0
-      ? this.credit.currentAmount
-      : calculateRemainingPrincipal(this.credit);
+    this.actualRemaining = calculateRemainingPrincipal(this.credit);
   }
 
   override onOpen(): void {

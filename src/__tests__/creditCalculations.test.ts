@@ -9,9 +9,11 @@ import {
   getCreditTypeLabel,
   buildCreditScheduleChartData,
   calculatePeriodInterest,
+  calculateSplitPeriodInterest,
+  resolveFirstInterestOnlyDate,
   getLastPaidPaymentDate,
 } from '../domain/creditCalculations';
-import { CreditRecord, CreditType, CreditStatus, PaymentStatus, DayCountConvention } from '../types';
+import { CreditPayment, CreditRecord, CreditType, CreditStatus, PaymentStatus, DayCountConvention } from '../types';
 import { t } from '../i18n';
 
 describe('creditCalculations', () => {
@@ -398,17 +400,73 @@ describe('creditCalculations', () => {
 
     it('calculates interest crossing leap and non-leap year boundary properly', () => {
       // 2024-12-15 to 2025-01-15:
-      // 17 days in 2024 (/366) + 14 days in 2025 (/365)
-      // 1 000 000 * 0.12 * (17 / 366 + 14 / 365) = 1 000 000 * 0.12 * (0.046448087 + 0.038356164)
-      // = 120 000 * 0.084804251 = 10176.51
-      const interest = calculatePeriodInterest(1000000, 12, '2024-12-15', '2025-01-15');
-      expect(interest).toBe(10176.51);
+      // 16 days in 2024 (Dec 16..31, /366) + 15 days in 2025 (Jan 1..15, /365)
+      // 1 000 000 * 0.12 * (16 / 366 + 15 / 365) = 10177.41
+      const PRINCIPAL = 1_000_000;
+      const ANNUAL_RATE = 12;
+      const EXPECTED_INTEREST = 10_177.41;
+      const interest = calculatePeriodInterest(PRINCIPAL, ANNUAL_RATE, '2024-12-15', '2025-01-15');
+      expect(interest).toBe(EXPECTED_INTEREST);
+    });
+
+    it('calculates interest across a full multi-year span', () => {
+      // 2023-12-15 to 2025-01-15:
+      // 16 days in 2023 (/365) + 366 days in 2024 (/366) + 15 days in 2025 (/365) = 130191.78
+      const PRINCIPAL = 1_000_000;
+      const ANNUAL_RATE = 12;
+      const EXPECTED_INTEREST = 130_191.78;
+      const interest = calculatePeriodInterest(PRINCIPAL, ANNUAL_RATE, '2023-12-15', '2025-01-15');
+      expect(interest).toBe(EXPECTED_INTEREST);
     });
 
     it('returns 0 for non-positive principal or rate or inverted dates', () => {
       expect(calculatePeriodInterest(0, 12, '2025-01-01', '2025-02-01')).toBe(0);
       expect(calculatePeriodInterest(1000000, 0, '2025-01-01', '2025-02-01')).toBe(0);
       expect(calculatePeriodInterest(1000000, 12, '2025-02-01', '2025-01-01')).toBe(0);
+    });
+  });
+
+  describe('calculateSplitPeriodInterest', () => {
+    const PREV_PRINCIPAL = 1_000_000;
+    const CURRENT_PRINCIPAL = 900_000;
+    const ANNUAL_RATE = 12;
+
+    it('splits interest between prevPrincipal and currentPrincipal when prevPaidDate is between due dates', () => {
+      const EXPECTED_INTEREST = 9_238.36;
+      const interest = calculateSplitPeriodInterest(
+        PREV_PRINCIPAL,
+        CURRENT_PRINCIPAL,
+        ANNUAL_RATE,
+        '2025-01-15',
+        '2025-01-17',
+        '2025-02-15',
+      );
+      // 2 days at 1M (/365) + 29 days at 900k (/365) = 657.5342... + 8580.8219... = 9238.36
+      expect(interest).toBe(EXPECTED_INTEREST);
+    });
+
+    it('accrues on prevPrincipal for the whole period when prevPaidDate is on or after toDate', () => {
+      const interest = calculateSplitPeriodInterest(
+        PREV_PRINCIPAL,
+        CURRENT_PRINCIPAL,
+        ANNUAL_RATE,
+        '2025-01-15',
+        '2025-02-20',
+        '2025-02-15',
+      );
+      expect(interest).toBe(calculatePeriodInterest(PREV_PRINCIPAL, ANNUAL_RATE, '2025-01-15', '2025-02-15'));
+    });
+
+    it('uses currentPrincipal directly when prevPaidDate is absent or not delayed', () => {
+      const interest = calculateSplitPeriodInterest(
+        PREV_PRINCIPAL,
+        CURRENT_PRINCIPAL,
+        ANNUAL_RATE,
+        '2025-01-15',
+        undefined,
+        '2025-02-15',
+      );
+      expect(interest).toBe(calculatePeriodInterest(CURRENT_PRINCIPAL, ANNUAL_RATE, '2025-01-15', '2025-02-15'));
     });
   });
 
@@ -419,6 +477,42 @@ describe('creditCalculations', () => {
       expect(breakdown.interestPart).toBe(10191.78);
       expect(breakdown.principalPart).toBe(9808.22);
       expect(breakdown.remainingDebt).toBe(990191.78);
+    });
+
+    it('applies shiftedFrom split period when provided', () => {
+      const PREV_PRINCIPAL = 1_000_000;
+      const CURRENT_PRINCIPAL = 900_000;
+      const PAYMENT_AMOUNT = 20_000;
+      const ANNUAL_RATE = 12;
+      const EXPECTED_INTEREST = 9_238.36;
+      const EXPECTED_PRINCIPAL = 10_761.64;
+      const EXPECTED_REMAINING = 889_238.36;
+      const period = {
+        fromDate: '2025-01-15',
+        toDate: '2025-02-15',
+        shiftedFrom: { prevPrincipal: PREV_PRINCIPAL, paidDate: '2025-01-17' },
+      };
+      const breakdown = calculatePaymentBreakdown(CURRENT_PRINCIPAL, PAYMENT_AMOUNT, ANNUAL_RATE, false, period);
+      expect(breakdown.interestPart).toBe(EXPECTED_INTEREST);
+      expect(breakdown.principalPart).toBe(EXPECTED_PRINCIPAL);
+      expect(breakdown.remainingDebt).toBe(EXPECTED_REMAINING);
+    });
+  });
+
+  describe('resolveFirstInterestOnlyDate', () => {
+    const PAYMENT_DAY = 15;
+
+    it('returns same-month date when start day precedes paymentDay', () => {
+      expect(resolveFirstInterestOnlyDate('2024-05-03', PAYMENT_DAY)).toBe('2024-05-15');
+    });
+
+    it('returns next-month date when start day follows paymentDay', () => {
+      expect(resolveFirstInterestOnlyDate('2024-05-20', PAYMENT_DAY)).toBe('2024-06-15');
+    });
+
+    it('returns null when start day matches paymentDay or paymentDay is missing', () => {
+      expect(resolveFirstInterestOnlyDate('2024-05-15', PAYMENT_DAY)).toBeNull();
+      expect(resolveFirstInterestOnlyDate('2024-05-03', undefined)).toBeNull();
     });
   });
 
@@ -473,6 +567,256 @@ describe('creditCalculations', () => {
       // Next payment calculates from 960000
       const expectedNextInterest = calculatePeriodInterest(960000, 12, '2025-02-15', '2025-03-15');
       expect(schedule.payments[1]?.interestPart).toBe(expectedNextInterest);
+    });
+
+    it('handles VTB mortgage with firstPaymentInterestOnly and weekend-shifted paidDates to exact remaining debt', () => {
+      const VTB_ORIGINAL_AMOUNT = 7_724_769;
+      const VTB_RATE = 5;
+      const VTB_MONTHLY_PAYMENT = 47_244;
+      const VTB_TERM_MONTHS = 276;
+      const VTB_PAYMENT_DAY = 15;
+      const EXPECTED_FIRST_INTEREST = 12_663.56;
+      const EXPECTED_BALANCE_AFTER_NOV_2026 = 7_245_608.3;
+      const EXPECTED_FINAL_PAYMENT = 1_132.39;
+      const AS_OF_TODAY = '2026-11-25';
+
+      const weekendShifts = new Map<string, string>([
+        ['2024-06-15', '2024-06-17'],
+        ['2024-09-15', '2024-09-16'],
+        ['2024-12-15', '2024-12-16'],
+        ['2025-02-15', '2025-02-17'],
+        ['2025-03-15', '2025-03-17'],
+        ['2025-06-15', '2025-06-16'],
+      ]);
+
+      let seq = 0;
+      const initial = generateAnnuitySchedule({
+        originalAmount: VTB_ORIGINAL_AMOUNT,
+        interestRate: VTB_RATE,
+        termMonths: VTB_TERM_MONTHS,
+        monthlyPayment: VTB_MONTHLY_PAYMENT,
+        startDate: '2024-05-03',
+        paymentDay: VTB_PAYMENT_DAY,
+        dayCountConvention: DayCountConvention.ACTUAL,
+        firstPaymentInterestOnly: true,
+        today: AS_OF_TODAY,
+        newId: () => `vtb-${++seq}`,
+      });
+
+      const withShiftedPaidDates: CreditPayment[] = initial.payments.map(p => {
+        const shiftedPaidDate = weekendShifts.get(p.dueDate);
+        if (!shiftedPaidDate) return p;
+        return { ...p, paidDate: shiftedPaidDate };
+      });
+
+      const recalculated = generateAnnuitySchedule({
+        originalAmount: VTB_ORIGINAL_AMOUNT,
+        interestRate: VTB_RATE,
+        termMonths: VTB_TERM_MONTHS,
+        monthlyPayment: VTB_MONTHLY_PAYMENT,
+        startDate: '2024-05-03',
+        paymentDay: VTB_PAYMENT_DAY,
+        existingPayments: withShiftedPaidDates,
+        dayCountConvention: DayCountConvention.ACTUAL,
+        firstPaymentInterestOnly: true,
+        recalculateAll: true,
+        today: AS_OF_TODAY,
+        newId: () => `vtb-recalc-${++seq}`,
+      });
+
+      expect(recalculated.payments).toHaveLength(VTB_TERM_MONTHS + 1);
+      expect(recalculated.payments[0]).toMatchObject({
+        dueDate: '2024-05-15',
+        amount: EXPECTED_FIRST_INTEREST,
+        principalPart: 0,
+        interestPart: EXPECTED_FIRST_INTEREST,
+        remainingDebt: VTB_ORIGINAL_AMOUNT,
+        status: PaymentStatus.PAID,
+      });
+      expect(recalculated.currentAmount).toBe(EXPECTED_BALANCE_AFTER_NOV_2026);
+      const nov2026 = recalculated.payments.find(p => p.dueDate === '2026-11-15');
+      expect(nov2026?.remainingDebt).toBe(EXPECTED_BALANCE_AFTER_NOV_2026);
+
+      const finalPayment = recalculated.payments[recalculated.payments.length - 1]!;
+      expect(finalPayment.dueDate).toBe('2047-05-15');
+      expect(finalPayment.amount).toBe(EXPECTED_FINAL_PAYMENT);
+      expect(finalPayment.remainingDebt).toBe(0);
+    });
+
+    it('schedules first interest-only payment in next month when startDate day exceeds paymentDay', () => {
+      const PRINCIPAL = 100_000;
+      const RATE = 12;
+      const TERM = 3;
+      const PAYMENT = 34_000;
+      const PAYMENT_DAY = 15;
+      const schedule = generateAnnuitySchedule({
+        originalAmount: PRINCIPAL,
+        interestRate: RATE,
+        termMonths: TERM,
+        monthlyPayment: PAYMENT,
+        startDate: '2024-05-20',
+        paymentDay: PAYMENT_DAY,
+        dayCountConvention: DayCountConvention.ACTUAL,
+        firstPaymentInterestOnly: true,
+        today: '2024-05-20',
+      });
+
+      expect(schedule.payments.map(p => p.dueDate)).toEqual([
+        '2024-06-15',
+        '2024-07-15',
+        '2024-08-15',
+        '2024-09-15',
+      ]);
+      expect(schedule.payments[0]?.principalPart).toBe(0);
+      expect(schedule.payments[0]?.interestPart).toBe(
+        calculatePeriodInterest(PRINCIPAL, RATE, '2024-05-20', '2024-06-15'),
+      );
+      expect(schedule.payments[0]?.remainingDebt).toBe(PRINCIPAL);
+    });
+
+    it('supports firstPaymentInterestOnly under fixed 30-day convention', () => {
+      const PRINCIPAL = 120_000;
+      const RATE = 12;
+      const TERM = 2;
+      const PAYMENT = 62_000;
+      const PAYMENT_DAY = 15;
+      const EXPECTED_STUB_INTEREST = 400; // 120000 * 0.01 * (10 / 30)
+      const schedule = generateAnnuitySchedule({
+        originalAmount: PRINCIPAL,
+        interestRate: RATE,
+        termMonths: TERM,
+        monthlyPayment: PAYMENT,
+        startDate: '2024-05-05',
+        paymentDay: PAYMENT_DAY,
+        dayCountConvention: DayCountConvention.FIXED_30,
+        firstPaymentInterestOnly: true,
+        today: '2024-05-05',
+      });
+
+      expect(schedule.payments).toHaveLength(TERM + 1);
+      expect(schedule.payments[0]).toMatchObject({
+        dueDate: '2024-05-15',
+        amount: EXPECTED_STUB_INTEREST,
+        principalPart: 0,
+        interestPart: EXPECTED_STUB_INTEREST,
+        remainingDebt: PRINCIPAL,
+      });
+    });
+
+    it('does not steal 2024-06-15 payment onto 2024-05-15 when enabling firstPaymentInterestOnly', () => {
+      const ORIGINAL = 1_000_000;
+      const RATE = 12;
+      const TERM = 3;
+      const PAYMENT = 50_000;
+      const PAYMENT_DAY = 15;
+      const STALE_PRINCIPAL = 40_000;
+      const STALE_INTEREST = 10_000;
+      const STALE_REMAINING = 960_000;
+      const existing: CreditPayment[] = [
+        {
+          id: 'june-paid',
+          amount: PAYMENT,
+          dueDate: '2024-06-15',
+          status: PaymentStatus.PAID,
+          paidDate: '2024-06-15',
+          principalPart: STALE_PRINCIPAL,
+          interestPart: STALE_INTEREST,
+          remainingDebt: STALE_REMAINING,
+        },
+        {
+          id: 'july-pending',
+          amount: PAYMENT,
+          dueDate: '2024-07-15',
+          status: PaymentStatus.PENDING,
+        },
+      ];
+
+      const schedule = generateAnnuitySchedule({
+        originalAmount: ORIGINAL,
+        interestRate: RATE,
+        termMonths: TERM,
+        monthlyPayment: PAYMENT,
+        startDate: '2024-05-03',
+        paymentDay: PAYMENT_DAY,
+        existingPayments: existing,
+        dayCountConvention: DayCountConvention.ACTUAL,
+        firstPaymentInterestOnly: true,
+        recalculateAll: true,
+        today: '2024-06-20',
+        newId: () => 'stub-may',
+      });
+
+      expect(schedule.payments[0]?.id).toBe('stub-may');
+      expect(schedule.payments[0]?.dueDate).toBe('2024-05-15');
+      expect(schedule.payments[0]?.principalPart).toBe(0);
+      expect(schedule.payments[1]?.id).toBe('june-paid');
+      expect(schedule.payments[1]?.dueDate).toBe('2024-06-15');
+      expect(schedule.payments[2]?.id).toBe('july-pending');
+      expect(schedule.payments[2]?.dueDate).toBe('2024-07-15');
+    });
+
+    it('recalculates PAID breakdowns and monthly payment amounts when recalculateAll is true', () => {
+      const OLD_PAYMENT = 50_000;
+      const NEW_PAYMENT = 60_000;
+      const NEW_ORIGINAL = 1_200_000;
+      const RATE = 12;
+      const TERM = 3;
+      const PAYMENT_DAY = 15;
+      const PREV_PRINCIPAL_PART = 39_808.22;
+      const PREV_INTEREST_PART = 10_191.78;
+      const PREV_REMAINING = 960_191.78;
+      const existing: CreditPayment[] = [
+        {
+          id: 'p1',
+          amount: OLD_PAYMENT,
+          dueDate: '2025-02-15',
+          status: PaymentStatus.PAID,
+          paidDate: '2025-02-15',
+          principalPart: PREV_PRINCIPAL_PART,
+          interestPart: PREV_INTEREST_PART,
+          remainingDebt: PREV_REMAINING,
+        },
+      ];
+
+      const schedule = generateAnnuitySchedule({
+        originalAmount: NEW_ORIGINAL,
+        interestRate: RATE,
+        termMonths: TERM,
+        monthlyPayment: NEW_PAYMENT,
+        previousMonthlyPayment: OLD_PAYMENT,
+        startDate: '2025-01-15',
+        paymentDay: PAYMENT_DAY,
+        existingPayments: existing,
+        dayCountConvention: DayCountConvention.ACTUAL,
+        recalculateAll: true,
+        today: '2025-02-20',
+      });
+
+      const expectedInterest = calculatePeriodInterest(NEW_ORIGINAL, RATE, '2025-01-15', '2025-02-15');
+      expect(schedule.payments[0]?.amount).toBe(NEW_PAYMENT);
+      expect(schedule.payments[0]?.interestPart).toBe(expectedInterest);
+      expect(schedule.payments[0]?.remainingDebt).toBe(NEW_ORIGINAL - (NEW_PAYMENT - expectedInterest));
+      expect(schedule.currentAmount).toBe(schedule.payments[0]?.remainingDebt);
+    });
+
+    it('stops generating trailing pending slots once credit is paid off before termMonths', () => {
+      const ORIGINAL = 100_000;
+      const RATE = 12;
+      const TERM = 12;
+      const LARGE_PAYMENT = 60_000;
+      const schedule = generateAnnuitySchedule({
+        originalAmount: ORIGINAL,
+        interestRate: RATE,
+        termMonths: TERM,
+        monthlyPayment: LARGE_PAYMENT,
+        startDate: '2030-01-01',
+        paymentDay: 1,
+        today: '2030-01-01',
+      });
+
+      expect(schedule.payments).toHaveLength(2);
+      expect(schedule.payments[1]?.remainingDebt).toBe(0);
+      expect(schedule.payments[1]?.amount).toBeLessThan(LARGE_PAYMENT);
     });
   });
 

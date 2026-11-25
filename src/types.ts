@@ -64,6 +64,7 @@ export interface DebtMovement {
   type:      DebtMovementType;
   amount:    number;
   interestAmount?: number; // Portion of a repayment that is interest; the remainder is principal
+  manualInterest?: boolean; // True when user explicitly overrode the principal/interest split
   date:      string;   // YYYY-MM-DD
   time:      string;   // HH:MM
   createdAt: number;
@@ -74,7 +75,7 @@ export interface DebtMovement {
 export interface DebtRecord {
   id:           string;
   person:       string;
-  amount:       number;   // current total (sum borrow - sum repay) WITHOUT interest
+  amount:       number;   // current total (sum borrow - sum repay principal) WITHOUT interest
   originalAmount: number; // original amount without interest
   interestRate: number;   // percentage (e.g., 10 = 10%)
   direction:    DebtDirection;
@@ -312,6 +313,7 @@ export const SKELETON_CARD_COUNT = 3;
 export const PLURAL_THRESHOLD = 5;
 export const DAYS_IN_YEAR = 365;
 export const DAYS_IN_LEAP_YEAR = 366;
+export const DAYS_IN_FIXED_MONTH = 30;
 export const ACCRUAL_STEP_MONTHLY = 12;
 export const ONE_WEEK_MS = 604_800_000;
 export const AUTO_TX_INTERVAL_MS = 3_600_000;
@@ -399,6 +401,7 @@ export interface CreditRecord {
   isEscrow?: boolean; // funds go to developer via escrow account, not added to balance
   attachmentPath?: string;
   dayCountConvention?: DayCountConvention | undefined;
+  firstPaymentInterestOnly?: boolean | undefined;
 }
 
 export type DepositAccrualStatus = PaymentStatus;

@@ -110,8 +110,12 @@ export interface Translations {
   specifyPerson: string;
   borrowAmountLabel: string;
   repayAmountLabel: string;
+  debtInterestAmountLabel: string;
   repaymentInterestLabel: string;
   repaymentInterestDesc: string;
+  repaymentSplitPreview: string;
+  repaymentInterestIncomeKind: string;
+  repaymentInterestExpenseKind: string;
   interestExceedsRepayment: string;
   debtInterestCategory: string;
   debtInterestNote: string;
@@ -416,12 +420,15 @@ export interface Translations {
   fieldDescCreditRate: string;
   fieldDescCreditStartDate: string;
   fieldDescCreditPaymentDay: string;
+  fieldDescCreditFirstPaymentInterestOnly: string;
   fieldDescCreditTerm: string;
   fieldDescCreditType: string;
   fieldDescCreditMonthlyPayment: string;
   fieldDescCreditBank: string;
   isEscrowLabel: string;
   isEscrowDesc: string;
+  firstPaymentInterestOnlyLabel: string;
+  firstPaymentInterestOnlyDesc: string;
   fieldDescDebtAmount: string;
   fieldDescDebtRate: string;
   fieldDescDebtDateCreated: string;
@@ -1068,8 +1075,12 @@ const ru: Translations = {
   specifyPerson: '⚠️ Укажите кому',
   borrowAmountLabel: 'Сумма (увеличить долг) *',
   repayAmountLabel: 'Сумма (погашение) *',
+  debtInterestAmountLabel: 'Сумма (проценты) *',
   repaymentInterestLabel: 'Проценты в этой сумме',
-  repaymentInterestDesc: 'Укажите, какая часть платежа — проценты. Остаток считается возвратом тела долга.',
+  repaymentInterestDesc: 'Автоматически выносится в отдельную операцию по процентам для суммы сверх остатка тела долга; при необходимости можно изменить вручную.',
+  repaymentSplitPreview: 'Тело (внутренняя): {principal} · Проценты ({kind}): {interest}',
+  repaymentInterestIncomeKind: 'доход',
+  repaymentInterestExpenseKind: 'расход',
   interestExceedsRepayment: 'Сумма процентов не может быть больше суммы погашения',
   debtInterestCategory: 'Проценты по долгу',
   debtInterestNote: 'Проценты по долгу',
@@ -1088,12 +1099,15 @@ const ru: Translations = {
   fieldDescCreditRate: 'Годовая процентная ставка. Используется для расчёта ежемесячного платежа.',
   fieldDescCreditStartDate: 'Дата выдачи кредита банком. Используется как точка отсчёта для графика платежей — от неё считаются месяцы.',
   fieldDescCreditPaymentDay: 'Число месяца, в которое нужно вносить ежемесячный платёж. Например, 15 — платёж будет 15-го каждого месяца. Если не указано, число берётся из даты начала кредита.',
+  fieldDescCreditFirstPaymentInterestOnly: 'Включите, если в месяц выдачи банк списывает только начисленные проценты за неполный период до ближайшего дня платежа, а полное тело и аннуитет начинаются со следующего месяца.',
   fieldDescCreditTerm: 'Срок кредита в месяцах. От него зависит сумма ежемесячного платежа и общая переплата.',
   fieldDescCreditType: 'Тип кредита: потребительский, автокредит или ипотека. Влияет на группировку и фильтрацию.',
   fieldDescCreditMonthlyPayment: 'Фиксированная сумма, которую нужно платить каждый месяц. Рассчитывается автоматически на основе суммы, ставки и срока.',
   fieldDescCreditBank: 'Название банка, в котором оформлен кредит. Используется для группировки и фильтрации.',
   isEscrowLabel: 'Средства на эскроу-счёт',
   isEscrowDesc: 'Деньги перечислены банком застройщику через эскроу-счёт и не поступают на баланс счёта',
+  firstPaymentInterestOnlyLabel: 'Первый платёж — только проценты',
+  firstPaymentInterestOnlyDesc: 'Если дата выдачи не совпадает с днём платежа: первый платёж в ближайший день платежа включает только начисленные проценты за неполный период (как в ВТБ/Сбербанке)',
   fieldDescDebtAmount: 'Сумма долга. Если указан процент, итоговая сумма будет увеличена на процент.',
   fieldDescDebtRate: 'Процент за пользование деньгами. Итоговая сумма долга = сумма + процент.',
   fieldDescDebtDateCreated: 'Дата, когда долг был оформлен.',
@@ -1736,8 +1750,12 @@ const en: Translations = {
   specifyPerson: '⚠️ Specify a person',
   borrowAmountLabel: 'Amount (increase debt) *',
   repayAmountLabel: 'Amount (repayment) *',
+  debtInterestAmountLabel: 'Amount (interest) *',
   repaymentInterestLabel: 'Interest included in this payment',
-  repaymentInterestDesc: 'Enter the interest portion of the payment. The remainder is treated as returned principal.',
+  repaymentInterestDesc: 'Automatically extracted into a separate interest operation for any amount exceeding remaining principal; you can adjust it manually.',
+  repaymentSplitPreview: 'Principal (internal): {principal} · Interest ({kind}): {interest}',
+  repaymentInterestIncomeKind: 'income',
+  repaymentInterestExpenseKind: 'expense',
   interestExceedsRepayment: 'Interest cannot exceed the repayment amount',
   debtInterestCategory: 'Debt interest',
   debtInterestNote: 'Debt interest',
@@ -1756,12 +1774,15 @@ const en: Translations = {
   fieldDescCreditRate: 'Annual interest rate. Used to calculate the monthly payment.',
   fieldDescCreditStartDate: 'Loan origination date — when the bank issued the loan. Used as the starting point for the payment schedule: months are counted from this date.',
   fieldDescCreditPaymentDay: 'Day of the month on which the monthly payment is due. For example, 15 means payment falls on the 15th each month. If not set, the day is taken from the start date.',
+  fieldDescCreditFirstPaymentInterestOnly: 'Enable if the bank charges accrued interest only for the partial period until the first payment day, starting regular annuity payments in the following month.',
   fieldDescCreditTerm: 'Loan term in months. Affects the monthly payment amount and total overpayment.',
   fieldDescCreditType: 'Credit type: consumer, auto loan, or mortgage. Used for grouping and filtering.',
   fieldDescCreditMonthlyPayment: 'Fixed monthly payment amount. Calculated automatically based on amount, rate, and term.',
   fieldDescCreditBank: 'Bank name where the loan was taken. Used for grouping and filtering.',
   isEscrowLabel: 'Funds via escrow account',
   isEscrowDesc: 'Funds are transferred by the bank to the developer via escrow and do not appear in your account balance',
+  firstPaymentInterestOnlyLabel: 'First payment — interest only',
+  firstPaymentInterestOnlyDesc: 'When origination date differs from payment day: the first payment on the next payment day covers accrued interest only for the partial period',
   fieldDescDebtAmount: 'Debt amount. If interest is set, the total amount is increased by the interest.',
   fieldDescDebtRate: 'Interest rate for borrowing. Total debt = amount + interest.',
   fieldDescDebtDateCreated: 'Date when the debt was created.',

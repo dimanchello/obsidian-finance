@@ -164,13 +164,266 @@ describe('AccountCommands', () => {
         'Interest'
       );
 
-      const records = findLinkedRecords((await storage.load(accountId)).records, debt.id);
+      const loaded = await storage.load(accountId);
+      const updatedDebt = loaded.debts.find(d => d.id === debt.id)!;
+      expect(updatedDebt.movements).toHaveLength(2);
+      expect(updatedDebt.movements[0]).toMatchObject({ type: DebtMovementType.REPAY, amount: 100 });
+      expect(updatedDebt.movements[1]).toMatchObject({ type: DebtMovementType.INTEREST, amount: 10 });
+
+      const records = findLinkedRecords(loaded.records, debt.id);
       expect(records).toHaveLength(2);
       expect(records.find(record => record.isInternal)?.amount).toBe(100);
       expect(records.find(record => !record.isInternal)).toMatchObject({
         type: RecordType.INCOME,
         amount: 10,
         category: 'Interest',
+      });
+    });
+
+    it('addDebtMovement auto-splits excess over principal into income (LENT) and expense (BORROWED)', async () => {
+      const PRINCIPAL_TEN_K = 10_000;
+      const AMOUNT_ELEVEN_K = 11_000;
+      const INTEREST_ONE_K = 1_000;
+      const RATE_TEN = 10;
+
+      const lentDebt: DebtRecord = {
+        id: 'debt-lent-auto',
+        person: 'Alex',
+        amount: PRINCIPAL_TEN_K,
+        originalAmount: PRINCIPAL_TEN_K,
+        interestRate: RATE_TEN,
+        direction: DebtDirection.LENT,
+        date: '2026-01-01',
+        time: '10:00',
+        dueDate: '',
+        createdAt: Date.now(),
+        note: '',
+        movements: [
+          {
+            id: 'mov-init-l',
+            type: DebtMovementType.BORROW,
+            amount: PRINCIPAL_TEN_K,
+            date: '2026-01-01',
+            time: '10:00',
+            createdAt: Date.now(),
+            note: '',
+          },
+        ],
+      };
+      const borrowedDebt: DebtRecord = {
+        ...lentDebt,
+        id: 'debt-borrowed-auto',
+        direction: DebtDirection.BORROWED,
+        movements: [{ ...lentDebt.movements[0]!, id: 'mov-init-b' }],
+      };
+      await storage.addDebt(accountId, lentDebt);
+      await storage.addDebt(accountId, borrowedDebt);
+
+      await commands.addDebtMovement(
+        lentDebt.id,
+        {
+          id: 'mov-repay-l',
+          type: DebtMovementType.REPAY,
+          amount: AMOUNT_ELEVEN_K,
+          date: '2026-02-01',
+          time: '12:00',
+          createdAt: Date.now(),
+          note: '',
+        },
+        'Долг',
+        'Возврат долга: Alex',
+        'Проценты по долгу',
+        'Проценты по долгу'
+      );
+
+      await commands.addDebtMovement(
+        borrowedDebt.id,
+        {
+          id: 'mov-repay-b',
+          type: DebtMovementType.REPAY,
+          amount: AMOUNT_ELEVEN_K,
+          date: '2026-02-01',
+          time: '12:00',
+          createdAt: Date.now(),
+          note: '',
+        },
+        'Долг',
+        'Возврат долга: Alex',
+        'Проценты по долгу',
+        'Проценты по долгу'
+      );
+
+      const loaded = await storage.load(accountId);
+      const lentRecs = findLinkedRecords(loaded.records, lentDebt.id);
+      expect(lentRecs.find(r => r.isInternal)?.amount).toBe(PRINCIPAL_TEN_K);
+      expect(lentRecs.find(r => !r.isInternal)).toMatchObject({
+        type: RecordType.INCOME,
+        amount: INTEREST_ONE_K,
+        isInternal: false,
+      });
+      expect(loaded.debts.find(d => d.id === lentDebt.id)?.amount).toBe(0);
+
+      const borrowedRecs = findLinkedRecords(loaded.records, borrowedDebt.id);
+      expect(borrowedRecs.find(r => r.isInternal)?.amount).toBe(PRINCIPAL_TEN_K);
+      expect(borrowedRecs.find(r => !r.isInternal)).toMatchObject({
+        type: RecordType.EXPENSE,
+        amount: INTEREST_ONE_K,
+        isInternal: false,
+      });
+    });
+
+    it('deleteDebtMovement deletes only target movement and keeps separate interest movement intact', async () => {
+      const PRINCIPAL_TEN_K = 10_000;
+      const AMOUNT_SIX_K = 6_000;
+      const AMOUNT_FIVE_K = 5_000;
+      const PRINCIPAL_FOUR_K = 4_000;
+      const INTEREST_ONE_K = 1_000;
+      const RATE_TEN = 10;
+      const THREE_MOVEMENTS = 3;
+
+      const debt: DebtRecord = {
+        id: 'debt-rebalance',
+        person: 'Alex',
+        amount: PRINCIPAL_TEN_K,
+        originalAmount: PRINCIPAL_TEN_K,
+        interestRate: RATE_TEN,
+        direction: DebtDirection.LENT,
+        date: '2026-01-01',
+        time: '10:00',
+        dueDate: '',
+        createdAt: 1,
+        note: '',
+        movements: [
+          { id: 'm1', type: DebtMovementType.BORROW, amount: PRINCIPAL_TEN_K, date: '2026-01-01', time: '10:00', createdAt: 1, note: '' },
+        ],
+      };
+      await storage.addDebt(accountId, debt);
+
+      const m2: DebtMovement = {
+        id: 'm2', type: DebtMovementType.REPAY, amount: AMOUNT_SIX_K, date: '2026-02-01', time: '10:00', createdAt: 2, note: '',
+      };
+      const m3: DebtMovement = {
+        id: 'm3', type: DebtMovementType.REPAY, amount: AMOUNT_FIVE_K, date: '2026-03-01', time: '10:00', createdAt: THREE_MOVEMENTS, note: '',
+      };
+      await commands.addDebtMovement(debt.id, m2, 'Долг', 'Возврат долга: Alex', 'Проценты по долгу', 'Проценты по долгу');
+      await commands.addDebtMovement(debt.id, m3, 'Долг', 'Возврат долга: Alex', 'Проценты по долгу', 'Проценты по долгу');
+
+      await commands.deleteDebtMovement(debt.id, m2.id, m2.date, m2.amount, {
+        debtDefaultCat: 'Долг',
+        debtRepayNote: 'Возврат долга',
+        debtInterestNote: 'Проценты по долгу',
+        debtInterestCategory: 'Проценты по долгу',
+      });
+
+      const loaded = await storage.load(accountId);
+      const updatedDebt = loaded.debts[0]!;
+      expect(updatedDebt.movements).toHaveLength(THREE_MOVEMENTS);
+      expect(updatedDebt.amount).toBe(AMOUNT_SIX_K);
+      const remainingM3 = updatedDebt.movements.find(m => m.id === 'm3');
+      const interestMov = updatedDebt.movements.find(m => m.type === DebtMovementType.INTEREST)!;
+      expect(remainingM3).toMatchObject({ type: DebtMovementType.REPAY, amount: PRINCIPAL_FOUR_K });
+      expect(interestMov.amount).toBe(INTEREST_ONE_K);
+      expect(loaded.records.find(r => r.linkedMovementId === 'm3')).toMatchObject({ amount: PRINCIPAL_FOUR_K, isInternal: true });
+      expect(loaded.records.find(r => r.linkedMovementId === interestMov.id)).toMatchObject({ amount: INTEREST_ONE_K, isInternal: false });
+    });
+
+    it('updateDebtMovement splits updated repayment exceeding principal into REPAY and INTEREST', async () => {
+      const PRINCIPAL_TEN_K = 10_000;
+      const INITIAL_REPAY = 8_000;
+      const UPDATED_REPAY = 11_000;
+      const INTEREST_ONE_K = 1_000;
+      const RATE_TEN = 10;
+      const THREE_MOVEMENTS = 3;
+
+      const debt: DebtRecord = {
+        id: 'debt-update-split',
+        person: 'Alex',
+        amount: PRINCIPAL_TEN_K,
+        originalAmount: PRINCIPAL_TEN_K,
+        interestRate: RATE_TEN,
+        direction: DebtDirection.LENT,
+        date: '2026-01-01',
+        time: '10:00',
+        dueDate: '',
+        createdAt: 1,
+        note: '',
+        movements: [
+          { id: 'm1', type: DebtMovementType.BORROW, amount: PRINCIPAL_TEN_K, date: '2026-01-01', time: '10:00', createdAt: 1, note: '' },
+        ],
+      };
+      await storage.addDebt(accountId, debt);
+
+      const m2: DebtMovement = {
+        id: 'm2', type: DebtMovementType.REPAY, amount: INITIAL_REPAY, date: '2026-02-01', time: '10:00', createdAt: 2, note: '',
+      };
+      await commands.addDebtMovement(debt.id, m2, 'Долг', 'Возврат долга: Alex', 'Проценты по долгу', 'Проценты по долгу');
+
+      await commands.updateDebtMovement(
+        debt.id,
+        m2,
+        { ...m2, amount: UPDATED_REPAY },
+        'Возврат долга: Alex',
+        'Долг',
+        'Проценты по долгу',
+        'Проценты по долгу'
+      );
+
+      const loaded = await storage.load(accountId);
+      const updatedDebt = loaded.debts[0]!;
+      expect(updatedDebt.movements).toHaveLength(THREE_MOVEMENTS);
+      expect(updatedDebt.amount).toBe(0);
+      const interestMov = updatedDebt.movements.find(m => m.type === DebtMovementType.INTEREST)!;
+      expect(updatedDebt.movements.find(m => m.id === 'm2')).toMatchObject({ type: DebtMovementType.REPAY, amount: PRINCIPAL_TEN_K });
+      expect(interestMov.amount).toBe(INTEREST_ONE_K);
+      expect(loaded.records.find(r => r.linkedMovementId === 'm2')).toMatchObject({ amount: PRINCIPAL_TEN_K, isInternal: true });
+      expect(loaded.records.find(r => r.linkedMovementId === interestMov.id)).toMatchObject({
+        type: RecordType.INCOME,
+        amount: INTEREST_ONE_K,
+        isInternal: false,
+      });
+    });
+
+    it('addDebtMovement handles standalone INTEREST movement without lowering principal', async () => {
+      const PRINCIPAL_TEN_K = 10_000;
+      const INTEREST_ONE_K = 1_000;
+      const RATE_TEN = 10;
+
+      const debt: DebtRecord = {
+        id: 'debt-standalone-int',
+        person: 'Alex',
+        amount: PRINCIPAL_TEN_K,
+        originalAmount: PRINCIPAL_TEN_K,
+        interestRate: RATE_TEN,
+        direction: DebtDirection.BORROWED,
+        date: '2026-01-01',
+        time: '10:00',
+        dueDate: '',
+        createdAt: 1,
+        note: '',
+        movements: [
+          { id: 'm1', type: DebtMovementType.BORROW, amount: PRINCIPAL_TEN_K, date: '2026-01-01', time: '10:00', createdAt: 1, note: '' },
+        ],
+      };
+      await storage.addDebt(accountId, debt);
+
+      const interestMov: DebtMovement = {
+        id: 'm-int',
+        type: DebtMovementType.INTEREST,
+        amount: INTEREST_ONE_K,
+        date: '2026-02-01',
+        time: '10:00',
+        createdAt: 2,
+        note: '',
+      };
+      await commands.addDebtMovement(debt.id, interestMov, 'Долг', 'Возврат долга: Alex', 'Проценты по долгу', 'Проценты по долгу');
+
+      const loaded = await storage.load(accountId);
+      expect(loaded.debts[0]!.amount).toBe(PRINCIPAL_TEN_K);
+      expect(loaded.records.find(r => r.linkedMovementId === 'm-int')).toMatchObject({
+        type: RecordType.EXPENSE,
+        amount: INTEREST_ONE_K,
+        category: 'Проценты по долгу',
+        isInternal: false,
       });
     });
 

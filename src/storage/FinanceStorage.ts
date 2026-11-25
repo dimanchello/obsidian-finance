@@ -2,12 +2,12 @@ import { App } from 'obsidian';
 import { AccountData, AccountMeta, CreditRecord, CurrencyExchange, DebtMovement, DebtRecord, DepositRecord, DepositTopUp, DepositWithdrawal, FinanceRecord } from '../types';
 import { getTodayStr } from '../utils';
 import { recalcFutureAccruals } from '../domain/schedule';
-import { round2, sumMoney } from '../domain/money';
+import { round2 } from '../domain/money';
+import { calculateDebtPrincipalAmount } from '../domain/debtCalculations';
 import { parseCredits, parseDebts, parseDeposits, parseRecords, parseStringList, parseExchanges } from '../domain/validate';
 import { VaultAdapter } from './VaultAdapter';
 import { AccountFiles } from './AccountFiles';
 import { FileStore, FlushScheduler } from './AccountRepo';
-import { DebtMovementType } from '../constants';
 
 export const DATA_VERSION = 1;
 
@@ -266,12 +266,16 @@ export class FinanceStorage {
     this.debts.deleteBatch(accountId, ids);
   }
 
+  async saveAllDebts(accountId: string, debts: DebtRecord[]): Promise<void> {
+    this.debts.set(accountId, debts);
+  }
+
   private async withDebt(accountId: string, debtId: string, fn: (debt: DebtRecord) => void): Promise<void> {
     const d = await this.loadDebts(accountId);
     const debt = d.find(x => x.id === debtId);
     if (!debt) return;
     fn(debt);
-    debt.amount = sumMoney(debt.movements.map(m => m.type === DebtMovementType.BORROW ? m.amount : -m.amount));
+    debt.amount = calculateDebtPrincipalAmount(debt);
     this.debts.markDirty(accountId);
   }
 
@@ -289,6 +293,22 @@ export class FinanceStorage {
   async deleteDebtMovement(accountId: string, debtId: string, movementId: string): Promise<void> {
     await this.withDebt(accountId, debtId, debt => {
       debt.movements = debt.movements.filter(m => m.id !== movementId);
+    });
+  }
+
+  async replaceDebtMovement(
+    accountId: string,
+    debtId: string,
+    movementId: string,
+    replacements: DebtMovement[]
+  ): Promise<void> {
+    await this.withDebt(accountId, debtId, debt => {
+      const idx = debt.movements.findIndex(m => m.id === movementId);
+      if (idx === -1) {
+        debt.movements.push(...replacements);
+        return;
+      }
+      debt.movements.splice(idx, 1, ...replacements);
     });
   }
 

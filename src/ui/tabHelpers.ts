@@ -1,11 +1,11 @@
 import { fmtDate } from "../utils";
 import { Translations } from '../i18n';
 import { FilterControl } from './DataTable';
-import { PERCENT_100 } from '../types';
+import { DebtMovement, PERCENT_100 } from '../types';
 import { ViewContext } from '../context';
 import { daysBetweenStr, safeEndDate } from '../domain/dateMath';
 import { getTodayStr } from '../utils';
-import { CSS_CLASS,  PaymentStatus  } from '../constants';
+import { CSS_CLASS, DebtMovementType, PaymentStatus } from '../constants';
 
 export function renderProgressBar(
   host: HTMLElement,
@@ -210,4 +210,29 @@ export function createAnalyticsToggle(
 
 export function calculateEndDate(startDate: string, termMonths: number | undefined): string | null {
   return safeEndDate(startDate, termMonths) || null;
+}
+
+/**
+ * Formats type label and signed amount text for a single debt movement row.
+ */
+export function formatDebtMovementDisplay(
+  mov: DebtMovement,
+  isLent: boolean,
+  isInitial: boolean,
+  tr: Translations,
+  fmtAmountFn: (amount: number) => string
+): { typeLabel: string; amountText: string } {
+  let typeLabel: string;
+  if (mov.type === DebtMovementType.BORROW) {
+    typeLabel = isInitial
+      ? (isLent ? tr.lentGiven : tr.borrowedTaken)
+      : (isLent ? tr.gaveMore : tr.tookMore);
+  } else if (mov.type === DebtMovementType.INTEREST) {
+    typeLabel = `📈 ${tr.debtInterestCategory}`;
+  } else {
+    typeLabel = isLent ? tr.returned : tr.repaymentAct;
+  }
+
+  const sign = mov.type === DebtMovementType.BORROW ? '−' : '+';
+  return { typeLabel, amountText: `${sign}${fmtAmountFn(mov.amount)}` };
 }

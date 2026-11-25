@@ -5,10 +5,24 @@ import {
   getDebtRepaid,
   getDebtWithInterest,
   getDebtRemaining,
+  getDebtAmountAsOf,
+  getDebtMovementInterest,
+  getDebtMovementPrincipal,
+  calcAutoRepaymentInterest,
+  calculateDebtPrincipalAmount,
+  getRemainingPrincipalBeforeMovement,
   isDebtPaidOff,
   calculateDebtsSummary,
 } from '../domain/debtCalculations';
 import { createLinkedRecord } from '../domain/records';
+
+const PRINCIPAL_THOUSAND = 1000;
+const AMOUNT_FOUR_HUNDRED = 400;
+const AMOUNT_FIVE_HUNDRED = 500;
+const AMOUNT_SIX_HUNDRED = 600;
+const AMOUNT_HUNDRED = 100;
+const AMOUNT_ELEVEN_HUNDRED = 1100;
+const INTEREST_RATE_TEN = 10;
 
 function createMockDebt(overrides: Partial<DebtRecord> = {}): DebtRecord {
   return {
@@ -199,6 +213,115 @@ describe('debtCalculations', () => {
       const summary = calculateDebtsSummary(debts);
       expect(summary.lentCount).toBe(1);
       expect(summary.lentRemaining).toBe(1000);
+    });
+  });
+
+  describe('principal and interest helpers', () => {
+    it('getDebtMovementInterest clamps interest to repayment amount', () => {
+      const mov = {
+        id: 'm1', type: DebtMovementType.REPAY, amount: AMOUNT_FIVE_HUNDRED,
+        interestAmount: AMOUNT_SIX_HUNDRED, date: '2026-01-02', time: '', createdAt: 1, note: '',
+      };
+      expect(getDebtMovementInterest(mov)).toBe(AMOUNT_FIVE_HUNDRED);
+    });
+
+    it('getDebtMovementPrincipal subtracts interest from repayment', () => {
+      const mov = {
+        id: 'm1', type: DebtMovementType.REPAY, amount: AMOUNT_FIVE_HUNDRED,
+        interestAmount: AMOUNT_HUNDRED, date: '2026-01-02', time: '', createdAt: 1, note: '',
+      };
+      expect(getDebtMovementPrincipal(mov)).toBe(AMOUNT_FOUR_HUNDRED);
+    });
+
+    it('calcAutoRepaymentInterest returns zero within remaining principal', () => {
+      expect(calcAutoRepaymentInterest(AMOUNT_SIX_HUNDRED, PRINCIPAL_THOUSAND)).toBe(0);
+    });
+
+    it('calcAutoRepaymentInterest returns excess above remaining principal', () => {
+      expect(calcAutoRepaymentInterest(AMOUNT_ELEVEN_HUNDRED, PRINCIPAL_THOUSAND)).toBe(AMOUNT_HUNDRED);
+    });
+
+    it('calculateDebtPrincipalAmount ignores interest portion of repayments', () => {
+      const debt = createMockDebt({
+        interestRate: INTEREST_RATE_TEN,
+        movements: [
+          { id: 'm1', type: DebtMovementType.BORROW, amount: PRINCIPAL_THOUSAND, date: '2026-01-01', time: '', createdAt: 1, note: '' },
+          { id: 'm2', type: DebtMovementType.REPAY, amount: AMOUNT_ELEVEN_HUNDRED, interestAmount: AMOUNT_HUNDRED, date: '2026-02-01', time: '', createdAt: 2, note: '' },
+        ],
+      });
+      expect(calculateDebtPrincipalAmount(debt)).toBe(0);
+    });
+
+    it('getRemainingPrincipalBeforeMovement returns principal prior to target movement', () => {
+      const m2 = { id: 'm2', type: DebtMovementType.REPAY, amount: AMOUNT_SIX_HUNDRED, date: '2026-02-01', time: '', createdAt: 2, note: '' };
+      const m3 = { id: 'm3', type: DebtMovementType.REPAY, amount: AMOUNT_FIVE_HUNDRED, interestAmount: AMOUNT_HUNDRED, date: '2026-03-01', time: '', createdAt: 3, note: '' };
+      const debt = createMockDebt({
+        interestRate: INTEREST_RATE_TEN,
+        movements: [
+          { id: 'm1', type: DebtMovementType.BORROW, amount: PRINCIPAL_THOUSAND, date: '2026-01-01', time: '', createdAt: 1, note: '' },
+          m2,
+          m3,
+        ],
+      });
+      expect(getRemainingPrincipalBeforeMovement(debt, m3)).toBe(AMOUNT_FOUR_HUNDRED);
+    });
+
+    it('getDebtAmountAsOf excludes future interest portion properly', () => {
+      const refNow = new Date('2026-02-15T12:00:00');
+      const debt = createMockDebt({
+        amount: AMOUNT_FIVE_HUNDRED,
+        movements: [
+          { id: 'm1', type: DebtMovementType.BORROW, amount: PRINCIPAL_THOUSAND, date: '2026-01-01', time: '', createdAt: 1, note: '' },
+          { id: 'm2', type: DebtMovementType.REPAY, amount: AMOUNT_SIX_HUNDRED, interestAmount: AMOUNT_HUNDRED, date: '2026-03-01', time: '', createdAt: 2, note: '' },
+        ],
+      });
+      expect(getDebtAmountAsOf(debt, refNow)).toBe(PRINCIPAL_THOUSAND);
+    });
+
+    it('getDebtRemaining preserves unpaid principal when extra interest is paid on zero-rate debt', () => {
+      const debt = createMockDebt({
+        interestRate: 0,
+        movements: [
+          { id: 'm1', type: DebtMovementType.BORROW, amount: PRINCIPAL_THOUSAND, date: '2026-01-01', time: '', createdAt: 1, note: '' },
+          { id: 'm2', type: DebtMovementType.REPAY, amount: AMOUNT_FIVE_HUNDRED, interestAmount: AMOUNT_HUNDRED, date: '2026-02-01', time: '', createdAt: 2, note: '' },
+        ],
+      });
+      expect(getDebtRemaining(debt)).toBe(AMOUNT_SIX_HUNDRED);
+    });
+
+    it('treats standalone INTEREST movement as full interest and zero principal', () => {
+      const mov = {
+        id: 'm-int', type: DebtMovementType.INTEREST, amount: AMOUNT_HUNDRED,
+        date: '2026-02-01', time: '', createdAt: 2, note: '',
+      };
+      expect(getDebtMovementInterest(mov)).toBe(AMOUNT_HUNDRED);
+      expect(getDebtMovementPrincipal(mov)).toBe(0);
+    });
+
+    it('calculates remaining debt and principal cleanly across separate REPAY and INTEREST movements', () => {
+      const debt = createMockDebt({
+        interestRate: INTEREST_RATE_TEN,
+        movements: [
+          { id: 'm1', type: DebtMovementType.BORROW, amount: PRINCIPAL_THOUSAND, date: '2026-01-01', time: '', createdAt: 1, note: '' },
+          { id: 'm2', type: DebtMovementType.REPAY, amount: PRINCIPAL_THOUSAND, date: '2026-02-01', time: '', createdAt: 2, note: '' },
+          { id: 'm3', type: DebtMovementType.INTEREST, amount: AMOUNT_HUNDRED, date: '2026-02-01', time: '', createdAt: 2, note: '' },
+        ],
+      });
+      expect(calculateDebtPrincipalAmount(debt)).toBe(0);
+      expect(getDebtRemaining(debt)).toBe(0);
+    });
+
+    it('getDebtRemaining ignores excess separate INTEREST above contractual interest when principal remains', () => {
+      const debt = createMockDebt({
+        interestRate: 0,
+        movements: [
+          { id: 'm1', type: DebtMovementType.BORROW, amount: PRINCIPAL_THOUSAND, date: '2026-01-01', time: '', createdAt: 1, note: '' },
+          { id: 'm2', type: DebtMovementType.REPAY, amount: AMOUNT_FOUR_HUNDRED, date: '2026-02-01', time: '', createdAt: 2, note: '' },
+          { id: 'm3', type: DebtMovementType.INTEREST, amount: AMOUNT_HUNDRED, date: '2026-02-01', time: '', createdAt: 2, note: '' },
+        ],
+      });
+      expect(calculateDebtPrincipalAmount(debt)).toBe(AMOUNT_SIX_HUNDRED);
+      expect(getDebtRemaining(debt)).toBe(AMOUNT_SIX_HUNDRED);
     });
   });
 });

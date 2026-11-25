@@ -10,6 +10,7 @@ import type {
 } from '../types';
 import {
   unlinkRecords,
+  buildDebtInterestNote,
   createDebtMovementRecord,
   createDebtMovementRecords,
   createCreditReceiptRecord,
@@ -18,6 +19,9 @@ import {
   createDepositRefundRecord,
   findLinkedRecord,
 } from './linkedRecords';
+import { calcAutoRepaymentInterest, getRemainingPrincipalBeforeMovement } from './debtCalculations';
+import { reconcileSingleDebt, type DebtRecordLabels } from './debtReconciliation';
+import { round2 } from './money';
 import { RecordType, DebtDirection, DebtMovementType, CreditType, PaymentStatus, DepositStatus } from '../constants';
 
 /**
@@ -73,8 +77,112 @@ export class AccountCommands {
     await this.storage.addRecord(this.accountId, record);
   }
 
+  private async reconcileDebtById(debtId: string, labels: DebtRecordLabels): Promise<void> {
+    const data = await this.storage.load(this.accountId);
+    const debt = data.debts.find(d => d.id === debtId);
+    if (!debt) return;
+
+    const res = reconcileSingleDebt(
+      debt,
+      data.records,
+      labels,
+      { newId: () => crypto.randomUUID(), now: Date.now() }
+    );
+    if (res.debtChanged) {
+      await this.storage.updateDebt(this.accountId, res.debt);
+    }
+    if (res.recordsChanged) {
+      await this.storage.saveAllRecords(this.accountId, res.records);
+    }
+  }
+
+  private resolveDebtMovementRecordType(debt: DebtRecord, movementType: DebtMovementType): RecordType {
+    if (movementType === DebtMovementType.BORROW) {
+      return debt.direction === DebtDirection.LENT ? RecordType.EXPENSE : RecordType.INCOME;
+    }
+    return debt.direction === DebtDirection.LENT ? RecordType.INCOME : RecordType.EXPENSE;
+  }
+
+  private prepareDebtMovementsForSave(debt: DebtRecord, movement: DebtMovement): DebtMovement[] {
+    if (movement.type === DebtMovementType.BORROW) {
+      return [movement];
+    }
+
+    if (movement.type === DebtMovementType.INTEREST) {
+      return [{
+        id: movement.id,
+        type: DebtMovementType.INTEREST,
+        amount: round2(Math.max(0, movement.amount)),
+        date: movement.date,
+        time: movement.time,
+        createdAt: movement.createdAt,
+        note: movement.note,
+      }];
+    }
+
+    const debtSnapshot: DebtRecord = debt.movements.some(m => m.id === movement.id)
+      ? { ...debt, movements: debt.movements.map(m => (m.id === movement.id ? movement : m)) }
+      : debt;
+    const remainingPrincipal = getRemainingPrincipalBeforeMovement(debtSnapshot, movement);
+    const autoInterest = calcAutoRepaymentInterest(movement.amount, remainingPrincipal);
+    const hasExplicitInterest = Boolean(movement.manualInterest) || (movement.interestAmount ?? 0) > 0;
+    const targetInterest = hasExplicitInterest
+      ? round2(Math.max(0, Math.min(movement.amount, movement.interestAmount ?? 0)))
+      : autoInterest;
+    const roundedAmount = round2(Math.max(0, movement.amount));
+    const principalPart = round2(Math.max(0, roundedAmount - targetInterest));
+
+    if (targetInterest > 0 && principalPart > 0) {
+      return [
+        {
+          id: movement.id,
+          type: DebtMovementType.REPAY,
+          amount: principalPart,
+          date: movement.date,
+          time: movement.time,
+          createdAt: movement.createdAt,
+          note: movement.note,
+        },
+        {
+          id: crypto.randomUUID(),
+          type: DebtMovementType.INTEREST,
+          amount: targetInterest,
+          date: movement.date,
+          time: movement.time,
+          createdAt: movement.createdAt + 1,
+          note: movement.note,
+        },
+      ];
+    }
+
+    if (targetInterest > 0) {
+      return [{
+        id: movement.id,
+        type: DebtMovementType.INTEREST,
+        amount: targetInterest,
+        date: movement.date,
+        time: movement.time,
+        createdAt: movement.createdAt,
+        note: movement.note,
+      }];
+    }
+
+    const keepManual = Boolean(movement.manualInterest) && autoInterest > 0;
+    return [{
+      id: movement.id,
+      type: DebtMovementType.REPAY,
+      amount: movement.amount,
+      date: movement.date,
+      time: movement.time,
+      createdAt: movement.createdAt,
+      note: movement.note,
+      ...(keepManual ? { manualInterest: true } : {}),
+    }];
+  }
+
   /**
-   * Adds a debt movement (borrow/repay) with its mirrored record.
+   * Adds a debt movement (borrow/repay/interest) with its mirrored record(s).
+   * Combined repayments that include interest are split into separate REPAY and INTEREST movements.
    */
   async addDebtMovement(
     debtId: string,
@@ -88,28 +196,39 @@ export class AccountCommands {
     const debt = data.debts.find(d => d.id === debtId);
     if (!debt) return;
 
-    await this.storage.addDebtMovement(this.accountId, debtId, movement);
-
-    const recordType = movement.type === DebtMovementType.BORROW
-      ? (debt.direction === DebtDirection.LENT ? RecordType.EXPENSE : RecordType.INCOME)
-      : (debt.direction === DebtDirection.LENT ? RecordType.INCOME : RecordType.EXPENSE);
-
-    const records = createDebtMovementRecords(
-      debt,
-      movement,
-      recordType,
-      note,
-      category,
-      `${note} — ${interestNote}`,
-      interestCategory
-    );
-    for (const record of records) {
-      await this.storage.addRecord(this.accountId, record);
+    const splitMovements = this.prepareDebtMovementsForSave(debt, movement);
+    for (const mov of splitMovements) {
+      await this.storage.addDebtMovement(this.accountId, debtId, mov);
     }
+
+    const resolvedInterestNote = buildDebtInterestNote(note, note, interestNote);
+    for (const mov of splitMovements) {
+      const recordType = this.resolveDebtMovementRecordType(debt, mov.type);
+      const isInterestMov = mov.type === DebtMovementType.INTEREST;
+      const records = createDebtMovementRecords(
+        debt,
+        mov,
+        recordType,
+        isInterestMov ? resolvedInterestNote : note,
+        isInterestMov ? interestCategory : category,
+        resolvedInterestNote,
+        interestCategory
+      );
+      for (const record of records) {
+        await this.storage.addRecord(this.accountId, record);
+      }
+    }
+
+    await this.reconcileDebtById(debtId, {
+      debtDefaultCat: category,
+      debtRepayNote: note,
+      debtInterestNote: interestNote,
+      debtInterestCategory: interestCategory,
+    });
   }
 
   /**
-   * Updates a debt movement and its mirrored record.
+   * Updates a debt movement and its mirrored record(s).
    */
   async updateDebtMovement(
     debtId: string,
@@ -120,7 +239,13 @@ export class AccountCommands {
     interestNote?: string,
     interestCategory?: string
   ): Promise<void> {
-    await this.storage.updateDebtMovement(this.accountId, debtId, updatedMovement);
+    const dataBefore = await this.storage.load(this.accountId);
+    const debtBefore = dataBefore.debts.find(record => record.id === debtId);
+    const splitMovements = debtBefore
+      ? this.prepareDebtMovementsForSave(debtBefore, updatedMovement)
+      : [updatedMovement];
+
+    await this.storage.replaceDebtMovement(this.accountId, debtId, oldMovement.id, splitMovements);
 
     const data = await this.storage.load(this.accountId);
     const linkedRecords = data.records.filter(record =>
@@ -134,9 +259,6 @@ export class AccountCommands {
     const primary = linkedRecords.find(record => record.isInternal) ?? linkedRecords[0];
     if (!debt) return;
 
-    const recordType = updatedMovement.type === DebtMovementType.BORROW
-      ? (debt.direction === DebtDirection.LENT ? RecordType.EXPENSE : RecordType.INCOME)
-      : (debt.direction === DebtDirection.LENT ? RecordType.INCOME : RecordType.EXPENSE);
     const interestRecord = linkedRecords.find(record => !record.isInternal);
     const recordNote = primary?.isInternal
       ? (note ?? primary.note)
@@ -144,15 +266,28 @@ export class AccountCommands {
     const recordCategory = primary?.isInternal
       ? primary.category
       : (category ?? primary?.category ?? interestRecord?.category ?? '');
-    const replacements = createDebtMovementRecords(
-      debt,
-      updatedMovement,
-      recordType,
-      recordNote,
-      recordCategory,
-      `${recordNote} — ${interestNote ?? interestRecord?.note ?? recordNote}`,
-      interestCategory ?? interestRecord?.category ?? recordCategory
-    );
+    const resolvedInterestNote = interestNote
+      ? buildDebtInterestNote(recordNote, recordNote, interestNote)
+      : (interestRecord?.note ?? recordNote);
+    const existingInterestCat = interestRecord && interestRecord.category !== ''
+      ? interestRecord.category
+      : undefined;
+    const resolvedInterestCategory = existingInterestCat ?? interestCategory ?? recordCategory;
+
+    const replacements: FinanceRecord[] = [];
+    for (const mov of splitMovements) {
+      const recordType = this.resolveDebtMovementRecordType(debt, mov.type);
+      const isInterestMov = mov.type === DebtMovementType.INTEREST;
+      replacements.push(...createDebtMovementRecords(
+        debt,
+        mov,
+        recordType,
+        isInterestMov ? resolvedInterestNote : recordNote,
+        isInterestMov ? resolvedInterestCategory : recordCategory,
+        resolvedInterestNote,
+        resolvedInterestCategory
+      ));
+    }
 
     const remainingRecords = [...linkedRecords];
     const remainingReplacements = [...replacements];
@@ -188,6 +323,20 @@ export class AccountCommands {
     for (const record of remainingReplacements) {
       await this.storage.addRecord(this.accountId, record);
     }
+
+    const splitIds = new Set(splitMovements.map(m => m.id));
+    if (
+      interestCategory !== undefined ||
+      note !== undefined ||
+      debt.movements.some(m => !splitIds.has(m.id) && m.type === DebtMovementType.REPAY)
+    ) {
+      await this.reconcileDebtById(debtId, {
+        debtDefaultCat: recordCategory,
+        debtRepayNote: recordNote,
+        debtInterestNote: interestNote ?? '',
+        debtInterestCategory: resolvedInterestCategory,
+      });
+    }
   }
 
   /**
@@ -197,7 +346,8 @@ export class AccountCommands {
     debtId: string,
     movementId: string,
     movementDate: string,
-    movementAmount: number
+    movementAmount: number,
+    labels?: DebtRecordLabels
   ): Promise<void> {
     await this.storage.deleteDebtMovement(this.accountId, debtId, movementId);
 
@@ -209,11 +359,14 @@ export class AccountCommands {
       for (const record of linkedRecords) {
         await this.storage.deleteRecord(this.accountId, record.id);
       }
-      return;
+    } else {
+      const legacyRecord = findLinkedRecord(data.records, debtId, movementDate, movementAmount);
+      if (legacyRecord) await this.storage.deleteRecord(this.accountId, legacyRecord.id);
     }
 
-    const legacyRecord = findLinkedRecord(data.records, debtId, movementDate, movementAmount);
-    if (legacyRecord) await this.storage.deleteRecord(this.accountId, legacyRecord.id);
+    if (labels) {
+      await this.reconcileDebtById(debtId, labels);
+    }
   }
 
   /**
@@ -235,7 +388,8 @@ export class AccountCommands {
    */
   async updateDebt(
     updatedDebt: DebtRecord,
-    translations: { lentNote: string; borrowedNote: string }
+    translations: { lentNote: string; borrowedNote: string },
+    repayLabels?: DebtRecordLabels
   ): Promise<void> {
     await this.storage.updateDebt(this.accountId, updatedDebt);
 
@@ -262,6 +416,10 @@ export class AccountCommands {
       linkedRec.payer = updatedDebt.person;
       linkedRec.note = note;
       await this.storage.updateRecord(this.accountId, linkedRec);
+    }
+
+    if (repayLabels) {
+      await this.reconcileDebtById(updatedDebt.id, repayLabels);
     }
   }
 

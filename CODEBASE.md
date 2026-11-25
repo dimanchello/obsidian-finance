@@ -40,7 +40,8 @@ Obsidian плагин для личного финансового учёта. �
 - `autoTransactions.ts` — advances schedules to today, materializes deposit/credit records
 - `linkedRecords.ts` — creates/unlinks mirrored FinanceRecords for debts/credits/deposits
 - `schedule.ts` — builds credit payment and deposit accrual schedules
-- `creditCalculations.ts`, `debtCalculations.ts`, `depositCalculations.ts` — interest/annuity/deposit math. `creditCalculations.ts` supports actual calendar day count convention (ACT/365 / ACT/366, `DayCountConvention`) and `calculatePeriodInterest`. `debtCalculations.ts` exports `calculateDebtsSummary` for open debt aggregates.
+- `creditCalculations.ts`, `debtCalculations.ts`, `depositCalculations.ts` — interest/annuity/deposit math. `creditCalculations.ts` supports actual calendar day count convention (ACT/365–366 across year boundaries per Regulation 39-P/579-P, `DayCountConvention`), `calculatePeriodInterestRaw` / `calculatePeriodInterest`, delayed-payment split interest (`calculateSplitPeriodInterest`), and `firstPaymentInterestOnly` initial partial periods (`resolveFirstInterestOnlyDate`). `debtCalculations.ts` exports `calculateDebtsSummary`, `calcAutoRepaymentInterest`, `calculateDebtPrincipalAmount`, `getRemainingPrincipalBeforeMovement`, `getDebtMovementPrincipal`, `getDebtMovementInterest`.
+- `debtReconciliation.ts` — principal-first repayment splitting, movement/record rebalancing, and idempotent migration (`reconcileSingleDebt`, `reconcileAllDebts`)
 - `overviewMetrics.ts` — dashboard calculations (savings rate, debt burden, trends).
   Trend span is a month count; `ALL_TIME_MONTHS` (0) is a sentinel meaning "span the data",
   clamped to `OVERVIEW_MAX_TREND_MONTHS`. `calcActiveDepositsProgress` returns
@@ -223,7 +224,7 @@ Debts, credits, deposits do NOT have separate ledgers — they materialize Finan
 - `FinanceStorage` class
 - `load(accountId): Promise<AccountData>` — composite load of all files
 - `addRecord()`, `updateRecord()`, `deleteRecord()`, `importRecords()`, `saveAllRecords()`
-- `addDebt()`, `updateDebt()`, `deleteDebt()`, `addDebtMovement()`, `updateDebtMovement()`, `deleteDebtMovement()`
+- `addDebt()`, `updateDebt()`, `deleteDebt()`, `saveAllDebts()`, `addDebtMovement()`, `updateDebtMovement()`, `deleteDebtMovement()`, `replaceDebtMovement()`
 - `addCredit()`, `updateCredit()`, `deleteCredit()`, `saveAllCredits()`
 - `addDeposit()`, `updateDeposit()`, `deleteDeposit()`, `saveAllDeposits()`, `addDepositTopUp()`, `deleteDepositTopUp()`, `addDepositWithdrawal()`, `deleteDepositWithdrawal()`
 - `addExchange()`, `updateExchange()`, `deleteExchange()`, `saveAllExchanges()`
@@ -313,11 +314,11 @@ every call site. `CreditModal` no longer touches records at all.
 **Important symbols:**
 - `applyAutoTransactions(data, deps): AutoTxResult` — pure function, returns new state
 - `processDeposit()` — generates accruals, creates opening/interest/refund records
-- `processCredit()` — generates payments, creates payment records
+- `processCredit()` — generates schedule via `generateAnnuitySchedule`, backfills missing payment breakdowns on settlement, creates payment records, and keeps `credit.currentAmount` synchronized via `calculateRemainingPrincipal()`
 - `RecordMirror` — ensures idempotent record creation
 
 **Depends on:**
-- `schedule`, `money`, `dateMath`
+- `schedule`, `creditCalculations`, `money`, `dateMath`
 
 **Used by:** `AccountView.checkAutoTransactions()`
 
@@ -329,11 +330,10 @@ every call site. `CreditModal` no longer touches records at all.
 
 **Purpose:** Creates/finds/unlinks mirrored FinanceRecords for debts/credits/deposits.
 
-Debt principal movements, credit receipts, deposit principal transfers, and credit payments are internal so they do not inflate income/expense statistics. Debt repayments can store an explicit `interestAmount`; that share becomes an external income/expense record. Deposit interest remains a regular income record.
+Debt principal movements, credit receipts, deposit principal transfers, and credit payments are internal so they do not inflate income/expense statistics. Separate `DebtMovementType.INTEREST` movements (or legacy `REPAY` with `interestAmount`) become external income/expense records. Deposit interest remains a regular income record.
 
 **Important symbols:**
-- `createDebtMovementRecord()`
-- `createDebtMovementRecords()` — splits repayment principal and interest into separate linked records
+- `createDebtMovementRecord()`, `createDebtMovementRecords()`, `buildDebtInterestNote()` — maps `BORROW`/`REPAY` principal to internal records and `INTEREST` (or interest share) to external income/expense records
 - `createCreditReceiptRecord()`, `createCreditPaymentRecord()`
 - `createCreditDownPaymentRecord()` — keeps a caller-supplied id (`credit.downPaymentRecordId`) so
   the record survives schedule regeneration
@@ -341,9 +341,26 @@ Debt principal movements, credit receipts, deposit principal transfers, and cred
 - `findLinkedRecord()` — finds record by linkedId + date + amount
 - `unlinkRecords()` — filters out records with given linkedId
 
-**Depends on:** types
+**Depends on:** types, money
 
-**Used by:** `AccountCommands`, tabs
+**Used by:** `AccountCommands`, `debtReconciliation`, tabs
+
+---
+
+### debtReconciliation
+
+**Path:** `src/domain/debtReconciliation.ts`
+
+**Purpose:** Enforces principal-first debt repayment splitting, splits combined `REPAY` + interest movements into separate `DebtMovementType.REPAY` and `DebtMovementType.INTEREST` movements with 1-to-1 linked `FinanceRecord` mirrors, updates `debt.amount` to principal remaining, and runs idempotent migration on account load.
+
+**Important symbols:**
+- `reconcileSingleDebt()` — synchronizes one debt's repayments, `debt.amount`, and existing linked records
+- `reconcileAllDebts()` — idempotent account-wide reconciliation called during `AccountView.checkAutoTransactions()`
+- `DebtRecordLabels`
+
+**Depends on:** `debtCalculations`, `linkedRecords`, `money`
+
+**Used by:** `AccountCommands`, `AccountView`
 
 ---
 
@@ -604,7 +621,7 @@ It owns `onClose()` (empties the body) plus `openHeader(title)` / `openBody()`.
 **Used by:** DebtsTab, AccountCommands
 
 ### CreditRecord
-**Definition:** `src/types.ts:281`  
+**Definition:** `src/types.ts:378`  
 **Type:** interface  
 **Purpose:** Credit with payment schedule  
 **Related:** CreditPayment  
@@ -636,7 +653,7 @@ Editing either date input clears the flag unless both inputs are empty.
 **Used by:** tabs
 
 ### applyAutoTransactions
-**Definition:** `src/domain/autoTransactions.ts:242`  
+**Definition:** `src/domain/autoTransactions.ts:329`  
 **Type:** function  
 **Purpose:** Advances schedules, materializes records  
 **Related:** processDeposit, processCredit, RecordMirror  
@@ -769,11 +786,14 @@ AutoTxScheduler fires (every 3600s)
     │    │    ├── if accrualType === 'to_account': RecordMirror.ensure() — income records
     │    │    └── if matured: status = 'closed', RecordMirror.ensure() — refund income
     │    ├── for each credit: processCredit()
-    │    │    ├── if no payments: buildCreditSchedule()
-    │    │    ├── settleDue() — mark past-due payments paid
-    │    │    └── RecordMirror.ensure() — expense records
+    │    │    ├── if no payments: generateAnnuitySchedule()
+    │    │    ├── settleDue() + backfillSettledBreakdowns() — mark past-due payments paid
+    │    │    ├── RecordMirror.ensure() — expense records
+    │    │    └── calculateRemainingPrincipal() — sync credit.currentAmount
     │    └── return { records, deposits, credits, changed }
-    ├── if changed.records: storage.saveAllRecords()
+    ├── reconcileAllDebts(ctx.data.debts, result.records, debtLabels, deps)
+    ├── if recordsChanged: storage.saveAllRecords()
+    ├── if debtsChanged: storage.saveAllDebts()
     ├── if changed.deposits: storage.saveAllDeposits()
     └── if changed.credits: storage.saveAllCredits()
  → renderBodyContent()
@@ -839,7 +859,8 @@ main.ts → storage/index → storage/{AccountRepo, VaultAdapter, AccountFiles}
 main.ts → AccountView → context → storage/index
 AccountView → tabs/* → ui/* → domain/*
 tabs/* → domain/AccountCommands → storage/index + domain/linkedRecords
-AccountView.checkAutoTransactions → domain/autoTransactions → domain/{schedule, money, dateMath}
+AccountView.checkAutoTransactions → domain/autoTransactions → domain/{schedule, creditCalculations, money, dateMath}
+AccountView.checkAutoTransactions → domain/debtReconciliation → domain/{debtCalculations, linkedRecords, money}
 storage/index → domain/validate
 tabs/* → ui/DataTable → ui/{pagination, tabHelpers}
 ```
@@ -1071,6 +1092,9 @@ Credit with downPayment creates a FinanceRecord with `downPaymentRecordId` store
 ### Debt movements don't have status
 Unlike credit payments and deposit accruals, debt movements are always "completed". No pending/paid tracking. This is intentional: debts are manual ledger, credits/deposits are scheduled.
 
+### Debt repayments split principal-first into separate REPAY and INTEREST movements
+Repayments allocate toward remaining principal first (`DebtMovementType.REPAY`, `isInternal: true`) and extract any excess/interest into a standalone `DebtMovementType.INTEREST` movement with an external `FinanceRecord` (`INCOME` for `LENT`, `EXPENSE` for `BORROWED`). Even when a combined repayment sum is entered in `DebtMovementModal` (which auto-populates `interestAmount` and shows a live split preview, allowing manual adjustment), `AccountCommands` and `reconcileSingleDebt()` / `reconcileAllDebts()` store principal and interest as separate operations in debt history and ledger records while keeping `debt.amount` strictly equal to principal remaining.
+
 ### FinanceStorage is shared singleton
 One FinanceStorage instance per plugin, shared by all AccountView instances. Cache is keyed by accountId, so multiple accounts can coexist in same session.
 
@@ -1086,10 +1110,13 @@ AccountFiles → src/storage/AccountFiles.ts:8
 AccountHeader → src/AccountHeader.ts:26
 AccountView → src/AccountView.ts:19
 AnalyticsView → src/AnalyticsView.ts (~20)
-applyAutoTransactions → src/domain/autoTransactions.ts:242
+applyAutoTransactions → src/domain/autoTransactions.ts:329
 AutoTxScheduler → src/AutoTxScheduler.ts (~10)
 buildCreditSchedule → src/domain/schedule.ts (~50)
 buildDepositSchedule → src/domain/schedule.ts (~150)
+calcAutoRepaymentInterest → src/domain/debtCalculations.ts:26
+calculateDebtPrincipalAmount → src/domain/debtCalculations.ts:55
+calculateRemainingPrincipal → src/domain/creditCalculations.ts:494
 ConfirmModal → src/ConfirmModal.ts (~10)
 createCreditPaymentRecord → src/domain/linkedRecords.ts (~100)
 createCreditReceiptRecord → src/domain/linkedRecords.ts (~50)
@@ -1097,7 +1124,7 @@ createDebtMovementRecord → src/domain/linkedRecords.ts (~20)
 createDepositRefundRecord → src/domain/linkedRecords.ts (~180)
 CreditModal → src/CreditModal.ts (~20)
 CreditPaymentModal → src/CreditPaymentModal.ts (~15)
-CreditRecord → src/types.ts:281
+CreditRecord → src/types.ts:378
 CreditsAnalyticsView → src/CreditsAnalyticsView.ts (~15)
 CreditsTab → src/tabs/CreditsTab.ts (~40)
 CurrencyExchange → src/types.ts:362
@@ -1120,6 +1147,7 @@ FinanceStorage → src/storage/index.ts:50
 FinanceManagerPlugin → main.ts:14
 findLinkedRecord → src/domain/linkedRecords.ts (~250)
 FlushScheduler → src/storage/AccountRepo.ts:62
+generateAnnuitySchedule → src/domain/creditCalculations.ts:325
 getLocaleFromApp → src/i18n.ts (~200)
 ImportExportModal → src/ImportExportModal.ts (~20)
 newAccountId → src/domain/accountId.ts (~15)
@@ -1131,8 +1159,10 @@ parseDebts → src/domain/validate.ts (~150)
 parseDeposits → src/domain/validate.ts (~250)
 parseRecords → src/domain/validate.ts (~50)
 PluginSettings → src/types.ts:128
-processCredit → src/domain/autoTransactions.ts:174
-processDeposit → src/domain/autoTransactions.ts:95
+processCredit → src/domain/autoTransactions.ts:242
+processDeposit → src/domain/autoTransactions.ts:110
+reconcileAllDebts → src/domain/debtReconciliation.ts:457
+reconcileSingleDebt → src/domain/debtReconciliation.ts:228
 RecordModal → src/RecordModal.ts (~20)
 RecordsTab → src/tabs/RecordsTab.ts:16
 RecordType → src/types.ts:1
@@ -1146,7 +1176,7 @@ ViewState → src/types.ts:92
 
 ---
 
-**Lines:** 1102  
+**Lines:** 1200  
 **Sections covered:** 15/15  
 
 **Основные подсистемы:**

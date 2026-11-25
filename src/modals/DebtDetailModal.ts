@@ -7,12 +7,14 @@ import {
   getDebtOriginalAsOf,
   getDebtWithInterestAsOf,
   getDebtRemaining,
+  calculateDebtPrincipalAmount,
   isDebtPaidOff,
 } from '../domain/debtCalculations';
 import { fmtDate } from '../utils';
 import { AccountCommands } from '../domain/AccountCommands';
 import { DebtMovementModal } from '../DebtMovementModal';
 import { ConfirmModal } from '../ConfirmModal';
+import { formatDebtMovementDisplay } from '../ui/tabHelpers';
 import type { Translations } from '../i18n';
 
 export interface DebtDetailModalOptions {
@@ -109,22 +111,16 @@ export class DebtDetailModal extends FinanceBaseModal {
     this.debt.movements.slice().reverse().forEach(m => {
       const mr = movBody.createEl('tr', { cls: `finance-mov-${m.type}` });
       const isInitial = m.id === initialMov?.id;
-      let typeLabel: string;
-      if (m.type === DebtMovementType.BORROW) {
-        if (isInitial) {
-          typeLabel = isLent ? this.tr.lentGiven : this.tr.borrowedTaken;
-        } else {
-          typeLabel = isLent ? this.tr.gaveMore : this.tr.tookMore;
-        }
-      } else {
-        typeLabel = isLent ? this.tr.returned : this.tr.repaymentAct;
-      }
+      const { typeLabel, amountText } = formatDebtMovementDisplay(
+        m,
+        isLent,
+        isInitial,
+        this.tr,
+        amount => this.ctx.fmt(amount)
+      );
       mr.createEl('td', { text: typeLabel, cls: CSS_CLASS.FINANCE_TD });
       mr.createEl('td', {
-        text: (m.type === DebtMovementType.BORROW ? '−' : '+') + this.ctx.fmt(m.amount) +
-          (m.interestAmount && m.interestAmount > 0
-            ? ` · ${this.tr.debtInterestCategory}: ${this.ctx.fmt(m.interestAmount)}`
-            : ''),
+        text: amountText,
         cls: `finance-td finance-td-mov-${m.type}`,
       });
       mr.createEl('td', { text: fmtDate(m.date, m.time), cls: CSS_CLASS.FINANCE_TD });
@@ -181,6 +177,8 @@ export class DebtDetailModal extends FinanceBaseModal {
       title: `${this.tr.repaymentAct} — ${this.debt.person}`,
       type: DebtMovementType.REPAY,
       remainingAmount: getDebtRemaining(this.debt),
+      remainingPrincipal: calculateDebtPrincipalAmount(this.debt),
+      direction: this.debt.direction,
       allowInterestAmount: true,
       currency: this.ctx.currency,
       onSave: async mov => {
@@ -218,7 +216,12 @@ export class DebtDetailModal extends FinanceBaseModal {
   private confirmDeleteMovement(mov: DebtMovement): void {
     const label = `${this.debt.person} · ${this.ctx.fmt(mov.amount)} · ${fmtDate(mov.date, mov.time)}`;
     new ConfirmModal(this.ctx.app, `${this.tr.confirmDeleteMovement}\n${label}`, async () => {
-      await this.commands.deleteDebtMovement(this.debt.id, mov.id, mov.date, mov.amount);
+      await this.commands.deleteDebtMovement(this.debt.id, mov.id, mov.date, mov.amount, {
+        debtDefaultCat: this.tr.debtDefaultCat,
+        debtRepayNote: this.tr.debtRepayNote,
+        debtInterestNote: this.tr.debtInterestNote,
+        debtInterestCategory: this.tr.debtInterestCategory,
+      });
       await this.reload();
     }).open();
   }

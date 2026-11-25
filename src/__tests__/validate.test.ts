@@ -74,11 +74,13 @@ describe('parseDebts', () => {
   });
 
   it('сохраняет сумму процентов в движении погашения', () => {
+    const INTEREST_SAMPLE = 125;
     const [d] = parseDebts([{
       ...valid,
-      movements: [{ ...valid.movements[0], interestAmount: 125 }],
+      movements: [{ ...valid.movements[0], interestAmount: INTEREST_SAMPLE, manualInterest: true }],
     }]);
-    expect(d.movements[0].interestAmount).toBe(125);
+    expect(d.movements[0].interestAmount).toBe(INTEREST_SAMPLE);
+    expect(d.movements[0].manualInterest).toBe(true);
   });
 
   it('отсутствующие движения дают пустой список', () => {
@@ -124,6 +126,13 @@ describe('parseCredits', () => {
   it('pending-платёж не получает paidDate', () => {
     const payments = [{ id: 'p1', amount: 1000, dueDate: '2026-03-01', status: PaymentStatus.PENDING }];
     expect(parseCredits([{ ...valid, payments }])[0].payments[0].paidDate).toBeUndefined();
+  });
+
+  it('сохраняет firstPaymentInterestOnly только если это boolean', () => {
+    expect(parseCredits([{ ...valid, firstPaymentInterestOnly: true }])[0].firstPaymentInterestOnly).toBe(true);
+    expect(parseCredits([{ ...valid, firstPaymentInterestOnly: false }])[0].firstPaymentInterestOnly).toBe(false);
+    expect(parseCredits([valid])[0].firstPaymentInterestOnly).toBeUndefined();
+    expect(parseCredits([{ ...valid, firstPaymentInterestOnly: 'yes' }])[0].firstPaymentInterestOnly).toBeUndefined();
   });
 });
 

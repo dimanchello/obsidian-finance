@@ -51,7 +51,7 @@ export class CreditsTab {
         { key: 'name', label: this.tr.name, cell: c => ({ text: c.name || '—' }) },
         { key: 'bank', label: this.tr.bankName, cell: c => ({ text: c.bankName || '—' }) },
         { key: 'type', label: this.tr.type, cell: c => ({ text: this.typeLabel(c) }) },
-        { key: 'amount', label: this.tr.remaining, cell: c => ({ text: this.ctx.fmt(c.currentAmount), cls: 'finance-amount-cell' }) },
+        { key: 'amount', label: this.tr.remaining, cell: c => ({ text: this.ctx.fmt(calculateRemainingPrincipal(c)), cls: 'finance-amount-cell' }) },
         { key: 'payment', label: this.tr.monthlyPayment, cell: c => ({ text: this.ctx.fmt(c.monthlyPayment), cls: 'finance-amount-cell' }) },
         { key: 'rate', label: this.tr.rate, cell: c => ({ text: `${c.interestRate}%` }) },
         { key: 'date', label: this.tr.opened, cell: c => ({ text: fmtDate(c.startDate) }) },
@@ -195,9 +195,10 @@ export class CreditsTab {
 
     const countSub = (count: number) => `${count} ${count === 1 ? this.tr.creditCount_one : count < PLURAL_THRESHOLD ? this.tr.creditCount_few : this.tr.creditCount_many}`;
 
+    const activeRemaining = sumMoney(activeCredits.map(c => calculateRemainingPrincipal(c)));
     renderSummaryCard(summary, {
       icon: '💳', title: this.tr.activeCards,
-      main: sumMoney(activeCredits.map(c => c.currentAmount)) > 0 ? this.ctx.fmt(sumMoney(activeCredits.map(c => c.currentAmount))) : '—',
+      main: activeRemaining > 0 ? this.ctx.fmt(activeRemaining) : '—',
       sub: countSub(activeCredits.length),
       mod: 'finance-stat-credit-active'
     });
@@ -261,7 +262,7 @@ export class CreditsTab {
 
     result.sort((a, b) => {
       let av: string | number, bv: string | number;
-      if (s.field === 'amount') { av = a.currentAmount; bv = b.currentAmount; }
+      if (s.field === 'amount') { av = calculateRemainingPrincipal(a); bv = calculateRemainingPrincipal(b); }
       else if (s.field === 'bankName') { av = a.bankName; bv = b.bankName; }
       else { av = a.startDate; bv = b.startDate; }
       return compareValues(av, bv, s.dir);
@@ -289,7 +290,7 @@ export class CreditsTab {
     }
 
     renderMobileCard(block, {
-      amountText: '−' + this.ctx.fmt(credit.currentAmount),
+      amountText: '−' + this.ctx.fmt(calculateRemainingPrincipal(credit)),
       amountCls: 'finance-amount-expense',
       subtitle: `${credit.bankName} · ${this.typeLabel(credit)}`,
       details,
@@ -399,7 +400,7 @@ export class CreditsTab {
           }
         }
         const breakdown = calculatePaymentBreakdown(
-          credit.currentAmount,
+          calculateRemainingPrincipal(credit),
           payment.amount,
           credit.interestRate,
           false,
@@ -440,7 +441,7 @@ export class CreditsTab {
   }
 
   private confirmDeleteCredit(credit: CreditRecord): void {
-    const label = `${credit.name} · ${this.ctx.fmt(credit.currentAmount)}`;
+    const label = `${credit.name} · ${this.ctx.fmt(calculateRemainingPrincipal(credit))}`;
     new ConfirmModal(this.ctx.app, `${this.tr.confirmDeleteCredit}\n${label}`, async () => {
       await this.commands.deleteCredit(credit.id);
       await this.reload(this.tr.creditDeleted);

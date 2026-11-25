@@ -7,7 +7,7 @@ import { EntityModal } from './ui/EntityModal';
 import { buildDateField, buildRateInput, buildNoteField, buildComboboxField } from './ui/formHelpers';
 import { CSS_CLASS, DebtDirection, DebtMovementType } from './constants';
 import { validatePositiveAmount, validateRequiredString } from './domain/validators';
-import { getDebtOriginal } from './domain/debtCalculations';
+import { getDebtOriginal, getDebtMovementPrincipal } from './domain/debtCalculations';
 import { sumMoney } from './domain/money';
 
 export interface DebtModalOptions {
@@ -166,7 +166,7 @@ export class DebtModal extends EntityModal<DebtRecord> {
       updatedMovements.filter(m => m.type === DebtMovementType.BORROW).map(m => m.amount)
     );
     const totalRepays = sumMoney(
-      updatedMovements.filter(m => m.type === DebtMovementType.REPAY).map(m => m.amount)
+      updatedMovements.filter(m => m.type === DebtMovementType.REPAY).map(getDebtMovementPrincipal)
     );
     const remainingAmount = Math.max(0, totalBorrows - totalRepays);
 

@@ -137,7 +137,7 @@ Each account has tabs, switched via the `•••` menu:
 - Payment tracking: borrow → repay
 - Auto-calculated balance accounting for all additional disbursements
 - Interest rate and due date
-- Repayments can split principal from interest; principal is internal and interest is counted in income/expense statistics
+- Repayments automatically split principal from interest into separate operations (principal repayments stay internal while interest/excess is extracted into a separate external income operation for lent debts or expense operation for borrowed debts, with live preview and manual adjustment)
 - Filters by status (paid/unpaid), direction, person, dates
 - Movement history for each debt
 
@@ -148,6 +148,7 @@ Each account has tabs, switched via the `•••` menu:
 ### Credits
 - Types: consumer, auto loan, mortgage
 - Monthly payment schedule
+- Calendar-day interest calculation (ACT/365–366 across year boundaries and shifted payment dates) with an optional interest-only first partial payment
 - Automatic payment creation and expense records
 - Early repayment (reduce amount or term)
 - Status tracking: active / paid

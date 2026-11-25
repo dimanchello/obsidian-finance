@@ -660,6 +660,54 @@ describe('linkedRecords', () => {
       });
     });
 
+    it('creates external non-internal record for standalone INTEREST movement', () => {
+      const INTEREST_AMT = 150;
+      const ORIG_AMT = 1000;
+      const RATE_PCT = 15;
+      const debt: DebtRecord = {
+        id: 'debt-1',
+        person: 'John',
+        amount: ORIG_AMT,
+        originalAmount: ORIG_AMT,
+        interestRate: RATE_PCT,
+        direction: DebtDirection.BORROWED,
+        date: '2026-01-01',
+        time: '',
+        dueDate: '',
+        createdAt: Date.now(),
+        note: '',
+        movements: [],
+      };
+      const movement: DebtMovement = {
+        id: 'mov-standalone-int',
+        type: DebtMovementType.INTEREST,
+        amount: INTEREST_AMT,
+        date: '2026-02-01',
+        time: '14:00',
+        createdAt: Date.now(),
+        note: '',
+      };
+
+      const records = createDebtMovementRecords(
+        debt,
+        movement,
+        RecordType.EXPENSE,
+        'Repayment',
+        'Debt',
+        'Debt interest',
+        'Debt interest'
+      );
+
+      expect(records).toHaveLength(1);
+      expect(records[0]).toMatchObject({
+        type: RecordType.EXPENSE,
+        amount: INTEREST_AMT,
+        category: 'Debt interest',
+        isInternal: false,
+        linkedMovementId: 'mov-standalone-int',
+      });
+    });
+
     it('creates credit receipt record', () => {
       const credit: CreditRecord = {
         id: 'credit-1',

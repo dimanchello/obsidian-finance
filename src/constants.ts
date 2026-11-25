@@ -33,6 +33,7 @@ export type DebtDirection = ValueOf<typeof DebtDirection>;
 export const DebtMovementType = {
   BORROW: 'borrow',
   REPAY: 'repay',
+  INTEREST: 'interest',
 } as const;
 export type DebtMovementType = ValueOf<typeof DebtMovementType>;
 
@@ -193,6 +194,8 @@ export const CSS_CLASS = {
   FINANCE_BTN_SECONDARY: 'finance-btn-secondary',
   FINANCE_BTN_PRIMARY: 'finance-btn-primary',
   FINANCE_BTN_DANGER: 'finance-btn-danger',
+  FINANCE_FIELD_HINT: 'finance-field-hint',
+  FINANCE_REPAY_SPLIT_PREVIEW: 'finance-repay-split-preview',
 } as const;
 
 // ── Date Format Lengths ───────────────────────────────────────────────────

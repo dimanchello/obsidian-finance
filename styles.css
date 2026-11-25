@@ -890,6 +890,26 @@
 .finance-internal-field .finance-internal-toggle-wrap { padding: 0; }
 .finance-field-label  { font-size: .72em; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .06em; }
 .finance-field-hint   { font-size: .7em; color: var(--text-faint); font-weight: 400; text-transform: none; letter-spacing: normal; margin-left: 4px; }
+p.finance-field-hint  { margin: 2px 0 0 0; line-height: 1.35; }
+.finance-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: .9em;
+  font-weight: 500;
+  color: var(--text-normal);
+  line-height: 1.3;
+  user-select: none;
+}
+.finance-checkbox {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  flex-shrink: 0;
+  cursor: pointer;
+  accent-color: var(--ft-accent);
+}
 
 /* Fix 2: time input — Electron Chromium renders internal parts with OS colors.
    Must set color-scheme so -webkit-datetime-edit parts respect our theme colors.
@@ -2002,6 +2022,22 @@
   .finance-form { gap: 8px; }
   .finance-form-grid { grid-template-columns: 1fr !important; gap: 8px; }
   .finance-field-group { min-width: 0; }
+  .finance-fill-remaining-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 4px 2px;
+  }
+  .finance-checkbox-label {
+    min-height: 44px;
+    gap: 10px;
+    padding: 4px 0;
+  }
+  .finance-checkbox {
+    width: 20px;
+    height: 20px;
+  }
+  .finance-repay-split-preview { font-size: .82em; }
   .finance-field-label { font-size: .75em; }
   .finance-amount-input {
     font-size: 1.5em !important;
@@ -2538,6 +2574,10 @@
 }
 .finance-td-mov-repay {
   color: #16a34a !important;
+  font-weight: 700;
+}
+.finance-td-mov-interest {
+  color: #d97706 !important;
   font-weight: 700;
 }
 
@@ -3277,6 +3317,14 @@
   text-decoration: underline;
   display: inline-block;
   margin-top: 4px;
+}
+
+.finance-repay-split-preview {
+  margin: 4px 0 0 0;
+  color: var(--text-muted);
+  font-size: .78em;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 /* ── Field reference modal ──────────────────────────────────────────────── */

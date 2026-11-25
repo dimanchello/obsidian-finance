@@ -101,6 +101,7 @@ function parseMovement(o: Record<string, unknown>): DebtMovement | null {
     type: oneOf(o.type, MOVEMENT_TYPES, DebtMovementType.BORROW),
     amount: num(o.amount),
     ...(typeof o.interestAmount === 'number' ? { interestAmount: num(o.interestAmount) } : {}),
+    ...(typeof o.manualInterest === 'boolean' ? { manualInterest: bool(o.manualInterest) } : {}),
     date: normalizeDateStr(str(o.date)),
     time: normalizeTimeStr(str(o.time)),
     createdAt: num(o.createdAt),
@@ -175,6 +176,9 @@ export function parseCredit(o: Record<string, unknown>): CreditRecord | null {
     ...(typeof o.attachmentPath === 'string' ? { attachmentPath: str(o.attachmentPath) } : {}),
     ...(typeof o.dayCountConvention === 'string'
       ? { dayCountConvention: oneOf(o.dayCountConvention, DAY_COUNT_CONVENTIONS, DayCountConvention.ACTUAL) }
+      : {}),
+    ...(typeof o.firstPaymentInterestOnly === 'boolean'
+      ? { firstPaymentInterestOnly: bool(o.firstPaymentInterestOnly) }
       : {}),
   };
 }

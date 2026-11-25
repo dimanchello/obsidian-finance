@@ -3,7 +3,7 @@ import { applyAutoTransactions, type AutoTxDeps } from '../domain/autoTransactio
 import {
   AccountData, CreditRecord, DepositRecord, FinanceRecord,
   RecordType, DepositType, DepositAccrualType, DepositStatus,
-  CreditType, CreditStatus, PaymentStatus,
+  CreditType, CreditStatus, PaymentStatus, DayCountConvention,
 } from '../types';
 
 const LABELS = {
@@ -334,6 +334,98 @@ describe('applyAutoTransactions — кредиты', () => {
     expect(res.credits[0].payments[0]).toEqual(payments[0]); // paid untouched
     const pending = res.credits[0].payments.filter(p => p.status === PaymentStatus.PENDING);
     expect(pending.every(p => p.dueDate.endsWith('-20'))).toBe(true);
+  });
+
+  it('обновляет currentAmount кредита при автооплате наступивших платежей', () => {
+    const INITIAL_AMOUNT = 100_000;
+    const TERM_MONTHS = 12;
+    const data = mkData({ credits: [mkCredit({ startDate: '2026-01-15', termMonths: TERM_MONTHS })] });
+
+    const res = applyAutoTransactions(data, mkDeps('2026-04-01'));
+    const paidPayments = res.credits[0].payments.filter(p => p.status === PaymentStatus.PAID);
+    const lastPaid = paidPayments[paidPayments.length - 1]!;
+
+    expect(paidPayments).toHaveLength(2);
+    expect(lastPaid.remainingDebt).toBeDefined();
+    expect(res.credits[0].currentAmount).toBe(lastPaid.remainingDebt);
+    expect(res.credits[0].currentAmount).toBeLessThan(INITIAL_AMOUNT);
+  });
+
+  it('выравнивает устаревший currentAmount даже если новых списаний сегодня не было', () => {
+    const INITIAL_AMOUNT = 100_000;
+    const PAYMENT_AMOUNT = 9_000;
+    const PRINCIPAL_PART = 8_000;
+    const INTEREST_PART = 1_000;
+    const REMAINING = 92_000;
+    const payments = [
+      {
+        id: 'p1', amount: PAYMENT_AMOUNT, dueDate: '2026-02-15', status: PaymentStatus.PAID, paidDate: '2026-02-15',
+        principalPart: PRINCIPAL_PART, interestPart: INTEREST_PART, remainingDebt: REMAINING,
+      },
+      { id: 'p2', amount: PAYMENT_AMOUNT, dueDate: '2026-03-15', status: PaymentStatus.PENDING },
+    ];
+    const data = mkData({
+      credits: [mkCredit({ payments, currentAmount: INITIAL_AMOUNT })],
+      records: [{
+        id: 'rec-1', createdAt: 0, date: '2026-02-15', time: '', type: RecordType.EXPENSE,
+        amount: PAYMENT_AMOUNT, category: LABELS.creditDefaultCat, tag: '', payer: 'Банк',
+        note: '', attachmentPath: '', linkedId: 'cr-1', isInternal: false,
+      }],
+    });
+
+    const res = applyAutoTransactions(data, mkDeps('2026-02-20'));
+
+    expect(res.changed.credits).toBe(true);
+    expect(res.credits[0].currentAmount).toBe(REMAINING);
+  });
+
+  it('генерирует график с первым процентным платежом и заполняет разбивку платежей', () => {
+    const INITIAL_AMOUNT = 100_000;
+    const PAYMENT_DAY = 15;
+    const TERM_MONTHS = 6;
+    const EXPECTED_PAYMENTS = 7;
+    const data = mkData({
+      credits: [mkCredit({
+        startDate: '2026-01-03',
+        paymentDay: PAYMENT_DAY,
+        termMonths: TERM_MONTHS,
+        dayCountConvention: DayCountConvention.ACTUAL,
+        firstPaymentInterestOnly: true,
+      })],
+    });
+
+    const res = applyAutoTransactions(data, mkDeps('2026-02-20'));
+    const payments = res.credits[0].payments;
+
+    expect(payments).toHaveLength(EXPECTED_PAYMENTS);
+    expect(payments[0]?.dueDate).toBe('2026-01-15');
+    expect(payments[0]?.principalPart).toBe(0);
+    expect(payments[0]?.remainingDebt).toBe(INITIAL_AMOUNT);
+    expect(payments[1]?.dueDate).toBe('2026-02-15');
+    expect(payments[1]?.principalPart).toBeGreaterThan(0);
+    expect(payments[1]?.interestPart).toBeGreaterThan(0);
+    expect(res.credits[0].currentAmount).toBe(payments[1]?.remainingDebt);
+  });
+
+  it('досчитывает разбивку при автооплате legacy pending-платежей без remainingDebt', () => {
+    const INITIAL_AMOUNT = 100_000;
+    const PAYMENT_AMOUNT = 9_000;
+    const payments = [
+      { id: 'p1', amount: PAYMENT_AMOUNT, dueDate: '2026-02-15', status: PaymentStatus.PENDING },
+      { id: 'p2', amount: PAYMENT_AMOUNT, dueDate: '2026-03-15', status: PaymentStatus.PENDING },
+    ];
+    const data = mkData({
+      credits: [mkCredit({ payments, dayCountConvention: DayCountConvention.ACTUAL })],
+    });
+
+    const res = applyAutoTransactions(data, mkDeps('2026-02-20'));
+    const settled = res.credits[0].payments[0]!;
+
+    expect(settled.status).toBe(PaymentStatus.PAID);
+    expect(settled.principalPart).toBeGreaterThan(0);
+    expect(settled.interestPart).toBeGreaterThan(0);
+    expect(settled.remainingDebt).toBeLessThan(INITIAL_AMOUNT);
+    expect(res.credits[0].currentAmount).toBe(settled.remainingDebt);
   });
 });
 

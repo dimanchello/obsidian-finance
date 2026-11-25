@@ -351,6 +351,52 @@ describe('FinanceStorage', () => {
       // Recalculates amount (remaining originalAmount - repaid)
       expect(data.debts[0].amount).toBe(600);
     });
+
+    it('recalculates debt.amount using principal portion when interestAmount is recorded', async () => {
+      const PRINCIPAL_TEN_K = 10_000;
+      const AMOUNT_ELEVEN_K = 11_000;
+      const INTEREST_ONE_K = 1_000;
+      const RATE_TEN = 10;
+
+      await storage.addDebt('test-interest.md', {
+        id: 'debt-int',
+        person: 'Иван',
+        amount: PRINCIPAL_TEN_K,
+        originalAmount: PRINCIPAL_TEN_K,
+        interestRate: RATE_TEN,
+        direction: DebtDirection.LENT,
+        date: '2026-01-01',
+        time: '',
+        dueDate: '',
+        createdAt: 1,
+        note: '',
+        movements: [
+          {
+            id: 'mov-borrow',
+            type: DebtMovementType.BORROW,
+            amount: PRINCIPAL_TEN_K,
+            date: '2026-01-01',
+            time: '',
+            createdAt: 1,
+            note: '',
+          },
+        ],
+      });
+
+      await storage.addDebtMovement('test-interest.md', 'debt-int', {
+        id: 'mov-repay',
+        type: DebtMovementType.REPAY,
+        amount: AMOUNT_ELEVEN_K,
+        interestAmount: INTEREST_ONE_K,
+        date: '2026-02-01',
+        time: '',
+        createdAt: 2,
+        note: '',
+      });
+
+      const data = await storage.load('test-interest.md');
+      expect(data.debts[0]?.amount).toBe(0);
+    });
   });
 
   describe('credits CRUD', () => {

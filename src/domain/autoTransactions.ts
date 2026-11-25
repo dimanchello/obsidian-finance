@@ -1,12 +1,21 @@
 import {
   AccountData, CreditPayment, CreditRecord, DepositAccrual, DepositRecord, FinanceRecord,
 } from '../types';
-import { buildCreditSchedule, buildDepositSchedule, type ScheduleDeps } from './schedule';
+import { buildDepositSchedule, type ScheduleDeps } from './schedule';
+import {
+  generateAnnuitySchedule,
+  calculatePaymentBreakdown,
+  calculateRemainingPrincipal,
+  buildPaymentPeriod,
+  resolvePaymentShift,
+  type ShiftedPayment,
+} from './creditCalculations';
 import { round2 } from './money';
 import { parseDateStr, withDayClamped } from './dateMath';
+import { normalizeDateStr } from '../utils';
 import { getDepositInitialAmount } from './depositCalculations';
 import {
-  PaymentStatus, RecordType, DepositStatus, DepositAccrualType, CreditStatus,
+  PaymentStatus, RecordType, DepositStatus, DepositAccrualType, CreditStatus, DayCountConvention,
 } from '../constants';
 
 export interface AutoTxLabels {
@@ -180,6 +189,56 @@ function processDeposit(
   return { deposit: { ...deposit, accruals, amount, status }, changed: true };
 }
 
+function hasFullBreakdown(p: CreditPayment): boolean {
+  return p.remainingDebt !== undefined
+    && p.principalPart !== undefined
+    && p.interestPart !== undefined;
+}
+
+function backfillSettledBreakdowns(
+  credit: CreditRecord,
+  payments: CreditPayment[],
+  settled: CreditPayment[],
+): CreditPayment[] {
+  if (!settled.some(p => !hasFullBreakdown(p))) return payments;
+
+  const settledIds = new Set(settled.map(p => p.id));
+  const convention = credit.dayCountConvention ?? DayCountConvention.ACTUAL;
+  let runningPrincipal = credit.originalAmount;
+  let prevDueDate = normalizeDateStr(credit.startDate);
+  let pendingShift: ShiftedPayment | undefined;
+
+  return payments.map((p, idx) => {
+    const isLast = idx === payments.length - 1;
+    const prevPrincipalBefore = runningPrincipal;
+    let updated = p;
+
+    const period = buildPaymentPeriod(prevDueDate, p.dueDate, convention, pendingShift);
+
+    if (settledIds.has(p.id) && !hasFullBreakdown(p)) {
+      const breakdown = calculatePaymentBreakdown(runningPrincipal, p.amount, credit.interestRate, isLast, period);
+      updated = {
+        ...p,
+        principalPart: p.principalPart ?? breakdown.principalPart,
+        interestPart: p.interestPart ?? breakdown.interestPart,
+        remainingDebt: p.remainingDebt ?? breakdown.remainingDebt,
+      };
+      runningPrincipal = updated.remainingDebt ?? breakdown.remainingDebt;
+    } else if (p.remainingDebt !== undefined) {
+      runningPrincipal = p.remainingDebt;
+    } else {
+      const breakdown = calculatePaymentBreakdown(runningPrincipal, p.amount, credit.interestRate, isLast, period);
+      runningPrincipal = breakdown.remainingDebt;
+    }
+
+    pendingShift = updated.status === PaymentStatus.PAID
+      ? resolvePaymentShift(convention, prevPrincipalBefore, updated.dueDate, updated.paidDate)
+      : undefined;
+    prevDueDate = updated.dueDate;
+    return updated;
+  });
+}
+
 function processCredit(
   credit: CreditRecord, mirror: RecordMirror, deps: AutoTxDeps,
 ): { credit: CreditRecord; changed: boolean } {
@@ -189,7 +248,22 @@ function processCredit(
   let payments: CreditPayment[] = credit.payments;
 
   if (!payments.length) {
-    payments = buildCreditSchedule(credit, deps);
+    if (credit.monthlyPayment <= 0 || credit.termMonths <= 0 || credit.originalAmount <= 0) {
+      return { credit, changed: false };
+    }
+    const schedule = generateAnnuitySchedule({
+      originalAmount: credit.originalAmount,
+      interestRate: credit.interestRate,
+      termMonths: credit.termMonths,
+      monthlyPayment: credit.monthlyPayment,
+      startDate: credit.startDate,
+      paymentDay: credit.paymentDay,
+      dayCountConvention: credit.dayCountConvention ?? DayCountConvention.ACTUAL,
+      firstPaymentInterestOnly: credit.firstPaymentInterestOnly,
+      today: deps.today,
+      newId: deps.newId,
+    });
+    payments = schedule.payments;
     if (!payments.length) return { credit, changed: false };
     changed = true;
   } else {
@@ -198,7 +272,7 @@ function processCredit(
       const pendingWithWrongDay = payments.filter(p => {
         if (p.status !== PaymentStatus.PENDING) return false;
         const parsed = parseDateStr(p.dueDate);
-        return parsed !== null && parsed.day !== paymentDay;
+        return parsed !== null && withDayClamped(p.dueDate, paymentDay) !== p.dueDate;
       });
       if (pendingWithWrongDay.length > 0) {
         // Fix only the specific payments with wrong day, preserve manual edits to others
@@ -216,7 +290,7 @@ function processCredit(
     }
     const due = settleDue(payments, deps.today);
     if (due.settled.length) {
-      payments = due.items;
+      payments = backfillSettledBreakdowns(credit, due.items, due.settled);
       changed = true;
     }
   }
@@ -241,8 +315,11 @@ function processCredit(
     : credit.status;
   if (status !== credit.status) changed = true;
 
+  const currentAmount = calculateRemainingPrincipal({ ...credit, payments, status });
+  if (currentAmount !== credit.currentAmount) changed = true;
+
   if (!changed) return { credit, changed: false };
-  return { credit: { ...credit, payments, status }, changed: true };
+  return { credit: { ...credit, payments, status, currentAmount }, changed: true };
 }
 
 /**

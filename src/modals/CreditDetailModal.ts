@@ -192,7 +192,7 @@ export class CreditDetailModal extends FinanceBaseModal {
           }
         }
         const breakdown = calculatePaymentBreakdown(
-          this.credit.currentAmount,
+          calculateRemainingPrincipal(this.credit),
           payment.amount,
           this.credit.interestRate,
           false,

@@ -4,7 +4,7 @@ import {
   DEPOSIT_TERM_DEFAULT_MONTHS, DEPOSIT_TERM_MAX_MONTHS,
   CREDIT_CALC_DEBOUNCE_MS, DAY_OF_MONTH_MAX,
 } from './types';
-import { calculateAnnuityPayment, generateAnnuitySchedule } from './domain/creditCalculations';
+import { calculateAnnuityPayment, calculateRemainingPrincipal, generateAnnuitySchedule } from './domain/creditCalculations';
 import { fmtAmount, parseAmount, getTodayStr, normalizeDateStr } from './utils';
 import { parseDateStr } from './domain/dateMath';
 import { round2 } from './domain/money';
@@ -52,6 +52,7 @@ export class CreditModal extends EntityModal<CreditRecord> {
               paidDate: p.paidDate ? normalizeDateStr(p.paidDate) : undefined,
             })),
             dayCountConvention: opts.credit.dayCountConvention,
+            firstPaymentInterestOnly: opts.credit.firstPaymentInterestOnly,
           }
         : {
             id: crypto.randomUUID(),
@@ -75,6 +76,7 @@ export class CreditModal extends EntityModal<CreditRecord> {
             downPaymentValue: 0,
             downPaymentDate: '',
             isEscrow: false,
+            firstPaymentInterestOnly: false,
             dayCountConvention: DayCountConvention.ACTUAL,
           },
       isEdit: !!opts.credit,
@@ -144,6 +146,7 @@ export class CreditModal extends EntityModal<CreditRecord> {
     const typeSel = this.buildTypeSelect(row4);
 
     this.buildPaymentDayField(form);
+    this.buildFirstPaymentInterestOnlyRow(form);
     this.buildEscrowRow(form, typeSel);
 
     const row5 = form.createDiv('finance-form-row finance-full-width');
@@ -222,6 +225,20 @@ export class CreditModal extends EntityModal<CreditRecord> {
     this.paymentDayInput.addEventListener('change', () => {
       const v = parseInt(this.paymentDayInput.value);
       this.entity.paymentDay = (v >= 1 && v <= DAY_OF_MONTH_MAX) ? v : defaultDay;
+    });
+  }
+
+  private buildFirstPaymentInterestOnlyRow(form: HTMLElement): void {
+    const row = form.createDiv('finance-form-row finance-full-width');
+    const group = row.createDiv('finance-field-group finance-full-width');
+    const label = group.createEl('label', { cls: 'finance-checkbox-label' });
+    const checkbox = label.createEl('input', { type: 'checkbox', cls: CSS_CLASS.FINANCE_CHECKBOX });
+    checkbox.checked = this.entity.firstPaymentInterestOnly ?? false;
+    label.createSpan({ text: this.tr.firstPaymentInterestOnlyLabel });
+    group.createEl('p', { text: this.tr.firstPaymentInterestOnlyDesc, cls: CSS_CLASS.FINANCE_FIELD_HINT });
+
+    checkbox.addEventListener('change', () => {
+      this.entity.firstPaymentInterestOnly = checkbox.checked;
     });
   }
 
@@ -413,7 +430,8 @@ export class CreditModal extends EntityModal<CreditRecord> {
       initial?.termMonths !== credit.termMonths ||
       initial?.monthlyPayment !== credit.monthlyPayment ||
       initial?.startDate !== credit.startDate ||
-      initial?.paymentDay !== credit.paymentDay;
+      initial?.paymentDay !== credit.paymentDay ||
+      initial?.firstPaymentInterestOnly !== credit.firstPaymentInterestOnly;
 
     if (!hadConvention || financialParamsChanged) {
       if (credit.termMonths > 0 && credit.monthlyPayment > 0) {
@@ -426,12 +444,19 @@ export class CreditModal extends EntityModal<CreditRecord> {
           paymentDay: credit.paymentDay,
           existingPayments: credit.payments,
           dayCountConvention: credit.dayCountConvention,
+          firstPaymentInterestOnly: credit.firstPaymentInterestOnly,
+          recalculateAll: this.isEdit && financialParamsChanged,
+          previousMonthlyPayment: initial?.monthlyPayment,
         });
         credit.payments = schedule.payments;
         credit.currentAmount = schedule.currentAmount;
       } else {
         credit.currentAmount = credit.originalAmount;
       }
+    }
+
+    if (credit.payments.length > 0) {
+      credit.currentAmount = calculateRemainingPrincipal(credit);
     }
 
     return credit;

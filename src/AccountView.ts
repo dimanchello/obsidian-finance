@@ -6,6 +6,7 @@ import {
 } from './types';
 import { getTodayStr, getTodayTime } from './utils';
 import { applyAutoTransactions, type AutoTxDeps } from './domain/autoTransactions';
+import { reconcileAllDebts, type DebtRecordLabels } from './domain/debtReconciliation';
 import { RecordModal } from './RecordModal';
 import { ViewContext } from './context';
 import { AccountHeader } from './AccountHeader';
@@ -280,11 +281,33 @@ export class AccountView extends MarkdownRenderChild {
       };
 
       const result = applyAutoTransactions(data, deps);
-      if (!result.changed.records && !result.changed.deposits && !result.changed.credits) return;
+      const debtLabels: DebtRecordLabels = {
+        debtDefaultCat: this.ctx.tr.debtDefaultCat,
+        debtRepayNote: this.ctx.tr.debtRepayNote,
+        debtInterestNote: this.ctx.tr.debtInterestNote,
+        debtInterestCategory: this.ctx.tr.debtInterestCategory,
+      };
+      const debtResult = reconcileAllDebts(
+        data.debts,
+        result.records,
+        debtLabels,
+        { newId: deps.newId, now: deps.now }
+      );
 
-      this.ctx.data = { ...data, records: result.records, deposits: result.deposits, credits: result.credits };
+      const recordsChanged = result.changed.records || debtResult.changed.records;
+      const debtsChanged = debtResult.changed.debts;
+      if (!recordsChanged && !result.changed.deposits && !result.changed.credits && !debtsChanged) return;
 
-      if (result.changed.records) await this.storage.saveAllRecords(this.accountId, result.records);
+      this.ctx.data = {
+        ...data,
+        records: debtResult.records,
+        debts: debtResult.debts,
+        deposits: result.deposits,
+        credits: result.credits,
+      };
+
+      if (recordsChanged) await this.storage.saveAllRecords(this.accountId, debtResult.records);
+      if (debtsChanged) await this.storage.saveAllDebts(this.accountId, debtResult.debts);
       if (result.changed.deposits) await this.storage.saveAllDeposits(this.accountId, result.deposits);
       if (result.changed.credits) await this.storage.saveAllCredits(this.accountId, result.credits);
     } finally {
