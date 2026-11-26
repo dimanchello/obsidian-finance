@@ -83,6 +83,13 @@ describe('fmtAmount and parseAmount', () => {
     expect(fmtAmount('1000.5')).toBe('1\u00a0000,5');
     expect(fmtAmount('1234567')).toBe('1\u00a0234\u00a0567');
   });
+
+  it('adds leading zero and keeps two decimal digits when formatting fractional strings', () => {
+    expect(fmtAmount('.5')).toBe('0,5');
+    expect(fmtAmount('1,2.3')).toBe('1,23');
+    expect(fmtAmount('0')).toBe('0');
+    expect(fmtAmount('')).toBe('');
+  });
 });
 
 describe('Date/Time Unified Helpers', () => {

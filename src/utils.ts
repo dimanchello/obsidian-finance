@@ -1,13 +1,24 @@
 import { addMonthsClamped } from './domain/dateMath';
+import {
+  DEFAULT_NUMBER_LOCALE,
+  DATE_FORMAT_LENGTH,
+  DECIMAL_PLACES,
+  DECIMAL_SEPARATOR,
+  INPUT_ATTR,
+  STRING_SEPARATOR,
+} from './constants';
 
 export function fmtAmount(raw: string): string {
   const clean = raw.replace(/[^\d.,]/g, '');
   const dotPos = clean.search(/[.,]/);
   let intPart  = dotPos >= 0 ? clean.slice(0, dotPos)  : clean;
   let decPart  = dotPos >= 0 ? clean.slice(dotPos + 1) : '';
-  decPart = decPart.slice(0, 2).replace(/[.,]/g, '');
-  intPart = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0');
-  return decPart.length > 0 ? `${intPart},${decPart}` : intPart;
+  decPart = decPart.replace(/[.,]/g, '').slice(0, DECIMAL_PLACES);
+  if (decPart.length > 0 && intPart.length === 0) {
+    intPart = INPUT_ATTR.PLACEHOLDER_ZERO;
+  }
+  intPart = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, STRING_SEPARATOR.NBSP);
+  return decPart.length > 0 ? `${intPart}${DECIMAL_SEPARATOR.INPUT}${decPart}` : intPart;
 }
 
 export function parseAmount(s: string): number {
@@ -66,8 +77,6 @@ export function parseDate(d: string): Date | null {
   }
   return null;
 }
-
-import { DEFAULT_NUMBER_LOCALE, DATE_FORMAT_LENGTH } from './constants';
 
 export function normalizeDateStr(d: string): string {
   const parsed = parseDate(d);

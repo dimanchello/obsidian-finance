@@ -221,6 +221,7 @@ export const STRING_SEPARATOR = {
   COMMA: ',',
   NEWLINE: '\n',
   SPACE: ' ',
+  NBSP: '\u00a0',
 } as const;
 
 /** Decimal separator conventions: user input vs normalized form for parseFloat. */
